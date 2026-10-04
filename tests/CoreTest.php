@@ -33,6 +33,10 @@ return [
         $names = Packs::enabled(['packs' => ['disabled' => []], 'root' => ['disabled' => true]]);
         check(!in_array('root', $names, true) && in_array('pmss', $names, true), 'root.disabled must leave the root pack out');
     },
+    'soul stays within its size budget (sent to the model on every turn)' => function () {
+        $s = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
+        check(strlen($s) <= 8000, 'SOUL.md is ' . strlen($s) . ' bytes; keep it at or under 8000');
+    },
     'soul starts with what this machine allows, and nothing else from the profile' => function () {
         $p = ['pmss' => true, 'root' => ['available' => false, 'via' => 'none'], 'apps' => ['secretapp'], 'user' => 'someone'];
         $s = HermesConfig::renderSoul($p, Config::defaults());
