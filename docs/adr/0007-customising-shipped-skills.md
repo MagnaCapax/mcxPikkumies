@@ -27,7 +27,7 @@ Separately, the first live run showed the model saving a lesson with Hermes's bu
 
 ## Consequences
 - The README and the shipped `update` skill now give advice that works.
-- Whether the rename changes which memory the model uses is not proven until the same "save a lesson" request is run live again; until then the routing is changed but unverified.
+- Checked live on 2026-10-04 after the rename (one run, same kind of request that failed before): the lesson was saved as a file in `pikkumies/memory/` and the built-in memory was not touched.
 - The tool-name list in the test is tied to Hermes 0.19.0 and is re-checked when the pin moves (ADR-0008).
 
 ## References
