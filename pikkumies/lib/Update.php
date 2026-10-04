@@ -6,9 +6,12 @@
  */
 class Update
 {
+    /** @var string|null test seam: a checkout other than this one */
+    public static $root = null;
+
     public static function repoRoot()
     {
-        return dirname(Config::root());
+        return self::$root !== null ? self::$root : dirname(Config::root());
     }
 
     public static function git(array $args, &$code = null)
@@ -33,7 +36,10 @@ class Update
             return [false, "tracked files were changed locally; update stopped so nothing is overwritten:\n" . implode("\n", $dirty) . "\nMove your changes to local/ (or a local skill) and run update again."];
         }
         $before = trim(implode('', self::git(['rev-parse', '--short', 'HEAD'])));
-        $fetch = self::git(['fetch', '--depth', '1', 'origin', 'main'], $code);
+        // No --depth: on a shallow clone a depth-1 fetch grafts the new tip as a parentless root,
+        // so the fast-forward sees unrelated histories. A plain fetch stops at the existing shallow
+        // boundary and downloads only the new commits.
+        $fetch = self::git(['fetch', 'origin', 'main'], $code);
         if ($code !== 0) {
             return [false, "fetch failed:\n" . implode("\n", $fetch)];
         }

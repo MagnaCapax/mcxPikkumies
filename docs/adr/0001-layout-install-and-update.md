@@ -20,8 +20,8 @@ Pikkumies runs on the machine it manages, as the user. It must be quick to insta
   - `packs/` holds the bundles, plus a generated `INDEX.md` and a `README.md`.
   - `docs/adr/` and `tests/` sit at the root.
 - **Install.** `git clone --depth 1 <repo> ~/.mcxPikkumies && ~/.mcxPikkumies/pikkumies/bin/pikkumies install`. The installer links `~/pikkumies` to the runtime directory. It needs no root and returns quickly, while the Hermes virtualenv builds in the background.
-- **State.** All user and agent state is gitignored: `pikkumies/local/` (config, profile, Hermes home, logs), the user lessons directory under `pikkumies/memory/`, and `pikkumies/include/hermes/`. Tracked files are never written at runtime.
-- **Update.** `pikkumies update` stops and lists the files if any tracked file was edited. Otherwise it fetches `origin/main` and fast-forwards only, never stashing, merging, rebasing or resetting. Release tags and channels come later, when there is a release to pin.
+- **State.** All user and agent state is gitignored: `pikkumies/local/` (config, profile, Hermes home, logs), the user lesson files in `pikkumies/memory/`, and `pikkumies/include/hermes/`. Tracked files are never written at runtime.
+- **Update.** `pikkumies update` stops and lists the files if any tracked file was edited. Otherwise it fetches `origin/main` (a plain fetch, never `--depth 1`: on a shallow clone that grafts the new tip as a parentless root and the fast-forward fails) and fast-forwards only, never stashing, merging, rebasing or resetting. Release tags and channels come later, when there is a release to pin.
 - **Code.** PHP compatible with 7.3 (hosts may run older distributions), no Composer dependencies, camelCase.
 
 ## Consequences

@@ -45,4 +45,29 @@ return [
         check(trim($out) === '', 'unrelated query matched');
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'update: fast-forwards a depth-1 clone, refuses local edits' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-upd-' . getmypid();
+        $g = function ($dir, $args) {
+            exec('git -C ' . escapeshellarg($dir) . ' -c user.name=t -c user.email=t@t ' . $args . ' 2>&1', $o, $c);
+            check($c === 0, "git $args: " . implode(' ', $o));
+            return trim(implode("\n", $o));
+        };
+        @mkdir("$tmp/src", 0700, true);
+        $g("$tmp/src", 'init -q -b main');
+        file_put_contents("$tmp/src/a.txt", "1\n");
+        $g("$tmp/src", 'add a.txt');
+        $g("$tmp/src", 'commit -q -m one');
+        $g($tmp, 'clone -q --depth 1 file://' . "$tmp/src" . ' co');
+        file_put_contents("$tmp/src/a.txt", "2\n");
+        $g("$tmp/src", 'commit -q -am two');
+        Update::$root = "$tmp/co";
+        list($ok, $msg) = Update::run();
+        check($ok && strpos($msg, 'updated') === 0, 'shallow update failed: ' . $msg);
+        check(file_get_contents("$tmp/co/a.txt") === "2\n", 'content not updated');
+        file_put_contents("$tmp/co/a.txt", "local\n");
+        list($ok) = Update::run();
+        check(!$ok && file_get_contents("$tmp/co/a.txt") === "local\n", 'local edit not protected');
+        Update::$root = null;
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
 ];
