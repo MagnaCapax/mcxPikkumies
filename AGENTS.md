@@ -15,4 +15,5 @@ A lightweight helper agent that runs on the server it manages: as the user by de
 - **Privilege comes from the OS, never from the agent's own config.** Root is detected (ADR-0004). Anything that must be enforced is enforced by the OS or by the server the agent talks to, never by a setting the agent's user can edit. Hooks are safety prompts, not security.
 - **Privacy.** The agent works on its user's data at that user's request. It never sends anything off the machine that the user did not ask it to. Detection reads only the user's own processes.
 - **Keep it small.** Each feature has to earn its lines. If the OS, Hermes or an existing tool already does it, leave it there.
+- **Skills, tools, hooks, packs:** follow `pikkumies/doctrine/SOP/make-a-skill-tool-hook-or-pack.md`.
 - **Tests:** `php tests/run.php` must pass; CI runs it on PHP 7.3, 8.2 and 8.4.

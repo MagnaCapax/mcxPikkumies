@@ -32,7 +32,7 @@ Check everything with `~/pikkumies/bin/pikkumies doctor`, then start the agent w
 ~/pikkumies/bin/pikkumies update
 ```
 
-Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. To customise a shipped skill, copy it to a local skill under a new name and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
+Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
 
 ## Commands
 

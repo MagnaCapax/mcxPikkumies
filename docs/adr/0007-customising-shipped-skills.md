@@ -21,7 +21,7 @@ Separately, the first live run showed the model saving a lesson with Hermes's bu
 - **Delete our lessons skill and use the built-in memory.** Loses searchable, long-form lessons and the lessons packs ship.
 
 ## Decision
-- To change a shipped skill, copy it to a local skill under a new name (in `$HERMES_HOME/skills/`, which is `local/hermes/skills/`) and list the shipped name in `skills.disabled` in `local/config.php`. Pikkumies writes that list into the generated Hermes config. Never reuse a shipped name.
+- To change a shipped skill, copy it to a local skill under a new name (in `$HERMES_HOME/skills/`, which is `local/hermes/skills/`), set the copy's frontmatter `name:` to the new name (Hermes matches that field, not the directory: `agent/prompt_builder.py`, `tools/skills_tool.py`), and list the shipped name in `skills.disabled` in `local/config.php`. Pikkumies writes that list into the generated Hermes config. Never reuse a shipped name.
 - The core skill `memory` is renamed `lessons`. Its description starts with "Lessons:" and says to use it, not the built-in memory tool, for how a problem got solved. The doctrine's "what goes where" section says the same. The lesson files stay in `pikkumies/memory/` and the tool stays at `tools/memory/memory.php`, so existing lessons and commands keep working.
 - A contract test checks every shipped skill the way Hermes reads it: the frontmatter parses, `name` equals its directory, the description fits in 1,024 characters (Hermes cuts longer ones silently), no name exists twice, and no skill is named like a Hermes 0.19.0 tool.
 

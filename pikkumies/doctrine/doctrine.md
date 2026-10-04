@@ -14,4 +14,4 @@ A confident wrong answer is worse than "I don't know".
 
 - Short facts and user preferences: your built-in memory tool.
 - How a problem got solved: a lesson. To save or find a lesson, use the lessons skill, never the built-in memory tool.
-- A procedure you will repeat: a skill, or an SOP in doctrine/SOP/.
+- A procedure you will repeat: a skill, or an SOP in doctrine/SOP/. To make a skill, tool or hook, follow doctrine/SOP/make-a-skill-tool-hook-or-pack.md.
