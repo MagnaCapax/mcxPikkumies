@@ -14,7 +14,7 @@ git clone --depth 1 https://github.com/MagnaCapax/mcxPikkumies ~/.mcxPikkumies
 The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, root access, running apps, resources);
-- enables matching packs and writes the agent's configuration;
+- writes the agent's configuration with every pack loaded, and tells the agent what this machine allows;
 - builds the Hermes Agent environment in the background.
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
@@ -32,13 +32,13 @@ Check everything with `~/pikkumies/bin/pikkumies doctor`, then start the agent w
 ~/pikkumies/bin/pikkumies update
 ```
 
-Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. To customise a shipped skill, create a local skill with the same name instead of editing the original.
+Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. To customise a shipped skill, copy it to a local skill under a new name and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `pikkumies install` | Detect, enable packs, write config, build Hermes in the background |
+| `pikkumies install` | Detect the machine, write config (every pack is loaded), build Hermes in the background |
 | `pikkumies update` | Fast-forward to the latest version; refuses to overwrite local edits |
 | `pikkumies detect` | Print the machine profile (JSON) |
 | `pikkumies doctor` | Show provider, masked key, Hermes and pack status |
@@ -49,7 +49,7 @@ Updates fast-forward to the latest `main`. Your own state is never touched: conf
 
 - **It runs as you.** By default it works under the user's own account, inside that user's slice of the server. Root access is one more capability layer on top of that. When the agent detects sudo or root deterministically, it can do full server administration. When it doesn't, it manages only that slice. A config switch turns the root layer off.
 - **It knows where to look.** Basic memory (lessons), knowledge sources, and a small doctrine: verify before claiming, cite the source, ask before anything destructive.
-- **It grows by packs.** Skills, tools and hooks come in packs that are enabled automatically from what the machine looks like.
+- **It grows by packs.** Skills, tools and hooks come in packs. Every pack is loaded on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0006).
 - **Your model, your keys.** It talks to any OpenAI-compatible endpoint. A deployment chooses its own provider and keys.
 - **It is not only for sysadmin work.** General investigation and research are in scope too.
 

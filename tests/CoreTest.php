@@ -24,21 +24,25 @@ return [
         check($m['a']['b'] === 9 && $m['a']['c'] === 2, 'nested merge wrong');
         check($m['l'] === ['y', 'z'], 'list not replaced');
     },
-    'pack detect rules' => function () {
-        $profile = ['pmss' => true, 'root' => ['available' => false], 'apps' => ['rtorrent']];
-        $cfg = ['root' => ['disabled' => false]];
-        check(!Packs::matches([], $profile, $cfg), 'empty rule matched');
-        check(Packs::matches(['pmss' => true], $profile, $cfg), 'pmss');
-        check(!Packs::matches(['root' => true], $profile, $cfg), 'root without root');
-        check(Packs::matches(['apps' => ['rtorrent']], $profile, $cfg), 'apps');
-        $rootProfile = ['pmss' => false, 'root' => ['available' => true], 'apps' => []];
-        check(!Packs::matches(['root' => true], $rootProfile, ['root' => ['disabled' => true]]), 'root disabled ignored');
+    'packs: every pack loads; packs.disabled and root.disabled leave packs out' => function () {
+        $all = array_keys(Packs::all());
+        check(in_array('root', $all, true) && in_array('pmss', $all, true), 'shipped packs missing');
+        check(Packs::enabled(Config::defaults()) === $all, 'defaults must load every pack');
+        $names = Packs::enabled(['packs' => ['disabled' => ['pmss']], 'root' => ['disabled' => false]]);
+        check(!in_array('pmss', $names, true) && in_array('root', $names, true), 'packs.disabled ignored');
+        $names = Packs::enabled(['packs' => ['disabled' => []], 'root' => ['disabled' => true]]);
+        check(!in_array('root', $names, true) && in_array('pmss', $names, true), 'root.disabled must leave the root pack out');
     },
-    'shipped packs: auto-enable on a pmss box without root' => function () {
-        $profile = ['pmss' => true, 'root' => ['available' => false], 'apps' => []];
-        $names = Packs::enabled($profile, ['packs' => ['enabled' => [], 'auto' => true], 'root' => ['disabled' => false]]);
-        check(in_array('pmss', $names, true), 'pmss not enabled');
-        check(!in_array('root', $names, true), 'root enabled without root');
+    'soul starts with what this machine allows, and nothing else from the profile' => function () {
+        $p = ['pmss' => true, 'root' => ['available' => false, 'via' => 'none'], 'apps' => ['secretapp'], 'user' => 'someone'];
+        $s = HermesConfig::renderSoul($p, Config::defaults());
+        check(strpos($s, "# This machine\n\n- Root: not available") === 0, 'capability block must open SOUL.md');
+        check(strpos($s, '- PMSS seedbox platform: yes') !== false, 'pmss line');
+        check(strpos($s, 'secretapp') === false && strpos($s, 'someone') === false, 'profile details leaked into SOUL.md');
+        $r = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
+        check(strpos($r, 'Root: available (via sudo)') !== false, 'root via sudo');
+        $off = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => true, 'via' => 'sudo']], ['root' => ['disabled' => true]]);
+        check(strpos($off, 'turned off in config') !== false && strpos($off, 'available (via') === false, 'root.disabled must win over detection');
     },
     'packs index lists every pack' => function () {
         $idx = Packs::renderIndex();
@@ -61,6 +65,10 @@ return [
         check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n") !== false && strpos($y, '/h/g.php') !== false, 'hook with consent');
         $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);
         check(strpos($noHooks, 'hooks_auto_accept') === false, 'no consent line without hooks');
+        check(strpos($noHooks, 'disabled:') === false, 'no disabled list when none set');
+        $off = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], ['seedbox-apps']);
+        check(strpos($off, "skills:\n  external_dirs:\n    - \"/a/skills\"\n  disabled:\n    - \"seedbox-apps\"\n") !== false, 'skills.disabled must render under skills:');
+        check(strpos($y, 'fail_closed') === false, 'fail_closed is never read by Hermes 0.19.0');
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');

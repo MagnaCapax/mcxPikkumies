@@ -28,14 +28,21 @@ function profile()
 function generate(array $profile)
 {
     $config = Config::load();
-    $packs = Packs::enabled($profile, $config);
-    HermesConfig::write($config, $packs);
+    $packs = Packs::enabled($config);
+    HermesConfig::write($config, $packs, $profile);
     return $packs;
 }
 
 function hermesBin()
 {
     return Config::root() . '/include/hermes/bin/hermes';
+}
+
+/** Installed Hermes version, read from the venv's package metadata (no Python start-up). */
+function hermesVersion()
+{
+    $dirs = (array) glob(Config::root() . '/include/hermes/lib/python3*/site-packages/hermes_agent-*.dist-info');
+    return $dirs && preg_match('/hermes_agent-(.+)\.dist-info$/', (string) $dirs[0], $m) ? $m[1] : 'unknown';
 }
 
 /** Build the Hermes venv in the background so install returns immediately. */
@@ -69,7 +76,7 @@ switch ($cmd) {
         out('pikkumies installed at ' . Config::root());
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
-        out('  packs enabled: ' . (implode(', ', $packs) ?: 'none'));
+        out('  packs: ' . (implode(', ', $packs) ?: 'none'));
         out('  hermes: ' . buildHermesInBackground(Config::load()));
         out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
         break;
@@ -96,8 +103,8 @@ switch ($cmd) {
         out('key:      ' . Provider::mask($prov['key']));
         out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
         out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
-        out('hermes:   ' . (is_file(hermesBin()) ? 'installed' : 'not installed yet'));
-        out('packs:    ' . implode(', ', Packs::enabled(profile(), $config)));
+        out('hermes:   ' . (is_file(hermesBin()) ? 'installed ' . hermesVersion() . ' (pinned ' . $config['hermes']['version'] . ')' : 'not installed yet'));
+        out('packs:    ' . (implode(', ', Packs::enabled($config)) ?: 'none'));
         break;
 
     case 'packs':

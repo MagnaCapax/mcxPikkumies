@@ -1,9 +1,9 @@
 ---
-name: memory
-description: Search past lessons before solving a problem, and save a lesson after solving one. Use at the start of any troubleshooting task and whenever you learned something worth keeping.
+name: lessons
+description: "Lessons: search how past problems on this machine were solved before you start troubleshooting, and save a lesson after you solve something non-obvious. Use this, not the built-in memory tool, for anything about how a problem got solved."
 ---
 
-# Memory
+# Lessons
 
 1. Before you start: search for the problem in plain words.
    `php ~/pikkumies/tools/memory/memory.php search "<what is wrong>"`
@@ -12,4 +12,4 @@ description: Search past lessons before solving a problem, and save a lesson aft
    `php ~/pikkumies/tools/memory/memory.php save "<short title>" /tmp/lesson.md --tags <a,b> --sources "<commands or files you used>"`
 3. If `save` prints related lessons, link the relevant ones in the body as `[short description](file.md)`.
 
-Short facts about the user go to your built-in memory, not here. Lessons are for "how this got solved".
+The built-in memory tool is small and goes into every turn, so it holds only short facts about the user and their preferences. Lessons live here, as files you can search.

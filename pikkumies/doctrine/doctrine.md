@@ -12,6 +12,6 @@ A confident wrong answer is worse than "I don't know".
 
 ## Memory: what goes where
 
-- Short facts and user preferences: your built-in memory.
-- How a problem got solved: a lesson (memory skill).
+- Short facts and user preferences: your built-in memory tool.
+- How a problem got solved: a lesson. To save or find a lesson, use the lessons skill, never the built-in memory tool.
 - A procedure you will repeat: a skill, or an SOP in doctrine/SOP/.

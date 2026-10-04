@@ -13,4 +13,4 @@ Run `~/pikkumies/bin/pikkumies update`.
 - **"cannot fast-forward"**: the checkout's history differs from upstream. Report it to the user. Do not try to repair the git history yourself.
 - **"fetch failed"**: usually no network or no access to the repository. Report the error text.
 
-Never edit files under `~/pikkumies` that git tracks. To change how a shipped skill behaves, create a local skill with the same name instead; local skills take precedence over shipped ones.
+Never edit files under `~/pikkumies` that git tracks. To change how a shipped skill behaves, make a local copy under a new name (for example `seedbox-apps-local`) in `~/pikkumies/local/hermes/skills/`, then turn the shipped one off by adding its name to `skills.disabled` in `~/pikkumies/local/config.php` (the Hermes config is regenerated from it). Do not reuse the shipped name: Hermes refuses to load a skill name that exists twice (ADR-0007).

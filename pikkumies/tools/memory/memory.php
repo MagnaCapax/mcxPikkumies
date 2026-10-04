@@ -6,7 +6,7 @@
  *   php memory.php search "<query>" [--limit 5]
  *
  * Lessons: ../../memory/YYYYMMDD-slug.md (user data, gitignored) plus read-only
- * lessons shipped by enabled packs (packs/<name>/memory/). Frontmatter: tags, sources.
+ * lessons shipped by packs (packs/<name>/memory/). Frontmatter: tags, sources.
  * Search: whole words, stopwords dropped, all terms required (a quarter may miss at 5+ terms),
  * score divided by sqrt(length), inline-link boost only for files that already matched.
  * The link graph is built at query time; there is no index file to go stale.

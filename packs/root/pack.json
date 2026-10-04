@@ -1,1 +1,1 @@
-{"name": "root", "description": "Full server administration when root is available: packages, services, users, firewall.", "detect": {"root": true}}
+{"name":"root","description":"Full server administration when root is available: packages, services, users, firewall."}

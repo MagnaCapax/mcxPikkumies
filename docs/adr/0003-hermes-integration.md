@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted; the provider key wiring, hook consent and guard action are superseded by ADR-0005
+- Status: Accepted; the provider key wiring, hook consent and guard action are superseded by ADR-0005, the same-name skill override by ADR-0007, and pack doctrine fragments by ADR-0006
 
 ## Context
 Hermes Agent (MIT, NousResearch) is the harness. Pikkumies must wire its skills, hooks and doctrine into Hermes without forking it. It must also keep Hermes state out of git and avoid Python in this repository.
