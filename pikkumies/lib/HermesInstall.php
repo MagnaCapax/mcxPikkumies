@@ -112,6 +112,23 @@ class HermesInstall
         return 'building ' . $tag . ' in the background (log: local/install.log)';
     }
 
+    /**
+     * True when one of this user's processes runs from $dir: a session started before a switch
+     * keeps using its build (the agent can run update from inside a session), so it must stay.
+     */
+    public static function inUse($dir)
+    {
+        $dir = rtrim($dir, '/') . '/';
+        foreach ((array) glob('/proc/[0-9]*', GLOB_ONLYDIR) as $p) {
+            $exe = (string) @readlink($p . '/exe');
+            $cmd = str_replace("\0", ' ', (string) @file_get_contents($p . '/cmdline'));
+            if (strpos($exe, $dir) === 0 || strpos($cmd, $dir) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Remove our own builds that are neither current nor the pinned one (run by update). */
     public static function cleanup(array $config)
     {
@@ -119,7 +136,7 @@ class HermesInstall
         $removed = [];
         foreach ((array) glob(self::includeDir() . '/hermes-*', GLOB_ONLYDIR) as $dir) {
             $tag = substr(basename($dir), strlen('hermes-'));
-            if (in_array($tag, $keep, true) || is_link($dir)) {
+            if (in_array($tag, $keep, true) || is_link($dir) || self::inUse($dir)) {
                 continue;
             }
             exec('rm -rf ' . escapeshellarg($dir), $o, $code);

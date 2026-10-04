@@ -23,14 +23,15 @@ ADR-0008 pinned Hermes 0.19.0 from PyPI. That channel is a dead end:
 - `hermes.version` is a release tag and `hermes.sha256` the checksum of that tag's source tarball (`https://github.com/NousResearch/hermes-agent/archive/refs/tags/<tag>.tar.gz`). Default: `v2026.9.24` (Hermes 0.21.5).
 - The build runs in the background under a lock (`include/.hermes-build.lock`) and logs to `local/install.log`. Into `include/hermes-<tag>/` it: downloads the tarball, verifies the checksum before unpacking, unpacks without the top-level `tests/`, `website/` and `apps/` directories (nested directories with those names are kept: the terminal UI has its own `apps/`), creates a venv, runs `pip install -e`, and marks the build complete. Only then does it switch `include/hermes` to the new venv with an atomic rename. A failed build never replaces a working one.
 - With no `.git` in the source tree, `hermes update` refuses ("Not a git repository"), so the pin holds without tricks. `pikkumies run update` is refused with a pointer to `pikkumies update`, the generated config sets `updates.check: false`, and the update skill tells the agent never to run Hermes's updater or installer.
-- `pikkumies update` builds a newly pinned release and removes old builds that are neither current nor pinned. An install from before this ADR (a plain venv in `include/hermes`) is moved aside to `include/hermes-legacy` at the switch and removed by the next update.
+- `pikkumies update` builds a newly pinned release and removes old builds that are neither current, pinned, nor in use by a running process of the user (a session started before a switch keeps its build). An install from before this ADR (a plain venv in `include/hermes`) is moved aside to `include/hermes-legacy` at the switch and removed by the next update.
 - Install and doctor check Python first: Hermes needs 3.11 to 3.13, so an older system (Debian 11 has 3.9) gets a clear message instead of a failing build.
 - The core skill `update` is renamed `pikkumies-update`: Hermes has a built-in `/update` command. The contract test now checks skill names against every name Hermes v0.21.5 uses: registered tools, toolsets and built-in commands.
 
 ## Consequences
-- About 83 MB of source and 190 MB of venv per user, against about 290 MB for a clone and 430 MB for the official installer.
+- About 83 MB of source and 190 MB of venv per user (a shallow clone alone is about 290 MB).
 - Dependencies are resolved by pip within Hermes's declared versions, not from its lock file. Most direct dependencies are pinned exactly in `pyproject.toml`; transitive ones are not.
 - GitHub generates tag tarballs on the fly. If one ever changes, the checksum fails and the build stops with nothing replaced; the fix is a new checksum in a reviewed commit.
+- Upgrading from code older than this ADR: the update that fetches it still runs the old code, so the Hermes rebuild starts on the next `pikkumies update` or `install`.
 - A pin bump is one commit that changes tag and checksum, re-runs the live check below, and regenerates the reserved-name list in `tests/ContractTest.php`.
 
 ## Live check for a pin bump
