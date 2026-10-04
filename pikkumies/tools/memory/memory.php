@@ -35,7 +35,8 @@ function terms($text)
 
 function slugify($title)
 {
-    return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+    return $slug !== '' ? $slug : 'lesson';
 }
 
 function search($query, $limit)

@@ -4,7 +4,7 @@ Lessons: what you learned solving a problem, as flat markdown files.
 
 ```sh
 php tools/memory/memory.php search "rtorrent not starting"
-php tools/memory/memory.php save "rtorrent fails after disk full" /tmp/body.md --tags rtorrent,disk --sources "journalctl, df -h"
+php tools/memory/memory.php save "rtorrent fails after disk full" ~/pikkumies/local/lesson-draft.md --tags rtorrent,disk --sources "journalctl, df -h"
 ```
 
 - User lessons live in `memory/` as `YYYYMMDD-slug.md` (gitignored, never touched by updates). Enabled packs may ship read-only lessons too; search covers both.

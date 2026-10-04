@@ -126,9 +126,10 @@ class HermesConfig
             . "\n\nThis was detected when the agent started. Skills for other kinds of machine are listed too; use one only when this machine matches it.";
     }
 
-    /** YAML double-quoted scalar. */
+    /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */
     public static function q($s)
     {
-        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], (string) $s) . '"';
+        $s = str_replace(['\\', '"', "\n", "\r", "\t"], ['\\\\', '\\"', '\\n', '\\r', '\\t'], (string) $s);
+        return '"' . preg_replace('/[\x00-\x1f\x7f]/', '', $s) . '"';
     }
 }

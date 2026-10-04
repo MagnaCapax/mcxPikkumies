@@ -72,6 +72,7 @@ return [
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');
+        check(HermesConfig::q("m\nx: 1\x01") === '"m\\nx: 1"', 'newline must be escaped and control characters dropped');
     },
     'provider key file: ini read, symlink ignored, key masked' => function () {
         $dir = sys_get_temp_dir() . '/pk-test-' . getmypid();
