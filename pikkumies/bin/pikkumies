@@ -95,6 +95,7 @@ switch ($cmd) {
         out('endpoint: ' . ($prov['endpoint'] ?: '(not set)'));
         out('key:      ' . Provider::mask($prov['key']));
         out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
+        out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
         out('hermes:   ' . (is_file(hermesBin()) ? 'installed' : 'not installed yet'));
         out('packs:    ' . implode(', ', Packs::enabled(profile(), $config)));
         break;
@@ -115,6 +116,8 @@ switch ($cmd) {
             out('Hermes is not installed yet; see local/install.log');
             exit(1);
         }
+        // Regenerate first, so a key or config set after install reaches Hermes.
+        generate(profile());
         putenv('HERMES_HOME=' . HermesConfig::home());
         $args = array_map('escapeshellarg', array_slice($argv, 2));
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);

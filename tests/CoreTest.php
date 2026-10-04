@@ -48,13 +48,19 @@ return [
         $committed = (string) @file_get_contents(Packs::dir() . '/INDEX.md');
         check($committed === $idx, 'packs/INDEX.md is stale: run `pikkumies packs index` and commit it');
     },
-    'hermes yaml: custom provider, key by env, external dirs, hooks' => function () {
+    'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);
-        check(strpos($y, 'provider: custom') !== false, 'provider');
-        check(strpos($y, 'key_env: PIKKUMIES_API_KEY') !== false, 'key_env');
+        // Hermes 0.19.0 reads key_env only under providers:<name>; a bare `provider: custom`
+        // ignores model.key_env and the request goes out without the key (HTTP 401).
+        check(strpos($y, "model:\n  provider: \"custom:pikkumies\"\n  default: \"m\"\n") !== false, 'model must name the custom:pikkumies provider and the model');
+        check(preg_match('/^providers:\n  pikkumies:\n    base_url: "https:\/\/x\/v1"\n    key_env: PIKKUMIES_API_KEY\n    default_model: "m"\n/m', $y) === 1, 'providers.pikkumies block');
+        check(preg_match('/^model:\n(  .*\n)*  key_env:/m', $y) === 0, 'key_env must not sit under model:');
         check(strpos($y, 'secret') === false, 'key leaked into config.yaml');
         check(strpos($y, '"/a/skills"') !== false, 'external dir');
-        check(strpos($y, 'pre_tool_call:') !== false && strpos($y, '/h/g.php') !== false, 'hook');
+        // Unapproved shell hooks are silently skipped in a non-interactive run.
+        check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n") !== false && strpos($y, '/h/g.php') !== false, 'hook with consent');
+        $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);
+        check(strpos($noHooks, 'hooks_auto_accept') === false, 'no consent line without hooks');
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');

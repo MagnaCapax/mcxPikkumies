@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted
+- Status: Accepted; the provider key wiring, hook consent and guard action are superseded by ADR-0005
 
 ## Context
 Hermes Agent (MIT, NousResearch) is the harness. Pikkumies must wire its skills, hooks and doctrine into Hermes without forking it. It must also keep Hermes state out of git and avoid Python in this repository.
@@ -11,7 +11,7 @@ Hermes Agent (MIT, NousResearch) is the harness. Pikkumies must wire its skills,
 ## Options Considered
 - **Fork Hermes.** High maintenance burden.
 - **Gateway hooks (`HOOK.yaml` + `handler.py`).** Python only, run in the gateway only, and cannot block a tool call.
-- **Shell hooks declared in `config.yaml`.** Any language; run in CLI and gateway; can block or escalate a tool call.
+- **Shell hooks declared in `config.yaml`.** Any language; run in CLI and gateway; can block a tool call (ADR-0005: block is the only `pre_tool_call` action Hermes acts on).
 
 ## Decision
 - **Home and install.** `HERMES_HOME` is `pikkumies/local/hermes` (gitignored). Hermes itself goes into a virtualenv in `pikkumies/include/hermes/`, not through its upstream installer, which edits shell profiles.

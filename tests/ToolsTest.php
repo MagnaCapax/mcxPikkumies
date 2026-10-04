@@ -16,11 +16,12 @@ function runPhp($script, array $args, $stdin = '')
 }
 
 return [
-    'guard hook escalates rm -rf to approval' => function () {
+    'guard hook blocks rm -rf' => function () {
         $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
         list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /home/x']]));
         $d = json_decode($out, true);
-        check(is_array($d) && $d['action'] === 'approve', 'no approval escalation: ' . $out);
+        // "block" is the only pre_tool_call action Hermes 0.19.0 acts on; anything else lets the call run.
+        check(is_array($d) && $d['action'] === 'block' && $d['message'] !== '', 'rm -rf not blocked: ' . $out);
     },
     'guard hook ignores harmless and non-terminal calls' => function () {
         $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
