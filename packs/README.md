@@ -6,7 +6,7 @@ Bundles of skills, tools, hooks, doctrine and lessons for a kind of system. A pa
 {"name": "pmss", "description": "...", "detect": {"pmss": true}}
 ```
 
-`detect` keys: `always`, `pmss` (seedbox platform present), `root` (root available and not disabled), `apps` (list of running apps). A pack is enabled when listed in `local/config.php` (`packs.enabled`) or when its detect rule matches and `packs.auto` is on. Nothing is downloaded: git already shipped it.
+`detect` keys: `pmss` (seedbox platform present), `root` (root available and not disabled), `apps` (list of running apps). A pack is enabled when listed in `local/config.php` (`packs.enabled`) or when its detect rule matches and `packs.auto` is on. Nothing is downloaded: git already shipped it. Anything every machine needs belongs in the core runtime (`pikkumies/`), not in a pack.
 
 Pack layout (all optional): `skills/<name>/SKILL.md`, `tools/<target>/`, `hooks/<event>/<name>.php`, `doctrine.md` (appended to the agent's soul), lesson files (read-only), `README.md`.
 

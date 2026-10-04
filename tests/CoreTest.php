@@ -27,7 +27,7 @@ return [
     'pack detect rules' => function () {
         $profile = ['pmss' => true, 'root' => ['available' => false], 'apps' => ['rtorrent']];
         $cfg = ['root' => ['disabled' => false]];
-        check(Packs::matches(['always' => true], $profile, $cfg), 'always');
+        check(!Packs::matches([], $profile, $cfg), 'empty rule matched');
         check(Packs::matches(['pmss' => true], $profile, $cfg), 'pmss');
         check(!Packs::matches(['root' => true], $profile, $cfg), 'root without root');
         check(Packs::matches(['apps' => ['rtorrent']], $profile, $cfg), 'apps');
@@ -37,7 +37,7 @@ return [
     'shipped packs: auto-enable on a pmss box without root' => function () {
         $profile = ['pmss' => true, 'root' => ['available' => false], 'apps' => []];
         $names = Packs::enabled($profile, ['packs' => ['enabled' => [], 'auto' => true], 'root' => ['disabled' => false]]);
-        check(in_array('pmss', $names, true) && in_array('system', $names, true), 'pmss/system not enabled');
+        check(in_array('pmss', $names, true), 'pmss not enabled');
         check(!in_array('root', $names, true), 'root enabled without root');
     },
     'packs index lists every pack' => function () {

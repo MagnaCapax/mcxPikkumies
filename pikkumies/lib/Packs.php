@@ -2,7 +2,8 @@
 /**
  * Packs: bundles under ../packs/<name>/ described by pack.json.
  *
- * pack.json: {"name","description","detect":{"pmss":true|"root":true|"apps":[...]|"always":true}}
+ * pack.json: {"name","description","detect":{"pmss":true|"root":true|"apps":[...]}}
+ * Anything every machine needs belongs in the core runtime, not in a pack.
  * Enabling a pack never downloads anything: git already shipped it. Enabled = listed in
  * config packs.enabled, or matched by detect rules when packs.auto is true.
  */
@@ -29,9 +30,6 @@ class Packs
 
     public static function matches(array $detect, array $profile, array $config)
     {
-        if (!empty($detect['always'])) {
-            return true;
-        }
         if (!empty($detect['pmss']) && !empty($profile['pmss'])) {
             return true;
         }
