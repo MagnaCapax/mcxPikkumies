@@ -16,7 +16,7 @@ Separately, the first live run showed the model saving a lesson with Hermes's bu
 
 ## Options Considered
 - **Keep the same-name advice.** Broken in the installed Hermes.
-- **Copy shipped skills into `$HERMES_HOME/skills` and keep a hash manifest**, the way Hermes syncs its own bundled skills. Makes customising in place work, but is more machinery; a follow-up.
+- **Copy shipped skills into `$HERMES_HOME/skills` and keep a hash manifest**, the way Hermes syncs its own bundled skills. Makes editing in place work, but adds a manifest and a sync step that the new-name path below does not need.
 - **Customise under a new name and hide the shipped one.** Uses Hermes's own `skills.disabled`, which matches by name. Chosen now.
 - **Delete our lessons skill and use the built-in memory.** Loses searchable, long-form lessons and the lessons packs ship.
 

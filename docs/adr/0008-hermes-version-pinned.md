@@ -25,7 +25,7 @@ Two facts, checked on 2026-10-04:
 
 ## Consequences
 - What was tested is what gets installed.
-- 0.19.0 lacks the fixes in the 14 later releases. Moving the install off PyPI to a pinned release tag, having `update` reconcile the installed version with the pin, and closing the `hermes update` pass-through are the follow-up.
+- 0.19.0 lacks the fixes in the 14 later releases. Moving the install off PyPI to a pinned release tag, having `update` reconcile the installed version with the pin, and closing the `hermes update` pass-through are tracked in issue #1.
 
 ## References
 - ADR-0003, ADR-0005, ADR-0007
