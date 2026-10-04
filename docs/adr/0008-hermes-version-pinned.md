@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted
+- Status: Accepted. The install method (PyPI) and the 0.19.0 pin are superseded by ADR-0009.
 
 ## Context
 The generated Hermes config, the hook output contract and the skill rules were verified against the source of Hermes Agent 0.19.0 (ADR-0005, ADR-0007). The installer asked pip for `latest`.

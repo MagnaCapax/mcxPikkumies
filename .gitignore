@@ -1,6 +1,7 @@
 # User and agent state: never tracked, never touched by updates.
 pikkumies/local/
-pikkumies/include/hermes/
+pikkumies/include/hermes*
+pikkumies/include/.hermes-build.lock
 pikkumies/memory/*.md
 !pikkumies/memory/README.md
 /vendor/

@@ -77,6 +77,8 @@ class HermesConfig
                 $y .= "    - " . self::q($name) . "\n";
             }
         }
+        // Hermes is pinned and updated by Pikkumies (ADR-0009): no update banners.
+        $y .= "updates:\n  check: false\n";
         if ($hooks) {
             // Hermes registers a shell hook only after first-use consent; a non-interactive run
             // silently skips unapproved hooks. These hooks ship with pikkumies, so the
@@ -86,8 +88,8 @@ class HermesConfig
             foreach ($hooks as $event => $scripts) {
                 $y .= "  " . $event . ":\n";
                 foreach ($scripts as $s) {
-                    // No fail_closed key: Hermes 0.19.0 never reads it; a hook that errors or
-                    // times out always lets the call run (agent/shell_hooks.py, ADR-0008).
+                    // fail_closed is left at the Hermes default (false): a hook that errors or times
+                    // out lets the call run. Hooks are safety prompts, not security (AGENTS.md).
                     $y .= "    - command: " . self::q(PHP_BINARY . ' ' . $s) . "\n      timeout: 10\n";
                 }
             }

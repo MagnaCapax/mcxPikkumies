@@ -4,7 +4,7 @@
  * Each tests/*Test.php returns an array of name => callable; a callable throws on failure.
  */
 $root = dirname(__DIR__);
-foreach (['Config', 'Detect', 'Provider', 'Packs', 'HermesConfig', 'Update'] as $class) {
+foreach (['Config', 'Detect', 'Provider', 'Packs', 'HermesConfig', 'HermesInstall', 'Update'] as $class) {
     require_once $root . '/pikkumies/lib/' . $class . '.php';
 }
 

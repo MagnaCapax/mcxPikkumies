@@ -15,7 +15,7 @@ The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, root access, running apps, resources);
 - writes the agent's configuration with every pack loaded, and tells the agent what this machine allows;
-- builds the Hermes Agent environment in the background.
+- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root and no changes to your PATH or shell files (needs Python 3.11 to 3.13).
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
 
@@ -38,8 +38,8 @@ Updates fast-forward to the latest `main`. Your own state is never touched: conf
 
 | Command | What it does |
 |---|---|
-| `pikkumies install` | Detect the machine, write config (every pack is loaded), build Hermes in the background |
-| `pikkumies update` | Fast-forward to the latest version; refuses to overwrite local edits |
+| `pikkumies install` | Detect the machine, write config (every pack is loaded), build the pinned Hermes release in the background |
+| `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); builds a newly pinned Hermes release |
 | `pikkumies detect` | Print the machine profile (JSON) |
 | `pikkumies doctor` | Show provider, masked key, Hermes and pack status |
 | `pikkumies packs [index]` | List packs; regenerate `packs/INDEX.md` |
@@ -64,7 +64,7 @@ pikkumies/            the runtime (~/pikkumies)
   hooks/<event>/      safety hooks run by the agent (PHP, JSON in and out)
   doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)
-  include/            third-party software (hermes/, installed, never tracked)
+  include/            third-party software, never tracked: hermes-<tag>/ builds, hermes -> current one
   local/              your config, machine profile and agent state (never tracked)
 packs/                bundles: INDEX.md (generated), README.md, one directory per pack
 docs/adr/             architecture decisions

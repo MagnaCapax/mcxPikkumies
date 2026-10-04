@@ -68,7 +68,25 @@ return [
         check(strpos($noHooks, 'disabled:') === false, 'no disabled list when none set');
         $off = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], ['seedbox-apps']);
         check(strpos($off, "skills:\n  external_dirs:\n    - \"/a/skills\"\n  disabled:\n    - \"seedbox-apps\"\n") !== false, 'skills.disabled must render under skills:');
-        check(strpos($y, 'fail_closed') === false, 'fail_closed is never read by Hermes 0.19.0');
+        check(strpos($y, 'fail_closed') === false, 'fail_closed stays at the Hermes default');
+        check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'update banners must be off: Hermes is pinned');
+    },
+    'hermes build: pinned tag and checksum, verified before unpacking, atomic switch' => function () {
+        $sha = str_repeat('a', 64);
+        check(HermesInstall::buildCommand('v1;rm -rf ~', $sha) === '', 'unsafe tag accepted');
+        check(HermesInstall::buildCommand('v2026.9.24', 'abc') === '', 'bad checksum accepted');
+        $c = HermesInstall::buildCommand('v2026.9.24', $sha);
+        check($c !== '' && strpos($c, 'set -e') === 0, 'build must stop at the first failure');
+        $check = strpos($c, 'sha256sum -c');
+        $tar = strpos($c, 'tar -xzf');
+        check($check !== false && $tar !== false && $check < $tar, 'checksum must be verified before unpacking');
+        check(strpos($c, '--anchored --no-wildcards-match-slash') !== false, 'excludes must only drop top-level directories');
+        check(strpos($c, 'archive/refs/tags/v2026.9.24.tar.gz') !== false, 'source must be the pinned tag');
+        $touch = strpos($c, '.complete');
+        $switch = strpos($c, 'mv -T');
+        check($touch !== false && $switch !== false && $touch < $switch, 'switch only after a complete build');
+        $cfg = Config::defaults();
+        check(preg_match(HermesInstall::TAG_RE, $cfg['hermes']['version']) === 1 && preg_match('/^[0-9a-f]{64}$/', $cfg['hermes']['sha256']) === 1, 'default pin must be a tag plus checksum');
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');

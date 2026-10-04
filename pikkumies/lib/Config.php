@@ -16,7 +16,8 @@ class Config
             'root'  => ['disabled' => false],     // UX switch only; the OS decides what root can do
             'skills' => ['disabled' => []],        // shipped skill names to hide, e.g. after copying one (ADR-0007)
             'packs' => ['disabled' => []],         // every pack loads unless named here (ADR-0006)
-            'hermes' => ['version' => '0.19.0'],     // the version the wiring was verified against (ADR-0008)
+            // The Hermes release the wiring was verified against, and its tarball checksum (ADR-0009).
+            'hermes' => ['version' => 'v2026.9.24', 'sha256' => '15b15ce4e6ec8ea424a081823709d1e17f0943e7b42b59597d24ebb94cbd1742'],
         ];
     }
 

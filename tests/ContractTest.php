@@ -7,9 +7,9 @@
  * (tools/skills_tool.py, "Ambiguous skill name").
  */
 
-// Tool names registered by Hermes 0.19.0 (registry.register(name=...) under tools/). A skill
-// named like a tool competes with it for the same requests. Re-check on a Hermes bump (ADR-0008).
-const HERMES_0_19_0_TOOLS = 'browser_back browser_cdp browser_click browser_console browser_dialog browser_get_images browser_navigate browser_press browser_scroll browser_snapshot browser_type browser_vision clarify close_terminal computer_use cronjob delegate_task discord discord_admin execute_code feishu_doc_read feishu_drive_add_comment feishu_drive_list_comment_replies feishu_drive_list_comments feishu_drive_reply_comment ha_call_service ha_get_state ha_list_entities ha_list_services image_generate kanban_attach kanban_attachments kanban_attach_url kanban_block kanban_comment kanban_complete kanban_create kanban_heartbeat kanban_link kanban_list kanban_show kanban_unblock memory patch process project_create project_list project_switch read_file read_terminal search_files session_search skill_manage skills_list skill_view terminal text_to_speech todo video_analyze video_generate vision_analyze web_extract web_search write_file xai_video_edit xai_video_extend x_search yb_query_group_info yb_query_group_members yb_search_sticker yb_send_dm yb_send_sticker';
+// Names Hermes v0.21.5 (tag v2026.9.24) already uses: registered tools, toolsets and built-in slash
+// commands. A skill with one of these names competes with the built-in. Re-check on a pin bump (ADR-0009).
+const HERMES_RESERVED_NAMES = 'a2a agents annotate_preview apply_layout approvals approve battery bg blueprint branch browser browser_cdp browser_dialog browser_exec browser_vault_enter_code browser_vault_fill browser_vault_list browser_vault_save_login browser_vault_unlock btw bundles busy clarify clear close_terminal code_execution codex-runtime commands compress computer_use config connections context context_engine copy cron cronjob cronjob_manage curator debug delegate_task delegation deny desktop_preview desktop_project diff drive_preview egress execute_code export fast feishu_doc_read file focus focus_pane footer goal gui_tour handoff hatch heartbeat help history homeassistant image image_gen image_generate import indicator init insights journey kanban learn login loop manage_catalog manage_connections meet memory moa model new palette paste patch pause personality pet plan platform platforms plugins process_manage profile prompt queue quit react_to_message read_file read_terminal read_window_below reasoning redraw refine relay reload reload-mcp reload-skills restart resume retry review rollback save search_files sessions session_search sethome show_tip skill_manage skills skills_list skill_view skin snapshot spotify start status statusbar steer stop stt subgoal subscription suggestions terminal text_to_speech timestamps title todo todo_list tools toolsets topic topup tts undo update usage verbose version video video_analyze video_gen video_generate vision vision_analyze voice wake web web_extract web_search whoami worktree write_file x_search yolo yuanbao';
 
 function shippedSkillFiles()
 {
@@ -60,14 +60,14 @@ return [
             check(strlen($desc) <= 1024, "$dir: description over 1024 characters is cut by Hermes");
         }
     },
-    'skills: names are unique and do not shadow a Hermes tool' => function () {
-        $tools = explode(' ', HERMES_0_19_0_TOOLS);
+    'skills: names are unique and do not shadow a Hermes built-in' => function () {
+        $tools = explode(' ', HERMES_RESERVED_NAMES);
         $seen = [];
         foreach (shippedSkillFiles() as $file) {
             $name = basename(dirname($file));
             check(!isset($seen[$name]), isset($seen[$name]) ? "skill '$name' exists twice ($seen[$name] and $file); Hermes cannot load an ambiguous name" : '');
             $seen[$name] = $file;
-            check(!in_array($name, $tools, true), "skill '$name' has the name of a Hermes tool");
+            check(!in_array($name, $tools, true), "skill '$name' has a name Hermes already uses (tool, toolset or command)");
         }
     },
     'packs: pack.json name matches its directory and has a description' => function () {
