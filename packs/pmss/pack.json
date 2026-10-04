@@ -1,0 +1,1 @@
+{"name": "pmss", "description": "Seedbox apps on the PMSS platform: torrent clients, web UIs, media servers.", "detect": {"pmss": true}}

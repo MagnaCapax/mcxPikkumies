@@ -1,0 +1,71 @@
+<?php
+/**
+ * Config: defaults in code, overrides in local/config.php (gitignored, never touched by updates).
+ */
+class Config
+{
+    public static function defaults()
+    {
+        $home = (string) getenv('HOME');
+        return [
+            'provider' => [
+                'endpoint' => '',                 // OpenAI-compatible base URL, e.g. https://host/v1
+                'model'    => '',
+                'keyFile'  => $home . '/.pikkumiesKey',
+            ],
+            'root'  => ['disabled' => false],     // UX switch only; the OS decides what root can do
+            'packs' => ['enabled' => [], 'auto' => true],
+            'hermes' => ['version' => 'latest'],
+        ];
+    }
+
+    /** Runtime root: the pikkumies/ directory this file lives under. */
+    public static function root()
+    {
+        return dirname(__DIR__);
+    }
+
+    public static function localDir()
+    {
+        return self::root() . '/local';
+    }
+
+    public static function load()
+    {
+        $file = self::localDir() . '/config.php';
+        $local = is_file($file) ? require $file : [];
+        return self::merge(self::defaults(), is_array($local) ? $local : []);
+    }
+
+    /** Recursive merge where local scalars and lists replace defaults. */
+    public static function merge(array $base, array $over)
+    {
+        foreach ($over as $k => $v) {
+            if (is_array($v) && isset($base[$k]) && is_array($base[$k]) && !self::isList($v)) {
+                $base[$k] = self::merge($base[$k], $v);
+            } else {
+                $base[$k] = $v;
+            }
+        }
+        return $base;
+    }
+
+    public static function isList(array $a)
+    {
+        return $a === [] || array_keys($a) === range(0, count($a) - 1);
+    }
+
+    /** Write local/config.php only if absent: local edits always win. */
+    public static function writeDefaultsIfMissing()
+    {
+        $file = self::localDir() . '/config.php';
+        if (is_file($file)) {
+            return false;
+        }
+        @mkdir(self::localDir(), 0700, true);
+        $body = "<?php\n// Local overrides. Updates never touch this file.\nreturn " . var_export(['provider' => ['endpoint' => '', 'model' => '']], true) . ";\n";
+        file_put_contents($file, $body);
+        chmod($file, 0600);
+        return true;
+    }
+}

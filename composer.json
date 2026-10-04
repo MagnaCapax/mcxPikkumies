@@ -1,0 +1,9 @@
+{
+    "name": "magnacapax/mcx-pikkumies",
+    "description": "A lightweight sysadmin helper agent that runs on the server it manages: as the user by default, root as a capability layer.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "homepage": "https://pulsedmedia.com",
+    "authors": [{"name": "Aleksi Ursin / MCX", "homepage": "https://pulsedmedia.com"}],
+    "require": {"php": ">=7.3"}
+}

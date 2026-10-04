@@ -1,0 +1,126 @@
+#!/usr/bin/env php
+<?php
+/**
+ * pikkumies: install | update | detect | doctor | packs [index] | run [args...]
+ */
+// Everything we write (config, .env with the key, profile) is private to the user from
+// creation; chmod-after-write would leave a window where a secret is world-readable.
+umask(0077);
+
+foreach (['Config', 'Detect', 'Provider', 'Packs', 'HermesConfig', 'Update'] as $class) {
+    require __DIR__ . '/../lib/' . $class . '.php';
+}
+
+function out($line)
+{
+    fwrite(STDOUT, $line . "\n");
+}
+
+function profile()
+{
+    $profile = Detect::run();
+    @mkdir(Config::localDir(), 0700, true);
+    @chmod(Config::localDir(), 0700);
+    file_put_contents(Config::localDir() . '/profile.json', json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+    return $profile;
+}
+
+function generate(array $profile)
+{
+    $config = Config::load();
+    $packs = Packs::enabled($profile, $config);
+    HermesConfig::write($config, $packs);
+    file_put_contents(Packs::dir() . '/INDEX.md', Packs::renderIndex());
+    return $packs;
+}
+
+function hermesBin()
+{
+    return Config::root() . '/include/hermes/bin/hermes';
+}
+
+/** Build the Hermes venv in the background so install returns immediately. */
+function buildHermesInBackground(array $config)
+{
+    if (is_file(hermesBin())) {
+        return 'already installed';
+    }
+    if (getenv('PIKKUMIES_SKIP_HERMES') === '1') {
+        return 'skipped (PIKKUMIES_SKIP_HERMES=1)';
+    }
+    $venv = Config::root() . '/include/hermes';
+    $log = Config::localDir() . '/install.log';
+    $spec = $config['hermes']['version'] === 'latest' ? 'hermes-agent' : 'hermes-agent==' . $config['hermes']['version'];
+    $cmd = 'python3 -m venv ' . escapeshellarg($venv) . ' && ' . escapeshellarg($venv . '/bin/pip') . ' install --quiet ' . escapeshellarg($spec);
+    exec('nohup sh -c ' . escapeshellarg($cmd) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
+    return 'building in background (log: local/install.log)';
+}
+
+$cmd = isset($argv[1]) ? $argv[1] : 'help';
+
+switch ($cmd) {
+    case 'install':
+        $link = getenv('HOME') . '/pikkumies';
+        if (!file_exists($link)) {
+            @symlink(Config::root(), $link);
+        }
+        Config::writeDefaultsIfMissing();
+        $profile = profile();
+        $packs = generate($profile);
+        out('pikkumies installed at ' . Config::root());
+        out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
+        out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
+        out('  packs enabled: ' . (implode(', ', $packs) ?: 'none'));
+        out('  hermes: ' . buildHermesInBackground(Config::load()));
+        out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
+        break;
+
+    case 'update':
+        list($ok, $msg) = Update::run();
+        out($msg);
+        if (!$ok) {
+            exit(1);
+        }
+        generate(profile());
+        out('config regenerated');
+        break;
+
+    case 'detect':
+        out(json_encode(profile(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        break;
+
+    case 'doctor':
+        $config = Config::load();
+        $prov = Provider::resolve($config);
+        list($ok, $http) = Provider::check($prov);
+        out('endpoint: ' . ($prov['endpoint'] ?: '(not set)'));
+        out('key:      ' . Provider::mask($prov['key']));
+        out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
+        out('hermes:   ' . (is_file(hermesBin()) ? 'installed' : 'not installed yet'));
+        out('packs:    ' . implode(', ', Packs::enabled(profile(), $config)));
+        break;
+
+    case 'packs':
+        if (isset($argv[2]) && $argv[2] === 'index') {
+            file_put_contents(Packs::dir() . '/INDEX.md', Packs::renderIndex());
+            out('packs/INDEX.md written');
+            break;
+        }
+        foreach (Packs::all() as $name => $meta) {
+            out(str_pad($name, 12) . (isset($meta['description']) ? $meta['description'] : ''));
+        }
+        break;
+
+    case 'run':
+        if (!is_file(hermesBin())) {
+            out('Hermes is not installed yet; see local/install.log');
+            exit(1);
+        }
+        putenv('HERMES_HOME=' . HermesConfig::home());
+        $args = array_map('escapeshellarg', array_slice($argv, 2));
+        passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+        exit($code);
+
+    default:
+        out('usage: pikkumies install | update | detect | doctor | packs [index] | run [hermes args]');
+}

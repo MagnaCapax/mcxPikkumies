@@ -1,3 +1,7 @@
-config.php
+# User and agent state: never tracked, never touched by updates.
+pikkumies/local/
+pikkumies/include/hermes/
+pikkumies/memory/*.md
+!pikkumies/memory/README.md
 /vendor/
 *.log

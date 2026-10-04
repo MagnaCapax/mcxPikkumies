@@ -1,0 +1,1 @@
+{"name": "system", "description": "Generic Linux user-level housekeeping: disk, processes, logs.", "detect": {"always": true}}
