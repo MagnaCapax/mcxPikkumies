@@ -45,6 +45,8 @@ return [
         foreach (array_keys(Packs::all()) as $name) {
             check(strpos($idx, '[' . $name . ']') !== false, "index misses $name");
         }
+        $committed = (string) @file_get_contents(Packs::dir() . '/INDEX.md');
+        check($committed === $idx, 'packs/INDEX.md is stale: run `pikkumies packs index` and commit it');
     },
     'hermes yaml: custom provider, key by env, external dirs, hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);

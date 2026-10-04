@@ -30,7 +30,6 @@ function generate(array $profile)
     $config = Config::load();
     $packs = Packs::enabled($profile, $config);
     HermesConfig::write($config, $packs);
-    file_put_contents(Packs::dir() . '/INDEX.md', Packs::renderIndex());
     return $packs;
 }
 

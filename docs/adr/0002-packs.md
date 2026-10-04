@@ -17,7 +17,7 @@ Different machines need different skills and tools. A seedbox needs app know-how
 - **Format.** Bundles ("packs") live in `packs/<name>/` with a `pack.json` (`name`, `description`, `detect`). Optional contents: `skills/`, `tools/<target>/`, `hooks/<event>/`, `doctrine.md`, read-only lesson files, and `README.md`.
 - **Enabling.** A pack is enabled when listed in `local/config.php`, or when its `detect` rule matches the machine profile and `packs.auto` is on. Detect keys are `always`, `pmss`, `root` and `apps`.
 - **No downloads.** Enabling writes Hermes config only; nothing is downloaded or copied.
-- **Index.** `pikkumies packs index` generates `packs/INDEX.md` from the manifests, and install and update regenerate it.
+- **Index.** `pikkumies packs index` generates `packs/INDEX.md` from the manifests. The index is committed, and a test fails when it is stale. Install and update never write it, because a runtime write into the tracked tree would make the next fast-forward update refuse.
 - **Third-party packs.** Later, as a separate directory under `local/`.
 
 ## Consequences
