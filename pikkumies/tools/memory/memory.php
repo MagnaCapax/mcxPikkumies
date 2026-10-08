@@ -36,6 +36,7 @@ if (trim($body) === '') {
 }
 $root = dirname(__DIR__, 2);
 @mkdir($root . '/memory', 0700, true);
+@chmod($root . '/memory', 0700); // git creates this tracked directory with the clone's umask
 $path = $root . '/memory/' . gmdate('Ymd') . '-' . TextSearch::slug($title) . '.md';
 if (file_exists($path)) {
     fwrite(STDERR, "lesson exists, not overwriting: $path\n");

@@ -23,7 +23,11 @@ $patterns = [
     '/\bgit\s+push\s+.*--force\b/'                  => 'force push',
 ];
 foreach ($patterns as $re => $why) {
-    if (preg_match($re, $command)) {
+    $hit = preg_match($re, $command);
+    if ($hit === false) {
+        $why = 'a command too long or complex to check'; // a regex engine error must not let the call through
+    }
+    if ($hit !== 0) {
         echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run. Show the user the exact command and ask them to run it themselves if they want it."]) . "\n";
         exit(0);
     }

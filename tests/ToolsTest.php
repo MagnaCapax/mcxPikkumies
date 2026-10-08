@@ -6,6 +6,14 @@ return [
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'block' && $d['message'] !== '', 'rm -rf not blocked: ' . $out);
     },
+    'guard hook blocks when the check itself fails (regex engine limit)' => function () {
+        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+        // The dd check runs out of backtracking in the first segment before it reaches the real dd.
+        $cmd = str_repeat('dd ', 700000) . '| dd if=/dev/zero of=/dev/sdz';
+        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+        $d = json_decode($out, true);
+        check(is_array($d) && $d['action'] === 'block', 'regex error let the call through');
+    },
     'guard hook ignores harmless and non-terminal calls' => function () {
         $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
         list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]));
@@ -16,6 +24,8 @@ return [
     'memory: save writes the lesson, no overwrite; docs search finds it' => function () {
         $tmp = sys_get_temp_dir() . '/pk-mem-' . getmypid();
         @mkdir("$tmp/pikkumies/tools/memory", 0700, true);
+        mkdir("$tmp/pikkumies/memory");
+        chmod("$tmp/pikkumies/memory", 0755); // as git clone leaves this tracked directory
         copy(dirname(__DIR__) . '/pikkumies/tools/memory/memory.php', "$tmp/pikkumies/tools/memory/memory.php");
         @mkdir("$tmp/pikkumies/lib", 0700, true);
         foreach (['TextSearch', 'Config', 'DocSources'] as $lib) {
@@ -27,6 +37,7 @@ return [
         $tool = "$tmp/pikkumies/tools/memory/memory.php";
         list($code, $out) = runPhp($tool, ['save', 'rtorrent stops on full disk', "$tmp/body.md", '--tags', 'rtorrent,disk']);
         check($code === 0 && strpos($out, 'saved:') !== false, 'save failed: ' . $out);
+        check((fileperms("$tmp/pikkumies/memory") & 0777) === 0700, 'lessons directory not 0700');
         list($code) = runPhp($tool, ['save', 'rtorrent stops on full disk', "$tmp/body.md"]);
         check($code !== 0, 'overwrite allowed');
         $docs = "$tmp/pikkumies/tools/docs/docs.php";
