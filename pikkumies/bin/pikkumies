@@ -89,7 +89,7 @@ switch ($cmd) {
         out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
         $cur = HermesInstall::currentTag();
         $pin = $config['hermes']['version'];
-        list(, $py) = HermesInstall::pythonCheck();
+        list(, $py) = HermesInstall::python();
         out('hermes:   ' . ($cur === '' ? 'not installed' : 'installed ' . $cur) . '; pinned ' . $pin . (is_dir(HermesInstall::buildDir($pin)) && !HermesInstall::isComplete($pin) ? ' (building or failed, see local/install.log)' : '') . '; ' . $py);
         out('packs:    ' . (implode(', ', Packs::enabled($config)) ?: 'none'));
         break;

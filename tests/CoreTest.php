@@ -89,6 +89,14 @@ return [
         $touch = strpos($c, '.complete');
         $switch = strpos($c, 'mv -T');
         check($touch !== false && $switch !== false && $touch < $switch, 'switch only after a complete build');
+        $py = HermesInstall::includeDir() . '/python-3.13.16';
+        $s = HermesInstall::buildCommand('v2026.9.24', $sha, $py . '/bin/python3');
+        $pyCheck = strpos($s, 'sha256sum -c ' . escapeshellarg($py . '.sha256'));
+        $pyTar = strpos($s, 'tar -xzf ' . escapeshellarg($py . '.tgz'));
+        check(strpos($s, HermesInstall::PY_STANDALONE_SHA256) !== false && $pyCheck !== false && $pyTar !== false && $pyCheck < $pyTar, 'standalone Python must be checksum-verified before unpacking');
+        check(strpos($s, escapeshellarg($py . '/bin/python3') . ' -m venv') !== false && strpos($c, "'python3' -m venv") !== false, 'venv must use the chosen python');
+        check(HermesInstall::python('aarch64')[0] === '' || HermesInstall::python('aarch64')[0] === 'python3', 'no standalone build outside x86_64');
+        check(preg_match('/^[0-9a-f]{64}$/', HermesInstall::PY_STANDALONE_SHA256) === 1, 'standalone Python pin must be a checksum');
         $cfg = Config::defaults();
         check(preg_match(HermesInstall::TAG_RE, $cfg['hermes']['version']) === 1 && preg_match('/^[0-9a-f]{64}$/', $cfg['hermes']['sha256']) === 1, 'default pin must be a tag plus checksum');
     },

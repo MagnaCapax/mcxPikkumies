@@ -15,7 +15,7 @@ The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, root access, running apps, resources);
 - writes the agent's configuration with every pack loaded, and tells the agent what this machine allows;
-- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root and no changes to your PATH or shell files (needs Python 3.11 to 3.13).
+- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root and no changes to your PATH or shell files. It uses the system Python 3.11 to 3.13, or, on x86_64 where that is older, a pinned checksum-verified standalone Python in your own account (ADR-0014).
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
 
