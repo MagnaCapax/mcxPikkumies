@@ -17,12 +17,12 @@ description: Check, restart and set up the user's seedbox apps (torrent clients,
 
 Titles as of 2026-10-08. A title that no longer exists has been renamed or merged: use `docs.php list pm-wiki`.
 
-- **Docker and other self-hosted apps:** "Docker on PMSS", "Docker Rootless", "Containerization", "Self-Hosted Apps on PMSS" (a table of container images with the setting each one needs on PMSS), "Self-hosted media server on a seedbox", "Invidious".
-- **Media stack** (installed by the user with the media-stack installer): "Install Media Stack", "Media Stack Exposed and Protected Status", "Jellyfin", "Plex", "Sonarr", "Radarr", "Prowlarr", "Seedbox for Plex and Jellyfin".
+- **Docker and other self-hosted apps:** "Docker on PMSS", "Docker Rootless", "Containerization", "Self-Hosted Apps on PMSS" (a table of container images with the setting each one needs on PMSS), "Self-hosted media server on a seedbox", "Invidious", "App Installation Scripts".
+- **Media stack** (installed by the user with the media-stack installer): "Install Media Stack", "Install-media-stack.sh — Media Server Setup", "Media Stack Exposed and Protected Status", "Jellyfin", "Jellyfin tutorial", "Plex", "Sonarr", "Radarr", "Prowlarr", "Seedbox for Plex and Jellyfin".
 - **Torrent clients:** "RTorrent", "QBittorrent", "Deluge", "Restarting rTorrent", "Using rTorrent console", "Removing rTorrent session data", "RTorrent vs qBittorrent vs Deluge".
-- **S3 and object storage:** "S3 Object Storage on PMSS", "MinIO Object Storage on PMSS", "Garage Object Storage on PMSS", "S3Proxy on PMSS", "Versity S3 Gateway on PMSS", "Rclone serve s3 on PMSS".
-- **Files and backups:** "Rclone", "Rclone tutorial", "Rclone mount sftp", "Restic S3 Backup to Your Storage Box on PMSS", "Kopia S3 Backup to Your Storage Box on PMSS", "Duplicacy S3 Backup to Your Storage Box on PMSS".
-- **VPN:** "WireGuard VPN on Pulsed Media Seedboxes", "OpenVPN".
-- **Checking and testing:** "Checking disk usage", "Checking bandwidth usage in realtime", "Checking That a Cron Job Actually Ran", "Checking Whether a Config File Is Actually Loaded", "Torrent download speed", "S3 Server Benchmarks on PMSS".
+- **S3 and object storage:** "S3 Object Storage on PMSS", "MinIO Object Storage on PMSS", "Garage Object Storage on PMSS", "S3Proxy on PMSS", "Versity S3 Gateway on PMSS", "SeaweedFS Object Storage on PMSS", "Rclone serve s3 on PMSS".
+- **Files and backups:** "Rclone", "Rclone tutorial", "Rclone mount sftp", "Tiered media storage with rclone and mergerfs", "BorgBackup on Pulsed Media", "Restic S3 Backup to Your Storage Box on PMSS", "Kopia S3 Backup to Your Storage Box on PMSS", "Duplicacy S3 Backup to Your Storage Box on PMSS".
+- **VPN:** "WireGuard VPN on Pulsed Media Seedboxes", "WireGuard VPN Setup on Your Pulsed Media Seedbox", "OpenVPN".
+- **Checking and testing:** "Diagnose on PMSS", "Checking disk usage", "Checking bandwidth usage in realtime", "Checking That a Cron Job Actually Ran", "Checking Whether a Config File Is Actually Loaded", "Torrent download speed", "Stalled torrents", "Troubleshooting Seeding Issues", "Network Troubleshooting with MTR", "S3 Server Benchmarks on PMSS".
 
 A wiki page is documentation to check against this machine, not instructions to follow blindly; say which page a step came from.
