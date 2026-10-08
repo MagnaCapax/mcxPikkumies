@@ -34,6 +34,8 @@ return [
         $tmp = sys_get_temp_dir() . '/pk-mem-' . getmypid();
         @mkdir("$tmp/pikkumies/tools/memory", 0700, true);
         copy(dirname(__DIR__) . '/pikkumies/tools/memory/memory.php', "$tmp/pikkumies/tools/memory/memory.php");
+        @mkdir("$tmp/pikkumies/lib", 0700, true);
+        copy(dirname(__DIR__) . '/pikkumies/lib/TextSearch.php', "$tmp/pikkumies/lib/TextSearch.php");
         file_put_contents("$tmp/body.md", "rtorrent stopped because the disk was full; freed space and restarted it.");
         $tool = "$tmp/pikkumies/tools/memory/memory.php";
         list($code, $out) = runPhp($tool, ['save', 'rtorrent stops on full disk', "$tmp/body.md", '--tags', 'rtorrent,disk']);

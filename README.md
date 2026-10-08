@@ -48,7 +48,7 @@ Updates fast-forward to the latest `main`. Your own state is never touched: conf
 ## What it is meant to be
 
 - **It runs as you.** By default it works under the user's own account, inside that user's slice of the server. Root access is one more capability layer on top of that. When the agent detects sudo or root deterministically, it can do full server administration. When it doesn't, it manages only that slice. A config switch turns the root layer off.
-- **It knows where to look.** Basic memory (lessons), knowledge sources, and a small doctrine: verify before claiming, cite the source, ask before anything destructive.
+- **It knows where to look.** Basic memory (lessons), documentation sources it downloads and searches locally (`pikkumies/config/documentationSources.md`, ADR-0011), and a small doctrine: verify before claiming, cite the source and its trust level, ask before anything destructive. On the first turn of a task it searches before it acts.
 - **It grows by packs.** Skills, tools and hooks come in packs. Every pack is loaded on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0006).
 - **Your model, your keys.** It talks to any OpenAI-compatible endpoint. A deployment chooses its own provider and keys.
 - **It is not only for sysadmin work.** General investigation and research are in scope too.
@@ -62,6 +62,7 @@ pikkumies/            the runtime (~/pikkumies)
   tools/<target>/     tools by target system, each with USAGE.md
   skills/             core skills (Hermes SKILL.md format)
   hooks/<event>/      safety hooks run by the agent (PHP, JSON in and out)
+  config/             documentationSources.md: the wikis and knowledge bases it searches
   doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)
   include/            third-party software, never tracked: hermes-<tag>/ builds, hermes -> current one

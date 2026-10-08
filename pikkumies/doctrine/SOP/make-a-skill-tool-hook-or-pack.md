@@ -11,6 +11,7 @@ One page for contributors and for the agent itself. Checked against Hermes Agent
 | A check on every tool call | a hook | `pikkumies/hooks/<event>/<name>.php` or `packs/<pack>/hooks/<event>/` |
 | A bundle for one kind of system | a pack | `packs/<name>/` |
 | How a problem got solved | a lesson, not any of the above | the lessons skill |
+| A wiki or knowledge base the agent should search | a documentation source | a section in `pikkumies/config/documentationSources.md` (shipped) or `~/pikkumies/local/documentationSources.md` (one machine) |
 
 On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Hooks and changes to shipped skills come only from the repository, after review.
 
@@ -41,9 +42,10 @@ description: Check and restart the user's seedbox apps on the PMSS platform. Use
 
 ## Hook
 
-`hooks/<event>/<name>.php` runs on every matching event; `pre_tool_call` is the one used today.
+`hooks/<event>/<name>.php` runs on every matching event. Two events are used: `pre_tool_call` (before each tool call; can block it) and `pre_llm_call` (before each turn; can add text to the user's message; Hermes has no separate prompt-submit event).
 
-- Input on stdin is JSON: `hook_event_name`, `tool_name`, `tool_input` (the tool's arguments), `session_id`, `cwd`.
+- Input on stdin is JSON: `hook_event_name`, `tool_name`, `tool_input` (the tool's arguments), `session_id`, `cwd`, and `extra` with the event's own fields (for `pre_llm_call`: `user_message`, `is_first_turn`).
+- To add text to the turn from `pre_llm_call`, print `{"context":"..."}`; keep it short, it goes to the model every time (see `hooks/pre_llm_call/search-first.php`).
 - To stop a tool call, print `{"action":"block","message":"..."}`. Anything else (no output, other actions, invalid JSON) means no opinion and the call runs.
 - If the hook errors or takes longer than its 10-second timeout, the call runs (Hermes default; Pikkumies leaves `fail_closed` off). Hooks are safety prompts for the agent's own mistakes, not security; limits that must hold come from the OS.
 - Filter on `tool_name` inside the script and exit quietly otherwise (see `hooks/pre_tool_call/guard-destructive.php`).

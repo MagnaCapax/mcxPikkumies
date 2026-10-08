@@ -9,9 +9,9 @@
  * lessons shipped by packs (packs/<name>/memory/). Frontmatter: tags, sources.
  * Search: whole words, stopwords dropped, all terms required (a quarter may miss at 5+ terms),
  * score divided by sqrt(length), inline-link boost only for files that already matched.
- * The link graph is built at query time; there is no index file to go stale.
+ * The link graph is built at query time; there is no index file to go stale (lib/TextSearch.php).
  */
-const STOPWORDS = ['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'is', 'it', 'how', 'what', 'why', 'do', 'does', 'with', 'my', 'i'];
+require_once dirname(__DIR__, 2) . '/lib/TextSearch.php';
 
 function lessonsDir()
 {
@@ -20,67 +20,17 @@ function lessonsDir()
 
 function searchDirs()
 {
-    $dirs = [lessonsDir()];
-    foreach ((array) glob(dirname(__DIR__, 3) . '/packs/*/memory') as $d) {
-        $dirs[] = $d;
-    }
-    return $dirs;
-}
-
-function terms($text)
-{
-    preg_match_all('/[a-z0-9][a-z0-9._-]*/', strtolower($text), $m);
-    return array_values(array_diff(array_unique($m[0]), STOPWORDS));
+    return TextSearch::lessonDirs(dirname(__DIR__, 2));
 }
 
 function slugify($title)
 {
-    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
-    return $slug !== '' ? $slug : 'lesson';
+    return TextSearch::slug($title);
 }
 
 function search($query, $limit)
 {
-    $want = terms($query);
-    if (!$want) {
-        return [];
-    }
-    $allowMiss = count($want) >= 5 ? (int) floor(count($want) / 4) : 0;
-    $files = [];
-    foreach (searchDirs() as $dir) {
-        foreach ((array) glob($dir . '/*.md') as $f) {
-            if (basename($f) === 'README.md') {
-                continue;
-            }
-            $files[$f] = (string) file_get_contents($f);
-        }
-    }
-    $scores = [];
-    foreach ($files as $f => $text) {
-        $have = array_flip(terms($text));
-        $hits = 0;
-        foreach ($want as $t) {
-            if (isset($have[$t])) {
-                $hits++;
-            }
-        }
-        if ($hits >= count($want) - $allowMiss) {
-            $scores[$f] = $hits / sqrt(max(1, str_word_count($text)));
-        }
-    }
-    // Link boost: matched files linked from other matched files rank higher.
-    foreach ($scores as $f => $s) {
-        if (preg_match_all('/\]\(([^)]+\.md)\)/', $files[$f], $m)) {
-            foreach ($m[1] as $target) {
-                $abs = realpath(dirname($f) . '/' . $target);
-                if ($abs !== false && isset($scores[$abs])) {
-                    $scores[$abs] += 0.25 * $s;
-                }
-            }
-        }
-    }
-    arsort($scores);
-    return array_slice(array_keys($scores), 0, $limit);
+    return TextSearch::rank(TextSearch::readDirs(searchDirs()), $query, $limit);
 }
 
 function save($title, $bodyFile, $tags, $sources)
