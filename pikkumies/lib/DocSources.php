@@ -263,7 +263,7 @@ class DocSources
         return $items;
     }
 
-    /** HTTPS GET with TLS verification on and a size cap. */
+    /** HTTPS GET with TLS verification on and a size cap (PHP curl, which Provider needs too). */
     public static function get($url)
     {
         if (strpos($url, 'https://') !== 0 || stripos($url, '/clients/') !== false) {
@@ -272,39 +272,31 @@ class DocSources
         if (self::$fetcher !== null) {
             return (string) call_user_func(self::$fetcher, $url);
         }
-        if (function_exists('curl_init')) {
-            $body = '';
+        if (!function_exists('curl_init')) {
+            throw new Exception('the PHP curl extension is missing');
+        }
+        $body = '';
             $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_USERAGENT => 'pikkumies-docs',
-                CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$body) {
-                    $body .= $chunk;
-                    return strlen($body) > DocSources::MAX_RESPONSE ? 0 : strlen($chunk);
-                },
-            ]);
-            $ok = curl_exec($ch);
-            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $err = curl_error($ch);
-            curl_close($ch);
-            if (strlen($body) > self::MAX_RESPONSE) {
-                throw new Exception('response larger than ' . self::MAX_RESPONSE . ' bytes');
-            }
-            if ($ok === false || $code !== 200) {
-                throw new Exception("fetch failed (HTTP $code) $err");
-            }
-            return $body;
-        }
-        $ctx = stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'pikkumies-docs', 'follow_location' => 0, 'ignore_errors' => true]]);
-        $body = @file_get_contents($url, false, $ctx, 0, self::MAX_RESPONSE + 1);
-        $status = isset($http_response_header[0]) ? $http_response_header[0] : '';
-        if ($body === false || !preg_match('#^HTTP/\S+ 200#', $status)) {
-            throw new Exception('fetch failed: ' . ($status !== '' ? $status : 'no response'));
-        }
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_USERAGENT => 'pikkumies-docs',
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$body) {
+                $body .= $chunk;
+                return strlen($body) > DocSources::MAX_RESPONSE ? 0 : strlen($chunk);
+            },
+        ]);
+        $ok = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
         if (strlen($body) > self::MAX_RESPONSE) {
             throw new Exception('response larger than ' . self::MAX_RESPONSE . ' bytes');
+        }
+        if ($ok === false || $code !== 200) {
+            throw new Exception("fetch failed (HTTP $code) $err");
         }
         return $body;
     }
@@ -359,15 +351,6 @@ class DocSources
 
     public static function removeDir($dir)
     {
-        if (!is_dir($dir) || is_link($dir)) {
-            return;
-        }
-        foreach ((array) scandir($dir) as $f) {
-            if ($f !== '.' && $f !== '..') {
-                $p = $dir . '/' . $f;
-                is_dir($p) && !is_link($p) ? self::removeDir($p) : unlink($p);
-            }
-        }
-        rmdir($dir);
+        exec('rm -rf -- ' . escapeshellarg($dir));
     }
 }

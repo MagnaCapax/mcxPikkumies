@@ -145,7 +145,8 @@ class Detect
         return [
             'cpus'       => (int) trim((string) @shell_exec('nproc 2>/dev/null')),
             'memTotalMb' => (int) round($memTotalKb / 1024),
-            'homeFreeGb' => $home !== '' && is_dir($home) ? (int) round(disk_free_space($home) / 1073741824) : null,
+            'homeFreeGb' => $home !== '' && is_dir($home) ? round(disk_free_space($home) / 1073741824, 1) : null,
+            'homeTotalGb' => $home !== '' && is_dir($home) ? round(disk_total_space($home) / 1073741824, 1) : null,
         ];
     }
 }

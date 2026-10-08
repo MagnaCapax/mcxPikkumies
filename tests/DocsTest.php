@@ -1,6 +1,4 @@
 <?php
-require_once dirname(__DIR__) . '/pikkumies/lib/DocSources.php';
-
 /** A throwaway pikkumies tree (lib, hooks, tools, config) so nothing touches this checkout's local/. */
 function docsTree()
 {
@@ -19,13 +17,7 @@ function docsTree()
 
 function docsHook($tree, $hook, array $payload)
 {
-    $p = proc_open(escapeshellarg(PHP_BINARY) . " " . escapeshellarg("$tree/pikkumies/hooks/$hook"), [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]], $pipes);
-    fwrite($pipes[0], json_encode($payload));
-    fclose($pipes[0]);
-    $out = stream_get_contents($pipes[1]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    proc_close($p);
+    list(, $out) = runPhp("$tree/pikkumies/hooks/$hook", [], json_encode($payload));
     return $out;
 }
 
@@ -163,8 +155,8 @@ return [
         check($call('s1', 'write_file'), 'write_file not blocked before search');
         check($call('s1', 'terminal', 'systemctl restart nginx'), 'terminal not blocked before search');
         check(!$call('s1', 'read_file') && !$call('s1', 'clarify'), 'read-only tool blocked');
-        check(!$call('s1', 'terminal', 'php ~/pikkumies/tools/memory/memory.php search "disk"'), 'lessons search blocked');
-        check($call('s1', 'patch'), 'lessons search must not open the gate');
+        check(!$call('s1', 'terminal', 'php ~/pikkumies/tools/docs/docs.php sources'), 'docs sources blocked');
+        check($call('s1', 'patch'), 'docs sources must not open the gate');
         check(!$call('s1', 'terminal', 'php /home/u/pikkumies/tools/docs/docs.php search "disk full"'), 'docs search blocked');
         check(!$call('s1', 'write_file') && !$call('s1', 'terminal', 'df -h'), 'gate stayed closed after search');
         check($call('s2', 'write_file'), 'another session inherited the opened gate');

@@ -58,8 +58,8 @@ return [
     },
     'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);
-        // Hermes 0.19.0 reads key_env only under providers:<name>; a bare `provider: custom`
-        // ignores model.key_env and the request goes out without the key (HTTP 401).
+        // Hermes reads key_env under providers:<name>; a bare `provider: custom` ignored
+        // model.key_env when first verified and the request went out without the key (ADR-0005).
         check(strpos($y, "model:\n  provider: \"custom:pikkumies\"\n  default: \"m\"\n") !== false, 'model must name the custom:pikkumies provider and the model');
         check(preg_match('/^providers:\n  pikkumies:\n    base_url: "https:\/\/x\/v1"\n    key_env: PIKKUMIES_API_KEY\n    default_model: "m"\n/m', $y) === 1, 'providers.pikkumies block');
         check(preg_match('/^model:\n(  .*\n)*  key_env:/m', $y) === 0, 'key_env must not sit under model:');

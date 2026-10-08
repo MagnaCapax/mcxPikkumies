@@ -5,8 +5,8 @@ description: "Lessons: search how past problems on this machine were solved befo
 
 # Lessons
 
-1. Before you start: search for the problem in plain words.
-   `php ~/pikkumies/tools/memory/memory.php search "<what is wrong>"`
+1. Before you start: search for the problem in plain words. One search covers the lessons and the documentation.
+   `php ~/pikkumies/tools/docs/docs.php search "<what is wrong>"`
    Read the top results. Past fixes and mistakes are in there.
 2. After you solved something non-obvious: write the lesson body (what was wrong, the real cause, the fix, how you verified it) to `~/pikkumies/local/lesson-draft.md`, a private directory (never `/tmp`, which other users share), then save it.
    `php ~/pikkumies/tools/memory/memory.php save "<short title>" ~/pikkumies/local/lesson-draft.md --tags <a,b> --sources "<commands or files you used>"`

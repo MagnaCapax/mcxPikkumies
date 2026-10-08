@@ -1,9 +1,8 @@
 <?php
 /**
  * Hermes shell hook (pre_tool_call): blocks obviously destructive terminal commands and tells
- * the agent to ask the user first. Reads the hook JSON on stdin, prints a JSON decision on stdout.
- * A pre_tool_call shell hook can only block: any other action is ignored and the call runs
- * (agent/shell_hooks.py _parse_response, Hermes 0.19.0). The user can run the command themselves.
+ * the agent to ask the user first. Reads the hook JSON on stdin, prints a JSON decision on stdout
+ * (agent/shell_hooks.py _parse_pre_tool_call). The user can run the command themselves.
  *
  * This is a safety prompt for the agent's own mistakes, NOT a security boundary: the user
  * owns this file and Hermes' config. Real limits come from the OS (permissions, no sudo).

@@ -7,8 +7,8 @@
 // creation; chmod-after-write would leave a window where a secret is world-readable.
 umask(0077);
 
-foreach (['Config', 'Detect', 'Provider', 'Packs', 'HermesConfig', 'HermesInstall', 'Update'] as $class) {
-    require __DIR__ . '/../lib/' . $class . '.php';
+foreach (glob(dirname(__DIR__) . '/lib/*.php') as $lib) {
+    require_once $lib;
 }
 
 function out($line)

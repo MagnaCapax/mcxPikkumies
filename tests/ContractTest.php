@@ -1,6 +1,7 @@
 <?php
 /**
- * Authoring contract for shipped skills and packs, checked the way Hermes 0.19.0 reads them.
+ * Authoring contract for shipped skills and packs, checked the way Hermes reads them (found in the
+ * 0.19.0 source; re-check on a pin bump, ADR-0009).
  * A frontmatter Hermes cannot parse does not fail loudly: it logs a warning and lists the skill
  * with an empty description (agent/prompt_builder.py). Descriptions over 1024 characters are
  * cut silently (tools/skills_tool.py). A skill name that exists twice cannot be loaded

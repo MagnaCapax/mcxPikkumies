@@ -9,4 +9,4 @@ Run `php ~/pikkumies/tools/system/status.php` and read the JSON before you chang
 
 - `root.available` tells you whether you may use root at all. If it is false, do not try sudo.
 - `apps` lists only processes of the current user.
-- Low `disk.freeGb` is the most common cause of services failing to start; check it first.
+- Low `resources.homeFreeGb` is the most common cause of services failing to start; check it first.

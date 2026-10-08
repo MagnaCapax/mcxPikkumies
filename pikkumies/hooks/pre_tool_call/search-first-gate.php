@@ -39,7 +39,7 @@ if (preg_match('#tools/docs/docs\.php["\']?\s+search\b#', $command)) {
     }
     exit(0);
 }
-if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match('#tools/(docs/docs|memory/memory)\.php["\']?\s+(search|read|sources)\b#', $command)) {
+if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match('#tools/docs/docs\.php["\']?\s+(read|sources)\b#', $command)) {
     exit(0);
 }
 $docs = Config::root() . '/tools/docs/docs.php';
