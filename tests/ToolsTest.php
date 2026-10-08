@@ -49,6 +49,30 @@ return [
         check($code === 2, 'memory.php search must point to docs.php');
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'auto-update cron: one tagged line, other lines kept, off removes it, a failing crontab -l writes nothing' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-cron-' . getmypid();
+        @mkdir($tmp, 0700, true);
+        // A fake crontab command: never the real one.
+        file_put_contents("$tmp/crontab", "#!/bin/sh\nf=\"$tmp/tab\"\nif [ \"\$1\" = -l ]; then\n  [ -f \"$tmp/fail\" ] && { echo 'crontab: permission denied' >&2; exit 1; }\n  [ -f \"\$f\" ] && exec cat \"\$f\"\n  echo 'no crontab for u' >&2; exit 1\nfi\ncp \"\$1\" \"\$f\"\n");
+        chmod("$tmp/crontab", 0700);
+        Update::$crontab = "$tmp/crontab";
+        $on = Config::defaults();
+        check(strpos(Update::schedule($on, 1061), 'daily') === 0, 'first schedule');
+        $tab = file_get_contents("$tmp/tab");
+        check(substr_count($tab, Update::CRON_TAG) === 1 && strpos($tab, '41 17 * * * ') === 0 && strpos($tab, ' update > ') !== false, 'line: ' . $tab);
+        file_put_contents("$tmp/tab", "@reboot ~/start-rtorrent\n" . $tab . "0 1 * * * echo keep");
+        Update::schedule($on, 1061);
+        $tab = file_get_contents("$tmp/tab");
+        check(substr_count($tab, Update::CRON_TAG) === 1 && strpos($tab, "@reboot ~/start-rtorrent\n") === 0 && strpos($tab, "0 1 * * * echo keep\n") !== false, 'foreign lines lost: ' . $tab);
+        $off = Config::merge($on, ['autoUpdate' => ['disabled' => true]]);
+        Update::schedule($off, 1061);
+        check(strpos(file_get_contents("$tmp/tab"), Update::CRON_TAG) === false, 'off did not remove the line');
+        $before = file_get_contents("$tmp/tab");
+        touch("$tmp/fail");
+        check(strpos(Update::schedule($on, 1061), 'not changed') === 0 && file_get_contents("$tmp/tab") === $before, 'wrote after a failed crontab -l');
+        Update::$crontab = 'crontab';
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
     'update: fast-forwards a depth-1 clone, refuses local edits' => function () {
         $tmp = sys_get_temp_dir() . '/pk-upd-' . getmypid();
         $g = function ($dir, $args) {

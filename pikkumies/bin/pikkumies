@@ -54,6 +54,7 @@ switch ($cmd) {
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  packs: ' . (implode(', ', $packs) ?: 'none'));
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
+        out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
         break;
 
@@ -63,9 +64,11 @@ switch ($cmd) {
         if (!$ok) {
             exit(1);
         }
-        generate(profile());
+        $profile = profile();
+        generate($profile);
         out('config regenerated');
         $config = Config::load();
+        out('auto-update: ' . Update::schedule($config, $profile['uid']));
         foreach (HermesInstall::cleanup($config) as $old) {
             out('removed old Hermes build ' . $old);
         }

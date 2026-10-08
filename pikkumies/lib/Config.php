@@ -17,6 +17,7 @@ class Config
             'skills' => ['disabled' => []],        // shipped skill names to hide, e.g. after copying one (ADR-0007)
             'packs' => ['disabled' => []],         // every pack loads unless named here (ADR-0006)
             'searchFirst' => ['disabled' => false], // first-turn search hint + search-first gate (ADR-0011)
+            'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
             // The Hermes release the wiring was verified against, and its tarball checksum (ADR-0009).
             'hermes' => ['version' => 'v2026.9.24', 'sha256' => '15b15ce4e6ec8ea424a081823709d1e17f0943e7b42b59597d24ebb94cbd1742'],
         ];
