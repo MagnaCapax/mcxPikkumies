@@ -7,6 +7,7 @@ php ~/pikkumies/tools/docs/docs.php search "rtorrent not starting"      # lesson
 php ~/pikkumies/tools/docs/docs.php search "refund policy" --offline     # use the copies already on disk
 php ~/pikkumies/tools/docs/docs.php read ~/pikkumies/local/docs-cache/pm-wiki/rtorrent.md
 php ~/pikkumies/tools/docs/docs.php sources                              # what is configured, what is wrong, how old each copy is
+php ~/pikkumies/tools/docs/docs.php list pm-wiki | grep -i docker        # quick list: every downloaded page title and address
 php ~/pikkumies/tools/docs/docs.php refresh [name]                       # download now
 ```
 

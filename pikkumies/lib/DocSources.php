@@ -323,12 +323,19 @@ class DocSources
         $hits = [];
         foreach ($paths as $p) {
             list($source, $trust) = $dirs[dirname($p)];
-            $head = (string) file_get_contents($p, false, null, 0, 2048);
-            $title = preg_match('/^# (.+)$/m', $head, $m) ? trim($m[1]) : basename($p, '.md');
-            $url = preg_match('/^url: "(.*)"$/m', $head, $m) ? stripcslashes($m[1]) : '';
+            list($title, $url) = self::pageInfo($p);
             $hits[] = [$p, $title, $source, $trust, $url];
         }
         return [$hits, $notes];
+    }
+
+    /** [title, url] of a cached page or lesson, from its first lines. */
+    public static function pageInfo($path)
+    {
+        $head = (string) file_get_contents($path, false, null, 0, 2048);
+        $title = preg_match('/^# (.+)$/m', $head, $m) ? trim($m[1]) : basename($path, '.md');
+        $url = preg_match('/^url: "(.*)"$/m', $head, $m) ? stripcslashes($m[1]) : '';
+        return [$title, $url];
     }
 
     /** A path is readable through the tool only inside the lessons or the docs cache. */

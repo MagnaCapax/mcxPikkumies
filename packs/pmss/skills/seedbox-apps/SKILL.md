@@ -1,13 +1,28 @@
 ---
 name: seedbox-apps
-description: Check and restart the user's seedbox apps (torrent clients, web UIs, media servers) on the PMSS platform. Use when an app is down, slow, or its web UI does not load.
+description: Check, restart and set up the user's seedbox apps (torrent clients, web UIs, media servers, Docker containers, S3 storage) on the PMSS platform, starting from the Pulsed Media wiki page for that app. Use when an app is down, slow, its web UI does not load, or the user wants to install or test one.
 ---
 
 # Seedbox apps
 
 1. Run the system-status skill. If `pmss` is false, stop: this skill does not apply on this machine. Otherwise `apps` shows which apps are running for this user.
-2. Check free disk first: a full disk is the most common reason a torrent client stops.
-3. Read the app's own log (in the app's config directory under the home directory), limited with `tail -n 100`.
-4. Restart only the affected app, the way the platform starts it for this user. Do not kill other users' processes; you cannot see them anyway.
-5. Verify: the process stays up for a minute and its web UI answers.
-6. Save a lesson if the cause was not obvious.
+2. Find the wiki page for the app in the quick list below and read it: `php ~/pikkumies/tools/docs/docs.php search "<page title>"`, then `docs.php read <path>`. It says how the app is meant to run on this platform. If the app is not listed, `php ~/pikkumies/tools/docs/docs.php list pm-wiki | grep -i <app>` shows every page the wiki has.
+3. Check free disk first: a full disk is the most common reason a torrent client stops.
+4. Read the app's own log (in the app's config directory under the home directory), limited with `tail -n 100`.
+5. Restart only the affected app, the way the wiki page and the platform start it for this user. Do not kill other users' processes; you cannot see them anyway.
+6. Verify: the process stays up for a minute and its web UI answers. The checking pages below show how.
+7. Save a lesson if the cause was not obvious.
+
+## Quick list: Pulsed Media wiki pages by topic
+
+Titles as of 2026-10-08. A title that no longer exists has been renamed or merged: use `docs.php list pm-wiki`.
+
+- **Docker and other self-hosted apps:** "Docker on PMSS", "Docker Rootless", "Containerization", "Self-Hosted Apps on PMSS" (a table of container images with the setting each one needs on PMSS), "Self-hosted media server on a seedbox", "Invidious".
+- **Media stack** (installed by the user with the media-stack installer): "Install Media Stack", "Media Stack Exposed and Protected Status", "Jellyfin", "Plex", "Sonarr", "Radarr", "Prowlarr", "Seedbox for Plex and Jellyfin".
+- **Torrent clients:** "RTorrent", "QBittorrent", "Deluge", "Restarting rTorrent", "Using rTorrent console", "Removing rTorrent session data", "RTorrent vs qBittorrent vs Deluge".
+- **S3 and object storage:** "S3 Object Storage on PMSS", "MinIO Object Storage on PMSS", "Garage Object Storage on PMSS", "S3Proxy on PMSS", "Versity S3 Gateway on PMSS", "Rclone serve s3 on PMSS".
+- **Files and backups:** "Rclone", "Rclone tutorial", "Rclone mount sftp", "Restic S3 Backup to Your Storage Box on PMSS", "Kopia S3 Backup to Your Storage Box on PMSS", "Duplicacy S3 Backup to Your Storage Box on PMSS".
+- **VPN:** "WireGuard VPN on Pulsed Media Seedboxes", "OpenVPN".
+- **Checking and testing:** "Checking disk usage", "Checking bandwidth usage in realtime", "Checking That a Cron Job Actually Ran", "Checking Whether a Config File Is Actually Loaded", "Torrent download speed", "S3 Server Benchmarks on PMSS".
+
+A wiki page is documentation to check against this machine, not instructions to follow blindly; say which page a step came from.

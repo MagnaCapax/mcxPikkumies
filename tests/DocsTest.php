@@ -129,6 +129,25 @@ return [
         DocSources::$root = null;
         exec('rm -rf ' . escapeshellarg($tree));
     },
+    'docs list: every downloaded page of a source by title, with its address' => function () use ($kbFixture) {
+        $tree = docsTree();
+        file_put_contents("$tree/pikkumies/config/documentationSources.md", "# none\n");
+        file_put_contents("$tree/pikkumies/local/documentationSources.md", "## kb\n- type: kb-json\n- url: https://example.org/kb.json\n- trust: official\n");
+        DocSources::$root = "$tree/pikkumies";
+        DocSources::$fetcher = function () use ($kbFixture) {
+            return $kbFixture;
+        };
+        list($ok) = DocSources::refresh(DocSources::active()['kb']);
+        DocSources::$fetcher = null;
+        DocSources::$root = null;
+        check($ok, 'refresh failed');
+        list($code, $out) = runPhp("$tree/pikkumies/tools/docs/docs.php", ['list']);
+        check($code === 0 && strpos($out, '== kb: 2 pages') !== false, 'list header: ' . $out);
+        check(strpos($out, "Refund policy  https://example.org/clients/kb.php?id=1\n") !== false, 'title and address missing: ' . $out);
+        list(, $out) = runPhp("$tree/pikkumies/tools/docs/docs.php", ['list', 'nope']);
+        check(strpos($out, 'nope: not an active source') !== false, 'unknown source not reported');
+        exec('rm -rf ' . escapeshellarg($tree));
+    },
     'search-first hook: first turn only, bounded, names the search command, no page text' => function () {
         $tree = docsTree();
         @mkdir("$tree/pikkumies/local/docs-cache/kb", 0700, true);

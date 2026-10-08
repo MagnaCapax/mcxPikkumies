@@ -51,6 +51,23 @@ if ($cmd === 'sources') {
         echo '  covers: ' . (isset($src['covers']) ? $src['covers'] : '') . "\n";
         echo $problems ? '  NOT USED: ' . implode('; ', $problems) . "\n" : ($status === 'on' ? '  copy: ' . age($name) . "\n" : '');
     }
+} elseif ($cmd === 'list') {
+    // Every downloaded page of each source, by title: the quick list of what the documentation covers.
+    $active = DocSources::active();
+    foreach (count($args) > 1 ? array_slice($args, 1) : array_keys($active) as $name) {
+        if (!isset($active[$name])) {
+            echo "$name: not an active source (see: docs.php sources)\n";
+            continue;
+        }
+        $rows = [];
+        foreach ((array) glob(DocSources::cacheRoot() . '/' . $name . '/*.md') as $p) {
+            list($title, $url) = DocSources::pageInfo($p);
+            $rows[$title] = $title . ($url !== '' ? '  ' . $url : '');
+        }
+        ksort($rows, SORT_NATURAL | SORT_FLAG_CASE);
+        echo "== $name: " . count($rows) . ' pages' . ($rows ? '' : ' (not downloaded yet: docs.php refresh ' . $name . ')') . "\n";
+        echo $rows ? implode("\n", $rows) . "\n" : '';
+    }
 } elseif ($cmd === 'refresh') {
     $active = DocSources::active();
     $names = count($args) > 1 ? array_slice($args, 1) : array_keys($active);
@@ -86,6 +103,6 @@ if ($cmd === 'sources') {
     }
     echo file_get_contents(realpath($args[1]));
 } else {
-    fwrite(STDERR, "usage: docs.php sources | refresh [name...] | search \"<words>\" [--limit N] [--offline] | read <path>\n");
+    fwrite(STDERR, "usage: docs.php sources | list [name...] | refresh [name...] | search \"<words>\" [--limit N] [--offline] | read <path>\n");
     exit(2);
 }
