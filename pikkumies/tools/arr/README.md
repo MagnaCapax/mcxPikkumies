@@ -15,7 +15,7 @@ These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `son
 | history | `[--since <time>] [--limit N]` | no | Recent events: grabbed, imported, failed, deleted (Prowlarr: queries and grabs). |
 | restart | | yes | Restarts the app the provider's way, then checks it answers with a newer start time (PMSS: and runs in its tmux session). PMSS: refused while the user has it turned off. |
 
-`history`, `queue` and `wanted` read the app's list page by page (200 records a request, at most 1000 a call, `lib/ArrPages.php`): `--limit 0` prints as many as fit in the 16 KiB output, and `truncated` with `next_offset` says when there are more.
+`history`, `queue` and `wanted` read the app's list page by page (200 records a request, at most 1000 a call, `lib/ArrPages.php`): `--limit 0` prints as many as fit in the 16 KiB output, and `truncated` with `next_offset` says when there are more. `total` is then the app's own count (Servarr `totalRecords`, Bazarr `total`, the sum of both lists for Bazarr's two-kind verbs, autobrr `count`), not the records one call read; `null` when the app sends none.
 
 ## Library apps (sonarr, radarr, lidarr; whisparr: all but lookup and add; readarr: queue and wanted only)
 

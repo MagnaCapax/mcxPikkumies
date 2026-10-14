@@ -70,9 +70,10 @@ function plexFixture(array $over = [])
     return $fx;
 }
 
+/** Plex's data-directory variable is never taken from the test runner's environment. */
 function plexRun(array $fx, array $args, array $seams = [])
 {
-    return mediaRun($fx, 'plex', $args, $seams, [PLEX_TOKEN]);
+    return mediaRun($fx, 'plex', $args, $seams + ['support_dir' => ''], [PLEX_TOKEN]);
 }
 
 function plexSecret(array $fx)

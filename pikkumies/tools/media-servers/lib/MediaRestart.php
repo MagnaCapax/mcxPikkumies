@@ -71,7 +71,9 @@ class MediaRestart
         $hint = $family === 'pmss' ? 'use the PMSS panel, or restart it the way it was started'
             : 'restart it the way your provider documents, or the way it was started';
         $hint = isset(self::ELSEWHERE[$family][$unit]) ? self::ELSEWHERE[$family][$unit] : $hint;
-        $why = "restart works for a PMSS media-stack install and a container on the user's own rootless Docker; this one was found by $how";
+        // Only Jellyfin has a PMSS media-stack install (JellyfinLocate.php); Emby and Plex run in the user's own container.
+        $ways = ($unit === 'jellyfin' ? 'as a PMSS media-stack install or ' : '') . "in a container on the user's own rootless Docker";
+        $why = 'restart works for ' . ucfirst($unit) . " $ways; this one was found by $how";
         return ['how' => 'refuse', 'why' => $why, 'hint' => $hint];
     }
 

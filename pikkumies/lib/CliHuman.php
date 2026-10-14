@@ -91,7 +91,7 @@ class CliHuman
         }
         $line = 'ok, ' . $s['count'] . ' shown';
         if (!empty($s['truncated'])) {
-            $line .= ' of ' . $s['total'] . ' (use --limit to see more)';
+            $line .= isset($s['total']) ? ' of ' . $s['total'] . ' (use --limit to see more)' : ', more exist (use --limit to see more)';
         }
         foreach ($s as $k => $v) {
             if (!in_array($k, ['ok', 'count', 'truncated', 'total'], true)) {

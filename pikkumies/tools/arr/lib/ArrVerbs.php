@@ -68,7 +68,8 @@ class ArrVerbs
             $status = [];
         } else {
             $q = ['sortKey' => 'date', 'sortDirection' => 'descending'] + $app['historyBools'];
-            list($rows, $status) = ArrPages::get($c, 'history', ArrPages::SERVARR, $q, $opt);
+            list($rows, $status, , $total) = ArrPages::get($c, 'history', ArrPages::SERVARR, $q, $opt);
+            $status['total'] = $total;
         }
         return ['records' => array_map(function ($h) use ($app) {
             return ArrRecords::history($app, $h);

@@ -23,9 +23,10 @@ class MediaServers
 
     /**
      * $connect: fn(array $opt, bool $auth) => MediaServer, called only when a verb needs the server; $auth false
-     * (restart) loads no credential and sends none. $login: the unit's login verb.
+     * (restart) loads no credential and sends none. $login: the unit's login verb. $options: the unit's own options that
+     * take a value (plex: --log), which its $connect reads from $opt.
      */
-    public static function run(array $argv, callable $connect, callable $login, $usage)
+    public static function run(array $argv, callable $connect, callable $login, $usage, array $options = [])
     {
         $server = null;
         $s = function ($opt, $auth = true) use (&$server, $connect) {
@@ -71,10 +72,14 @@ class MediaServers
                 return $scrub(self::addresses(MediaEndStream::finish($done), false));
             },
             'recent' => function ($args, $opt) use ($s, $scrub) {
-                $items = $s($opt)->recent(self::need($opt));
+                $got = $s($opt)->recent($need = self::need($opt));
+                $items = isset($got['items']) ? $got['items'] : $got;
+                // The whole list's size: the server's own count, else exact only when fewer came than were asked for.
+                $total = array_key_exists('total', $got) ? $got['total'] : (count($items) < $need ? count($items) : null);
                 $capped = count($items) >= self::RECENT_CAP;
-                return ['records' => $scrub($items), 'status' => $capped ? ['note' => 'read the ' . self::RECENT_CAP
-                    . ' most recently added items, the most one call reads; older ones: the server\'s own web UI'] : []];
+                $note = 'read the ' . self::RECENT_CAP . ' most recently added items, the most one call reads; older ones: '
+                    . 'the server\'s own web UI';
+                return ['records' => $scrub($items), 'status' => ['total' => $total] + ($capped ? ['note' => $note] : [])];
             },
             'logs' => function ($args, $opt) use ($s) {
                 $n = isset($opt['lines']) ? (int) $opt['lines'] : 50;
@@ -90,7 +95,7 @@ class MediaServers
                 return $scrub([$s($opt, false)->restart()]); // public status and the platform's own restart: no credential
             },
             'login' => $login,
-        ], $usage, ['all', 'addresses'], ['reason', 'lines', 'url']);
+        ], $usage, ['all', 'addresses'], array_merge(['reason', 'lines', 'url'], $options));
     }
 
     /**

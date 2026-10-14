@@ -16,7 +16,11 @@ class PlexRecords
             'scanning' => !empty($d['refreshing']), 'progress' => null];
     }
 
-    /** A Metadata of /status/sessions. */
+    /**
+     * A Metadata of /status/sessions. id: Session.id, which terminate takes; a row without a Session object (live 1.43.4:
+     * a client that only reports its timeline) falls back to sessionKey, then Player.machineIdentifier, so it can still be
+     * named; whether terminate ends such a row is [UNVERIFIED], and end-stream's read-back reports what happened.
+     */
     public static function session(array $m)
     {
         $sess = isset($m['Session']) ? (array) $m['Session'] : [];
@@ -24,7 +28,7 @@ class PlexRecords
         $tc = isset($m['TranscodeSession']) ? (array) $m['TranscodeSession'] : null;
         $decisions = $tc === null ? [] : array_intersect_key($tc, ['videoDecision' => 1, 'audioDecision' => 1]);
         return [
-            'id' => (string) (isset($sess['id']) ? $sess['id'] : ''),
+            'id' => (string) self::first([$sess, 'id'], [$m, 'sessionKey'], [$p, 'machineIdentifier']),
             'user' => (string) (isset($m['User']['title']) ? $m['User']['title'] : ''),
             'client' => (string) (isset($p['product']) ? $p['product'] : ''),
             'device' => (string) (isset($p['title']) ? $p['title'] : ''),
@@ -47,6 +51,17 @@ class PlexRecords
         return ['title' => self::title($m), 'type' => (string) (isset($m['type']) ? $m['type'] : ''),
             'library' => (string) (isset($m['librarySectionTitle']) ? $m['librarySectionTitle'] : ''),
             'added_at' => isset($m['addedAt']) ? (int) $m['addedAt'] : null];
+    }
+
+    /** The first non-empty [array, key] value, '' when none. */
+    private static function first()
+    {
+        foreach (func_get_args() as $a) {
+            if (isset($a[0][$a[1]]) && (string) $a[0][$a[1]] !== '') {
+                return $a[0][$a[1]];
+            }
+        }
+        return '';
     }
 
     public static function title(array $m)

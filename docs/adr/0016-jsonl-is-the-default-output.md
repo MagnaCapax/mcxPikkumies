@@ -30,3 +30,6 @@ The request of 2026-10-14: every tool "should have --human option to output pret
 
 ## References
 - ADR-0017 (`--human` output), ADR-0015 (tool units)
+
+## Addendum 2026-10-14: what `total` counts
+- When the app reports its own total (Plex totalSize, Servarr totalRecords, Bazarr total, autobrr count), the status line `total` is that number, never lower than the records read; when the app reports none, `total` is the number read, or `null` when more may exist but the count is unknown. `--human` prints "N shown of M" or "N shown, more exist". Found in a live run: Plex `recent --limit 1` reported `total:2` while the server held 3.

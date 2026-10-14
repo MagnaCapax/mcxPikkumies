@@ -28,6 +28,7 @@ class MediaEndStream
                 $r['result'] = 'failed: ' . $e->getMessage();
             } catch (CliError $e) {
                 $r['result'] = 'failed: ' . $e->getMessage();
+                $r['hint'] = $e->hint; // the unit's own advice (plex: end it from the dashboard); finish() puts it in its hint
             }
             $out[] = $r;
         }
@@ -64,11 +65,14 @@ class MediaEndStream
         if (!$bad) {
             return $done;
         }
+        $hints = array_unique(array_filter(array_column($bad, 'hint'), 'strlen'));
         $each = array_map(function ($r) {
             $sent = empty($r['verified']) ? 'stop sent, but it still plays' : 'ended';
             return "{$r['id']}: " . ($r['result'] === 'stop sent' ? $sent : $r['result']);
         }, $done);
-        throw new CliError('not every stream ended: ' . implode(' | ', $each),
-            '`sessions` shows what still plays (a client may ignore the stop command); tell the user exactly this');
+        // The unit's own advice first (plex: end it from the dashboard), else the generic one.
+        $hint = $hints ? implode('; ', $hints) . '; `sessions` shows what still plays'
+            : '`sessions` shows what still plays (a client may ignore the stop command)';
+        throw new CliError('not every stream ended: ' . implode(' | ', $each), $hint . '; tell the user exactly this');
     }
 }

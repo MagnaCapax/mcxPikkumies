@@ -41,18 +41,18 @@ class ArrLibrary
                 }, $targets));
             },
             'queue' => function ($args, $opt) use ($app, $c) {
-                list($rows, $status, $total) = ArrPages::get($c(), 'queue', ArrPages::SERVARR, $app['queueBools'], $opt);
+                list($rows, $status, $total, $all) = ArrPages::get($c(), 'queue', ArrPages::SERVARR, $app['queueBools'], $opt);
                 return ['records' => array_map(function ($q) use ($app) {
                     return ArrRecords::queue($app, $q);
-                }, $rows), 'status' => ['in_queue' => $total] + $status];
+                }, $rows), 'status' => ['in_queue' => $total, 'total' => $all] + $status];
             },
             'wanted' => function ($args, $opt) use ($app, $c) {
                 $cutoff = !empty($opt['cutoff']);
-                list($rows, $status, $total) = ArrPages::get($c(), $cutoff ? 'wanted/cutoff' : 'wanted/missing', ArrPages::SERVARR,
+                list($rows, $status, $total, $all) = ArrPages::get($c(), $cutoff ? 'wanted/cutoff' : 'wanted/missing', ArrPages::SERVARR,
                     $app[$cutoff ? 'cutoffBools' : 'wantedBools'], $opt);
                 return ['records' => array_map(function ($w) use ($app) {
                     return self::wanted($app, $w);
-                }, $rows), 'status' => ['wanted' => $total] + $status];
+                }, $rows), 'status' => ['wanted' => $total, 'total' => $all] + $status];
             },
         ];
     }

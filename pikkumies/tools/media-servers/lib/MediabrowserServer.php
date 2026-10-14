@@ -114,18 +114,22 @@ class MediabrowserServer implements MediaServer
     public function recent($limit)
     {
         $items = [];
+        $full = false; // a library sent all $limit asked for: it may hold more, so the whole count is unknown
         $user = $this->admin();
         foreach ($this->libraries(false) as $l) {
             $q = ['parentId' => $l['id'], 'limit' => (string) $limit, 'fields' => 'DateCreated'];
             $path = str_replace('{user}', rawurlencode($user), $this->mb->set['latest']);
-            foreach ($this->mb->get($path, $path === '/Items/Latest' ? $q + ['userId' => $user] : $q) as $i) {
+            $got = (array) $this->mb->get($path, $path === '/Items/Latest' ? $q + ['userId' => $user] : $q);
+            $full = $full || count($got) >= $limit;
+            foreach ($got as $i) {
                 $items[] = MediabrowserRecords::item((array) $i, $l['name']);
             }
         }
         usort($items, function ($a, $b) {
             return (int) $b['added_at'] - (int) $a['added_at'];
         });
-        return array_slice($items, 0, $limit);
+        // Items/Latest is a plain list with no TotalRecordCount: the merged count is the total only when no library was cut.
+        return ['items' => array_slice($items, 0, $limit), 'total' => $full ? null : count($items)];
     }
 
     public function logs($lines)

@@ -25,7 +25,10 @@ interface MediaServer
     /** Ends the playback of each session record given (from sessions()); one record each: id, result. */
     public function endStream(array $sessions, $reason);
 
-    /** The $limit most recently added items: title, type, library, added_at (unix time). */
+    /**
+     * The $limit most recently added items: title, type, library, added_at (unix time). Either that list, or
+     * ['items' => the list, 'total' => the server's count of every recently added item, null when unknown].
+     */
     public function recent($limit);
 
     /** ['file' => where the lines came from, 'lines' => the last $lines lines, raw]. */

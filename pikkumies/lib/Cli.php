@@ -5,6 +5,8 @@
  * A tool ends with Cli::run($argv, ['verb' => callable, ...], $usage). A verb receives
  * (array $args, array $opt) and returns a list of records (arrays), or
  * ['records' => [...], 'status' => [...]] to add fields to the status line (e.g. 'verified').
+ * A status `total` (an int, or null for "unknown") is the app's own count of the whole list, printed instead of the
+ * number of records read when the output is truncated: a unit that reads one record more than it prints passes it.
  * It throws CliError for a failure the user can act on. Output: one JSON object per line and a
  * final {"ok":...} line; --human prints the same records for people. Exit 0 ok, 1 error, 2 usage.
  */
@@ -145,6 +147,9 @@ class Cli
             }
             $bytes += strlen($line) + 1;
             $shown[] = $r;
+        }
+        if (array_key_exists('total', $extra) && ($extra['total'] === null || is_int($extra['total']))) {
+            $total = $extra['total'] === null ? null : max($extra['total'], $total); // never fewer than were read
         }
         $extra = self::clean($extra);
         unset($extra['ok'], $extra['count'], $extra['truncated'], $extra['total'], $extra['next_offset']); // the status line and exit code always agree

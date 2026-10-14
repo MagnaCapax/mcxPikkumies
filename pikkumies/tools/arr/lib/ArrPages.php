@@ -23,7 +23,8 @@ class ArrPages
     /**
      * One list of the app: $k = [offset param, size param, rows field, total field]. Servarr pages by number (SERVARR);
      * Bazarr (start, length -> data, total) and autobrr (offset, limit -> data, count) by record offset. Stops at a
-     * short page, at the app's total or at need(). Returns [rows, status, the app's total or 0].
+     * short page, at the app's total or at need(). Returns [rows, status, the app's total or 0, the app's total or null]:
+     * the last one goes to Cli as status `total`, so a truncated call reports the app's count, not the records read.
      */
     public static function get(ArrClient $c, $path, array $k, array $query, array $opt)
     {
@@ -40,6 +41,6 @@ class ArrPages
         $rows = array_slice($rows, 0, $need);
         $more = count($rows) >= self::CAP && ($total === null || $total > count($rows));
         return [$rows, $more ? ['note' => 'read the first ' . self::CAP . ' of ' . ($total === null ? 'more' : $total)
-            . ' records; the rest: --since where the verb has it, or the app\'s own UI'] : [], (int) $total];
+            . ' records; the rest: --since where the verb has it, or the app\'s own UI'] : [], (int) $total, $total];
     }
 }

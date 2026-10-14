@@ -118,9 +118,11 @@ class BazarrRun
     {
         $out = [];
         $note = [];
+        $all = 0; // both kinds' totals; null once one is unknown
         foreach (['episodes' => 'series', 'movies' => 'movie'] as $path => $kind) {
-            list($rows, $more) = ArrPages::get($c, "$path/history", ['start', 'length', 'data', 'total'], [], $opt);
+            list($rows, $more, , $total) = ArrPages::get($c, "$path/history", ['start', 'length', 'data', 'total'], [], $opt);
             $note += $more;
+            $all = $all === null || $total === null ? null : $all + $total;
             foreach ($rows as $h) {
                 $id = $kind === 'series' ? ArrRecords::s($h, 'sonarrSeriesId') : ArrRecords::s($h, 'radarrId');
                 $at = strtotime(ArrRecords::s($h, 'parsed_timestamp'));
@@ -135,6 +137,6 @@ class BazarrRun
         usort($out, function ($a, $b) {
             return $b['event_at'] - $a['event_at'];
         });
-        return ['records' => array_slice($out, 0, ArrPages::need($opt)), 'status' => $note];
+        return ['records' => array_slice($out, 0, ArrPages::need($opt)), 'status' => ['total' => $all] + $note];
     }
 }

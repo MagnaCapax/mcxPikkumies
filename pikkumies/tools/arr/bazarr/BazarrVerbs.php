@@ -76,8 +76,8 @@ class BazarrVerbs
     /** Wanted episodes and movies: the items with missing subtitles. */
     public static function wanted(ArrClient $c, array $opt)
     {
-        list($ep, $epNote, $epTotal) = ArrPages::get($c, 'episodes/wanted', ['start', 'length', 'data', 'total'], [], $opt);
-        list($mv, $mvNote, $mvTotal) = ArrPages::get($c, 'movies/wanted', ['start', 'length', 'data', 'total'], [], $opt);
+        list($ep, $epNote, $epTotal, $epAll) = ArrPages::get($c, 'episodes/wanted', ['start', 'length', 'data', 'total'], [], $opt);
+        list($mv, $mvNote, $mvTotal, $mvAll) = ArrPages::get($c, 'movies/wanted', ['start', 'length', 'data', 'total'], [], $opt);
         $out = [];
         foreach ($ep as $e) {
             $out[] = ['kind' => 'episode', 'item' => 'series:' . (int) ArrRecords::s($e, 'sonarrSeriesId'),
@@ -89,7 +89,9 @@ class BazarrVerbs
             $out[] = ['kind' => 'movie', 'item' => 'movie:' . (int) ArrRecords::s($m, 'radarrId'), 'title' => ArrRecords::s($m, 'title'),
                 'missing_languages' => self::languages(isset($m['missing_subtitles']) ? $m['missing_subtitles'] : [])];
         }
-        return ['records' => $out, 'status' => ['episodes_wanted' => $epTotal, 'movies_wanted' => $mvTotal] + $epNote + $mvNote];
+        $all = $epAll === null || $mvAll === null ? null : $epAll + $mvAll; // both lists, as the records hold both
+        return ['records' => $out,
+            'status' => ['episodes_wanted' => $epTotal, 'movies_wanted' => $mvTotal, 'total' => $all] + $epNote + $mvNote];
     }
 
     /** Language names, with ":forced" / ":hi" when the subtitle is that kind. */

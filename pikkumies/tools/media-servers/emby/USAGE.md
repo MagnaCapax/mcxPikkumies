@@ -9,7 +9,7 @@ The user's own Emby through its HTTP API (under `/emby`). Same verbs and records
 | scan | `<library>... \| --all` | yes | Starts a recursive scan of each named library (`MetadataRefreshMode` and `ImageRefreshMode` `Default`, no `ReplaceAll*`). `result`: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play`, `transcode_reasons`, `hardware` (decoder or encoder in hardware), `bitrate`, `remote`; `address` only with `--addresses`. |
 | end-stream | `<session-id>... [--reason <text>]` | yes | Sends Stop to each session (and the reason as a message first, when given); `verified` when it left the list. A failed stop, or a session that still plays after it (the list is read up to 5 times, 0.4 s apart; a client may ignore the command), ends the call `ok:false` with each id's result. |
-| recent | `[--limit N]` | no | Recently added items across libraries: `title`, `type`, `library`, `added_at`. |
+| recent | `[--limit N]` | no | Recently added items across libraries: `title`, `type`, `library`, `added_at`. When truncated, `total` is the merged count, or `null` (unknown) when a library had more than one call read: the server sends no total for recently added items. |
 | logs | `[--lines N] [--addresses]` | no | `file` (the newest log the API lists) and its last `lines` (default 50). |
 | restart | | yes | A container on the user's own rootless Docker: `docker restart`, then waits up to 90 s for an answer. Elsewhere it refuses and says how. |
 | login | | yes | The user types an API key at a terminal; it is checked once and stored in `local/secrets/emby`. |

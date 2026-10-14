@@ -10,23 +10,26 @@ require_once "$mediaUnitLib/MediaServers.php";
 require_once __DIR__ . '/PlexClient.php';
 require_once __DIR__ . '/PlexRecords.php';
 require_once __DIR__ . '/PlexServer.php';
+require_once __DIR__ . '/PlexLocal.php';
 
 $usage = <<<'TXT'
 usage: php plex.php <verb> [arguments] [--url http://127.0.0.1:<port>] [--human]
   stats             libraries           sessions [--addresses]       recent [--limit N]
   scan <library>... | scan --all        end-stream <session-id>... [--reason <text>]
-  logs [--lines N] [--addresses]        restart
+  logs [--lines N] [--log <name>] [--addresses]   restart
   login             (the user types a Plex token at a terminal; stored for this tool)
 Libraries: an id or name from `libraries`. Session ids: from `sessions`. Output: JSON Lines. See USAGE.md.
 TXT;
 
-// Test seams: a test may set $mediaSeams before including this file. Nothing here is read from the environment.
+// Test seams: a test may set $mediaSeams before including this file. Only HOME and Plex's own data-directory variable
+// are read from the environment, to find the Plex data directory (PlexLocal.php).
 $plexSeams = (isset($mediaSeams) ? $mediaSeams : []) + ['secrets' => Config::localDir() . '/secrets', 'pmss_dir' => '/etc/seedbox/config',
-    'docker_sock' => null, 'tables' => null, 'timeout' => 15, 'wait' => 90];
+    'docker_sock' => null, 'tables' => null, 'timeout' => 15, 'wait' => 90, 'home' => rtrim((string) getenv('HOME'), '/'),
+    'support_dir' => (string) getenv('PLEX_MEDIA_SERVER_APPLICATION_SUPPORT_DIR')];
 $plexUid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
 $plexSecret = new MediaSecret($plexSeams['secrets'], 'plex');
 
-/** [PlexClient, found]. The data directory is the host side of the container's /config mount. */
+/** [PlexClient, found]. The data directory: the host side of the container's /config mount, else Plex's defaults (PlexLocal). */
 $plexConnect = function (array $opt) use ($plexSeams, $plexUid, $plexSecret) {
     $family = Host::family($plexSeams['pmss_dir']);
     $url = isset($opt['url']) && is_string($opt['url']) ? rtrim($opt['url'], '/') : '';
@@ -44,7 +47,8 @@ $plexConnect = function (array $opt) use ($plexSeams, $plexUid, $plexSecret) {
     $restart = $c !== null ? ['how' => 'docker', 'docker' => $docker, 'container' => $c]
         : MediaRestart::elsewhere($family, 'plex', '--url');
     $found = ['how' => $c !== null ? 'docker' : 'url', 'url' => $base, 'port' => $port, 'listen' => $listen,
-        'data_dir' => $config !== '' ? "$config/Library/Application Support/Plex Media Server" : '', 'restart' => $restart];
+        'data_dirs' => PlexLocal::dirs($config, $plexSeams['home'], $plexSeams['support_dir']), 'restart' => $restart,
+        'log' => isset($opt['log']) && is_string($opt['log']) ? $opt['log'] : ''];
     $http = new MediaHttp('Plex', $base, PlexClient::ALLOW, $plexUid, $plexSeams['timeout'], $plexSeams['tables']);
     return [new PlexClient($http, $plexSecret->deviceIdLater()), $found];
 };
@@ -56,15 +60,16 @@ MediaServers::run($argv, function (array $opt, $auth = true) use ($plexConnect, 
         return new PlexServer($plex, $found + ['login_from' => ''], [], $plexSeams['wait']);
     }
     $s = $plexSecret->load();
-    $prefs = $found['data_dir'] !== '' ? $found['data_dir'] . '/Preferences.xml' : '';
+    $prefs = PlexLocal::first($found['data_dirs'], 'Preferences.xml');
     if (!empty($s['key']) && is_string($s['key'])) {
         list($token, $from, $mark) = [$s['key'], 'token stored with `login` in ' . $plexSecret->path(), 'key_rejected'];
     } else {
         // The server's own account token, PlexOnlineToken in Preferences.xml ([UNVERIFIED]: README.md).
         $xml = $prefs !== '' && is_file($prefs) ? (string) @file_get_contents($prefs, false, null, 0, 1048576) : '';
         if (!preg_match('/\bPlexOnlineToken="([^"]+)"/', $xml, $m)) {
-            throw new CliError('no Plex token: none stored with `login`' . ($prefs !== '' ? ', none readable in Preferences.xml' : ''),
-                $plexLoginHint);
+            $where = $prefs !== '' ? "none readable in $prefs"
+                : 'no Preferences.xml in ' . (implode(', ', $found['data_dirs']) ?: 'any folder (HOME is not set)');
+            throw new CliError("no Plex token: none stored with `login`, $where", $plexLoginHint);
         }
         list($token, $from, $mark) = [html_entity_decode($m[1], ENT_QUOTES | ENT_XML1), 'PlexOnlineToken in ' . $prefs, 'prefs_rejected'];
     }
@@ -80,8 +85,6 @@ MediaServers::run($argv, function (array $opt, $auth = true) use ($plexConnect, 
 }, function ($args, $opt) use ($plexConnect, $plexSecret) {
     return $plexSecret->login('Plex token (X-Plex-Token; not shown): ', __FILE__, function ($key) use ($plexConnect, $opt) {
         list($plex) = $plexConnect($opt);
-        $plex->useToken($key, function () {
-        });
-        $plex->get('/library/sections/all');
+        $plex->checkToken($key);
     });
-}, $usage);
+}, $usage, ['log']);

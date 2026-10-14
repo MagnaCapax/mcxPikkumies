@@ -55,6 +55,22 @@ class PlexClient
     }
 
     /**
+     * `login`'s check of a typed token: MediaAuthRejected when Plex refuses it; a plain CliError (stored, `verified:false`)
+     * when the same read also answers with no token at all. Plex lets an allowed network (allowedNetworks) and, while
+     * unclaimed, its own subnet in without a token (live 1.43.4: any token got 200 there), so a 200 alone proves nothing.
+     */
+    public function checkToken($token)
+    {
+        $this->useToken($token, function () {
+        });
+        $this->get('/library/sections/all');
+        if ($this->http->send('GET', '/library/sections/all', [], null, ['Accept: application/json'])['code'] === 200) {
+            throw new CliError('Plex answered without any token too (an allowed network or an unclaimed server),'
+                . ' so it did not check this one');
+        }
+    }
+
+    /**
      * $gated: a 401 here is Plex's feature gate, not a refused token (the terminate call's documented 401 is
      * "Server does not have the feature enabled"), so the token is not marked rejected.
      */
@@ -75,7 +91,7 @@ class PlexClient
             if ($gated) {
                 throw new CliError('Plex refused (HTTP 401): for this call its API documents that answer as'
                     . ' "Server does not have the feature enabled"',
-                    'end the stream from the Plex dashboard instead; nothing was ended');
+                    'end the stream from the Plex dashboard instead');
             }
             if ($optional) {
                 throw new CliError("Plex answered 401 to $method $path", 'an optional read; the token is not marked');

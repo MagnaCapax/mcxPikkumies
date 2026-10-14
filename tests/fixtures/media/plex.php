@@ -8,7 +8,10 @@
  * "Server does not have the feature enabled". The token is accepted only in the X-Plex-Token header; one in
  * the URL is recorded as a violation. Scan is refreshSectionPost (POST /library/sections/{id}/refresh, spec
  * lines 41951-42011 of the 1.1.1 file); its `force` and `path` query parameters are POST parameters there.
- * Test knob: `deny` (path => 401 or 403 for a valid token).
+ * Test knobs: `deny` (path => 401 or 403 for a valid token); `open` (an allowed network: any token or none gets in, as
+ * live 1.43.4 answered a caller in allowedNetworks); `recent` (the recently added Metadata list). As live 1.43.4 did,
+ * /library/recentlyAdded takes X-Plex-Container-Start/-Size as query parameters and answers `size` (this page) and
+ * `totalSize` (the whole list: 3 for a size-2 request on 2026-10-14).
  */
 $dir = getenv('MEDIA_FAKE_DIR');
 $s = json_decode((string) file_get_contents("$dir/state.json"), true);
@@ -40,7 +43,7 @@ if ($m === 'GET' && $path === '/identity') {
     $out(200, ['size' => 0, 'claimed' => true, 'machineIdentifier' => 'm1', 'version' => $s['version']]);
 }
 $token = isset($h['x-plex-token']) ? $h['x-plex-token'] : '';
-if (!in_array($token, $s['tokens'], true)) {
+if (empty($s['open']) && !in_array($token, $s['tokens'], true)) {
     $out(401, '<html><head><title>Unauthorized</title></head></html>');
 }
 if (isset($s['deny'][$path])) {
@@ -81,8 +84,11 @@ if ($route === 'POST /status/sessions/terminate') {
     $out(200);
 }
 if ($route === 'GET /library/recentlyAdded') {
-    $out(200, ['size' => 2, 'Metadata' => [
+    $all = isset($s['recent']) ? $s['recent'] : [
         ['title' => 'Pilot', 'grandparentTitle' => 'A Show', 'type' => 'episode', 'librarySectionTitle' => 'TV', 'addedAt' => 1760400000],
-        ['title' => 'New Film', 'type' => 'movie', 'librarySectionTitle' => 'Movies', 'addedAt' => 1760300000]]]);
+        ['title' => 'New Film', 'type' => 'movie', 'librarySectionTitle' => 'Movies', 'addedAt' => 1760300000]];
+    $size = isset($q['X-Plex-Container-Size']) ? (int) $q['X-Plex-Container-Size'] : count($all);
+    $page = array_slice($all, isset($q['X-Plex-Container-Start']) ? (int) $q['X-Plex-Container-Start'] : 0, $size);
+    $out(200, ['size' => count($page), 'totalSize' => count($all), 'Metadata' => $page]);
 }
 $out(200, []); // anything else "succeeds", so a test sees it in the calls if it was ever sent

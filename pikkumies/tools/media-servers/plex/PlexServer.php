@@ -1,7 +1,8 @@
 <?php
 /**
- * PlexServer: the shared verbs for Plex over PlexClient.php. $found: how (docker, url), url, port,
- * listen, data_dir (the Plex data directory on disk, '' when unknown), login_from, restart (plan).
+ * PlexServer: the shared verbs for Plex over PlexClient.php. $found: how (docker, url), url, port, listen, data_dirs
+ * (the Plex data directories to look in, PlexLocal::dirs), log (the --log name, '' for the server's own), login_from,
+ * restart (plan).
  * Records come from PlexRecords.php (README.md "Plex calls", [UNVERIFIED-spec]).
  */
 class PlexServer implements MediaServer
@@ -28,7 +29,12 @@ class PlexServer implements MediaServer
     {
         $id = $this->plex->get('/identity');
         $root = $this->plex->get('/');
-        $streams = $this->sessions();
+        $note = [];
+        try { // optional: an account that may not list sessions still gets the rest (live: 403 to /status/sessions)
+            $streams = array_map(['PlexRecords', 'session'], $this->rows('/status/sessions', 'Metadata', true));
+        } catch (CliError $e) {
+            list($streams, $note) = [null, ['note' => 'streams unknown: ' . $e->getMessage()]];
+        }
         $hw = [];
         try {
             foreach ($this->rows('/:/prefs', 'Setting', true) as $s) { // optional: a refusal here marks nothing
@@ -44,10 +50,11 @@ class PlexServer implements MediaServer
         $name = isset($root['friendlyName']) ? (string) $root['friendlyName'] : '';
         return ['server' => 'Plex', 'version' => $version, 'server_name' => $name,
             'found' => $f['how'], 'url' => $f['url'], 'listen' => $f['listen'], 'libraries' => count($this->libraries(false)),
-            'streams' => count($streams), 'transcodes' => count(array_filter($streams, function ($s) {
+            'streams' => $streams === null ? null : count($streams),
+            'transcodes' => $streams === null ? null : count(array_filter($streams, function ($s) {
                 return $s['play'] === 'transcode';
             })),
-            'hardware_acceleration' => $hw ?: null, 'update_available' => null, 'login_from' => $f['login_from']];
+            'hardware_acceleration' => $hw ?: null, 'update_available' => null, 'login_from' => $f['login_from']] + $note;
     }
 
     public function libraries($counts = true)
@@ -96,22 +103,15 @@ class PlexServer implements MediaServer
     public function recent($limit)
     {
         $c = $this->plex->get('/library/recentlyAdded', ['X-Plex-Container-Start' => '0', 'X-Plex-Container-Size' => (string) $limit]);
-        return array_slice(array_map(['PlexRecords', 'item'], isset($c['Metadata']) ? (array) $c['Metadata'] : []), 0, $limit);
+        $items = array_slice(array_map(['PlexRecords', 'item'], isset($c['Metadata']) ? (array) $c['Metadata'] : []), 0, $limit);
+        // totalSize: every recently added item, not just this page (live 1.43.4: totalSize 3 for a size-2 request).
+        return isset($c['totalSize']) ? ['items' => $items, 'total' => (int) $c['totalSize']] : $items;
     }
 
-    /** Plex has no log-reading API; its logs are files in Logs/ inside its data directory (README.md). */
+    /** Plex has no log-reading API; its logs are files in Logs/ inside its data directory (README.md, PlexLocal.php). */
     public function logs($lines)
     {
-        $dir = $this->found['data_dir'];
-        $files = $dir !== '' ? (array) glob("$dir/Logs/*.log") : [];
-        if (!$files) {
-            throw new CliError('no Plex log files found' . ($dir !== '' ? " in $dir/Logs" : ''),
-                'the logs are in the Logs folder of the Plex data directory; the Plex dashboard can download them too');
-        }
-        usort($files, function ($a, $b) {
-            return filemtime($b) - filemtime($a);
-        });
-        return ['file' => $files[0], 'lines' => MediaLocal::tail($files[0], $lines)];
+        return PlexLocal::log($this->found['data_dirs'], $this->found['log'], $lines);
     }
 
     public function restart()

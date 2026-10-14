@@ -49,8 +49,9 @@ class AutobrrRun
                 return AutobrrVerbs::health($c());
             },
             'history' => function ($args, $opt) use ($c) {
-                list($rows, $note, $total) = ArrPages::get($c(), 'release', ['offset', 'limit', 'data', 'count'], [], $opt);
-                return ['records' => array_map(['AutobrrVerbs', 'release'], $rows), 'status' => ['releases' => $total] + $note];
+                list($rows, $note, $total, $all) = ArrPages::get($c(), 'release', ['offset', 'limit', 'data', 'count'], [], $opt);
+                return ['records' => array_map(['AutobrrVerbs', 'release'], $rows),
+                    'status' => ['releases' => $total, 'total' => $all] + $note];
             },
             'restart' => function ($args, $opt) use ($locate, $timeout) {
                 $where = $locate(true);
