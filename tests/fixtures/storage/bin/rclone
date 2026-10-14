@@ -1,0 +1,110 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Fake rclone (rclone 1.69.1 formats): version (docs/content/commands/rclone_version.md),
+ * config file (fs/config/ui.go:639-650), listremotes --long (cmd/listremotes/listremotes.go:224),
+ * lsf --format tsp (rclone_lsf.md), size --json (cmd/size/size.go:56-58), about --json
+ * (rclone_about.md), check --combined - and sync --combined - (rclone_check.md, rclone_sync.md).
+ * Two comparison rules are scripted, as in real rclone: `check` (size and hash: state "check") and
+ * what sync and move decide (size and modification time: state "rule", else "check"). A real sync
+ * applies its own rule: it prints and records in state "applied" every file it deletes ("-") or
+ * replaces ("*"), honouring --max-delete like rclone (docs.md "--max-delete=N"); "run" scripts a
+ * sync that finds more than the plan did. copy, sync and move then switch to the scripted "after".
+ * "decrypt_fail" makes every call fail like rclone with an encrypted config (crypt.go:147-148).
+ */
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+list($words, $flags, $paths) = fakeSplit($argv);
+$s = fakeState();
+$cmd = implode(' ', $words);
+if (!empty($s['decrypt_fail']) && $cmd !== 'version') {
+    fwrite(STDERR,
+        "Failed to load config file: unable to decrypt configuration and not allowed to ask for password - set RCLONE_CONFIG_PASS\n");
+    exit(1);
+}
+$rule = isset($s['rule']) ? $s['rule'] : (isset($s['check']) ? $s['check'] : []);
+$print = function (array $lines, $oneWay = false) {
+    $diff = 0;
+    foreach ($lines as $line) {
+        if (!$oneWay || $line[0] !== '-') {
+            $diff += $line[0] === '=' ? 0 : 1;
+            echo $line, "\n";
+        }
+    }
+    return $diff;
+};
+switch ($cmd) {
+    case 'version':
+        $v = isset($s['version']) ? $s['version'] : '1.69.1';
+        echo "rclone v$v\n- os/version: debian 12.7 (64 bit)\n- os/kernel: 6.1.0-25-amd64 (x86_64)\n- os/type: linux\n- go/version: go1.24.0\n";
+        exit(0);
+    case 'config file':
+        echo "Configuration file is stored at:\n{$s['config']}\n";
+        exit(0);
+    case 'listremotes':
+        foreach ($s['remotes'] as $name => $type) {
+            printf("%-*s %-*s %s\n", 8, $name . ':', 6, $type, '');
+        }
+        exit(0);
+    case 'lsf':
+        foreach (isset($s['lsf'][$paths[0]]) ? $s['lsf'][$paths[0]] : [] as $row) {
+            echo implode("\t", $row), "\n";
+        }
+        exit(isset($s['lsf'][$paths[0]]) ? 0 : 3);
+    case 'size':
+        if (!isset($s['size'][$paths[0]])) {
+            fwrite(STDERR, "ERROR : directory not found\n");
+            exit(3);
+        }
+        echo json_encode($s['size'][$paths[0]]), "\n";
+        exit(0);
+    case 'about':
+        echo json_encode(['total' => 1099511627776, 'used' => 549755813888, 'free' => 549755813888]), "\n";
+        exit(0);
+    case 'check':
+        $diff = $print($s['check'], in_array('--one-way', $flags, true));
+        if ($diff) {
+            fwrite(STDERR, date('Y/m/d H:i:s') . " ERROR : $diff differences found\n");
+        }
+        exit($diff ? 1 : 0);
+    case 'sync':
+        if (in_array('--dry-run', $flags, true)) {
+            $print($rule);
+            exit(preg_grep('/^! /', $rule) ? 1 : 0);
+        }
+        $run = isset($s['run']) ? $s['run'] : $rule;
+        $max = array_search('--max-delete', $flags, true);
+        $max = $max === false ? -1 : (int) $flags[$max + 1];
+        $s['applied'] = [];
+        $deletes = 0;
+        foreach ($run as $line) {
+            if (in_array('--combined', $flags, true)) {
+                echo $line, "\n";
+            }
+            if ($line[0] === '-' && $max >= 0 && ++$deletes > $max) {
+                fakeSave($s);
+                fwrite(STDERR, "ERROR : Fatal error received - not attempting retries: --max-delete threshold reached\n");
+                exit(7);
+            }
+            if ($line[0] === '-' || $line[0] === '*') {
+                $s['applied'][] = $line;
+            }
+        }
+        // fall through: switch to the scripted state after the sync
+    case 'copy':
+    case 'move':
+        if ($cmd === 'move') {
+            $s['applied'] = array_values(preg_grep('/^\* /', $rule));
+        }
+        if (isset($s['after'][$cmd])) {
+            $s['check'] = $s['after'][$cmd];
+            unset($s['rule']);
+        }
+        if ($cmd === 'move' && isset($s['size_after_move'])) {
+            $s['size'][$paths[0]] = $s['size_after_move'];
+        }
+        fakeSave($s);
+        exit(0);
+}
+fwrite(STDERR, "fake rclone: unknown command $cmd\n");
+exit(2);

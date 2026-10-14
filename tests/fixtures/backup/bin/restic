@@ -1,0 +1,96 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Fake restic (0.14.0 formats): version (cmd/restic/cmd_version.go:24), snapshots --json
+ * (internal/restic/snapshot.go:18-28, cmd_snapshots.go:303-304), forget --dry-run --json groups
+ * (cmd_forget.go:258-263), ls --json (cmd_ls.go:72-88), backup --json summary
+ * (internal/ui/json/backup.go:443-456). The password file is checked like restic does: trimmed
+ * content (global.go:301) against the scripted password, else "wrong password or no key found"
+ * (internal/repository/key.go:21). Like restic it refuses RESTIC_REPOSITORY_FILE together with a
+ * repository (cmd/restic/global.go:395, 0.11.0). Scripted: "version", "cat_err" (cat config fails, e.g.
+ * the network), "check_code" and "check_err" (restic's check output, cmd_check.go:273/374).
+ */
+require __DIR__ . '/fakelib.php'; // copied next to it by the test harness
+fakeLog($argv);
+list($words, $flags, $paths) = fakeSplit($argv);
+$s = fakeState();
+$cmd = isset($words[0]) ? $words[0] : '';
+if ($cmd === 'version') {
+    echo 'restic ' . (isset($s['version']) ? $s['version'] : '0.14.0') . " compiled with go1.19.8 on linux/amd64\n";
+    exit(0);
+}
+if (getenv('RESTIC_REPOSITORY_FILE') !== false && getenv('RESTIC_REPOSITORY') !== false) {
+    fwrite(STDERR, "Fatal: Options -r and --repository-file are mutually exclusive, please specify only one\n");
+    exit(1);
+}
+if (($cmd === 'cat' && isset($s['cat_err'])) || isset($s['all_err'])) {
+    fwrite(STDERR, (isset($s['all_err']) ? $s['all_err'] : $s['cat_err']) . "\n");
+    exit(1);
+}
+$file = (string) getenv('RESTIC_PASSWORD_FILE');
+if (getenv('RESTIC_PASSWORD') !== false || $file === '' || trim((string) @file_get_contents($file)) !== $s['secret']) {
+    fwrite(STDERR, "Fatal: wrong password or no key found\n");
+    exit(1);
+}
+$find = function ($id) use ($s) {
+    return array_values(array_filter($s['snapshots'], function ($x) use ($id) {
+        return strpos($x['id'], $id) === 0;
+    }));
+};
+switch ($cmd) {
+    case 'cat':
+        echo '{"version":2,"id":"' . str_repeat('c', 64) . '","chunker_polynomial":"3d"}', "\n";
+        exit(0);
+    case 'list':
+        echo implode("\n", isset($s['locks']) ? $s['locks'] : []), "\n";
+        exit(0);
+    case 'snapshots':
+        echo json_encode($paths ? $find($paths[0]) : $s['snapshots']), "\n";
+        exit(0);
+    case 'forget':
+        if (in_array('--dry-run', $flags, true)) {
+            $rm = array_values(array_filter($s['snapshots'], function ($x) use ($s) {
+                return in_array($x['id'], $s['plan'], true);
+            }));
+            $keep = array_values(array_filter($s['snapshots'], function ($x) use ($s) {
+                return !in_array($x['id'], $s['plan'], true);
+            }));
+            echo json_encode([['tags' => null, 'host' => 'box', 'paths' => ['/home/u/data'], 'keep' => $keep, 'remove' => $rm,
+                'reasons' => []]]), "\n";
+            exit(0);
+        }
+        $s['snapshots'] = array_values(array_filter($s['snapshots'], function ($x) use ($paths) {
+            return !in_array($x['id'], $paths, true);
+        }));
+        fakeSave($s);
+        echo 'removed ' . count($paths) . " snapshots\n";
+        exit(0);
+    case 'prune':
+        echo "done\n";
+        exit(0);
+    case 'check':
+        echo "using temporary cache\nload indexes\ncheck all packs\n", isset($s['check_err']) ? '' : "no errors were found\n";
+        fwrite(STDERR, isset($s['check_err']) ? $s['check_err'] . "\n" : '');
+        exit(isset($s['check_code']) ? (int) $s['check_code'] : 0);
+    case 'ls':
+        $sn = $find($paths[0]);
+        echo json_encode($sn[0] + ['struct_type' => 'snapshot']), "\n";
+        foreach ($s['files'] as $f) {
+            echo json_encode($f + ['struct_type' => 'node']), "\n";
+        }
+        exit(0);
+    case 'backup':
+        echo json_encode(['message_type' => 'status', 'percent_done' => 0.5]), "\n";
+        echo json_encode(['message_type' => 'summary', 'files_new' => 3, 'files_changed' => 1, 'files_unmodified' => 9,
+            'data_added' => 4096,
+            'total_files_processed' => 13, 'total_bytes_processed' => 99999, 'total_duration' => 1.5, 'snapshot_id' => 'abcd1234']), "\n";
+        exit(0);
+    case 'restore':
+        $t = $flags[array_search('--target', $flags, true) + 1];
+        @mkdir("$t/home/u/data", 0700, true);
+        file_put_contents("$t/home/u/data/restored.txt", "x\n");
+        echo "restoring <Snapshot {$paths[0]}> to $t\n";
+        exit(0);
+}
+fwrite(STDERR, "fake restic: unknown command $cmd\n");
+exit(1);

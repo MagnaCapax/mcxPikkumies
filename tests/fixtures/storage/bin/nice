@@ -1,0 +1,7 @@
+#!/usr/bin/env php
+<?php
+// Fake nice: logs, drops "-n N", runs the rest (which may be another fake).
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+$a = array_slice($argv, 1);
+fakeExec($a[0] === '-n' ? array_slice($a, 2) : $a);

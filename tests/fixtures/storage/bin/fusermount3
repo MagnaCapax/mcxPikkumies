@@ -1,0 +1,10 @@
+#!/usr/bin/env php
+<?php
+// Fake fusermount3 -u <path>: logs and removes the mount from the fake mountinfo ($FAKE_MOUNTINFO).
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+$file = getenv('FAKE_MOUNTINFO');
+$keep = array_filter(explode("\n", (string) file_get_contents($file)), function ($l) use ($argv) {
+    return strpos($l, ' ' . str_replace(' ', '\\040', $argv[2]) . ' ') === false;
+});
+file_put_contents($file, implode("\n", $keep) . "\n");

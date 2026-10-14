@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+// Fake quota: prints the scripted stdout and stderr. A non-root `quota -s` on a host whose kernel
+// quota is off prints "quota: Cannot open quotafile /home/aquota.user: Permission denied"
+// (quota-tools 4.06 quotaio.c:151).
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+$s = fakeState();
+echo isset($s['quota_out']) ? $s['quota_out'] : '';
+fwrite(STDERR, isset($s['quota_err']) ? $s['quota_err'] : '');
+exit(isset($s['quota_code']) ? (int) $s['quota_code'] : 0);

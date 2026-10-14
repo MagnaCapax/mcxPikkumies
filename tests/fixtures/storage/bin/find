@@ -1,0 +1,6 @@
+#!/usr/bin/env php
+<?php
+// Fake find: logs its argv, then runs the real GNU find.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+fakeExec(array_merge([fakeReal('find')], array_slice($argv, 1)));

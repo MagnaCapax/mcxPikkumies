@@ -1,0 +1,6 @@
+#!/usr/bin/env php
+<?php
+// Fake timeout: logs, drops the seconds, runs the rest (exit 124 is what real timeout returns on expiry).
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+fakeExec(array_slice($argv, 2));

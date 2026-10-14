@@ -1,0 +1,78 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Fake borg (1.2.4 formats unless state says 1.1.16): --version (archiver.py:3018), list --json and
+ * info --json (docs/internals/frontends.rst), prune --dry-run --list lines on stderr
+ * (archiver.py:1597-1616, helpers/parseformat.py:287-292, helpers/time.py:92-96). The passphrase
+ * is read by running BORG_PASSCOMMAND, as borg does (crypto/key.py:425-445); a wrong one gets the
+ * PassphraseWrong text (key.py:38-39) and rc 2. extract writes into the working directory.
+ */
+require __DIR__ . '/fakelib.php'; // copied next to it by the test harness
+fakeLog($argv);
+$a = array_slice($argv, 1);
+$s = fakeState();
+$cmd = isset($a[0]) ? $a[0] : '';
+if ($cmd === '--version') {
+    echo 'borg ' . (isset($s['version']) ? $s['version'] : '1.2.4') . "\n";
+    exit(0);
+}
+$pw = getenv('BORG_PASSPHRASE') !== false ? getenv('BORG_PASSPHRASE') : rtrim((string) shell_exec((string) getenv('BORG_PASSCOMMAND')),
+    "\n");
+if ($pw !== $s['secret']) {
+    fwrite(STDERR, "passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.\n");
+    exit(2);
+}
+$fmt = function ($x) {
+    return sprintf('%-36s %s [%s]', $x['name'], date('D, Y-m-d H:i:s', strtotime($x['start'])), $x['id']);
+};
+$repo = ['id' => str_repeat('0', 64), 'last_modified' => '2026-10-14T03:00:00.000000', 'location' => (string) getenv('BORG_REPO')];
+switch ($cmd) {
+    case 'list':
+        if (in_array('--json-lines', $a, true)) {
+            foreach ($s['files'] as $f) {
+                echo json_encode($f), "\n";
+            }
+            exit(0);
+        }
+        echo json_encode(['archives' => $s['archives'], 'encryption' => ['mode' => 'repokey'], 'repository' => $repo]), "\n";
+        exit(0);
+    case 'info':
+        $name = isset($a[2]) ? substr($a[2], 2) : null;
+        $arch = array_values(array_filter($s['archives'], function ($x) use ($name) {
+            return $x['name'] === $name;
+        }));
+        $arch = array_map(function ($x) {
+            return $x + ['hostname' => 'box', 'end' => $x['start'], 'duration' => 2.5, 'username' => 'u',
+                'command_line' => ['/usr/bin/borg', 'create', '::x'], 'stats' => ['nfiles' => 3, 'original_size' => 100]];
+        }, $arch);
+        echo json_encode(['archives' => $name === null ? [] : $arch, 'repository' => $repo]), "\n";
+        exit(0);
+    case 'prune':
+        foreach ($s['archives'] as $x) {
+            $msg = in_array($x['name'], $s['plan'], true) ? 'Would prune:' : 'Keeping archive (rule: daily #1):';
+            fwrite(STDERR, sprintf('%-40s %s', $msg, $fmt($x)) . "\n");
+        }
+        exit(0);
+    case 'delete':
+        $gone = array_slice($a, 2);
+        $s['archives'] = array_values(array_filter($s['archives'], function ($x) use ($gone) {
+            return !in_array($x['name'], $gone, true);
+        }));
+        fakeSave($s);
+        exit(0);
+    case 'compact':
+        exit(0);
+    case 'check': // rc 1: the check found damage (archiver.py:343-351, 1.2.4); rc 2: it did not finish (return-codes.rst.inc)
+        fwrite(STDERR, isset($s['check_err']) ? $s['check_err'] . "\n" : '');
+        exit(isset($s['check_code']) ? (int) $s['check_code'] : 0);
+    case 'create':
+        echo json_encode(['archive' => ['name' => 'box-2026-10-14T10:00:00', 'id' => str_repeat('e', 64), 'stats' => ['nfiles' => 3,
+            'original_size' => 4096]], 'repository' => $repo]), "\n";
+        exit(0);
+    case 'extract':
+        @mkdir('home/u/data', 0700, true);
+        file_put_contents('home/u/data/restored.txt', "x\n");
+        exit(0);
+}
+fwrite(STDERR, "fake borg: unknown command $cmd\n");
+exit(2);

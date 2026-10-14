@@ -1,0 +1,6 @@
+#!/usr/bin/env php
+<?php
+// Fake ionice: logs, drops "-cN", runs the rest.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+fakeExec(array_slice($argv, 2));
