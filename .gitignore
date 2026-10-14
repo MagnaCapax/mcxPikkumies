@@ -2,7 +2,7 @@
 pikkumies/local/
 pikkumies/include/hermes*
 pikkumies/include/.hermes-build.lock
-pikkumies/memory/*.md
+pikkumies/memory/*
 !pikkumies/memory/README.md
 /vendor/
 *.log

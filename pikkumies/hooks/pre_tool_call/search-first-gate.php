@@ -1,7 +1,7 @@
 <?php
 /**
- * Hermes shell hook (pre_tool_call): search first. Until the agent has run
- * `docs.php search` in this session (it searches lessons and documentation together), tool calls
+ * Hermes shell hook (pre_tool_call): search first. Until the agent has run the memory search
+ * (`tools/memory/pikkumies/pikkumies.php search`, lessons and documentation together), tool calls
  * that act are blocked with the command to run. Reading, asking the user and the search tools
  * themselves are allowed. Partner of hooks/pre_llm_call/search-first.php.
  *
@@ -29,7 +29,9 @@ if (is_file($marker)) {
 $tool = (string) $payload['tool_name'];
 $command = $tool === 'terminal' && isset($payload['tool_input']['command']) ? (string) $payload['tool_input']['command'] : '';
 
-if (preg_match('#tools/docs/docs\.php["\']?\s+search\b#', $command)) {
+// The memory unit's script, optionally followed by flags, then the verb (ADR-0018).
+const SEARCH_FIRST_TOOL = '#tools/memory/pikkumies/pikkumies\.php["\']?(\s+--?[a-z][a-z-]*)*\s+';
+if (preg_match(SEARCH_FIRST_TOOL . 'search\b#', $command)) {
     @mkdir($dir, 0700, true);
     touch($marker);
     foreach ((array) glob($dir . '/*') as $old) {
@@ -39,9 +41,9 @@ if (preg_match('#tools/docs/docs\.php["\']?\s+search\b#', $command)) {
     }
     exit(0);
 }
-if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match('#tools/docs/docs\.php["\']?\s+(read|sources)\b#', $command)) {
+if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match(SEARCH_FIRST_TOOL . '(list|sources)\b#', $command)) {
     exit(0);
 }
-$docs = Config::root() . '/tools/docs/docs.php';
+$tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';
 echo json_encode(['action' => 'block', 'message' => "Pikkumies search first: before acting, search the lessons and documentation for this task:\n"
-    . "php $docs search \"<a few technical words>\"\nRead the best hits, then continue. (Reading files and asking the user are allowed meanwhile.)"]) . "\n";
+    . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading files and asking the user are allowed meanwhile.)"]) . "\n";

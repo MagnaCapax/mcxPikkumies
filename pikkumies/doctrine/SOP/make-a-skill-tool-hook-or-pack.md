@@ -9,7 +9,7 @@ One page for contributors and for the agent itself. Checked against Hermes Agent
 | A command the agent runs, with the procedure for using it | a tool unit | `pikkumies/tools/<category>/<tool>/` |
 | A procedure without its own command | a tool unit without a script | `pikkumies/tools/<category>/<name>/` |
 | A check on every tool call | a hook | `pikkumies/hooks/<event>/<name>.php` |
-| How a problem got solved | a lesson, not any of the above | the lessons skill |
+| How a problem got solved | a lesson, not any of the above | the memory skill (`pikkumies save`) |
 | A wiki or knowledge base the agent should search | a documentation source | a section in `pikkumies/config/documentationSources.md` (shipped) or `~/pikkumies/local/documentationSources.md` (one machine) |
 
 On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Hooks and changes to shipped units come only from the repository, after review.

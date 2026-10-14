@@ -42,14 +42,10 @@ class HermesConfig
         }
     }
 
-    /** The generated skills, plus the not-yet-migrated core skills while they exist (stage 2 moves them). */
+    /** The skills generated from the tool units; the user's own skills live in Hermes' home (ADR-0007). */
     public static function skillDirs()
     {
-        $dirs = [Units::generatedDir()];
-        if (is_dir(Config::root() . '/skills')) {
-            $dirs[] = Config::root() . '/skills';
-        }
-        return $dirs;
+        return [Units::generatedDir()];
     }
 
     /** Shell hooks: hooks/<event>/<name>.php, run with php. */

@@ -12,11 +12,11 @@
 // commands. A skill with one of these names competes with the built-in. Re-check on a pin bump (ADR-0009).
 const HERMES_RESERVED_NAMES = 'a2a agents annotate_preview apply_layout approvals approve battery bg blueprint branch browser browser_cdp browser_dialog browser_exec browser_vault_enter_code browser_vault_fill browser_vault_list browser_vault_save_login browser_vault_unlock btw bundles busy clarify clear close_terminal code_execution codex-runtime commands compress computer_use config connections context context_engine copy cron cronjob cronjob_manage curator debug delegate_task delegation deny desktop_preview desktop_project diff drive_preview egress execute_code export fast feishu_doc_read file focus focus_pane footer goal gui_tour handoff hatch heartbeat help history homeassistant image image_gen image_generate import indicator init insights journey kanban learn login loop manage_catalog manage_connections meet memory moa model new palette paste patch pause personality pet plan platform platforms plugins process_manage profile prompt queue quit react_to_message read_file read_terminal read_window_below reasoning redraw refine relay reload reload-mcp reload-skills restart resume retry review rollback save search_files sessions session_search sethome show_tip skill_manage skills skills_list skill_view skin snapshot spotify start status statusbar steer stop stt subgoal subscription suggestions terminal text_to_speech timestamps title todo todo_list tools toolsets topic topup tts undo update usage verbose version video video_analyze video_gen video_generate vision vision_analyze voice wake web web_extract web_search whoami worktree write_file x_search yolo yuanbao';
 
-/** Every shipped skill source: tool units (skill.md) and the core skills not yet moved into units. */
+/** Every shipped skill source: the skill.md of each tool unit. */
 function shippedSkillFiles()
 {
     $root = dirname(__DIR__);
-    return array_merge((array) glob($root . '/pikkumies/tools/*/*/skill.md'), (array) glob($root . '/pikkumies/skills/*/SKILL.md'));
+    return (array) glob($root . '/pikkumies/tools/*/*/skill.md');
 }
 
 /** [name, description] from a SKILL.md, or a string describing what is wrong. */

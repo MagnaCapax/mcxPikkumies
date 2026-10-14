@@ -69,32 +69,55 @@ return [
         list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'read_file', 'tool_input' => ['path' => 'x']]));
         check(trim($out) === '', 'non-terminal flagged');
     },
-    'memory: save writes the lesson, no overwrite; docs search finds it' => function () {
+    'memory unit: save needs links or a reason, never overwrites; append adds; search finds it in two steps' => function () {
         $tmp = sys_get_temp_dir() . '/pk-mem-' . getmypid();
-        @mkdir("$tmp/pikkumies/tools/memory", 0700, true);
+        $src = dirname(__DIR__) . '/pikkumies';
+        foreach (['lib', 'tools/memory/pikkumies', 'config'] as $d) {
+            @mkdir("$tmp/pikkumies/$d", 0700, true);
+            foreach ((array) glob("$src/$d/*.*") as $f) {
+                copy($f, "$tmp/pikkumies/$d/" . basename($f));
+            }
+        }
         mkdir("$tmp/pikkumies/memory");
         chmod("$tmp/pikkumies/memory", 0755); // as git clone leaves this tracked directory
-        copy(dirname(__DIR__) . '/pikkumies/tools/memory/memory.php', "$tmp/pikkumies/tools/memory/memory.php");
-        @mkdir("$tmp/pikkumies/lib", 0700, true);
-        foreach (['TextSearch', 'Config', 'DocSources', 'Http', 'Host'] as $lib) {
-            copy(dirname(__DIR__) . "/pikkumies/lib/$lib.php", "$tmp/pikkumies/lib/$lib.php");
-        }
-        @mkdir("$tmp/pikkumies/tools/docs", 0700, true);
-        copy(dirname(__DIR__) . '/pikkumies/tools/docs/docs.php', "$tmp/pikkumies/tools/docs/docs.php");
-        file_put_contents("$tmp/body.md", "rtorrent stopped because the disk was full; freed space and restarted it.");
-        $tool = "$tmp/pikkumies/tools/memory/memory.php";
-        list($code, $out) = runPhp($tool, ['save', 'rtorrent stops on full disk', "$tmp/body.md", '--tags', 'rtorrent,disk']);
-        check($code === 0 && strpos($out, 'saved:') !== false, 'save failed: ' . $out);
-        check((fileperms("$tmp/pikkumies/memory") & 0777) === 0700, 'lessons directory not 0700');
-        list($code) = runPhp($tool, ['save', 'rtorrent stops on full disk', "$tmp/body.md"]);
-        check($code !== 0, 'overwrite allowed');
-        $docs = "$tmp/pikkumies/tools/docs/docs.php";
-        list(, $out) = runPhp($docs, ['search', 'rtorrent disk full', '--offline']);
-        check(strpos($out, 'rtorrent-stops-on-full-disk') !== false && strpos($out, '[lessons]') !== false, 'search missed lesson: ' . $out);
-        list(, $out) = runPhp($docs, ['search', 'nginx certificate', '--offline']);
-        check(strpos($out, 'no matches') !== false, 'unrelated query matched: ' . $out);
-        list($code, $out) = runPhp($tool, ['search', 'x']);
-        check($code === 2, 'memory.php search must point to docs.php');
+        @mkdir("$tmp/pikkumies/local", 0700, true);
+        file_put_contents("$tmp/pikkumies/config/documentationSources.md", "# none\n");
+        $tool = "$tmp/pikkumies/tools/memory/pikkumies/pikkumies.php";
+        $last = function ($out) {
+            $l = cliLines($out);
+            return $l ? $l[count($l) - 1] : null;
+        };
+        file_put_contents("$tmp/a.md", "rtorrent stopped because the disk was full; freed space and restarted it.");
+        list($code, $out) = runPhp($tool, ['save', '--topic', 'rtorrent', '--title', 'rtorrent stops on a full disk', '--sources', 'df -h', '--body-file', "$tmp/a.md"]);
+        check($code === 1 && strpos($last($out)['error'], 'link') !== false, 'a lesson without links or a reason was saved: ' . $out);
+        list($code, $out) = runPhp($tool, ['save', '--topic', 'rtorrent', '--title', 'rtorrent stops on a full disk', '--sources', 'df -h', '--body-file', "$tmp/a.md", '--no-related', 'first lesson on this machine']);
+        $first = cliLines($out)[0]['path'];
+        check($code === 0 && is_file($first) && strpos($first, '/memory/lessons/rtorrent/') !== false, 'save failed: ' . $out);
+        check(strpos(file_get_contents($first), "sources: [\"df -h\"]") !== false, 'sources not in frontmatter');
+        check((fileperms("$tmp/pikkumies/memory") & 0777) === 0700, 'memory directory not 0700');
+        list($code) = runPhp($tool, ['save', '--topic', 'rtorrent', '--title', 'rtorrent stops on a full disk', '--sources', 'x', '--body-file', "$tmp/a.md", '--no-related', 'x']);
+        check($code === 1, 'same lesson saved twice the same day (overwrite)');
+        file_put_contents("$tmp/b.md", "Quota hit stops rtorrent too, like [the full disk case](" . $first . ").");
+        list($code, $out) = runPhp($tool, ['save', '--topic', 'rtorrent', '--title', 'rtorrent stops at the quota', '--sources', 'quota -s', '--body-file', "$tmp/b.md"]);
+        check($code === 0 && cliLines($out)[0]['links'] === [realpath($first)], 'link not recognised: ' . $out);
+        file_put_contents("$tmp/c.md", "Also check ~/.rtorrent.socket.");
+        list($code, $out) = runPhp($tool, ['append', '--path', $first, '--body-file', "$tmp/c.md"]);
+        check($code === 0 && strpos(file_get_contents($first), "## Update ") !== false && strpos(file_get_contents($first), 'freed space') !== false, 'append failed or rewrote: ' . $out);
+        list($code) = runPhp($tool, ['append', '--path', "$src/lib/Cli.php", '--body-file', "$tmp/c.md"]);
+        check($code === 1, 'append outside memory allowed');
+        file_put_contents("$tmp/pikkumies/memory/README.md", "# memory\n");
+        list($code) = runPhp($tool, ['append', '--path', "$tmp/pikkumies/memory/README.md", '--body-file', "$tmp/c.md"]);
+        check($code === 1, 'append to the tracked README allowed (it would stop updates)');
+        file_put_contents("$tmp/d.md", "See [the readme]($tmp/pikkumies/memory/README.md).");
+        list($code) = runPhp($tool, ['save', '--topic', 'x', '--title', 'readme link only', '--sources', 'y', '--body-file', "$tmp/d.md"]);
+        check($code === 1, 'a link to README.md must not count as a related lesson');
+        list($code, $out) = runPhp($tool, ['search', 'rtorrent', 'disk', 'full', '--offline']);
+        $l = cliLines($out);
+        check($code === 0 && $l[0]['path'] === realpath($first) && $l[0]['trust'] === 'lessons' && strpos($l[0]['excerpt'], 'disk was full') !== false && $last($out)['matched'] === 'keywords', 'search step 1: ' . $out);
+        list(, $out) = runPhp($tool, ['search', 'rtorrent', 'zebra', 'quantum', '--offline']);
+        check($last($out)['matched'] === 'any words' && count(cliLines($out)) > 1, 'search step 2 did not retry with any of the words: ' . $out);
+        list(, $out) = runPhp($tool, ['search', 'nginx', 'certificate', '--offline']);
+        check(isset($last($out)['next']) && count(cliLines($out)) === 1, 'no hit must name the next step: ' . $out);
         exec('rm -rf ' . escapeshellarg($tmp));
     },
     'auto-update cron: one tagged line, other lines kept, off removes it, a failing crontab -l writes nothing' => function () {

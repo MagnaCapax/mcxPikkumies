@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-08
-- Status: Accepted
+- Status: Superseded by ADR-0018 (the one search is `tools/memory/pikkumies/pikkumies.php search`; the curl decision stands, now in `lib/Http.php`, ADR-0019).
 
 ## Context
 A simplification review of the whole runtime after ADR-0011 found two places where the code did one job two ways:

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-08
-- Status: Accepted. The context line on Hermes web tools is corrected by ADR-0021.
+- Status: Accepted. The context line on Hermes web tools is corrected by ADR-0021; the search command the hook and gate name is changed by ADR-0018.
 
 ## Context
 The spec asks for a helper "which looks into our KB+Wiki" with "configurable information sources (wikis, KB, etc.)". The request of 2026-10-08 adds: one human-editable config file listing URLs and types (`pikkumies/config/documentationSources.md`), a skill to search them, a hook or gate so memory and documentation are searched first after the first prompt of a task, and accuracy doctrine that defines trust levels (in the doctrine and in the config file) and resolves conflicting sources by adversarial rounds.

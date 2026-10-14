@@ -1,6 +1,6 @@
 # Documentation sources
 
-The documentation Pikkumies searches before it acts: wikis, knowledge bases and similar. `php ~/pikkumies/tools/docs/docs.php` downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded.
+The documentation Pikkumies searches before it acts: wikis, knowledge bases and similar. The memory skill (`php ~/pikkumies/tools/memory/pikkumies/pikkumies.php`) downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded.
 
 ## How to change this list
 
@@ -10,7 +10,7 @@ This file ships with Pikkumies and is replaced by updates, so do not edit it her
 - To change a shipped source, write a section with the same name; yours replaces it.
 - To turn a shipped source off, write a section with the same name and `- status: off`.
 
-Then run `php ~/pikkumies/tools/docs/docs.php sources` to check what is in use.
+Then run `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php sources` to check what is in use.
 
 ## Trust levels
 

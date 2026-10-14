@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Proposed. Supersedes ADR-0012 (the one search lives in `docs.php`). Amends ADR-0011: the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
+- Status: Accepted. Supersedes ADR-0012 (the one search lives in `docs.php`). Amends ADR-0011: the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
 
 ## Context
 The request of 2026-10-14: "a skill for memorySave, memoryAppend, memorySearch a bit like ours but lightened, but not less powerful, so memorySearch is just the first step and the last big step if not found -- combine merge the other memory things, and make sure the memory doctrine is there", with "Minimal frontmatter, but full on hierarchy for the memory, autofetches and a hook similar to here to enforce memory searches. cross linking enforced", and the location `tools/memory/pikkumies/ {save,search,append}`, so later memory sources can sit beside it.
@@ -18,9 +18,9 @@ Today lessons are saved by `tools/memory/memory.php save` and searched, together
 ## Decision
 - **The unit.** `tools/memory/pikkumies/pikkumies.php` with the verbs `search`, `save`, `append`, `list`, `refresh` and `sources`. The last three are the former `docs.php` verbs, unchanged; `read` is dropped because Hermes' own `read_file` opens any path the search prints. `tools/docs/`, `memory.php` and the `lessons` and `documentation` skills are removed. The skill is named `pikkumies` after its directory, as the operator named it; its description starts with "Memory:" so the skills index says what it is.
 - **Where memory lives.** Under `pikkumies/memory/`: `lessons/<topic>/` for solved problems, `reference/` for facts and data, `research/` for longer findings. The whole tree is gitignored except its README.
-- **Trust.** Memory sits inside the ADR-0011 ladder (live, official, lessons, upstream, community, recall), and priority stays per topic: `lessons/` and `reference/` are at the lessons level, `research/` ranks below them, and the documentation copies keep their configured levels.
+- **Trust.** Memory sits inside the ADR-0011 ladder (live, official, lessons, upstream, community, recall), and priority stays per topic: `lessons/` and `reference/` are labelled at the lessons level, `research/` is labelled `research` (below lessons: verify before relying on it), and the documentation copies keep their configured levels. Results are ordered by relevance; the label tells the agent how far to trust each hit. Lessons saved before this layout, directly in `memory/`, are still searched.
 - **Search, in two steps.**
-  1. `search` ranks lessons and documentation together (`TextSearch`, keyword mode). It returns path, title, trust level and score for each hit, plus an excerpt of the best lessons or official hit (autofetch).
+  1. `search` ranks lessons and documentation together (`TextSearch`, keyword mode). It returns title, source, trust level, path and address for each hit, plus an excerpt of the best lessons or official hit (autofetch).
   2. With no hit, the same call retries in free-text mode (rare words weigh more, a share of the words is enough). With still no hit, the status line says the last step: delegate a wider look to a subagent, or search the web through a configured backend, then save what was learned.
 - **Save.** `save` needs a topic, a title, at least one source, and a body that links to at least one existing memory file, or `--no-related "<reason>"`. Before writing, it searches the title, prints the closest files as links to use, and warns when one looks like the same lesson (append instead). Frontmatter holds only `date`, `topic` and `sources`.
 - **Append.** `append` adds a dated section to an existing memory file and never rewrites what is there.

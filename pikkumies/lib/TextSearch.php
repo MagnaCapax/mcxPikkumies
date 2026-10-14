@@ -14,7 +14,11 @@ class TextSearch
     public static function terms($text)
     {
         preg_match_all('/[a-z0-9][a-z0-9._-]*/', strtolower((string) $text), $m);
-        return array_values(array_diff(array_unique($m[0]), self::STOPWORDS));
+        // "policy." at the end of a sentence is the word "policy"; inner dots stay (rtorrent.rc, 1.2.3).
+        $words = array_map(function ($w) {
+            return rtrim($w, '._-');
+        }, $m[0]);
+        return array_values(array_diff(array_unique($words), self::STOPWORDS));
     }
 
     public static function slug($title, $fallback = 'lesson')
@@ -23,10 +27,14 @@ class TextSearch
         return $slug !== '' ? $slug : $fallback;
     }
 
-    /** Lesson directories: the user's own (pikkumies/memory). */
+    /**
+     * Memory directories (ADR-0018): lessons/<topic>/, reference/ and research/ under
+     * pikkumies/memory, plus memory/ itself, where lessons saved before the hierarchy still live.
+     */
     public static function lessonDirs($pikkumiesRoot)
     {
-        return [$pikkumiesRoot . '/memory'];
+        $m = $pikkumiesRoot . '/memory';
+        return array_merge([$m, "$m/reference", "$m/research"], (array) glob("$m/lessons/*", GLOB_ONLYDIR));
     }
 
     /** Markdown files (README.md excluded) in the given directories, path => text. */

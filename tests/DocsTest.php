@@ -4,7 +4,7 @@ function docsTree()
 {
     $tmp = sys_get_temp_dir() . '/pk-docs-' . getmypid() . '-' . mt_rand();
     $src = dirname(__DIR__) . '/pikkumies';
-    foreach (['lib', 'hooks/pre_llm_call', 'hooks/pre_tool_call', 'tools/docs', 'config'] as $d) {
+    foreach (['lib', 'hooks/pre_llm_call', 'hooks/pre_tool_call', 'tools/memory/pikkumies', 'config'] as $d) {
         @mkdir("$tmp/pikkumies/$d", 0700, true);
         foreach ((array) glob("$src/$d/*.*") as $f) {
             copy($f, "$tmp/pikkumies/$d/" . basename($f));
@@ -125,11 +125,20 @@ return [
             return $h[3] . ':' . $h[1];
         }, $hits);
         check(in_array('official:Refund policy', $labels, true) && in_array('lessons:Refund questions', $labels, true), 'hits: ' . implode(' | ', $labels));
-        check(DocSources::readable("$dir/refund-policy.md") && !DocSources::readable("$dir/../../../../../../etc/passwd") && !DocSources::readable("$tree/pikkumies/lib/Config.php"), 'readable() wrong');
+        // The memory hierarchy (ADR-0018): lessons/<topic>/ and reference/ at the lessons level, research/ below.
+        @mkdir("$tree/pikkumies/memory/lessons/billing", 0700, true);
+        @mkdir("$tree/pikkumies/memory/research", 0700, true);
+        file_put_contents("$tree/pikkumies/memory/lessons/billing/20261014-refund-timing.md", "# Refund timing\n\nA refund policy question answered.\n");
+        file_put_contents("$tree/pikkumies/memory/research/20261014-refund-survey.md", "# Refund survey\n\nHow other providers word their refund policy.\n");
+        list($hits) = DocSources::search('refund policy', 10, true);
+        $labels = array_map(function ($h) {
+            return $h[3] . ':' . $h[1];
+        }, $hits);
+        check(in_array('lessons:Refund timing', $labels, true) && in_array('research:Refund survey', $labels, true), 'nested memory not searched or mislabelled: ' . implode(' | ', $labels));
         DocSources::$root = null;
         exec('rm -rf ' . escapeshellarg($tree));
     },
-    'docs list: every downloaded page of a source by title, with its address' => function () use ($kbFixture) {
+    'memory list: every downloaded page of a source by title, with its address' => function () use ($kbFixture) {
         $tree = docsTree();
         file_put_contents("$tree/pikkumies/config/documentationSources.md", "# none\n");
         file_put_contents("$tree/pikkumies/local/documentationSources.md", "## kb\n- type: kb-json\n- url: https://example.org/kb.json\n- trust: official\n");
@@ -141,11 +150,13 @@ return [
         DocSources::$fetcher = null;
         DocSources::$root = null;
         check($ok, 'refresh failed');
-        list($code, $out) = runPhp("$tree/pikkumies/tools/docs/docs.php", ['list']);
-        check($code === 0 && strpos($out, '== kb: 2 pages') !== false, 'list header: ' . $out);
-        check(strpos($out, "Refund policy  https://example.org/clients/kb.php?id=1\n") !== false, 'title and address missing: ' . $out);
-        list(, $out) = runPhp("$tree/pikkumies/tools/docs/docs.php", ['list', 'nope']);
-        check(strpos($out, 'nope: not an active source') !== false, 'unknown source not reported');
+        $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+        list($code, $out) = runPhp($tool, ['list']);
+        $l = cliLines($out);
+        check($code === 0 && $l[count($l) - 1]['count'] === 2, 'list: ' . $out);
+        check(strpos($out, '"title":"Refund policy","url":"https://example.org/clients/kb.php?id=1"') !== false, 'title and address missing: ' . $out);
+        list($code, $out) = runPhp($tool, ['list', 'nope']);
+        check($code === 1 && strpos($out, 'nope is not an active source') !== false, 'unknown source not reported: ' . $out);
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'search-first hook: first turn only, bounded, names the search command, no page text' => function () {
@@ -155,7 +166,7 @@ return [
         file_put_contents("$tree/pikkumies/local/docs-cache/kb/disk-full.md", "---\ntitle: \"Disk full\"\nurl: \"https://example.org/x\"\n---\n# Disk full\n\nSECRET-BODY-TEXT rtorrent stops when the disk is full.\n");
         $out = docsHook($tree, 'pre_llm_call/search-first.php', ['hook_event_name' => 'pre_llm_call', 'session_id' => 's', 'extra' => ['is_first_turn' => true, 'user_message' => 'rtorrent stopped, disk full?']]);
         $d = json_decode($out, true);
-        check(is_array($d) && strpos($d['context'], 'docs.php search') !== false, 'no instruction: ' . $out);
+        check(is_array($d) && strpos($d['context'], 'tools/memory/pikkumies/pikkumies.php search') !== false, 'no instruction: ' . $out);
         check(strpos($d['context'], '[official] kb: Disk full') !== false && strpos($d['context'], 'SECRET-BODY-TEXT') === false, 'hits wrong or page text leaked: ' . $d['context']);
         check(strlen($d['context']) <= 1500, 'context too long');
         $multi = json_decode(docsHook($tree, 'pre_llm_call/search-first.php', ['extra' => ['is_first_turn' => true, 'user_message' => [['type' => 'text', 'text' => 'disk full']]]]), true);
@@ -163,7 +174,7 @@ return [
         check(trim(docsHook($tree, 'pre_llm_call/search-first.php', ['extra' => ['is_first_turn' => false, 'user_message' => 'x']])) === '', 'fired after the first turn');
         exec('rm -rf ' . escapeshellarg($tree));
     },
-    'search-first gate: blocks acting tools until docs.php search runs, per session; switch turns it off' => function () {
+    'search-first gate: blocks acting tools until the memory search runs, per session; switch turns it off' => function () {
         $tree = docsTree();
         $gate = 'pre_tool_call/search-first-gate.php';
         $call = function ($session, $tool, $cmd = null) use ($tree, $gate) {
@@ -174,9 +185,10 @@ return [
         check($call('s1', 'write_file'), 'write_file not blocked before search');
         check($call('s1', 'terminal', 'systemctl restart nginx'), 'terminal not blocked before search');
         check(!$call('s1', 'read_file') && !$call('s1', 'clarify'), 'read-only tool blocked');
-        check(!$call('s1', 'terminal', 'php ~/pikkumies/tools/docs/docs.php sources'), 'docs sources blocked');
-        check($call('s1', 'patch'), 'docs sources must not open the gate');
-        check(!$call('s1', 'terminal', 'php /home/u/pikkumies/tools/docs/docs.php search "disk full"'), 'docs search blocked');
+        check(!$call('s1', 'terminal', 'php ~/pikkumies/tools/memory/pikkumies/pikkumies.php sources') && !$call('s1', 'terminal', 'php ~/pikkumies/tools/memory/pikkumies/pikkumies.php list pm-wiki --human'), 'sources or list blocked');
+        check($call('s1', 'patch'), 'sources or list must not open the gate');
+        check($call('s1', 'terminal', 'php ~/pikkumies/tools/memory/pikkumies/pikkumies.php save --topic x --title y'), 'save is an action, it must not pass before a search');
+        check(!$call('s1', 'terminal', 'php /home/u/pikkumies/tools/memory/pikkumies/pikkumies.php --offline search "disk full"'), 'memory search blocked');
         check(!$call('s1', 'write_file') && !$call('s1', 'terminal', 'df -h'), 'gate stayed closed after search');
         check($call('s2', 'write_file'), 'another session inherited the opened gate');
         file_put_contents("$tree/pikkumies/local/config.php", "<?php return ['searchFirst' => ['disabled' => true]];\n");

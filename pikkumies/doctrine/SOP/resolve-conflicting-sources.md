@@ -26,7 +26,7 @@ Each round, try to prove the current pick wrong:
 
 - Is it out of date? Look for a newer page, a changelog, a dated note.
 - Does its scope really match this user's case?
-- Search again with different words (`docs.php search`), and read the pages, not just the titles.
+- Search again with different words (`pikkumies.php search`), and read the pages, not just the titles.
 - What would you see on this machine if the pick were wrong? Look for it.
 
 If a round changes the pick, run another round on the new pick. Stop when a round changes nothing, or after three rounds.
@@ -41,4 +41,4 @@ Never present an unresolved conflict as settled, and never merge two claims into
 
 ## 5. Keep what you learned
 
-If you settled a real conflict (say a wiki page is out of date and the knowledge base is current), save a lesson with the lessons skill: both claims, the sources, the deciding evidence. The next search will find it.
+If you settled a real conflict (say a wiki page is out of date and the knowledge base is current), save a lesson with the memory skill (`pikkumies.php save`): both claims, the sources, the deciding evidence. The next search will find it.

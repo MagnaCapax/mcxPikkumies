@@ -6,7 +6,7 @@ description: Check, restart and set up the user's seedbox apps (torrent clients,
 # Seedbox apps
 
 1. Run the system-status skill. If `pmss` is false, stop: this skill does not apply on this machine. Otherwise `apps` shows which apps are running for this user.
-2. Find the wiki page for the app in the quick list below and read it: `php ~/pikkumies/tools/docs/docs.php search "<page title>"`, then `docs.php read <path>`. It says how the app is meant to run on this platform. If the app is not listed, `php ~/pikkumies/tools/docs/docs.php list pm-wiki | grep -i <app>` shows every page the wiki has.
+2. Find the wiki page for the app in the quick list below and read it: `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search "<page title>"`, then read the path it prints. It says how the app is meant to run on this platform. If the app is not listed, `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php list pm-wiki --human | grep -i <app>` shows every page the wiki has.
 3. Check free disk first: a full disk is the most common reason a torrent client stops.
 4. Read the app's own log (in the app's config directory under the home directory), limited with `tail -n 100`.
 5. Restart only the affected app, the way the wiki page and the platform start it for this user. Do not kill other users' processes; you cannot see them anyway.
@@ -15,7 +15,7 @@ description: Check, restart and set up the user's seedbox apps (torrent clients,
 
 ## Quick list: Pulsed Media wiki pages by topic
 
-Titles as of 2026-10-08. A title that no longer exists has been renamed or merged: use `docs.php list pm-wiki`.
+Titles as of 2026-10-08. A title that no longer exists has been renamed or merged: use `pikkumies.php list pm-wiki`.
 
 - **Docker and other self-hosted apps:** "Docker on PMSS", "Docker Rootless", "Containerization", "Self-Hosted Apps on PMSS" (a table of container images with the setting each one needs on PMSS), "Self-hosted media server on a seedbox", "Invidious", "App Installation Scripts".
 - **Media stack** (installed by the user with the media-stack installer): "Install Media Stack", "Install-media-stack.sh — Media Server Setup", "Media Stack Exposed and Protected Status", "Jellyfin", "Jellyfin tutorial", "Plex", "Sonarr", "Radarr", "Prowlarr", "Seedbox for Plex and Jellyfin".

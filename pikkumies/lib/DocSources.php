@@ -289,7 +289,8 @@ class DocSources
         $notes = [];
         $dirs = [];
         foreach (TextSearch::lessonDirs(self::root()) as $d) {
-            $dirs[$d] = ['lessons', 'lessons'];
+            // research/ is labelled below lessons: longer findings to verify before relying on them.
+            $dirs[$d] = basename($d) === 'research' ? ['research', 'research'] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons'];
         }
         foreach (self::active() as $name => $src) {
             if (!$offline && self::isStale($src)) {
@@ -315,24 +316,6 @@ class DocSources
         $title = preg_match('/^# (.+)$/m', $head, $m) ? trim($m[1]) : basename($path, '.md');
         $url = preg_match('/^url: "(.*)"$/m', $head, $m) ? stripcslashes($m[1]) : '';
         return [$title, $url];
-    }
-
-    /** A path is readable through the tool only inside the lessons or the docs cache. */
-    public static function readable($path)
-    {
-        $real = realpath($path);
-        if ($real === false || !is_file($real) || substr($real, -3) !== '.md') {
-            return false;
-        }
-        $roots = TextSearch::lessonDirs(self::root());
-        $roots[] = self::cacheRoot();
-        foreach ($roots as $r) {
-            $rr = realpath($r);
-            if ($rr !== false && strpos($real, $rr . '/') === 0) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public static function removeDir($dir)

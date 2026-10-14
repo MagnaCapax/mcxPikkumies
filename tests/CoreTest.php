@@ -32,6 +32,8 @@ return [
     'soul stays within its size budget (sent to the model on every turn)' => function () {
         $s = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
         check(strlen($s) <= 8000, 'SOUL.md is ' . strlen($s) . ' bytes; keep it at or under 8000');
+        // ADR-0007: a live run saved a lesson into the built-in memory; the doctrine must steer away from it.
+        check(strpos($s, 'never the built-in memory tool') !== false, 'the built-in memory steer is missing from SOUL.md');
     },
     'soul starts with what this machine allows, and nothing else from the profile' => function () {
         $p = ['pmss' => true, 'root' => ['available' => false, 'via' => 'none'], 'apps' => ['secretapp'], 'user' => 'someone'];
