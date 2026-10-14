@@ -65,8 +65,9 @@ $approve = [
     // library and filesystem" (Jellyfin 12.2 and Emby 4.1 specs), Plex DELETE /library/metadata/{id}; /Auth/Keys/{key} revokes a key.
     '#^(?=.*((-X|--request)[\\s=]*["\']?DELETE\\b|\\.delete\\(|["\']DELETE["\']))(?=.*/(Items|library/metadata|Auth/Keys)(/|\\?|\\b))#si' => 'deletes media files or an API key through a media server',
     '/delete[-_]local[-_]data/i'                                                              => 'deletes torrent data through a local app',
-    // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file.
-    '/(^|[\s"\',\[(])--(with-data|delete-files)\b/'                                          => 'deletes data through a Pikkumies tool',
+    // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file, and
+    // `php $R sync|move|prune ... --expect <n>` names no rclone/restic/borg: every deleting tool verb carries --expect.
+    '/(^|[\s"\',\[(])--(with-data|delete-files|expect)\b/'                                   => 'deletes data through a Pikkumies tool',
     "/\\bphp\\b.*{$v}(prune|forget|purge)\\b/s"                                                => 'removes data through a Pikkumies tool',
     '/\bcore\.remove_torrents?\b/'                                                            => 'removes torrents, and with remove_data their files, through Deluge',
     '/\bexecute[a-z0-9.]*\b.*\brm\b/s'                                                         => 'runs rm through rTorrent',
