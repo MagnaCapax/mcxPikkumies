@@ -85,7 +85,7 @@ class RcloneTransfer
             ?: ToolProc::need('fusermount', 'fuse3 provides fusermount3; on Pulsed Media a missing one is a support ticket');
         $r = ToolProc::run([$fm, '-u', reset($mine)['mountpoint']]);
         if ($r['code'] !== 0) {
-            throw new CliError('fusermount failed: ' . ToolProc::tail($r['err']),
+            throw new CliError('fusermount failed: ' . ToolText::tail($r['err']),
                 'a program still using files there must stop first (never kill rclone: unwritten cache files would be lost)');
         }
         $still = array_filter(HomePath::fuseMounts($mountinfo, $c->uid), $match);
@@ -98,14 +98,14 @@ class RcloneTransfer
             throw new CliError("$verb needs exactly a source and a destination", "$verb <src> <dst>: remote:path or a full local path");
         }
         $c->ready();
-        return [$c->place($args[0], true), $c->place($args[1], false)];
+        return [RclonePlace::of($args[0], true, $c->home), RclonePlace::of($args[1], false, $c->home)];
     }
 
     private static function transfer(RcloneCmd $c, $verb, array $flags, $src, $dst, $onLine = null)
     {
         $r = $c->run([$verb], $flags, [$src, $dst], $onLine, 0);
         if ($r['code'] !== 0 && !$r['stopped']) {
-            throw new CliError("rclone $verb stopped (exit {$r['code']}): " . ToolProc::tail($r['err']),
+            throw new CliError("rclone $verb stopped (exit {$r['code']}): " . ToolText::tail($r['err']),
                 'part of it may have run: run `check` to see where things stand');
         }
         return $r;

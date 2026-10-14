@@ -45,7 +45,7 @@ class BorgRepo
         if ($r['code'] !== 0) {
             $locked = preg_match('/\\block(ed)?\\b|LockTimeout|LockError/i', $r['err'])
                 ? ' (the repository is locked: another borg is running, or one was killed)' : '';
-            throw new CliError('borg ' . $args[0] . " failed$locked: " . ToolProc::tail($r['err']),
+            throw new CliError('borg ' . $args[0] . " failed$locked: " . ToolText::tail($r['err']),
                 'see the error; `stats` checks the repository and the login');
         }
         return $r;
@@ -75,38 +75,6 @@ class BorgRepo
         return ['id' => (string) $a['name'], 'time' => isset($a['start']) ? self::utc($a['start']) : null,
             'host' => isset($a['hostname']) ? $a['hostname'] : null,
             'paths' => [], 'tags' => [], 'snapshot_id' => isset($a['id']) ? (string) $a['id'] : null];
-    }
-
-    /** The shared keep options as borg prune flags (docs/usage/prune.rst.inc, 1.1.16 and 1.2.4). */
-    public static function keepFlags(array $keep)
-    {
-        $flags = [];
-        foreach ($keep as $k => $v) {
-            $flags[] = "--$k";
-            $flags[] = $v;
-        }
-        return $flags;
-    }
-
-    /**
-     * "Would prune:" lines of `prune --dry-run --list` (stderr): the archive as name, time and
-     * [id] (archiver.py:1597-1616 in 1.2.4, :1660 in 1.1.16; helpers/parseformat.py:287-292
-     * format_archive; helpers/time.py:92-96, "%a, %Y-%m-%d %H:%M:%S").
-     */
-    public static function wouldPrune($stderr)
-    {
-        $out = [];
-        $kept = 0;
-        foreach (explode("\n", (string) $stderr) as $line) {
-            $line = rtrim($line);
-            if (strpos($line, 'Keeping') === 0) {
-                $kept++;
-            } elseif (preg_match('/^Would prune:\s+(.+?)\s+\w{3}, (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) \[([0-9a-f]{64})\]$/', $line, $m)) {
-                $out[] = ['id' => $m[1], 'time' => self::utc($m[2]), 'host' => null, 'paths' => [], 'tags' => [],
-                    'snapshot_id' => $m[3]];
-            }
-        }
-        return ['remove' => $out, 'keep' => $kept];
     }
 
     /** A borg time (UTC, as borg runs with TZ=UTC0) as unix time; a time that carries its own zone keeps it. Else null. */

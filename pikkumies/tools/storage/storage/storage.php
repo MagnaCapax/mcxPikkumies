@@ -8,8 +8,9 @@ $lib = dirname(__DIR__, 3) . '/lib';
 foreach (['Cli', 'CliHuman', 'Config', 'Quota'] as $storageClass) {
     require_once "$lib/$storageClass.php";
 }
-require_once dirname(__DIR__) . '/lib/ToolProc.php';
-require_once dirname(__DIR__) . '/lib/HomePath.php';
+foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+    require_once dirname(__DIR__) . "/lib/$toolLib.php";
+}
 require_once __DIR__ . '/StorageStats.php';
 require_once __DIR__ . '/StorageScan.php';
 

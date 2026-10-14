@@ -4,13 +4,12 @@
  * (storage and backup units). PHP 7.3 proc_open takes a string, so every word is escapeshellarg'd,
  * as lib/Update.php exec() does, and `exec` replaces the shell so a stop signal reaches the program.
  * Nothing here installs anything. The backup units use it too; it belongs in pikkumies/lib once a
- * third category needs it.
+ * third category needs it. Error text (ToolText) and listing size (ToolList) are their own classes.
  */
 class ToolProc
 {
     const MAX_OUT = 8388608;  // stdout bytes kept when no line reader is given
     const MAX_ERR = 1048576;  // stderr bytes kept (borg prints its --list output there)
-    const CAP = 10000;        // entries one listing reads: --offset pages within it, --limit 0 reads this many
 
     /** Absolute path of $name from PATH, or null. */
     public static function which($name)
@@ -117,50 +116,5 @@ class ToolProc
         }
         $r['code'] = proc_close($p);
         return $r;
-    }
-
-    /** Entries a listing reads so Cli::emit pages it: offset + limit + 1 (the extra one marks `truncated`), CAP for --limit 0. */
-    public static function want(array $opt)
-    {
-        $limit = isset($opt['limit']) ? max(0, (int) $opt['limit']) : Cli::LIMIT;
-        $offset = isset($opt['offset']) ? max(0, (int) $opt['offset']) : 0;
-        return $limit > 0 ? min(self::CAP, $offset + $limit + 1) : self::CAP;
-    }
-
-    /** Status of a listing that read $count of at most $want entries: listed_all = it read to the end. */
-    public static function listed($count, $want)
-    {
-        return ['listed_all' => $count < $want]
-            + ($count >= self::CAP ? ['note' => 'read the first ' . self::CAP . ' entries only; list a narrower path for the rest'] : []);
-    }
-
-    /**
-     * The last lines of a program's error output, cleaned, for an error message. When the line naming the error comes
-     * before them (a borg traceback ends in a Platform, PID and sys.argv footer), it is put first and the tail is cut.
-     */
-    public static function tail($text, $chars = 400)
-    {
-        $lines = array_values(array_filter(array_map('trim', explode("\n", (string) $text)), 'strlen'));
-        $cause = '';
-        foreach (array_reverse(array_slice($lines, 0, -4)) as $l) {
-            if (preg_match('/error|exception|fatal/i', $l) && !preg_match('/^(sys\.argv|SSH_ORIGINAL_COMMAND|Platform|PID):/', $l)) {
-                $cause = substr($l, 0, (int) ($chars / 2)) . ' | ... | ';
-                break;
-            }
-        }
-        $t = implode(' | ', array_slice($lines, -4));
-        $room = $chars - strlen($cause);
-        return Cli::cleanString(self::redact($cause . (strlen($t) > $room ? '...' . substr($t, -$room) : $t)));
-    }
-
-    /**
-     * Removes the password of scheme://user:password@host, also one with an unencoded @: restic takes
-     * rest:https://user:pass@host:8000/ (doc/030_preparing_a_new_repo.rst:208, 0.14.0) and parses it with Go's
-     * url.Parse (internal/backend/rest/config.go:36), which splits the userinfo at the LAST @ (net/url/url.go:577,
-     * go1.19.8). Cli::cleanString stops at the first @ and would leave the rest of such a password.
-     */
-    public static function redact($s)
-    {
-        return $s === null ? null : (string) preg_replace('#(://[^/\s:@]*:)[^/\s]*@#', '$1REDACTED@', (string) $s);
     }
 }

@@ -6,6 +6,7 @@
  */
 require_once dirname(__DIR__) . '/lib/Backup.php';
 require_once __DIR__ . '/BorgRepo.php';
+require_once __DIR__ . '/BorgPrune.php';
 require_once __DIR__ . '/BorgTool.php';
 
 $usage = <<<'TXT'

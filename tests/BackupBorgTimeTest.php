@@ -46,6 +46,23 @@ return [
             stDone($fx);
         }
     },
+    'borg list: archives in the same second come newest first (borg lists the older first and its start is whole seconds)'
+        => function () {
+            // Live run 2026-10-14, borg 1.2.4: two backups 0.24 s apart both had start "...T13:10:50.000000", the older listed first.
+            $arch = function ($c, $name, $start) {
+                return ['id' => str_repeat($c, 64), 'name' => $name, 'start' => $start];
+            };
+            $at = '2026-10-14T13:10:50.000000';
+            $fx = bkFixture('borg', ['archives' => [$arch('c', 'box-oldest', '2026-10-13T09:00:00.000000'),
+                $arch('a', 'box-older', $at), $arch('b', 'box-newer', $at)]]);
+            try {
+                list($code, $l, $out) = bkRun($fx, 'borg', ['list']);
+                array_pop($l);
+                check($code === 0 && array_column($l, 'id') === ['box-newer', 'box-older', 'box-oldest'], 'order: ' . $out);
+            } finally {
+                stDone($fx);
+            }
+        },
     'borg errors: a traceback is reported by its exception line, not by the Platform / PID / sys.argv footer; passwords stay redacted'
         => function () {
             $tb = (string) file_get_contents(__DIR__ . '/fixtures/backup/borg-create-traceback.txt'); // verbatim borg 1.2.4 stderr

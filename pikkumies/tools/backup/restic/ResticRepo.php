@@ -53,7 +53,7 @@ class ResticRepo
     {
         $r = $this->run($args, null, $gentle);
         if ($r['code'] !== 0) {
-            throw new CliError('restic ' . $args[0] . ' failed: ' . ToolProc::tail($r['err']),
+            throw new CliError('restic ' . $args[0] . ' failed: ' . ToolText::tail($r['err']),
                 'see the error; `stats` checks the repository and the login');
         }
         return $r;
@@ -80,21 +80,5 @@ class ResticRepo
     public static function time($t)
     {
         return (int) strtotime((string) preg_replace('/\.\d+/', '', (string) $t));
-    }
-
-    /** The shared keep options as restic flags. restic durations know y, m, d, h (internal/restic/duration.go, 0.11.0). */
-    public static function keepFlags(array $keep)
-    {
-        $flags = [];
-        foreach ($keep as $k => $v) {
-            if ($k === 'keep-within') {
-                $n = (int) $v;
-                $unit = substr($v, -1);
-                $v = $unit === 'w' ? (7 * $n) . 'd' : ($unit === 'H' ? "{$n}h" : $v);
-            }
-            $flags[] = "--$k";
-            $flags[] = $v;
-        }
-        return $flags;
     }
 }

@@ -20,7 +20,7 @@ class RcloneInfo
     }
 
     /**
-     * One directory level (`lsf --max-depth 1`, read line by line up to ToolProc::want, so --offset and --limit 0 page
+     * One directory level (`lsf --max-depth 1`, read line by line up to ToolList::want, so --offset and --limit 0 page
      * like every list). lsf prints times in rclone's local zone without saying which, so rclone runs with TZ=UTC0 (Go
      * reads TZ; seen on rclone 1.75.0) and `modified` is ISO 8601 UTC.
      */
@@ -30,8 +30,8 @@ class RcloneInfo
             throw new CliError('show needs one place', 'show remote:path, or a full local path');
         }
         $c->ready();
-        $where = $c->place($args[0], true);
-        $want = ToolProc::want($opt);
+        $where = RclonePlace::of($args[0], true, $c->home);
+        $want = ToolList::want($opt);
         $rows = [];
         $flags = ['--max-depth', '1', '--format', 'tsp', '--separator', "\t"];
         $r = $c->run(['lsf'], $flags, [$where], function ($line) use (&$rows, $want) {
@@ -44,14 +44,14 @@ class RcloneInfo
             return count($rows) < $want;
         }, null, ['TZ' => 'UTC0']);
         if (!$r['stopped'] && $r['code'] !== 0) {
-            throw new CliError("rclone lsf failed (exit {$r['code']}): " . ToolProc::tail($r['err']), 'remote names come from `list`');
+            throw new CliError("rclone lsf failed (exit {$r['code']}): " . ToolText::tail($r['err']), 'remote names come from `list`');
         }
-        $status = ['place' => $where] + ToolProc::listed(count($rows), $want);
+        $status = ['place' => $where] + ToolList::listed(count($rows), $want);
         if (!empty($opt['size'])) {
             $size = json_decode($c->must(['size'], ['--json'], [$where])['out'], true); // a full listing: API calls and time on big remotes
             $status['files'] = isset($size['count']) ? (int) $size['count'] : null;
             $status['total_bytes'] = isset($size['bytes']) ? (int) $size['bytes'] : null;
-            if (!RcloneCmd::isLocal($where)) {
+            if (!RclonePlace::isLocal($where)) {
                 $about = $c->run(['about'], ['--json'], [substr($where, 0, strpos($where, ':') + 1)]);
                 $a = $about['code'] === 0 ? json_decode($about['out'], true) : null; // not every backend supports about
                 foreach (['total', 'used', 'free'] as $k) {

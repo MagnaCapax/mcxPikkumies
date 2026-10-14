@@ -6,6 +6,7 @@
  */
 require_once dirname(__DIR__) . '/lib/Backup.php';
 require_once __DIR__ . '/ResticRepo.php';
+require_once __DIR__ . '/ResticPrune.php';
 require_once __DIR__ . '/ResticTool.php';
 
 $usage = <<<'TXT'

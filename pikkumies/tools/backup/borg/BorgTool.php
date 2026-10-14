@@ -1,20 +1,19 @@
 <?php
 /**
- * BorgTool: the shared backup verbs on borg (tools/backup/README.md, README.md here). Prune deletes
- * exactly the archives the plan named (`borg delete :: <names>`, docs/usage/delete.rst.inc:9 in
- * 1.1.16 and 1.2.4), then runs `borg compact` on borg 1.2 or newer: borg 1.2 frees repository
- * space only on compact (compact.rst.inc:56-60, 1.2.4), and borg 1.1.16 has no compact command
- * (no docs/usage/compact.rst.inc at that tag).
+ * BorgTool: the shared backup verbs on borg (tools/backup/README.md, README.md here). BorgRepo runs borg and reads
+ * its output, BorgPrune plans and removes archives.
  */
 class BorgTool implements BackupTool
 {
     private $repo;
+    private $prune;
     private $store;
     private $script;
 
     public function __construct(BackupStore $store, $script)
     {
         $this->repo = new BorgRepo($store, $script);
+        $this->prune = new BorgPrune($this->repo);
         $this->store = $store;
         $this->script = $script;
     }
@@ -28,7 +27,7 @@ class BorgTool implements BackupTool
     {
         $v = $this->repo->version();
         $r = ['version' => $v, 'compact_supported' => $v !== null && version_compare($v, '1.2', '>='),
-            'repo' => ToolProc::redact($this->store->repo()),
+            'repo' => ToolText::redact($this->store->repo()),
             'borgmatic_configs' => BorgRepo::borgmaticConfigs(), 'logged_in' => false];
         try {
             $this->store->usable($this->script);
@@ -51,7 +50,7 @@ class BorgTool implements BackupTool
         if ($r['code'] === 0) {
             return 'ok';
         }
-        return preg_match('/passphrase.*(incorrect|wrong)/i', $r['err']) ? 'wrong' : ToolProc::tail($r['err']);
+        return preg_match('/passphrase.*(incorrect|wrong)/i', $r['err']) ? 'wrong' : ToolText::tail($r['err']);
     }
 
     public function snapshots()
@@ -85,32 +84,21 @@ class BorgTool implements BackupTool
             return count($out) < $max;
         });
         if (!$r['stopped'] && $r['code'] !== 0) {
-            throw new CliError('borg list failed: ' . ToolProc::tail($r['err']), 'names come from `list`');
+            throw new CliError('borg list failed: ' . ToolText::tail($r['err']), 'names come from `list`');
         }
         $links = array_filter(array_column($out, 'hardlink'));
-        return ['records' => $out, 'status' => ToolProc::listed(count($out), $max) + ($links ? ['hardlink_note' => 'bytes is null'
+        return ['records' => $out, 'status' => ToolList::listed(count($out), $max) + ($links ? ['hardlink_note' => 'bytes is null'
             . ' for the second name of a hard link: its data is the file named in link_to, counted once there'] : [])];
     }
 
     public function prunePlan(array $keep)
     {
-        $r = $this->repo->run(array_merge(['prune', '--dry-run', '--list'], BorgRepo::keepFlags($keep)));
-        if ($r['code'] !== 0) {
-            throw new CliError('borg prune --dry-run failed: ' . ToolProc::tail($r['err']), 'see the error; `stats` checks the repository');
-        }
-        return BorgRepo::wouldPrune($r['err']);
+        return $this->prune->plan($keep);
     }
 
     public function prune(array $remove)
     {
-        $this->repo->must(array_merge(['delete', '::'], array_column($remove, 'id')));
-        $v = $this->repo->version();
-        $compact = $v !== null && version_compare($v, '1.2', '>=');
-        if ($compact) {
-            $this->repo->must(['compact']);
-        }
-        return ['records' => $remove, 'status' => ['compacted' => $compact] + ($compact ? []
-            : ['note' => "borg $v has no compact command (it arrived in 1.2)"])];
+        return $this->prune->remove($remove);
     }
 
     /**
@@ -140,7 +128,7 @@ class BorgTool implements BackupTool
         $r = $this->repo->run(array_merge(['create', '--json', '::' . $name, '--'], $paths), null, null, true);
         $d = json_decode($r['out'], true); // {"archive": {"name", "id", "stats": {...}}, ...} (docs/internals/frontends.rst, 1.2.4)
         if ($r['code'] !== 0 && !isset($d['archive'])) {
-            throw new CliError('borg create failed: ' . ToolProc::tail($r['err']), 'see the error; `stats` checks the repository');
+            throw new CliError('borg create failed: ' . ToolText::tail($r['err']), 'see the error; `stats` checks the repository');
         }
         $a = isset($d['archive']) ? $d['archive'] : [];
         // rc 1 = warning (docs/usage/general/return-codes.rst.inc, 1.2.4)

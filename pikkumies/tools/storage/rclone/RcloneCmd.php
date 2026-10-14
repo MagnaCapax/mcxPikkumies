@@ -44,7 +44,7 @@ class RcloneCmd
     {
         $r = $this->run($words, $flags, $paths, $onLine);
         if (!in_array($r['code'], $ok, true)) {
-            throw new CliError('rclone ' . implode(' ', $words) . " failed (exit {$r['code']}): " . ToolProc::tail($r['err']),
+            throw new CliError('rclone ' . implode(' ', $words) . " failed (exit {$r['code']}): " . ToolText::tail($r['err']),
                 'read the error; a remote name comes from `list`');
         }
         return $r;
@@ -117,39 +117,5 @@ class RcloneCmd
             . ' nothing was done',
             'the user runs the rclone command in their own terminal, where rclone asks for the config password; '
             . 'that password is never typed into the chat');
-    }
-
-    /**
-     * A source or destination: "remote:path" with a remote name, or an absolute local path inside the
-     * home ($mustExist: it exists; otherwise its parent does). Never an option, never a connection
-     * string (":sftp,pass=...:" carries credentials on the command line).
-     */
-    public function place($s, $mustExist)
-    {
-        $s = (string) $s;
-        if ($s === '' || $s[0] === '-' || $s[0] === ':' || strpos($s, "\n") !== false) {
-            throw new CliError("not a place rclone may use: $s", 'use remote:path with a remote from `list`, or a full local path;'
-                . ' connection strings are refused because they carry passwords');
-        }
-        if ($s[0] !== '/') {
-            if (!preg_match('/^[\w.+@ -]+:/', $s)) {
-                throw new CliError("not remote:path and not a full local path: $s", 'remote names come from `list`; local paths'
-                    . ' start with /');
-            }
-            return $s;
-        }
-        if ($mustExist || file_exists($s)) {
-            return HomePath::existing($s, $this->home);
-        }
-        $parent = realpath(dirname($s));
-        if ($parent === false || !HomePath::inside($parent, $this->home)) {
-            throw new CliError("$s is not inside the home directory", 'local paths must be under ' . $this->home);
-        }
-        return $parent . '/' . basename($s);
-    }
-
-    public static function isLocal($place)
-    {
-        return $place !== '' && $place[0] === '/';
     }
 }

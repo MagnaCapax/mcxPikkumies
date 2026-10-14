@@ -1,18 +1,20 @@
 <?php
 /**
  * ResticTool: the shared backup verbs on restic (tools/backup/README.md, README.md here). Sources
- * are restic 0.11.0 and 0.14.0 (Debian 11 and 12). Prune forgets exactly the snapshot ids the user
- * saw in the plan, never re-running the policy, then runs `restic prune`.
+ * are restic 0.11.0 and 0.14.0 (Debian 11 and 12). ResticRepo runs restic and reads its JSON, ResticPrune plans and
+ * removes snapshots.
  */
 class ResticTool implements BackupTool
 {
     private $repo;
+    private $prune;
     private $store;
     private $script;
 
     public function __construct(BackupStore $store, $script)
     {
         $this->repo = new ResticRepo($store, $script);
+        $this->prune = new ResticPrune($this->repo);
         $this->store = $store;
         $this->script = $script;
     }
@@ -24,7 +26,7 @@ class ResticTool implements BackupTool
 
     public function stats()
     {
-        $r = ['version' => $this->repo->version(), 'repo' => ToolProc::redact($this->store->repo()), 'logged_in' => false];
+        $r = ['version' => $this->repo->version(), 'repo' => ToolText::redact($this->store->repo()), 'logged_in' => false];
         try {
             $this->store->usable($this->script);
         } catch (CliError $e) {
@@ -48,7 +50,7 @@ class ResticTool implements BackupTool
         if ($r['code'] === 0) {
             return 'ok';
         }
-        return stripos($r['err'], 'wrong password') !== false ? 'wrong' : ToolProc::tail($r['err']);
+        return stripos($r['err'], 'wrong password') !== false ? 'wrong' : ToolText::tail($r['err']);
     }
 
     public function snapshots()
@@ -78,30 +80,19 @@ class ResticTool implements BackupTool
             return count($out) < $max;
         });
         if (!$r['stopped'] && $r['code'] !== 0) {
-            throw new CliError('restic ls failed: ' . ToolProc::tail($r['err']), 'ids come from `list`');
+            throw new CliError('restic ls failed: ' . ToolText::tail($r['err']), 'ids come from `list`');
         }
-        return ['records' => $out, 'status' => ToolProc::listed(count($out), $max)];
+        return ['records' => $out, 'status' => ToolList::listed(count($out), $max)];
     }
 
-    /** `forget --dry-run --json <policy>`: groups with keep and remove lists (cmd/restic/cmd_forget.go:216-221, 0.11.0). */
     public function prunePlan(array $keep)
     {
-        $remove = [];
-        $kept = 0;
-        foreach ($this->repo->json(array_merge(['forget', '--dry-run', '--json'], ResticRepo::keepFlags($keep))) as $g) {
-            $kept += isset($g['keep']) ? count((array) $g['keep']) : 0;
-            foreach (isset($g['remove']) ? (array) $g['remove'] : [] as $s) {
-                $remove[$s['id']] = ResticRepo::record($s);
-            }
-        }
-        return ['remove' => array_values($remove), 'keep' => $kept];
+        return $this->prune->plan($keep);
     }
 
     public function prune(array $remove)
     {
-        $this->repo->must(array_merge(['forget', '--'], array_column($remove, 'snapshot_id')));
-        $this->repo->must(['prune']);
-        return ['records' => $remove, 'status' => ['space_freed_by' => 'restic prune']];
+        return $this->prune->remove($remove);
     }
 
     /**
@@ -133,7 +124,7 @@ class ResticTool implements BackupTool
             }
         }, true);
         if ($r['code'] !== 0 && !$s) {
-            throw new CliError('restic backup failed: ' . ToolProc::tail($r['err']), 'see the error; `stats` checks the repository');
+            throw new CliError('restic backup failed: ' . ToolText::tail($r['err']), 'see the error; `stats` checks the repository');
         }
         $get = function ($k) use ($s) {
             return isset($s[$k]) ? $s[$k] : null;

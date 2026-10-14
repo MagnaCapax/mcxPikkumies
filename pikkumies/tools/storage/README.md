@@ -2,7 +2,7 @@
 
 Tools for the space the user has and where their files go: `storage` (disk space and quota) and `rclone` (cloud and SFTP remotes, transfers, mounts). The two share no verbs, so this category has no verb table and no shared contract (ADR-0015); each unit's USAGE.md lists its own. Snapshot backups (restic, borg) are the `backup` category.
 
-`lib/` holds what both units, and the backup units, use: running a program from PATH with a quoted argv and reading its output line by line (`ToolProc.php`), and deciding which paths a verb may touch (`HomePath.php`). Both should move to `pikkumies/lib/` once a third category needs them.
+`lib/` holds what both units, and the backup units, use: running a program from PATH with a quoted argv and reading its output line by line (`ToolProc.php`), the error text and listing size taken from that output (`ToolText.php`, `ToolList.php`), and deciding which paths a verb may touch (`HomePath.php`). They should move to `pikkumies/lib/` once a third category needs them.
 
 ## Safety rules (in the code and in the skills)
 

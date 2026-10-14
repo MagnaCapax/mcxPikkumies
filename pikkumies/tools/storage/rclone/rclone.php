@@ -8,9 +8,10 @@ $lib = dirname(__DIR__, 3) . '/lib';
 foreach (['Cli', 'CliHuman', 'Host'] as $rcloneClass) {
     require_once "$lib/$rcloneClass.php";
 }
-require_once dirname(__DIR__) . '/lib/ToolProc.php';
-require_once dirname(__DIR__) . '/lib/HomePath.php';
-foreach (['RcloneCmd', 'RclonePlan', 'RcloneInfo', 'RcloneTransfer'] as $rcloneClass) {
+foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+    require_once dirname(__DIR__) . "/lib/$toolLib.php";
+}
+foreach (['RcloneCmd', 'RclonePlace', 'RclonePlan', 'RcloneInfo', 'RcloneTransfer'] as $rcloneClass) {
     require_once __DIR__ . "/$rcloneClass.php";
 }
 
@@ -53,7 +54,7 @@ Cli::run($argv, [
         }
         $c->ready();
         $oneWay = !empty($opt['one-way']);
-        $plan = RclonePlan::build($c, $c->place($args[0], true), $c->place($args[1], false), $oneWay);
+        $plan = RclonePlan::build($c, RclonePlace::of($args[0], true, $c->home), RclonePlace::of($args[1], false, $c->home), $oneWay);
         return RclonePlan::show($plan, $oneWay, $c->version());
     },
     'copy' => function ($args, $opt) use ($rcloneMake) {

@@ -1,7 +1,7 @@
 <?php
 /**
- * BackupRules: the checks every backup verb shares (tools/backup/README.md): the keep options, snapshot
- * ids, the check record, and one backup job per account at a time (file listings page with ToolProc::want).
+ * BackupRules: the checks every backup verb shares (tools/backup/README.md): the keep options, snapshot ids, the
+ * listing order, the check record, and one backup job per account at a time (file listings page with ToolList::want).
  */
 class BackupRules
 {
@@ -41,7 +41,7 @@ class BackupRules
     public static function checked($damage, $finished, array $r, $readData)
     {
         $rec = ['errors_found' => $damage, 'finished' => $finished, 'exit_code' => $r['code'], 'read_data' => $readData,
-            'output' => ToolProc::tail($r['out'] . "\n" . $r['err'])];
+            'output' => ToolText::tail($r['out'] . "\n" . $r['err'])];
         return $finished ? $rec
             : $rec + ['note' => 'the check did not finish (lock, network, login or option: see output), so it says nothing about damage'];
     }
@@ -57,5 +57,22 @@ class BackupRules
                     'wait for it to finish');
             }
         }
+    }
+
+    /**
+     * Snapshots (of $path, if given) newest first. Equal times (borg starts are whole seconds) come in reverse tool order:
+     * borg lists the older first (live run 2026-10-14), and PHP 7.3's usort would leave ties in any order.
+     */
+    public static function newestFirst(array $snapshots, $path)
+    {
+        $all = array_values(array_filter($snapshots, function ($s) use ($path) {
+            return $path === null || in_array($path, (array) $s['paths'], true);
+        }));
+        $times = array_map(function ($s) {
+            return (int) $s['time'];
+        }, $all);
+        $order = array_keys($all);
+        array_multisort($times, SORT_DESC, $order, SORT_DESC, $all);
+        return $all;
     }
 }

@@ -29,7 +29,7 @@ class RclonePlan
         $exact = self::exact($c);
         $kinds = ['+' => 'copy', '*' => 'replace', '-' => 'extra_on_dst', '=' => 'same', '!' => 'error'];
         $p = ['copy' => 0, 'replace' => 0, 'extra_on_dst' => 0, 'same' => 0, 'error' => 0, 'samples' => [],
-            'copy_bytes' => RcloneCmd::isLocal($src) ? 0 : null, 'exact' => $exact];
+            'copy_bytes' => RclonePlace::isLocal($src) ? 0 : null, 'exact' => $exact];
         $read = function ($line) use (&$p, $kinds, $src, $oneWay) {
             if (strlen($line) < 3 || $line[1] !== ' ' || !isset($kinds[$line[0]]) || ($oneWay && $line[0] === '-')) {
                 return true;
@@ -56,7 +56,7 @@ class RclonePlan
                 'compare smaller folders');
         }
         if (!$p['complete'] && $p['error'] === 0) {
-            throw new CliError("rclone could not compare the two places (exit {$r['code']}): " . ToolProc::tail($r['err']),
+            throw new CliError("rclone could not compare the two places (exit {$r['code']}): " . ToolText::tail($r['err']),
                 'check both places exist: remotes come from `list`, local paths must exist');
         }
         $ok = $exact && $p['complete'];

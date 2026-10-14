@@ -112,7 +112,7 @@ class StorageScan
         } elseif ($r['code'] === 124) {
             $status['stopped_by'] = 'time limit (' . self::TIMEOUT . ' s); scan a smaller --path';
         } elseif ($r['code'] !== 0) {
-            $status['stopped_by'] = 'some directories could not be read: ' . ToolProc::tail($r['err'], 200);
+            $status['stopped_by'] = 'some directories could not be read: ' . ToolText::tail($r['err'], 200);
         }
         return $status;
     }

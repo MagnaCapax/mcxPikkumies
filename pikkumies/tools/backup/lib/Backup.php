@@ -8,8 +8,9 @@ $backupLib = dirname(__DIR__, 3) . '/lib';
 foreach (['Cli', 'CliHuman', 'Config'] as $backupClass) {
     require_once "$backupLib/$backupClass.php";
 }
-require_once dirname(__DIR__, 2) . '/storage/lib/ToolProc.php';
-require_once dirname(__DIR__, 2) . '/storage/lib/HomePath.php';
+foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+    require_once dirname(__DIR__, 2) . "/storage/lib/$toolLib.php";
+}
 require_once __DIR__ . '/BackupTool.php';
 require_once __DIR__ . '/BackupStore.php';
 require_once __DIR__ . '/BackupRules.php';
@@ -34,13 +35,7 @@ class Backup
             },
             'list' => function ($args, $opt) use ($t) {
                 $path = isset($opt['path']) && is_string($opt['path']) ? $opt['path'] : null;
-                $all = array_values(array_filter($t()->snapshots(), function ($s) use ($path) {
-                    return $path === null || in_array($path, (array) $s['paths'], true);
-                }));
-                usort($all, function ($a, $b) {
-                    return (int) $b['time'] - (int) $a['time'];
-                });
-                return $all;
+                return BackupRules::newestFirst($t()->snapshots(), $path);
             },
             'show' => function ($args, $opt) use ($t) {
                 if (!empty($opt['prune-plan'])) {
@@ -50,7 +45,7 @@ class Backup
                 }
                 $id = BackupRules::id($args);
                 $path = isset($args[1]) ? (string) $args[1] : null;
-                return !empty($opt['files']) ? $t()->files($id, $path, ToolProc::want($opt)) : [$t()->details($id)];
+                return !empty($opt['files']) ? $t()->files($id, $path, ToolList::want($opt)) : [$t()->details($id)];
             },
             'stats' => function ($args, $opt) use ($t) {
                 return [$t()->stats()];
@@ -121,7 +116,7 @@ class Backup
                 'run login again with the repository password');
         }
         $kept = $store->commit();
-        $r = ['repo' => ToolProc::redact($repo), 'stored' => $store->secretPath(), 'verified' => $res === 'ok']
+        $r = ['repo' => ToolText::redact($repo), 'stored' => $store->secretPath(), 'verified' => $res === 'ok']
             + ($kept !== null ? ['previous_password_kept' => $kept] : []);
         return ['records' => [$res === 'ok' ? $r : $r + ['note' => 'stored without a check: ' . $res]],
             'status' => ['verified' => $res === 'ok']];

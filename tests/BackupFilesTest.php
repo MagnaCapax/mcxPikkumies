@@ -48,24 +48,25 @@ return [
         },
     'borg show --files: a hard link\'s second name has bytes null and link_to (never 0, never counted twice); types are restic\'s words'
         => function () {
-            // borg 1.2.4 and 1.4.0 list the second name as "-" with mode "h...", size 0 and source = the first name (smoke 2026-10-14).
-            $t = '2026-10-14T12:19:30.000000';
-            $files = [['type' => 'd', 'mode' => 'drwxr-xr-x', 'path' => 'home/u/data/sub', 'size' => 0, 'mtime' => $t],
-                ['type' => '-', 'mode' => '-rw-r--r--', 'path' => 'home/u/data/sub/big-hardlink.bin', 'size' => 3000000, 'source' => '',
-                    'mtime' => $t],
-                ['type' => '-', 'mode' => 'hrw-r--r--', 'path' => 'home/u/data/big.bin', 'size' => 0,
-                    'source' => 'home/u/data/sub/big-hardlink.bin', 'mtime' => $t],
-                ['type' => 'l', 'mode' => 'lrwxrwxrwx', 'path' => 'home/u/data/link', 'size' => 0, 'source' => 'sub',
-                    'mtime' => $t]];
+            // Verbatim `borg list --json-lines` of borg 1.2.4 (TZ=UTC0) on data with a hard link and a symlink; borg 1.4.0 printed
+            // the same keys and values but the times (live run 2026-10-14). The second name is "-", mode "h...", size 0, source set.
+            $files = array_map(function ($l) {
+                return json_decode($l, true);
+            }, file(__DIR__ . '/fixtures/backup/borg-1.2.4-list-json-lines-hardlink.jsonl', FILE_IGNORE_NEW_LINES));
             $fx = bkFixture('borg', ['files' => $files]);
             try {
                 list($code, $l, $out) = bkRun($fx, 'borg', ['show', 'box-1', '--files']);
                 $st = array_pop($l);
-                check($code === 0 && array_column($l, 'type') === ['dir', 'file', 'file', 'symlink'], 'types: ' . $out);
-                check($l[2]['bytes'] === null && $l[2]['hardlink'] === true && $l[2]['link_to'] === '/home/u/data/sub/big-hardlink.bin'
-                    && $l[1]['bytes'] === 3000000 && !isset($l[1]['hardlink']) && !isset($l[3]['hardlink']), 'hard link: ' . $out);
-                check(array_sum(array_filter(array_column($l, 'bytes'))) === 3000000 && $l[0]['bytes'] === null
-                    && strpos($st['hardlink_note'], 'link_to') !== false, 'bytes counted twice or note missing: ' . $out);
+                check($code === 0 && array_column($l, 'type') === ['dir', 'dir', 'file', 'file', 'file', 'symlink'], 'types: ' . $out);
+                check($l[4]['bytes'] === null && $l[4]['hardlink'] === true && $l[4]['link_to'] === '/w/home/u/data/sub/big.bin'
+                    && $l[2]['bytes'] === 3000000 && !isset($l[2]['hardlink']) && !isset($l[5]['hardlink']), 'hard link: ' . $out);
+                $fileBytes = array_sum(array_column(array_filter($l, function ($r) {
+                    return $r['type'] === 'file';
+                }), 'bytes'));
+                // 3000006 is what borg 1.2.4 itself gave as the archive's original_size in the same run
+                check($fileBytes === 3000006 && $l[0]['bytes'] === null && strpos($st['hardlink_note'], 'link_to') !== false,
+                    'bytes counted twice or note missing: ' . $out);
+                check($l[3]['modified_at'] === 1790000000, 'mtime: ' . $out); // the file was touched to 2026-09-21T14:13:20Z
             } finally {
                 stDone($fx);
             }
