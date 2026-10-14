@@ -6,6 +6,7 @@
  * Root is reported from what the OS says, never from configuration.
  */
 require_once __DIR__ . '/Host.php';
+require_once __DIR__ . '/Quota.php';
 
 class Detect
 {
@@ -148,7 +149,7 @@ class Detect
         return [
             'cpus'       => (int) trim((string) @shell_exec('nproc 2>/dev/null')),
             'memTotalMb' => (int) round($memTotalKb / 1024),
-            'homeFreeGb' => $home !== '' && is_dir($home) ? round(disk_free_space($home) / 1073741824, 1) : null,
+            'disk'       => Quota::fields($home), // quota first: the filesystem's free space is the whole array on shared servers
             'homeTotalGb' => $home !== '' && is_dir($home) ? round(disk_total_space($home) / 1073741824, 1) : null,
         ];
     }

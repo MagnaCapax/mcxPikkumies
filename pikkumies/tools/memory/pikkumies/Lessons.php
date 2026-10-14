@@ -36,11 +36,16 @@ class Lessons
         if (!preg_match('/^[a-z0-9][a-z0-9-]*$/', $topic) || $title === '' || !$sources) {
             throw new CliError('save needs --topic, --title and --sources', 'e.g. --topic rtorrent --title "rtorrent stops on a full disk" --sources "df -h output; rtorrent log"');
         }
-        $dir = self::root() . "/lessons/$topic";
+        // ADR-0018 hierarchy: lessons/<topic>/ for solved problems, reference/ for facts, research/ for longer findings.
+        $kind = isset($opt['kind']) && is_string($opt['kind']) ? $opt['kind'] : 'lesson';
+        if (!in_array($kind, ['lesson', 'reference', 'research'], true)) {
+            throw new CliError("unknown --kind $kind", 'kinds: lesson (default), reference, research');
+        }
+        $dir = self::root() . ($kind === 'lesson' ? "/lessons/$topic" : "/$kind");
         $related = [];
         list($hits) = DocSources::search($title, 5, true, 0.5); // free text: half of the title's words
         foreach ($hits as $h) {
-            if ($h[3] === 'lessons') {
+            if ($h[3] === 'lessons' || ($kind === 'research' && $h[3] === 'research')) { // research notes are labelled research (DocSources)
                 $related[] = $h[0];
             }
         }

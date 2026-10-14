@@ -55,6 +55,10 @@ return [
         check(preg_match('/^model:\n(  .*\n)*  key_env:/m', $y) === 0, 'key_env must not sit under model:');
         check(strpos($y, 'secret') === false, 'key leaked into config.yaml');
         check(strpos($y, '"/a/skills"') !== false, 'external dir');
+        check(strpos($y, "security:\n  allow_lazy_installs: false\n") !== false, 'runtime installs must be off by default (ADR-0021)');
+        check(strpos($y, "approvals:\n  mode: manual\n") !== false, 'dangerous commands must ask the user, not a second model (ADR-0020)');
+        $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], [], true);
+        check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
         // Unapproved shell hooks are silently skipped in a non-interactive run.
         check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n") !== false && strpos($y, '/h/g.php') !== false, 'hook with consent');
         $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);

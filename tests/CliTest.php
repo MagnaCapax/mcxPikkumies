@@ -32,7 +32,7 @@ Cli::run($argv, [
     "leak" => function ($args, $opt) {
         return [["rpc_password" => "a", "webui_pass" => "b", "access_token" => "c", "Authorization" => "d", "x" => ["api-key" => "e"],
             "tracker" => "https://t.example/announce.php?passkey=0123456789abcdef&x=1", "t2" => "https://t.example/0123456789abcdef0123/announce",
-            "url" => "http://user:pw9@host.example/x", "total_tokens" => 5]];
+            "url" => "http://user:pw9@host.example/x", "total_tokens" => 5, "t3" => "https://t.example/a.php?pid=0123456789abcdef9", "t4" => "https://t.example/tracker/0123456789abcdef9z/announce"]];
     },
     "boom" => function ($args, $opt) {
         throw new RuntimeException("boom secret=hunter2");
@@ -43,7 +43,7 @@ Cli::run($argv, [
     "evil" => function ($args, $opt) {
         return ["records" => [], "status" => ["ok" => false, "password" => "pw", "note" => "x"]];
     },
-], "usage: fixture.php list|nasty|big|write|fail [--human]");
+], "usage: fixture.php list|nasty|big|write|fail [--human]", [], ["n"]);
 ');
     return $tool;
 }
@@ -137,9 +137,31 @@ return [
         list($code, $out) = runPhp(cliFixtureTool(), ['--limit', 'list']);
         check($code === 0, 'an option swallowed the verb: ' . $out);
     },
+    'cli: an unknown option (--dry-run, a typo) is a usage error and the verb never runs' => function () {
+        foreach ([['write', '--dry-run'], ['write', '--with-dat'], ['write', '--frobnicate=1']] as $argv) {
+            list($code, $out) = runPhp(cliFixtureTool(), $argv);
+            $l = cliLines($out); $s = end($l);
+            check($code === 2 && $s['ok'] === false && strpos($s['error'], 'unknown option') !== false, 'unknown option accepted: ' . implode(' ', $argv) . ' -> ' . $out);
+            check(strpos($out, 'wrote') === false, 'the verb ran despite an unknown option: ' . $out);
+        }
+        list($code) = runPhp(cliFixtureTool(), ['list', '--limit=2', '--human', '--yes', '--fields', 'id']);
+        check($code === 0, 'global options were refused');
+        list($code, $out) = runPhp(cliFixtureTool(), ['list', '--yes=no']);
+        check($code === 2 && strpos($out, 'unknown option') !== false, 'a value on an on/off option was accepted: ' . $out);
+    },
+    'cli: --offset pages through records; the status says where the next page starts' => function () {
+        list($code, $out) = runPhp(cliFixtureTool(), ['list', '--n', '7', '--limit', '3']);
+        $l = cliLines($out); $s = end($l);
+        check($code === 0 && $s['count'] === 3 && $s['total'] === 7 && $s['next_offset'] === 3, 'first page: ' . $out);
+        list($code, $out) = runPhp(cliFixtureTool(), ['list', '--n', '7', '--limit', '3', '--offset', '6']);
+        $l = cliLines($out); $s = array_pop($l);
+        check($code === 0 && $s['count'] === 1 && !isset($s['truncated']) && count($l) === 1, 'last page: ' . $out);
+    },
     'cli: parse handles --k=v, --k v, flags and --' => function () {
         list($verb, $args, $opt) = Cli::parse(['x', 'show', '--limit=5', '--fields', 'a,b', '--human', '--', '--not-an-option']);
         check($verb === 'show' && $opt['limit'] === '5' && $opt['fields'] === 'a,b' && $opt['human'] === true, 'options misparsed');
+        list(, $a2, $o2) = Cli::parse(['x', 'remove', '--with-data', 'abc', '--expect', '1GiB'], ['remove'], ['with-data']);
+        check($a2 === ['abc'] && $o2['with-data'] === true && $o2['expect'] === '1GiB', 'a declared flag took the next word');
         check($args === ['--not-an-option'], 'args after -- misparsed');
     },
 ];

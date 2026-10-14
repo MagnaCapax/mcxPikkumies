@@ -37,6 +37,23 @@ return [
             "curl http://127.0.0.1:8989/api/v3/movie/1 -X DELETE",
             "curl --request 'DELETE' http://0.0.0.0:7878/api/v3/movie/2",
             'php ~/pikkumies/tools/backup/restic/restic.php --human prune',
+            "curl --request=DELETE http://127.0.0.1:7878/public-u/radarr/api/v3/queue/5",
+            "curl -X DELETE 'https://host.example/public-u/radarr/api/v3/movie/12?deleteFiles=true'",
+            "curl -X POST http://127.0.0.1:8989/api/v3/command -d '{\"name\":\"DeleteSeriesFiles\"}'",
+            // The form the USAGE files teach names no .php file (review 2026-10-14).
+            'php $Q remove 0123456789abcdef --with-data --expect 41.2GiB',
+            'Q=~/pikkumies/tools/torrent-clients/qbittorrent/qbittorrent.php; php $Q remove abc --with-data',
+            'php $R prune --keep 3',
+            "curl -d '{\"method\":\"core.remove_torrent\",\"params\":[\"abc\",true]}' http://127.0.0.1:8112/json",
+            'rm ~/data/big.mkv', 'rm -r ~/data/old', 'cd ~/data && rm *.part', "find ~/data -name '*.part' -delete", 'find ~/data -type f -exec rm {} +',
+            'truncate -s 0 ~/data/x', 'shred -u ~/x', 'unlink ~/x',
+            'yes | bash ~/install-media-stack.sh', 'bash ~/install-media-stack.sh --uninstall=jellyfin', 'bash ~/install-media-stack.sh --uninstall --dry-run',
+            // Storage and backup forms the 2026-10-14 storage review found unasked.
+            'rclone rc operations/purge fs=remote: remote=old', "curl -X POST 'http://127.0.0.1:5572/operations/deletefile?fs=remote:&remote=x'",
+            'borgmatic', 'borgmatic prune', 'restic key remove abc', 'restic repair snapshots --forget', 'restic -r r restore latest --target ~',
+            'borg check --repair ~/repo', 'borg extract ~/repo::a', 'kopia snapshot restore k1 ~/x', 'duplicacy restore -r 3 -overwrite',
+            'rsync -a' . ' --delete ~/a/ host:b/', "lftp -e 'mirror -R --Remove-source-files a b'", 'rclone serve http ~/data --addr :8080',
+            'php $C copy ~/a remote:a --replace',
         ] as $cmd) {
             $d = $ask($cmd);
             check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], $cmd) !== false, "no approval asked for: $cmd");
@@ -47,7 +64,8 @@ return [
         list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => "import os; os.system('restic -r /a forget --prune')"]]));
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'approve', 'execute_code bypassed the guard');
-        foreach (['import subprocess; subprocess.run(["rclone", "purge", "remote:old"])', 'import requests; requests.delete("http://127.0.0.1:8989/api/v3/series/1")', 'rpc("torrent-remove", {"ids": [1], "delete-local-data": True})'] as $code) {
+        foreach (['import subprocess; subprocess.run(["rclone", "purge", "remote:old"])', 'import requests; requests.delete("http://127.0.0.1:8989/api/v3/series/1")', 'rpc("torrent-remove", {"ids": [1], "delete-local-data": True})',
+            'subprocess.run(["php", "/h/pikkumies/tools/arr/radarr/radarr.php", "remove", "12", "--with-data"])', 'requests.delete(f"http://127.0.0.1:{p}/api/v3/movie/1")', 'requests.request("DELETE", "http://127.0.0.1:8989/x")'] as $code) {
             list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
             $d = json_decode($out, true);
             check(is_array($d) && $d['action'] === 'approve', "execute_code delete not asked: $code");
@@ -57,7 +75,19 @@ return [
         check($d['action'] === 'approve' && strpos($d['message'], 'rclone purge remote:') !== false, 'the user must see the whole command they approve');
         $d = $ask(str_repeat('echo ok; ', 500) . 'rclone purge remote:');
         check($d['action'] === 'block', 'a delete too long to show in full must be refused, not half-shown');
-        foreach (['rclone ls remote:', 'rclone copy ~/a remote:a', 'restic snapshots', 'borg list ~/repo', 'curl http://127.0.0.1:8080/api/v2/torrents/info'] as $cmd) {
+        foreach (['import os; os.remove("/home/u/x")', 'import shutil; shutil.rmtree(p)', 'pathlib.Path(p).unlink()'] as $code) {
+            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
+            $d = json_decode($out, true);
+            check(is_array($d) && $d['action'] === 'approve', "execute_code file delete not asked: $code");
+        }
+        foreach (['cat ~/pikkumies/local/secrets/qbittorrent', 'ls pikkumies/local/secrets/', 'rclone config show', 'rclone config dump'] as $cmd) {
+            $d = $ask($cmd);
+            check(is_array($d) && $d['action'] === 'block', "stored passwords readable: $cmd");
+        }
+        foreach (['rclone ls remote:', 'rclone copy ~/a remote:a', 'restic snapshots', 'borg list ~/repo', 'curl http://127.0.0.1:8080/api/v2/torrents/info',
+            'php $Q remove abc', 'php $Q list --search firmware', 'grep -r term ~/notes', 'bash ~/install-media-stack.sh --stop-app=sonarr && bash ~/install-media-stack.sh --start-app=sonarr',
+            'ls -la ~/data', 'git status', 'borgmatic list', 'rclone serve http ~/data --addr 127.0.0.1:8080', 'rclone rc core/stats', 'restic snapshots --json',
+            'rclone config file', 'rclone listremotes --long'] as $cmd) {
             $out = $ask($cmd);
             check($out === null, "read-only command flagged: $cmd");
         }
@@ -111,6 +141,13 @@ return [
         file_put_contents("$tmp/d.md", "See [the readme]($tmp/pikkumies/memory/README.md).");
         list($code) = runPhp($tool, ['save', '--topic', 'x', '--title', 'readme link only', '--sources', 'y', '--body-file', "$tmp/d.md"]);
         check($code === 1, 'a link to README.md must not count as a related lesson');
+        file_put_contents("$tmp/e.md", "Survey of client defaults, see [the full disk case](" . $first . ").");
+        list($code, $out) = runPhp($tool, ['save', '--kind', 'research', '--topic', 'clients', '--title', 'client defaults survey', '--sources', 'docs', '--body-file', "$tmp/e.md"]);
+        check($code === 0 && strpos(cliLines($out)[0]['path'], '/memory/research/') !== false, 'research tier not writable: ' . $out);
+        list($code, $out) = runPhp($tool, ['search', 'client', 'defaults', 'survey', '--offline']);
+        check(strpos($out, '"trust":"research"') !== false, 'research note not found with its trust label: ' . $out);
+        list($code) = runPhp($tool, ['save', '--kind', 'secret', '--topic', 'x', '--title', 'y', '--sources', 'z', '--body-file', "$tmp/e.md"]);
+        check($code === 1, 'an unknown --kind was accepted');
         list($code, $out) = runPhp($tool, ['search', 'rtorrent', 'disk', 'full', '--offline']);
         $l = cliLines($out);
         check($code === 0 && $l[0]['path'] === realpath($first) && $l[0]['trust'] === 'lessons' && strpos($l[0]['excerpt'], 'disk was full') !== false && $last($out)['matched'] === 'keywords', 'search step 1: ' . $out);

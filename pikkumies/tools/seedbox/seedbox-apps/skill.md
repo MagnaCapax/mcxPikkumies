@@ -7,7 +7,7 @@ description: Check, restart and set up the user's seedbox apps (torrent clients,
 
 1. Run the system-status skill. If `pmss` is false, stop: this skill does not apply on this machine. Otherwise `apps` shows which apps are running for this user.
 2. Find the wiki page for the app in the quick list below and read it: `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search "<page title>"`, then read the path it prints. It says how the app is meant to run on this platform. If the app is not listed, `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php list pm-wiki --human | grep -i <app>` shows every page the wiki has.
-3. Check free disk first: a full disk is the most common reason a torrent client stops.
+3. Check the free space first (`quota_free_bytes` in any torrent `stats`, or `system-status`): a full quota is the most common reason a torrent client stops. The filesystem's free space (`df`, `fs_free_bytes`) is the whole server, not the user's share.
 4. Read the app's own log (in the app's config directory under the home directory), limited with `tail -n 100`.
 5. Restart only the affected app, the way the wiki page and the platform start it for this user. Do not kill other users' processes; you cannot see them anyway.
 6. Verify: the process stays up for a minute and its web UI answers. The checking pages below show how.

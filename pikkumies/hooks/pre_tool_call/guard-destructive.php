@@ -25,6 +25,8 @@ $patterns = [
     '/\bchmod\s+(-R\s+)?777\b/'                     => 'world-writable permissions',
     '/:\(\)\s*\{\s*:\|:&\s*\};:/'                   => 'fork bomb',
     '/\bgit\s+push\s+.*--force\b/'                  => 'force push',
+    '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
+    '/\brclone\b.*\bconfig\s+(show|dump)\b/s' => 'rclone config show/dump prints cloud credentials, and what the agent reads goes to the model',
 ];
 foreach ($patterns as $re => $why) {
     $hit = preg_match($re, $command);
@@ -53,11 +55,36 @@ $approve = [
     "/\\bkopia\\b.*{$v}snapshot$v(expire|delete)\\b/s"                                       => 'kopia removes backup snapshots',
     "/\\bduplicacy\\b.*{$v}prune\\b/s"                                                       => 'duplicacy removes backup revisions',
     "#{$lh}[^\\s]*/(api/v2/torrents/delete|[^\\s]*deletefiles=true)#si"                         => 'deletes torrent or media files through a local app',
-    "/^(?=.*\\bcurl\\b)(?=.*(-X|--request)\\s*[\"']?DELETE\\b)(?=.*$lh)/si"                  => 'deletes through a local app',
-    "#\\.delete\\(\\s*[\"']https?://$lh#i"                                                   => 'deletes through a local app',
+    "/^(?=.*\\bcurl\\b)(?=.*(-X|--request)[\\s=]*[\"']?DELETE\\b)(?=.*$lh)/si"                => 'deletes through a local app',
+    "#\\.delete\\(\\s*[fbru]*[\"']https?://$lh#i"                                              => 'deletes through a local app',
+    "#\\.request\\(\\s*[\"']DELETE[\"']\\s*,\\s*[fbru]*[\"']https?://$lh#i"                        => 'deletes through a local app',
+    // *arr items deleted by HTTP from anywhere (also the public proxy path): library items and their files.
+    '#^(?=.*(-X|--request|\\.delete\\(|["\']DELETE["\']))(?=.*/api/v[0-9]+/(queue|movie|series|artist|author|book|episodefile|moviefile|trackfile|bookfile)\\b)#si' => 'deletes media or downloads through an *arr app',
+    '#["\']name["\']\\s*:\\s*["\'](DeleteSeriesFiles|ResetApiKey|ApplicationUpdate)["\']#i'      => 'runs an *arr command that deletes files, resets the API key or replaces the app',
     '/delete[-_]local[-_]data/i'                                                              => 'deletes torrent data through a local app',
-    '/\.php["\']?\s+.*--(with-data|delete-files)\b/s'                                         => 'deletes data through a Pikkumies tool',
-    '#tools/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9-]+\.php["\']?(\s+-\S+)*\s+(prune|forget|purge)\b#'  => 'removes data through a Pikkumies tool',
+    // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file.
+    '/(^|[\s"\',\[(])--(with-data|delete-files)\b/'                                          => 'deletes data through a Pikkumies tool',
+    "/\\bphp\\b.*{$v}(prune|forget|purge)\\b/s"                                                => 'removes data through a Pikkumies tool',
+    '/\bcore\.remove_torrents?\b/'                                                            => 'removes torrents, and with remove_data their files, through Deluge',
+    '/\bexecute[a-z0-9.]*\b.*\brm\b/s'                                                         => 'runs rm through rTorrent',
+    // Plain file deletes: Hermes' own list catches only rm -r and rm /, and its default "smart" mode lets a
+    // second model approve them; the user decides about their files (ADR-0020). rm -rf stays blocked above.
+    '/(^|[\s;&|(`"\'])(rm|unlink|shred|truncate)\s/'                                           => 'deletes or empties files',
+    '/\bfind\b.*\s-(delete|exec(dir)?\s+(\S*\/)?(rm|unlink|shred)\b)/s'                        => 'deletes the files find matches',
+    '/\bos\.(remove|unlink|rmdir|removedirs)\(|\bshutil\.rmtree\(|\.unlink\(|\.rmdir\(/'          => 'deletes files from code',
+    // rclone's remote-control API (the WebUI's rcd runs for every rclone-enabled PMSS account) and its HTTP form.
+    '#\brclone\b.*\brc\b.*\boperations/(purge|delete|deletefile|rmdirs?|cleanup)\b#s'          => 'rclone deletes files through its remote control',
+    "#{$lh}[^\\s]*/(operations/(purge|delete|deletefile|rmdirs?|cleanup)|sync/(sync|bisync|move))\\b#" => 'rclone deletes or overwrites files through its remote control',
+    '/\bborgmatic\b(?!.*\s(list|info|check|rlist|rinfo|--help|--version)\b)/s'                 => 'borgmatic runs prune and compact by default',
+    "/\\brestic\\b.*{$v}(key{$v}remove|repair{$v}snapshots.*--forget|restore)\\b/s"            => 'restic removes a key, rewrites snapshots, or restores over existing files',
+    "/\\bborg\\b.*{$v}(check.*--repair|extract)\\b/s"                                      => 'borg repairs the repository or extracts over existing files',
+    "/\\bkopia\\b.*{$v}(snapshot{$v}restore|restore)\\b|\\bduplicacy\\b.*-overwrite\\b/s"   => 'a restore that can overwrite existing files',
+    '/\b(rsync|lftp)\b.*--(delete[a-z-]*|remove-source-files|Remove-source-files)\b/s'          => 'deletes files on one side of a transfer',
+    '/\brclone\b.*\bserve\b(?!.*--addr[=\s]+["\']?(127\.|localhost|\[::1\]|unix:))/s'         => 'rclone serve without a loopback --addr publishes files to the network',
+    '/(^|[\s"\',\[(])--replace\b/'                                                             => 'replaces existing files through a Pikkumies tool',
+    // Re-running the media installer can delete an app's settings and users (PMSS install-media-stack.sh
+    // asks on stdin, which a pipe can answer); stopping or starting one app is safe.
+    '/install-media-stack\.sh(?![^;&|\n]*--(stop-app|start-app|help)\b)/' => 'runs the media installer, which can delete app settings and data',
 ];
 foreach ($approve as $re => $why) {
     $hit = preg_match($re, $command);

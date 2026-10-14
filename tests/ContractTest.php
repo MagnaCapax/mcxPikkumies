@@ -113,6 +113,20 @@ return [
             check(!isset($bundled[$u['name']]), "{$u['name']} is also the name of a skill Hermes ships; skill_view would refuse both");
         }
     },
+    'units: every tool of a category has the verbs its category README lists (ADR-0015)' => function () {
+        foreach ((array) glob(dirname(__DIR__) . '/pikkumies/tools/*/README.md') as $readme) {
+            $shared = array_column(Units::verbs((string) file_get_contents($readme)), 'verb');
+            if (!$shared) {
+                continue;
+            }
+            foreach (Units::all() as $u) {
+                if ($u['category'] === basename(dirname($readme))) {
+                    $missing = array_diff($shared, array_column($u['verbs'], 'verb'));
+                    check(!$missing, $u['name'] . ' lacks the category verbs: ' . implode(', ', $missing));
+                }
+            }
+        }
+    },
     'units: removed commands are not mentioned in units, doctrine or docs' => function () {
         $root = dirname(__DIR__);
         $files = array_merge((array) glob("$root/pikkumies/tools/*/*/*.md"), (array) glob("$root/pikkumies/doctrine/*.md"), (array) glob("$root/pikkumies/doctrine/SOP/*.md"), (array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/skills/*/SKILL.md"), (array) glob("$root/pikkumies/hooks/*/*.php"), ["$root/README.md", "$root/AGENTS.md"]);
@@ -132,6 +146,8 @@ return [
             'hermes_cli/plugins.py' => ['rule_key=details.rule_key or tool_name'],                         // ADR-0020: per-command rule_key
             'hermes_cli/config_defaults.py' => ['"keyless_fallback": True', '"keyless_rescue": True'],     // ADR-0021: we turn both off
             'tools/tool_output_limits.py' => ['DEFAULT_MAX_BYTES = 50_000'],                                 // ADR-0016: our budget stays below
+            'tools/approval_context.py' => ['_VALID_MODES = ("manual", "smart", "off")'],                    // ADR-0020: we set manual
+            'hermes_cli/config.py' => ['def _deep_merge('],                                                   // ADR-0020: approvals.mode alone keeps the other defaults
         ];
         foreach ($facts as $file => $needles) {
             $text = (string) @file_get_contents($src[0] . '/' . $file);

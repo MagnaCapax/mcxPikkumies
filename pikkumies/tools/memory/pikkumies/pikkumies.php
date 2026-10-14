@@ -88,4 +88,4 @@ Cli::run($argv, [
         }
         return $out;
     },
-], "usage: pikkumies.php search|save|append|list|refresh|sources ... [--human]\n  see USAGE.md next to this file");
+], "usage: pikkumies.php search|save|append|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path']);

@@ -23,20 +23,23 @@ class Cli
 {
     const BUDGET = 16384;   // bytes of records per call: well under Hermes' 50,000-byte terminal cap, whole records only
     const LIMIT = 20;       // records per call unless --limit says otherwise
+    /** On/off options every tool takes. --yes is the confirmation a person types by hand (ADR-0020). */
+    const GLOBAL_FLAGS = ['human', 'jsonl', 'help', 'yes', 'verbs'];
     /** Field names (lower-cased) that are never printed: rpc_password, webUiPassword, x-api-key, Authorization... */
     const SECRET_KEY_RE = '/(pass|passwd|password|passkey|secret|token|apikey|api[-_]key|cookie|credentials?|authorization|private[-_]?key)$|^(sid|auth)$/';
 
     /**
      * argv -> [verb|null, positional args, options]; accepts --name value, --name=value and --flag.
-     * An option followed by a known verb name ($verbs) before any verb is a flag, so an unknown
-     * option cannot swallow the verb.
+     * $flags: the tool's on/off options; they never take the next word (`remove --with-data <id>`
+     * keeps the id). An option followed by a known verb name ($verbs) before any verb is a flag too,
+     * so an unknown option cannot swallow the verb.
      */
-    public static function parse(array $argv, array $verbs = [])
+    public static function parse(array $argv, array $verbs = [], array $flags = [])
     {
         $verb = null;
         $args = [];
         $opt = [];
-        $flags = ['human', 'jsonl', 'help', 'yes', 'dry-run', 'verbs'];
+        $flags = array_merge(self::GLOBAL_FLAGS, $flags);
         for ($i = 1; $i < count($argv); $i++) {
             $a = (string) $argv[$i];
             if ($a === '--') {
@@ -62,10 +65,26 @@ class Cli
         return [$verb, $args, $opt];
     }
 
-    public static function run(array $argv, array $verbs, $usage)
+    /**
+     * $flags: the tool's on/off options; $options: the ones that take a value. Any other option is a
+     * usage error, so a mistyped or invented one (--dry-run) never runs the verb without it.
+     */
+    public static function run(array $argv, array $verbs, $usage, array $flags = [], array $options = [])
     {
-        list($verb, $args, $opt) = self::parse($argv, array_keys($verbs));
+        list($verb, $args, $opt) = self::parse($argv, array_keys($verbs), $flags);
         $human = !empty($opt['human']);
+        $known = array_merge(self::GLOBAL_FLAGS, $flags, ['limit', 'offset', 'fields'], $options);
+        $unknown = array_diff(array_keys($opt), $known);
+        foreach (array_merge(self::GLOBAL_FLAGS, $flags) as $f) {
+            if (isset($opt[$f]) && $opt[$f] !== true) {
+                $unknown[] = "$f=" . $opt[$f]; // an on/off option takes no value: --with-data=no must not mean yes
+            }
+        }
+        if ($unknown) {
+            fwrite(STDERR, rtrim($usage) . "\n");
+            self::fail('unknown option: --' . implode(', --', $unknown) . '; nothing was done', 'options: --' . implode(', --', $known), $human);
+            exit(2);
+        }
         if ($verb === null && !empty($opt['verbs'])) {
             echo implode("\n", array_keys($verbs)), "\n"; // for the contract test: code verbs == USAGE.md verbs
             exit(0);
@@ -104,6 +123,9 @@ class Cli
     {
         $limit = isset($opt['limit']) ? max(0, (int) $opt['limit']) : self::LIMIT;
         $fields = isset($opt['fields']) && is_string($opt['fields']) ? array_flip(explode(',', $opt['fields'])) : null;
+        $offset = isset($opt['offset']) ? max(0, (int) $opt['offset']) : 0; // the next page: status next_offset
+        $total = count($records);
+        $records = array_slice(array_values($records), $offset);
         $shown = [];
         $bytes = 0;
         $truncated = false;
@@ -114,10 +136,10 @@ class Cli
             }
             $line = self::json($r);
             if (strlen($line) > self::BUDGET) {
-                $r = ['record' => $n, 'error' => 'record larger than ' . self::BUDGET . ' bytes; ask for fewer fields with --fields'];
+                $r = ['record' => $offset + $n, 'error' => 'record larger than ' . self::BUDGET . ' bytes; ask for fewer fields with --fields'];
                 $line = self::json($r);
             }
-            if (($limit > 0 && $n >= $limit) || $bytes + strlen($line) > self::BUDGET) {
+            if (($limit > 0 && count($shown) >= $limit) || $bytes + strlen($line) > self::BUDGET) {
                 $truncated = true;
                 break;
             }
@@ -125,8 +147,8 @@ class Cli
             $shown[] = $r;
         }
         $extra = self::clean($extra);
-        unset($extra['ok'], $extra['count'], $extra['truncated'], $extra['total']); // the status line and exit code always agree
-        $status = array_merge(['ok' => true, 'count' => count($shown)], $truncated ? ['truncated' => true, 'total' => count($records)] : [], $extra);
+        unset($extra['ok'], $extra['count'], $extra['truncated'], $extra['total'], $extra['next_offset']); // the status line and exit code always agree
+        $status = array_merge(['ok' => true, 'count' => count($shown)], $truncated ? ['truncated' => true, 'total' => $total, 'next_offset' => $offset + count($shown)] : [], $extra);
         if ($human) {
             echo CliHuman::render($shown), CliHuman::statusLine($status), "\n";
             return;
@@ -178,8 +200,10 @@ class Cli
         $s = preg_replace('/[\x00-\x08\x0B-\x1F\x7F]|\xC2[\x80-\x9F]/', '', $s);
         $s = (string) preg_replace('/[\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}]/u', '', (string) $s);
         return (string) preg_replace(
-            ['/([?&;](?:passkey|apikey|api_key|token|authkey|auth|key|pass|password)=)[^&\s"\'<>]+/i', '#/[0-9A-Za-z]{16,}/announce#', '#/announce/[0-9A-Za-z]{16,}#', '#(://[^/:@\s]*:)[^/@\s]+@#'],
-            ['$1REDACTED', '/REDACTED/announce', '/announce/REDACTED', '$1REDACTED@'],
+            // Tracker keys come as query values (passkey=, pid=, uk=, torrent_pass=...) or path segments
+            // (/<key>/announce, /announce/<key>, /tracker/<key>): any long token in a URL is removed.
+            ['/([?&;][A-Za-z_]*(?:pass|key|token|auth|secret|sid|pid|uk)[A-Za-z_]*=)[^&\s"\'<>]+/i', '#(\w+://[^\s"\'<>]*?/)(?=[0-9A-Za-z]*[0-9])[0-9A-Za-z]{16,}(?=[/?\s"\'<>]|$)#', '#(://[^/:@\s]*:)[^/@\s]+@#'],
+            ['$1REDACTED', '$1REDACTED', '$1REDACTED@'],
             $s
         );
     }
