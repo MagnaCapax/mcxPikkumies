@@ -18,20 +18,19 @@ class Arr
 {
     public static function run(array $argv, $id, $usage)
     {
-        $app = ArrApps::get($id);
-        $family = Host::family(getenv('PIKKUMIES_PMSS_DIR') ?: '/etc/seedbox/config');
-        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
-        $home = ArrLocate::home($uid);
-        $locate = function ($lenient = false) use ($app, $home, $family, $uid) {
-            if ($home === '' || !is_dir($home)) {
-                throw new CliError('no home folder of this user found (HOME, or the passwd entry)', 'run the tool as the seedbox user');
-            }
-            $cfg = Config::load();
-            $over = isset($cfg['arr'][$app['id']]) && is_array($cfg['arr'][$app['id']]) ? $cfg['arr'][$app['id']] : [];
-            return ArrLocate::find($app, $home, $family, $uid, $over, $lenient);
-        };
-        $t = (int) getenv('PIKKUMIES_ARR_TIMEOUT');
-        $timeout = $t > 0 && $t <= 60 ? $t : 15;
+        list($verbs, $flags, $options) = self::build(ArrApps::get($id));
+        Cli::run($argv, $verbs, $usage, $flags, $options);
+    }
+
+    /**
+     * [verbs, flags, options] of a Servarr unit for one table row. Nothing is contacted until a verb runs, so
+     * Whisparr builds its verb list first and picks the row (v2 or v3) when a verb runs (whisparr/WhisparrRun.php).
+     * noAdd: the library verbs without lookup and add.
+     */
+    public static function build(array $app)
+    {
+        $locate = self::locator($app);
+        $timeout = self::timeout();
         $client = null;
         $c = function () use (&$client, $locate, $app, $timeout) {
             return $client !== null ? $client : ($client = new ArrClient($locate(), $locate, $app['api'], $timeout));
@@ -46,14 +45,38 @@ class Arr
             $verbs += array_intersect_key(ArrLibrary::verbs($app, $c), array_flip(['queue', 'wanted']));
             $flags = ['cutoff'];
         } elseif ($app['kind'] === 'library') {
-            $verbs += ArrLibrary::verbs($app, $c);
-            $flags = ['files', 'with-data', 'no-search', 'cutoff'];
-            $options = array_merge($options, ['expect', 'profile', 'root']);
+            $lib = ArrLibrary::verbs($app, $c);
+            $verbs += empty($app['noAdd']) ? $lib : array_diff_key($lib, array_flip(['lookup', 'add']));
+            $flags = empty($app['noAdd']) ? ['files', 'with-data', 'no-search', 'cutoff'] : ['files', 'with-data', 'cutoff'];
+            $options = array_merge($options, empty($app['noAdd']) ? ['expect', 'profile', 'root'] : ['expect']);
         } else {
             $verbs += ArrIndexers::verbs($app, $c);
             $options[] = 'indexer';
         }
-        Cli::run($argv, $verbs, $usage, $flags, $options);
+        return [$verbs, $flags, $options];
+    }
+
+    /** fn($lenient = false) => ArrLocate::find for this user and app (tools/arr/README.md "Where each app is found"). */
+    public static function locator(array $app)
+    {
+        $family = Host::family(getenv('PIKKUMIES_PMSS_DIR') ?: '/etc/seedbox/config');
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $home = ArrLocate::home($uid);
+        return function ($lenient = false) use ($app, $home, $family, $uid) {
+            if ($home === '' || !is_dir($home)) {
+                throw new CliError('no home folder of this user found (HOME, or the passwd entry)', 'run the tool as the seedbox user');
+            }
+            $cfg = Config::load();
+            $over = isset($cfg['arr'][$app['id']]) && is_array($cfg['arr'][$app['id']]) ? $cfg['arr'][$app['id']] : [];
+            return ArrLocate::find($app, $home, $family, $uid, $over, $lenient);
+        };
+    }
+
+    /** Seconds per API call: 15, or PIKKUMIES_ARR_TIMEOUT (1-60, the tests). */
+    public static function timeout()
+    {
+        $t = (int) getenv('PIKKUMIES_ARR_TIMEOUT');
+        return $t > 0 && $t <= 60 ? $t : 15;
     }
 
     /** Every library item (series, movies) or, for Prowlarr, every indexer, as the API returns them. */

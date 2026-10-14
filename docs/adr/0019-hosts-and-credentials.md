@@ -35,3 +35,8 @@ Facts this rests on, checked 2026-10-14:
 
 ## References
 - ADR-0004 (provider key and root detection), ADR-0015, ADR-0020
+
+## Addendum 2026-10-14: Jackett's API key goes in the URL
+- Context: every other tool sends an app's API key in a request header. Jackett accepts its key only as the `apikey` (or `passkey`) query parameter of its Torznab and results routes (Jackett `src/Jackett.Server/Controllers/ResultsController.cs:33-49` at commit `6fdd78f6`); there is no header option, and its admin API needs a browser login cookie instead (`Startup.cs:51-58,83-86`).
+- Decision: `arr/jackett` puts the key in the query on those routes only, and only after the listener owner check has passed for the user's own port. The URL is built inside PHP's curl extension and never appears on a command line or in a process list. `/health` gets no key. Every error text, record and log line has the key replaced and URL queries cut, and the tests check the literal key against a wrong key, a 401, a 500 that echoes the URL and a dead port.
+- Consequence: the key can still reach Jackett's own logs as part of a request URL, as it does when the user's own browser or *arr apps call Jackett; the tool adds no new place where the key is stored or shown.

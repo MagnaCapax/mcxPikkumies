@@ -137,7 +137,7 @@ return [
         $units = array_values(array_filter(Units::all(), function ($u) {
             return $u['category'] === 'arr';
         }));
-        check(array_column($units, 'name') === ['autobrr', 'bazarr', 'lidarr', 'prowlarr', 'radarr', 'readarr', 'sonarr'],
+        check(array_column($units, 'name') === ['autobrr', 'bazarr', 'jackett', 'lidarr', 'prowlarr', 'radarr', 'readarr', 'sonarr', 'whisparr'],
             'arr units: ' . json_encode(array_column($units, 'name')));
         $shared = array_column(Units::verbs((string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/arr/README.md')), 'verb');
         check($shared === ['list', 'show', 'stats', 'health', 'history', 'restart'], 'first table: ' . json_encode($shared));

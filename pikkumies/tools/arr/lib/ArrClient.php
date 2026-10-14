@@ -6,8 +6,8 @@
  * the local port, no redirects, pinned address). Failures are named in the order of tools/arr/README.md
  * "When it cannot reach the app" (steps 5-12; steps 1-4 are ArrLocate's). An answer Http could not read
  * whole (over the size cap) or an empty GET answer is an error, never an empty list.
- * Bazarr and Autobrr reuse it: $where may name 'apiBase' (the path before the API route), 'header' (the
- * key header) and 'labels' (the config names used in errors, ArrConfig::LABELS).
+ * Bazarr, Autobrr and Jackett reuse it: $where may name 'apiBase' (the path before the API route), 'header' (the
+ * key header), 'keyQuery' (Jackett: the key goes in that query parameter, no header) and 'labels' (ArrConfig::LABELS).
  */
 class ArrClient
 {
@@ -53,7 +53,8 @@ class ArrClient
             $this->unreachable($r['error']);
         }
         if ($r['error'] !== '') {
-            throw new CliError("port $port answered HTTP $code, but the answer could not be read whole ({$r['error']}); nothing was used",
+            throw new CliError("port $port answered HTTP $code, but the answer could not be read whole ("
+                . $this->redact($r['error']) . '); nothing was used',
                 'too much for one call: use the app\'s own UI for this, or ask for less');
         }
         if (!empty($o['accept']) && in_array($code, $o['accept'], true)) {
@@ -93,13 +94,16 @@ class ArrClient
         $w = $this->where;
         $base = isset($w['apiBase']) ? $w['apiBase'] : $w['urlBase'] . '/api/' . $this->api . '/';
         $url = 'http://127.0.0.1:' . $w['port'] . $base . ltrim($path, '/');
+        $byQuery = isset($w['keyQuery']) && $w['key'] !== ''; // Jackett takes its key only as ?apikey= (jackett README)
+        $query = $byQuery ? $query + [$w['keyQuery'] => $w['key']] : $query;
         $q = [];
         foreach ($query as $k => $v) {
             foreach (is_array($v) ? $v : [$v] as $one) {
                 $q[] = rawurlencode($k) . '=' . rawurlencode(is_bool($one) ? ($one ? 'true' : 'false') : (string) $one);
             }
         }
-        $headers = [(isset($w['header']) ? $w['header'] : 'X-Api-Key') . ': ' . $w['key'], 'Accept: application/json'];
+        $headers = isset($w['keyQuery']) ? ['Accept: application/json']
+            : [(isset($w['header']) ? $w['header'] : 'X-Api-Key') . ': ' . $w['key'], 'Accept: application/json'];
         $form = isset($o['form']); // Bazarr reads its parameters from a form, as its own web page sends them
         if ($form || $body !== null) {
             $body = $form ? http_build_query($o['form'], '', '&', PHP_QUERY_RFC3986) : json_encode($body, JSON_UNESCAPED_SLASHES);

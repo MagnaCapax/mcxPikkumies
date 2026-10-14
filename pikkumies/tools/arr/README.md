@@ -1,8 +1,8 @@
 # arr
 
-Sonarr (TV), Radarr (movies), Lidarr (music) and Readarr (books) watch for wanted titles, find releases through indexers, send them to the torrent/usenet client, then import and rename the finished files into the library; Prowlarr manages the indexers for all of them. Bazarr fetches subtitles for what Sonarr and Radarr hold, and autobrr grabs releases the moment a tracker announces them on IRC or in a feed.
+Sonarr (TV), Radarr (movies), Lidarr (music) and Readarr (books) watch for wanted titles, find releases through indexers, send them to the torrent/usenet client, then import and rename the finished files into the library; Whisparr does the same for adult movies and scenes. Prowlarr and Jackett manage the indexers for all of them. Bazarr fetches subtitles for what Sonarr and Radarr hold, and autobrr grabs releases the moment a tracker announces them on IRC or in a feed.
 
-These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `sonarr`, `radarr`, `lidarr`, `readarr` (read verbs only) and `prowlarr` share the Servarr code in `lib/` and only name their app; `bazarr` and `autobrr` have their own APIs, so their own verb and config code in their unit folders, on the same `lib/` client, Docker, restart and output code. A verb that two units have means the same thing in both, with the same arguments and record fields. The contract test checks every unit against the first table below.
+These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `sonarr`, `radarr`, `lidarr`, `readarr` (read verbs only), `whisparr` (no lookup or add) and `prowlarr` share the Servarr code in `lib/` and only name their app (`whisparr` also picks its v2 or v3 row); `bazarr`, `autobrr` and `jackett` have their own APIs, so their own verb and config code in their unit folders, on the same `lib/` client, Docker, restart and output code. A verb that two units have means the same thing in both, with the same arguments and record fields. The contract test checks every unit against the first table below.
 
 ## Verbs every unit has
 
@@ -17,7 +17,7 @@ These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `son
 
 `history`, `queue` and `wanted` read the app's list page by page (200 records a request, at most 1000 a call, `lib/ArrPages.php`): `--limit 0` prints as many as fit in the 16 KiB output, and `truncated` with `next_offset` says when there are more.
 
-## Library apps (sonarr, radarr, lidarr; readarr: queue and wanted only)
+## Library apps (sonarr, radarr, lidarr; whisparr: all but lookup and add; readarr: queue and wanted only)
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|
@@ -52,6 +52,14 @@ Ids are `series:<n>` and `movie:<n>` (the Sonarr series or Radarr movie Bazarr t
 | toggle | `<id>... --on\|--off` | yes | Turns filters on or off and reads them back. A filter that is on grabs matching releases by itself. |
 | login | | yes | The user types an API key made in autobrr at a terminal; it is stored for the tool (PMSS creates none). |
 
+## Jackett
+
+| verb | arguments | changes | what it does |
+|---|---|---|---|
+| test | `[<id>...]` | no (contacts the trackers) | An empty search on each named indexer, or on every configured one, with Jackett's own pass rule (no results is a failure). |
+
+Ids are Jackett's own indexer names (`1337x`), as `list` prints them. `history` answers `ok:false`: Jackett keeps none. Nothing is changed in Jackett except by `restart`.
+
 ## Ids
 
 - An id is the app's own internal number, exactly as `list` prints it. Plain numbers are always internal ids, resolved against the live library before anything changes; one unknown id fails the whole call and nothing changes.
@@ -70,11 +78,11 @@ Library items: `id`, `title`, `year`, `meta_id`, `monitored`, `status`, `size` (
 
 ## Safety
 
-- The API key is full admin. It goes only in a header (`X-Api-Key`; Bazarr `X-API-KEY`; autobrr `X-API-Token`) to this user's own port (lib/Http.php owner check), never in a URL, a form, on a command line or in output, although each app would also take it as `?apikey=`.
+- The API key is full admin. It goes only in a header (`X-Api-Key`; Bazarr `X-API-KEY`; autobrr `X-API-Token`) to this user's own port (lib/Http.php owner check), never in a URL, a form, on a command line or in output, although each app would also take it as `?apikey=`. The one exception is Jackett, which reads its key only from the query string: there it goes in the URL to the user's own port through PHP curl and is replaced in every printed text (jackett/README.md "The key in the URL").
 - Every boolean query parameter an endpoint declares with a default is sent explicitly; no API default is inherited (optional filters whose absence means "all", like Bazarr's `monitored` and `missing`, are left out). Queue removal is not offered: its `removeFromClient` defaults to true and deletes the download's data.
 - Commands come from a fixed list per app (`SeriesSearch`, `MoviesSearch`, `ArtistSearch`, `ApplicationIndexerSync`; Readarr none). Bazarr's only change is `search-missing`, autobrr's `toggle`. Update, key reset, shutdown, file deletes, log clearing, renames and moves can never be sent; there is no generic command verb.
 - In settings (`fields`), a value is shown only when its privacy is `normal`; everything else is hidden.
-- config.xml, Bazarr's config.yaml and autobrr's config.toml are read with regular expressions, never an XML, YAML or TOML library, never evaluated, and never written. autobrr's key is the one the user stored with `login` (`local/secrets/autobrr`, 0600).
+- config.xml, Bazarr's config.yaml and autobrr's config.toml are read with regular expressions, never an XML, YAML or TOML library, never evaluated, and never written. Jackett's ServerConfig.json is read with PHP's own `json_decode` (three fields taken), and its Torznab XML answers with regular expressions. autobrr's key is the one the user stored with `login` (`local/secrets/autobrr`, 0600).
 - Bazarr and autobrr records are built from lists of allowed fields: tracker settings, IRC passwords, action commands and download links never reach the output.
 - Programs the tool runs (`docker`, `tmux`, the PMSS installer) get an argument list with every word quoted; the app name in it is fixed per unit.
 - The tools never run anything as root. The home folder is `$HOME` only when this user owns it, else the passwd entry's; the PMSS installer runs only when it is this user's own file.
@@ -82,10 +90,10 @@ Library items: `id`, `title`, `year`, `meta_id`, `monitored`, `status`, `size` (
 
 ## Where each app is found
 
-The Servarr units (Bazarr and autobrr: their unit READMEs), first match wins:
+The Servarr units (Bazarr, autobrr and Jackett: their unit READMEs), first match wins:
 
 1. An override in `pikkumies/local/config.php`: `'arr' => ['sonarr' => ['config' => '/path/config.xml']]`.
-2. PMSS: `~/.config/<app>/config.xml`, lower case (the media-stack installer's folder; not for Lidarr and Readarr, which the installer does not manage).
+2. PMSS: `~/.config/<app>/config.xml`, lower case (the media-stack installer's folder; not for Lidarr, Readarr and Whisparr, which the installer does not manage).
 3. Servarr's default: `~/.config/<App>/config.xml`.
 4. Docker (PMSS LinuxServer.io containers): `~/docker/<app>/config/config.xml`, with the host port from `docker port <app>`, only against a Docker daemon this user owns.
 
@@ -104,8 +112,8 @@ The error names the first cause that applies, in this order: not installed; conf
 | bazarr | `arr/bazarr` | built | An *arr app with its own API, so its own verb and config code; adds `wanted` and `search` (subtitles). Restart: Docker only. |
 | autobrr | `arr/autobrr` | built | The PMSS installer creates only a login user (`etc/skel/install-media-stack.sh:1790`; none of its autobrr lines mentions a key or token), so the unit has `login`, the user's own key setup step (ADR-0019); adds `toggle`. |
 | readarr | `arr/readarr` | built, read verbs only | Upstream archived the repository (GitHub API: `archived: true`, last push 2025-06-27, read 2026-10-14), so no `lookup` or `add`, which depend on its metadata service [UNVERIFIED: whether that service still answers]. |
-| whisparr | `arr/whisparr` | after its API is investigated | Servarr family, but no API spec at the usual path (`Whisparr/develop/src/Whisparr.Api.V3/openapi.json`: HTTP 404 on 2026-10-14). |
-| jackett | `arr/jackett` | later | Indexer manager like Prowlarr, still common. |
+| whisparr | `arr/whisparr` | built, no lookup or add | Both majors: v2 (Sonarr-based, default branch `v2-develop`) and v3 (Radarr-based, branch `eros`), both API v3; the earlier 404 looked for a `develop` branch that does not exist. The unit reads `version` and picks the row. Lookup and add depend on Whisparr's own metadata service and, on v3, a multi-id model the shared `add` lacks (whisparr/README.md). Restart: Docker only. |
+| jackett | `arr/jackett` | built, read and test only | Its own API: the key works only as `?apikey=` (no header), the admin API needs a login cookie, so the unit uses the key routes: list and show from Torznab `t=indexers`, `test` from an empty search. No history in Jackett, so `history` says so. Restart: Docker only (a PMSS LinuxServer.io catalog app). |
 | unpackerr, flaresolverr | none | never | Helpers with no management API worth a tool; neither appears anywhere in PMSS (grep of the tree); FlareSolverr shows up as a Prowlarr indexer proxy (Prowlarr `src/NzbDrone.Core/IndexerProxies/FlareSolverr/`). |
 | seerr (Jellyseerr, Overseerr), ombi | category `media-requests` | with the media servers | Request front pages, not *arr apps. |
 | sabnzbd | category `usenet-clients` | later | A Usenet download client, not an *arr app. |
