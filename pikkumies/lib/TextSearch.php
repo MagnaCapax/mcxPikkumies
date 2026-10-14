@@ -23,14 +23,10 @@ class TextSearch
         return $slug !== '' ? $slug : $fallback;
     }
 
-    /** Lesson directories: the user's own (pikkumies/memory) plus read-only lessons shipped by packs. */
+    /** Lesson directories: the user's own (pikkumies/memory). */
     public static function lessonDirs($pikkumiesRoot)
     {
-        $dirs = [$pikkumiesRoot . '/memory'];
-        foreach ((array) glob(dirname($pikkumiesRoot) . '/packs/*/memory') as $d) {
-            $dirs[] = $d;
-        }
-        return $dirs;
+        return [$pikkumiesRoot . '/memory'];
     }
 
     /** Markdown files (README.md excluded) in the given directories, path => text. */

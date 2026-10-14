@@ -4,6 +4,8 @@
  * Precedence: env PIKKUMIES_ENDPOINT / PIKKUMIES_KEY, then local config, then the key file.
  * The key is never printed; use mask().
  */
+require_once __DIR__ . '/Http.php';
+
 class Provider
 {
     public static function resolve(array $config)
@@ -60,20 +62,14 @@ class Provider
     /** GET {endpoint}/models. Returns [httpCode, model ids]. */
     public static function models(array $prov)
     {
-        if ($prov['endpoint'] === '' || $prov['key'] === '' || !function_exists('curl_init')) {
+        if ($prov['endpoint'] === '' || $prov['key'] === '') {
             return [0, []];
         }
-        $ch = curl_init($prov['endpoint'] . '/models');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $prov['key']],
-        ]);
-        $body = curl_exec($ch);
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        // The provider endpoint may be a local service run by another account (root or a service account, never another customer).
+        $r = Http::request('GET', $prov['endpoint'] . '/models', ['timeout' => 10, 'owners' => 'system', 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
+        $code = $r['code'];
         $ids = [];
-        $data = json_decode(is_string($body) ? $body : '', true);
+        $data = json_decode($r['body'], true);
         if ($code >= 200 && $code < 300 && isset($data['data']) && is_array($data['data'])) {
             foreach ($data['data'] as $m) {
                 if (isset($m['id']) && is_string($m['id']) && $m['id'] !== '') {

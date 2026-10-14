@@ -24,14 +24,10 @@ return [
         check($m['a']['b'] === 9 && $m['a']['c'] === 2, 'nested merge wrong');
         check($m['l'] === ['y', 'z'], 'list not replaced');
     },
-    'packs: every pack loads; packs.disabled and root.disabled leave packs out' => function () {
-        $all = array_keys(Packs::all());
-        check(in_array('root', $all, true) && in_array('pmss', $all, true), 'shipped packs missing');
-        check(Packs::enabled(Config::defaults()) === $all, 'defaults must load every pack');
-        $names = Packs::enabled(['packs' => ['disabled' => ['pmss']], 'root' => ['disabled' => false]]);
-        check(!in_array('pmss', $names, true) && in_array('root', $names, true), 'packs.disabled ignored');
-        $names = Packs::enabled(['packs' => ['disabled' => []], 'root' => ['disabled' => true]]);
-        check(!in_array('root', $names, true) && in_array('pmss', $names, true), 'root.disabled must leave the root pack out');
+    'tools: tools.disabled leaves categories out; root.disabled hides server-admin' => function () {
+        check(Generate::disabledCategories(Config::defaults()) === [], 'defaults must load every category');
+        check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']], 'root' => ['disabled' => false]]) === ['seedbox'], 'tools.disabled ignored');
+        check(in_array('server-admin', Generate::disabledCategories(['root' => ['disabled' => true]]), true), 'root.disabled must hide the server-admin category');
     },
     'soul stays within its size budget (sent to the model on every turn)' => function () {
         $s = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
@@ -47,14 +43,6 @@ return [
         check(strpos($r, 'Root: available (via sudo)') !== false, 'root via sudo');
         $off = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => true, 'via' => 'sudo']], ['root' => ['disabled' => true]]);
         check(strpos($off, 'turned off in config') !== false && strpos($off, 'available (via') === false, 'root.disabled must win over detection');
-    },
-    'packs index lists every pack' => function () {
-        $idx = Packs::renderIndex();
-        foreach (array_keys(Packs::all()) as $name) {
-            check(strpos($idx, '[' . $name . ']') !== false, "index misses $name");
-        }
-        $committed = (string) @file_get_contents(Packs::dir() . '/INDEX.md');
-        check($committed === $idx, 'packs/INDEX.md is stale: run `pikkumies packs index` and commit it');
     },
     'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);
@@ -72,8 +60,11 @@ return [
         check(strpos($noHooks, 'disabled:') === false, 'no disabled list when none set');
         $off = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], ['seedbox-apps']);
         check(strpos($off, "skills:\n  external_dirs:\n    - \"/a/skills\"\n  disabled:\n    - \"seedbox-apps\"\n") !== false, 'skills.disabled must render under skills:');
-        check(strpos($y, 'fail_closed') === false, 'fail_closed stays at the Hermes default');
+        check(strpos($y, 'fail_closed') === false, 'fail_closed stays at the Hermes default for prompt hooks');
+        $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], ['pre_tool_call' => ['/h/guard-destructive.php', '/h/g.php']]);
+        check(strpos($guard, "guard-destructive.php\"\n      timeout: 10\n      fail_closed: true\n") !== false && substr_count($guard, 'fail_closed') === 1, 'the delete guard must fail closed, and only it');
         check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'update banners must be off: Hermes is pinned');
+        check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');
     },
     'hermes build: pinned tag and checksum, verified before unpacking, atomic switch' => function () {
         $sha = str_repeat('a', 64);

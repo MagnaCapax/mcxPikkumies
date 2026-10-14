@@ -5,11 +5,13 @@
  * Returns a plain array (the "profile"). No network calls, no writes, no LLM.
  * Root is reported from what the OS says, never from configuration.
  */
+require_once __DIR__ . '/Host.php';
+
 class Detect
 {
     /** Known user-level apps: profile key => process names that indicate it. */
     const KNOWN_APPS = [
-        'rtorrent'    => ['rtorrent'],
+        'rtorrent'    => ['rtorrent', 'rtorrent main', 'rtorrent-main'],  // main-thread names of 0.9 and 0.16
         'qbittorrent' => ['qbittorrent-nox', 'qbittorrent'],
         'deluge'      => ['deluged'],
         'transmission'=> ['transmission-daemon'],
@@ -30,6 +32,7 @@ class Detect
             'user'       => self::userName($uid),
             'uid'        => $uid,
             'pmss'       => is_dir('/etc/seedbox'),
+            'host'       => Host::family(),
             'root'       => self::rootAccess($uid),
             'apps'       => self::runningApps($uid),
             'resources'  => self::resources(),

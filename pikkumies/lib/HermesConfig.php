@@ -2,10 +2,13 @@
 /**
  * HermesConfig: generates Hermes' home (HERMES_HOME = local/hermes) from the tracked tree.
  *
- * - config.yaml: model provider, skills.external_dirs (core + every loaded pack), shell hooks.
+ * - config.yaml: model provider, skills.external_dirs (the skills generated from the tool units,
+ *   ADR-0015), shell hooks.
  *   A local skill must not reuse a shipped name: Hermes refuses an ambiguous name (ADR-0007).
  * - .env: provider key (0600). SOUL.md: what this machine allows (from detection) + doctrine.
  * Regenerated on install, update and run; hand edits belong in local/config.php, not here.
+ * Every file is written to a temporary name and renamed: a full disk leaves the old file, never an
+ * empty config without the safety hooks.
  */
 class HermesConfig
 {
@@ -14,46 +17,47 @@ class HermesConfig
         return Config::localDir() . '/hermes';
     }
 
-    public static function write(array $config, array $enabledPacks, array $profile)
+    public static function write(array $config, array $profile)
     {
         $home = self::home();
         @mkdir($home . '/skills', 0700, true);
         $prov = Provider::resolve($config);
         $prov['model'] = Provider::model($prov);
 
-        file_put_contents($home . '/config.yaml', self::renderYaml($prov, self::skillDirs($enabledPacks), self::hookEntries($enabledPacks), (array) $config['skills']['disabled']));
-        $env = $home . '/.env';
+        self::put($home . '/config.yaml', self::renderYaml($prov, self::skillDirs(), self::hookEntries(), (array) $config['skills']['disabled']));
         // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.
-        file_put_contents($env, "PIKKUMIES_API_KEY=" . $prov['key'] . "\n");
-        chmod($env, 0600);
-        file_put_contents($home . '/SOUL.md', self::renderSoul($profile, $config));
+        self::put($home . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
+        self::put($home . '/SOUL.md', self::renderSoul($profile, $config));
         return $home;
     }
 
-    public static function skillDirs(array $enabledPacks)
+    /** Write through a temporary file and rename; throws when the write fails (the old file stays). */
+    public static function put($path, $content, $mode = null)
     {
-        $dirs = [Config::root() . '/skills'];
-        foreach ($enabledPacks as $name) {
-            $d = Packs::dir() . '/' . $name . '/skills';
-            if (is_dir($d)) {
-                $dirs[] = $d;
-            }
+        $tmp = $path . '.tmp-' . getmypid();
+        $ok = @file_put_contents($tmp, $content) === strlen($content) && ($mode === null || chmod($tmp, $mode)) && @rename($tmp, $path);
+        if (!$ok) {
+            @unlink($tmp);
+            throw new Exception("could not write $path (disk full?)");
+        }
+    }
+
+    /** The generated skills, plus the not-yet-migrated core skills while they exist (stage 2 moves them). */
+    public static function skillDirs()
+    {
+        $dirs = [Units::generatedDir()];
+        if (is_dir(Config::root() . '/skills')) {
+            $dirs[] = Config::root() . '/skills';
         }
         return $dirs;
     }
 
-    /** Shell hooks: hooks/<event>/<name>.php in core and enabled packs, run with php. */
-    public static function hookEntries(array $enabledPacks)
+    /** Shell hooks: hooks/<event>/<name>.php, run with php. */
+    public static function hookEntries()
     {
-        $roots = [Config::root() . '/hooks'];
-        foreach ($enabledPacks as $name) {
-            $roots[] = Packs::dir() . '/' . $name . '/hooks';
-        }
         $entries = [];
-        foreach ($roots as $root) {
-            foreach ((array) glob($root . '/*/*.php') as $script) {
-                $entries[basename(dirname($script))][] = $script;
-            }
+        foreach ((array) glob(Config::root() . '/hooks/*/*.php') as $script) {
+            $entries[basename(dirname($script))][] = $script;
         }
         ksort($entries);
         return $entries;
@@ -78,6 +82,10 @@ class HermesConfig
         }
         // Hermes is pinned and updated by Pikkumies (ADR-0009): no update banners.
         $y .= "updates:\n  check: false\n";
+        // Hermes web_search/web_extract fall back to outside free search services when no backend is
+        // configured (keyless_fallback, hermes_cli/config_defaults.py). AGENTS.md: nothing leaves the
+        // machine unasked, so both are off; a user who wants web search configures a backend (ADR-0021).
+        $y .= "web:\n  keyless_fallback: false\n  keyless_rescue: false\n";
         if ($hooks) {
             // Hermes registers a shell hook only after first-use consent; a non-interactive run
             // silently skips unapproved hooks. These hooks ship with pikkumies, so the
@@ -87,9 +95,11 @@ class HermesConfig
             foreach ($hooks as $event => $scripts) {
                 $y .= "  " . $event . ":\n";
                 foreach ($scripts as $s) {
-                    // fail_closed is left at the Hermes default (false): a hook that errors or times
-                    // out lets the call run. Hooks are safety prompts, not security (AGENTS.md).
-                    $y .= "    - command: " . self::q(PHP_BINARY . ' ' . $s) . "\n      timeout: 10\n";
+                    // Hooks are safety prompts, not security (AGENTS.md), so most stay at the Hermes
+                    // default (a hook that errors or times out lets the call run). The delete guard
+                    // is the exception: if it cannot answer, the call is blocked (ADR-0020).
+                    $closed = basename($s) === 'guard-destructive.php' ? "      fail_closed: true\n" : '';
+                    $y .= "    - command: " . self::q(PHP_BINARY . ' ' . $s) . "\n      timeout: 10\n" . $closed;
                 }
             }
         }
@@ -109,8 +119,8 @@ class HermesConfig
     }
 
     /**
-     * What this machine allows, from detection. Every pack's skills are always listed
-     * (ADR-0006), so this tells the model which ones apply here.
+     * What this machine allows, from detection. Every tool's skill is always listed (ADR-0015), so
+     * this tells the model which ones apply here, and where the tool index is.
      */
     public static function capabilities(array $profile, array $config)
     {
@@ -124,7 +134,9 @@ class HermesConfig
         // Only what decides which skills apply. SOUL.md goes to the model on every turn, so the
         // rest of the profile stays local; the system-status skill reads it when needed.
         return "# This machine\n\n- Root: " . $root . "\n- PMSS seedbox platform: " . (!empty($profile['pmss']) ? 'yes' : 'no')
-            . "\n\nThis was detected when the agent started. Skills for other kinds of machine are listed too; use one only when this machine matches it.";
+            . "\n- Host: " . (isset($profile['host']) ? $profile['host'] : 'generic')
+            . "\n\nThis was detected when the agent started. Skills for other kinds of machine are listed too; use one only when this machine matches it."
+            . " Every tool has a skill; to compare tools or find one by what it does, read " . Units::toolsDir() . "/INDEX.md.";
     }
 
     /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */

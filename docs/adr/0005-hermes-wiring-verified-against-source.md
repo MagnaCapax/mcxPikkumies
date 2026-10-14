@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted
+- Status: Accepted. The guard bullet ("Escalation is not available to shell hooks in this version") is superseded by ADR-0020; the skill directories by ADR-0015.
 
 ## Context
 The first live run of Pikkumies under Hermes Agent 0.19.0 against an OpenAI-compatible endpoint found that three ADR-0003 decisions, taken from the Hermes documentation, do not match what the Hermes code does:

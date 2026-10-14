@@ -14,6 +14,54 @@ return [
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'block', 'regex error let the call through');
     },
+    'guard hook asks the user (approve) for data deletes, one decision per command' => function () {
+        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+        $ask = function ($cmd) use ($hook) {
+            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+            return json_decode($out, true);
+        };
+        foreach ([
+            'rclone sync ~/data remote:backup',
+            'rclone --config ~/.config/rclone/rclone.conf purge remote:old',
+            'restic -r /backup forget --keep-last 3 --prune',
+            'borg prune --keep-daily 7 ~/repo',
+            "curl -s 'http://127.0.0.1:8080/api/v2/torrents/delete' -d 'hashes=abc&deleteFiles=true'",
+            'curl -X DELETE http://localhost:8989/api/v3/series/1?deleteFiles=true',
+            'php ~/pikkumies/tools/torrent-clients/rtorrent/rtorrent.php remove abc --with-data',
+            'php ~/pikkumies/tools/backup/restic/restic.php prune --keep 3',
+            // A quoted argument with ";" or "&" before the flag must not hide it.
+            'php ~/pikkumies/tools/torrent-clients/qbittorrent/qbittorrent.php remove "Tom & Jerry 1940" --with-data',
+            'php ~/pikkumies/tools/torrent-clients/deluge/deluge.php remove "a;b" --with-data',
+            'rclone --config "a&b" delete remote:x',
+            'rclone bisync ~/a remote:a',
+            "curl http://127.0.0.1:8989/api/v3/movie/1 -X DELETE",
+            "curl --request 'DELETE' http://0.0.0.0:7878/api/v3/movie/2",
+            'php ~/pikkumies/tools/backup/restic/restic.php --human prune',
+        ] as $cmd) {
+            $d = $ask($cmd);
+            check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], $cmd) !== false, "no approval asked for: $cmd");
+        }
+        $a = $ask('restic -r /a forget --keep-last 1');
+        $b = $ask('restic -r /b forget --keep-last 1');
+        check($a['message'] !== $b['message'] && strpos($a['rule_key'], 'pikkumies-delete:') === 0 && $a['rule_key'] !== $b['rule_key'], 'two different deletes must not share one approval (rule_key)');
+        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => "import os; os.system('restic -r /a forget --prune')"]]));
+        $d = json_decode($out, true);
+        check(is_array($d) && $d['action'] === 'approve', 'execute_code bypassed the guard');
+        foreach (['import subprocess; subprocess.run(["rclone", "purge", "remote:old"])', 'import requests; requests.delete("http://127.0.0.1:8989/api/v3/series/1")', 'rpc("torrent-remove", {"ids": [1], "delete-local-data": True})'] as $code) {
+            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
+            $d = json_decode($out, true);
+            check(is_array($d) && $d['action'] === 'approve', "execute_code delete not asked: $code");
+        }
+        $long = str_repeat('echo ok; ', 40) . 'rclone purge remote:';
+        $d = $ask($long);
+        check($d['action'] === 'approve' && strpos($d['message'], 'rclone purge remote:') !== false, 'the user must see the whole command they approve');
+        $d = $ask(str_repeat('echo ok; ', 500) . 'rclone purge remote:');
+        check($d['action'] === 'block', 'a delete too long to show in full must be refused, not half-shown');
+        foreach (['rclone ls remote:', 'rclone copy ~/a remote:a', 'restic snapshots', 'borg list ~/repo', 'curl http://127.0.0.1:8080/api/v2/torrents/info'] as $cmd) {
+            $out = $ask($cmd);
+            check($out === null, "read-only command flagged: $cmd");
+        }
+    },
     'guard hook ignores harmless and non-terminal calls' => function () {
         $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
         list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]));
@@ -28,7 +76,7 @@ return [
         chmod("$tmp/pikkumies/memory", 0755); // as git clone leaves this tracked directory
         copy(dirname(__DIR__) . '/pikkumies/tools/memory/memory.php', "$tmp/pikkumies/tools/memory/memory.php");
         @mkdir("$tmp/pikkumies/lib", 0700, true);
-        foreach (['TextSearch', 'Config', 'DocSources'] as $lib) {
+        foreach (['TextSearch', 'Config', 'DocSources', 'Http', 'Host'] as $lib) {
             copy(dirname(__DIR__) . "/pikkumies/lib/$lib.php", "$tmp/pikkumies/lib/$lib.php");
         }
         @mkdir("$tmp/pikkumies/tools/docs", 0700, true);

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. Supersedes the "Enabling" decision and the root-pack consequence of ADR-0002.
+- Status: Superseded by ADR-0015 (tool units; every unit is always generated unless its category is in tools.disabled). It had superseded the "Enabling" decision and the root-pack consequence of ADR-0002.
 
 ## Context
 ADR-0002 enabled a pack only when its `detect` rule matched the machine (or it was listed in config). The point was relevance: keep skills that do not apply out of the agent's way. Measured against Hermes Agent 0.19.0, that is not needed:

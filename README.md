@@ -2,7 +2,7 @@
 
 A lightweight sysadmin helper agent that lives on the server it looks after. Its first home is the PMSS seedbox platform, but it is built general enough to run on other systems with your own API and keys.
 
-**Status:** early. The layout, installer, detection, packs, memory and Hermes wiring work; skills and packs are a first set.
+**Status:** early. The layout, installer, detection, memory and Hermes wiring work; the tool units are a first set, with torrent clients, *arr apps, media servers and backup tools on the way.
 
 ## Install
 
@@ -13,8 +13,8 @@ git clone --depth 1 https://github.com/MagnaCapax/mcxPikkumies ~/.mcxPikkumies
 
 The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
-- detects the machine (OS, root access, running apps, resources);
-- writes the agent's configuration with every pack loaded, and tells the agent what this machine allows;
+- detects the machine (OS, which seedbox host it is, root access, running apps, resources);
+- generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
 - builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root and no changes to your PATH or shell files. It uses the system Python 3.11 to 3.13, or, on x86_64 where that is older, a pinned checksum-verified standalone Python in your own account (ADR-0014).
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
@@ -38,18 +38,19 @@ Install also adds a daily `pikkumies update` to your own crontab (one tagged lin
 
 | Command | What it does |
 |---|---|
-| `pikkumies install` | Detect the machine, write config (every pack is loaded), build the pinned Hermes release in the background, add the daily auto-update line to your crontab |
+| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, build the pinned Hermes release in the background, add the daily auto-update line to your crontab |
 | `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); builds a newly pinned Hermes release |
 | `pikkumies detect` | Print the machine profile (JSON) |
-| `pikkumies doctor` | Show provider, masked key, Hermes and pack status |
-| `pikkumies packs [index]` | List packs; regenerate `packs/INDEX.md` |
+| `pikkumies doctor` | Show provider, masked key, Hermes and tool status |
+| `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
 | `pikkumies run [args]` | Start the agent |
 
 ## What it is meant to be
 
 - **It runs as you.** By default it works under the user's own account, inside that user's slice of the server. Root access is one more capability layer on top of that. When the agent detects sudo or root deterministically, it can do full server administration. When it doesn't, it manages only that slice. A config switch turns the root layer off.
 - **It knows where to look.** Basic memory (lessons), documentation sources it downloads and searches locally (`pikkumies/config/documentationSources.md`, ADR-0011), and a small doctrine: verify before claiming, cite the source and its trust level, ask before anything destructive. On the first turn of a task it searches before it acts.
-- **It grows by packs.** Skills, tools and hooks come in packs. Every pack is loaded on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0006).
+- **It grows by tool units.** Every capability is one directory under `pikkumies/tools/<category>/<tool>/`: a skill, its tool, USAGE.md and README.md. Every tool prints JSON Lines for the agent and `--human` for people. All units load on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0015 to ADR-0017).
+- **It asks before deleting data.** A torrent's files, a backup prune or an rclone sync go to the user for approval in the chat (ADR-0020).
 - **Your model, your keys.** It talks to any OpenAI-compatible endpoint. A deployment chooses its own provider and keys.
 - **It is not only for sysadmin work.** General investigation and research are in scope too.
 
@@ -59,15 +60,14 @@ Install also adds a daily `pikkumies update` to your own crontab (one tagged lin
 pikkumies/            the runtime (~/pikkumies)
   bin/pikkumies       entrypoint
   lib/                core PHP
-  tools/<target>/     tools by target system, each with USAGE.md
-  skills/             core skills (Hermes SKILL.md format)
+  tools/<category>/<tool>/  tool units: skill.md, USAGE.md, README.md, <tool>.php; INDEX.md is generated
+  skills/             core skills not yet moved into units (Hermes SKILL.md format)
   hooks/<event>/      safety hooks run by the agent (PHP, JSON in and out)
   config/             documentationSources.md: the wikis and knowledge bases it searches
   doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)
   include/            third-party software, never tracked: hermes-<tag>/ builds, hermes -> current one
   local/              your config, machine profile and agent state (never tracked)
-packs/                bundles: INDEX.md (generated), README.md, one directory per pack
 docs/adr/             architecture decisions
 tests/                php tests/run.php
 ```

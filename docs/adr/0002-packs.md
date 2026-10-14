@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. Superseded in part by ADR-0006 (every pack is always loaded; no detect rules).
+- Status: Superseded by ADR-0015 (tool units replace packs). Earlier superseded in part by ADR-0006.
 
 ## Context
 Different machines need different skills and tools. A seedbox needs app know-how; a server with root needs administration skills. Bundles should install automatically based on what the machine looks like, and stay easy to add.

@@ -1,62 +1,68 @@
-# Make a skill, tool, hook or pack
+# Make a tool unit, a hook or a documentation source
 
-One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 (ADR-0005 to ADR-0009). `php tests/run.php` enforces the skill and pack rules.
+One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 (ADR-0005 to ADR-0009, ADR-0015 to ADR-0021). `php tests/run.php` enforces the unit rules.
 
 ## Where things go
 
 | You want | Make | Lives in |
 |---|---|---|
-| A procedure the agent follows when a situation comes up | a skill | `pikkumies/skills/<name>/` (every machine) or `packs/<pack>/skills/<name>/` |
-| A command a skill runs | a tool | `pikkumies/tools/<target>/` or `packs/<pack>/tools/<target>/` |
-| A check on every tool call | a hook | `pikkumies/hooks/<event>/<name>.php` or `packs/<pack>/hooks/<event>/` |
-| A bundle for one kind of system | a pack | `packs/<name>/` |
+| A command the agent runs, with the procedure for using it | a tool unit | `pikkumies/tools/<category>/<tool>/` |
+| A procedure without its own command | a tool unit without a script | `pikkumies/tools/<category>/<name>/` |
+| A check on every tool call | a hook | `pikkumies/hooks/<event>/<name>.php` |
 | How a problem got solved | a lesson, not any of the above | the lessons skill |
 | A wiki or knowledge base the agent should search | a documentation source | a section in `pikkumies/config/documentationSources.md` (shipped) or `~/pikkumies/local/documentationSources.md` (one machine) |
 
-On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Hooks and changes to shipped skills come only from the repository, after review.
+On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Hooks and changes to shipped units come only from the repository, after review.
 
-## Skill
+## Tool unit
 
-`SKILL.md` with frontmatter, then plain steps:
+Every capability is one directory (ADR-0015). Install, update and every run turn `skill.md` into the Hermes skill and list the unit in `tools/INDEX.md`; both are generated, never tracked.
+
+```text
+pikkumies/tools/torrent-clients/rtorrent/
+  skill.md       for Hermes: when to use the tool and how
+  USAGE.md       the verbs table (the one list of verbs) and examples
+  README.md      for people: what it controls and how it finds it on each host
+  rtorrent.php   the tool: php rtorrent.php <verb> [arguments] [--human]
+```
+
+**skill.md**: frontmatter with exactly `name` (equal to the directory) and `description`, then plain steps.
 
 ```markdown
 ---
-name: seedbox-apps
-description: Check and restart the user's seedbox apps on the PMSS platform. Use when an app is down or its web UI does not load.
+name: rtorrent
+description: Control rTorrent: list, inspect, add, remove, pause torrents, stats, restart.
 ---
 ```
 
-- `name` equals the directory name. It must be unique across core and all packs, and must not be a name Hermes already uses for a tool, toolset or built-in command (for example `memory`, `terminal`, `update`). Hermes refuses to load a skill name that exists twice.
-- `description` is one line, at most 1024 characters (Hermes cuts longer ones silently). Put it in double quotes if it contains `: ` or ` #`; otherwise Hermes fails to parse it and lists the skill with an empty description. The description is the only part always in the prompt, so say what the skill does and when to use it.
-- Every pack loads on every machine, so a pack skill first checks that it applies (root, PMSS, the app) and stops if not. The top of the agent's instructions says what this machine allows.
-- Steps name exact commands with full paths (`php ~/pikkumies/tools/...`), say what to read before changing anything, and how to verify.
+- The name must be unique, and must not be a name Hermes already uses for a tool, toolset, command or bundled skill (for example `memory`, `terminal`, `update`); Hermes refuses a name that exists twice.
+- The skills index shows only the first 60 characters of the description, on every turn: start with what the tool controls. Quote the description if it contains `: ` or ` #`. Hermes cuts it at 1024 characters.
+- The generated skill adds the verbs table, the command line and the path of USAGE.md; do not repeat them in the body.
+- Name exact steps: what to read before changing anything, which verb to use, how to verify it worked.
 
-**Changing a shipped skill:** copy its directory to `~/pikkumies/local/hermes/skills/<new-name>/`, set `name: <new-name>` in the copy's `SKILL.md` (Hermes goes by that field, not the directory), edit the copy, and add the shipped name to `skills.disabled` in `~/pikkumies/local/config.php`. Never reuse the shipped name.
+**USAGE.md**: the first table with the header `| verb | arguments | changes | what it does |` lists every verb. The contract test checks that it matches the verbs the tool answers to, in both directions. Write a literal `|` inside a cell as `\|`. In `changes` write `no` for read-only verbs, `yes` for changes, and `deletes` for verbs that remove data. Examples follow the table.
 
-## Tool
+**The tool**: one PHP script (PHP 7.3, no Composer, no Python) that ends with `Cli::run($argv, ['verb' => function ($args, $opt) { ... }], $usage)`.
 
-- A PHP command-line script (PHP 7.3, no Composer, no Python), next to a `USAGE.md` that shows each command and says whether it changes anything.
-- Read-only unless its job is a change. It writes only under `pikkumies/local/` or the lessons directory, never tracked files.
-- Short, plain output (JSON when a skill parses it). Nothing leaves the machine unless the user asked for it.
-- A skill calls it; tools add no tool schema to the prompt.
+- Output is JSON Lines by default, the last line `{"ok":true}` or `{"ok":false,"error":...,"hint":...}`, with raw units (ADR-0016); `--human` prints the same records for people (ADR-0017). Return records; never print secrets (Cli drops secret-named fields anyway).
+- Throw `CliError($what, $hint)` for a failure the user can act on.
+- HTTP goes through `lib/Http.php`, which refuses a 127.0.0.1 port another account owns (ADR-0019). Read credentials from the user's own app config; never weaken an app's login.
+- A verb that deletes data takes `--with-data`, or is named `prune`, `forget` or `purge`, so the delete guard asks the user first (ADR-0020).
+- Write verbs read the state back and report `"verified"` in the status line.
+- Tools of one category use the same verb names and record fields, listed in `tools/<category>/README.md`.
+
+**Changing a shipped skill**: copy the generated `~/pikkumies/local/generated/skills/<category>/<tool>/SKILL.md` to `~/pikkumies/local/hermes/skills/<new-name>/SKILL.md`, set `name: <new-name>` in the copy, edit it, and add the shipped name to `skills.disabled` in `~/pikkumies/local/config.php`. Never reuse the shipped name. A whole category can be left out with `tools.disabled` (category names).
 
 ## Hook
 
-`hooks/<event>/<name>.php` runs on every matching event. Two events are used: `pre_tool_call` (before each tool call; can block it) and `pre_llm_call` (before each turn; can add text to the user's message; Hermes has no separate prompt-submit event).
+`hooks/<event>/<name>.php` runs on every matching event. Two events are used: `pre_tool_call` (before each tool call; can block it or ask the user) and `pre_llm_call` (before each turn; can add text to the user's message).
 
 - Input on stdin is JSON: `hook_event_name`, `tool_name`, `tool_input` (the tool's arguments), `session_id`, `cwd`, and `extra` with the event's own fields (for `pre_llm_call`: `user_message`, `is_first_turn`).
-- To add text to the turn from `pre_llm_call`, print `{"context":"..."}`; keep it short, it goes to the model every time (see `hooks/pre_llm_call/search-first.php`).
-- To stop a tool call, print `{"action":"block","message":"..."}`. Anything else (no output, other actions, invalid JSON) means no opinion and the call runs.
-- If the hook errors or takes longer than its 10-second timeout, the call runs (Hermes default; Pikkumies leaves `fail_closed` off). Hooks are safety prompts for the agent's own mistakes, not security; limits that must hold come from the OS.
+- To add text to the turn from `pre_llm_call`, print `{"context":"..."}`; keep it short, it goes to the model every time.
+- To stop a tool call, print `{"action":"block","message":"..."}`. To make Hermes ask the user, print `{"action":"approve","message":"...","rule_key":"..."}`: put the exact command in the message (the prompt shows only the message) and make `rule_key` specific to that command, or one "always" answer approves every later call of the tool.
+- Anything else means no opinion and the call runs. If a hook errors or times out (10 seconds), the call runs, except for the delete guard, which is registered `fail_closed`. Hooks are safety prompts for the agent's own mistakes, not security; limits that must hold come from the OS.
 - Filter on `tool_name` inside the script and exit quietly otherwise (see `hooks/pre_tool_call/guard-destructive.php`).
 - Shipped hooks are registered without a consent prompt (`hooks_auto_accept`), which is why only reviewed repository code may add one.
-
-## Pack
-
-- `packs/<name>/pack.json`: `{"name": "<name>", "description": "..."}`, with `name` equal to the directory.
-- Optional: `skills/`, `tools/<target>/`, `hooks/<event>/`, read-only lessons in `memory/`, `README.md`.
-- Every pack is always loaded; users opt out with `packs.disabled` (ADR-0006).
-- After adding or changing a pack, run `pikkumies packs index` and commit `packs/INDEX.md`.
 
 ## Before you commit
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install | update | detect | doctor | packs [index] | run [args...]
+ * pikkumies: install | update | detect | doctor | generate | run [args...]
  */
 // Everything we write (config, .env with the key, profile) is private to the user from
 // creation; chmod-after-write would leave a window where a secret is world-readable.
@@ -25,12 +25,22 @@ function profile()
     return $profile;
 }
 
+/**
+ * Skills and tools/INDEX.md from the tool units, then the Hermes config (ADR-0015). Throws when a
+ * file cannot be written, so `run` never starts Hermes on a half-written config.
+ */
 function generate(array $profile)
 {
     $config = Config::load();
-    $packs = Packs::enabled($config);
-    HermesConfig::write($config, $packs, $profile);
-    return $packs;
+    $result = Generate::run(Generate::disabledCategories($config));
+    if ($result['error'] !== '') {
+        throw new Exception($result['error']);
+    }
+    foreach ($result['problems'] as $unit => $problems) {
+        fwrite(STDERR, "tool unit $unit skipped: " . implode('; ', $problems) . "\n");
+    }
+    HermesConfig::write($config, $profile);
+    return $result;
 }
 
 function hermesBin()
@@ -48,11 +58,16 @@ switch ($cmd) {
         }
         Config::writeDefaultsIfMissing();
         $profile = profile();
-        $packs = generate($profile);
+        try {
+            $generated = generate($profile);
+        } catch (Exception $x) {
+            out('install stopped: ' . $x->getMessage());
+            exit(1);
+        }
         out('pikkumies installed at ' . Config::root());
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
-        out('  packs: ' . (implode(', ', $packs) ?: 'none'));
+        out('  host: ' . $profile['host'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
@@ -64,11 +79,20 @@ switch ($cmd) {
         if (!$ok) {
             exit(1);
         }
-        $profile = profile();
-        generate($profile);
-        out('config regenerated');
+        // This process still has the old code loaded; the rest runs the new code in a fresh one.
+        passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' post-update', $postCode);
+        exit($postCode === 0 ? 0 : 1);
+
+    case 'post-update': // internal: the second half of `update`, run by the updated code
+        try {
+            $r = generate(profile());
+        } catch (Exception $x) {
+            out('generate failed: ' . $x->getMessage());
+            exit(1);
+        }
+        out('generated ' . $r['skills'] . ' skills and tools/INDEX.md');
         $config = Config::load();
-        out('auto-update: ' . Update::schedule($config, $profile['uid']));
+        out('auto-update: ' . Update::schedule($config, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
         foreach (HermesInstall::cleanup($config) as $old) {
             out('removed old Hermes build ' . $old);
         }
@@ -91,18 +115,24 @@ switch ($cmd) {
         $pin = $config['hermes']['version'];
         list(, $py) = HermesInstall::python();
         out('hermes:   ' . ($cur === '' ? 'not installed' : 'installed ' . $cur) . '; pinned ' . $pin . (is_dir(HermesInstall::buildDir($pin)) && !HermesInstall::isComplete($pin) ? ' (building or failed, see local/install.log)' : '') . '; ' . $py);
-        out('packs:    ' . (implode(', ', Packs::enabled($config)) ?: 'none'));
+        $units = Units::all();
+        $bad = array_filter($units, function ($u) {
+            return $u['errors'];
+        });
+        out('tools:    ' . count($units) . ' units' . ($bad ? ', ' . count($bad) . ' with problems (run `pikkumies generate`)' : '') . '; off: ' . (implode(', ', Generate::disabledCategories($config)) ?: 'none'));
+        if (!empty($config['packs']['disabled'])) {
+            out('note:     packs.disabled in local/config.php is no longer read; use tools.disabled with category names (ADR-0015)');
+        }
         break;
 
-    case 'packs':
-        if (isset($argv[2]) && $argv[2] === 'index') {
-            file_put_contents(Packs::dir() . '/INDEX.md', Packs::renderIndex());
-            out('packs/INDEX.md written');
-            break;
+    case 'generate':
+        try {
+            $r = generate(profile());
+        } catch (Exception $x) {
+            out('generate failed: ' . $x->getMessage());
+            exit(1);
         }
-        foreach (Packs::all() as $name => $meta) {
-            out(str_pad($name, 12) . (isset($meta['description']) ? $meta['description'] : ''));
-        }
+        out('generated ' . $r['skills'] . ' skills (' . $r['written'] . ' written, ' . $r['removed'] . ' removed) and tools/INDEX.md');
         break;
 
     case 'run':
@@ -114,13 +144,19 @@ switch ($cmd) {
             out('Hermes is not installed yet; see local/install.log');
             exit(1);
         }
-        // Regenerate first, so a key or config set after install reaches Hermes.
-        generate(profile());
+        // Regenerate first, so a key or config set after install reaches Hermes. Never start Hermes
+        // on a config that could not be written: it would run without the safety hooks.
+        try {
+            generate(profile());
+        } catch (Exception $x) {
+            out('not starting: ' . $x->getMessage());
+            exit(1);
+        }
         putenv('HERMES_HOME=' . HermesConfig::home());
         $args = array_map('escapeshellarg', array_slice($argv, 2));
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);
 
     default:
-        out('usage: pikkumies install | update | detect | doctor | packs [index] | run [hermes args]');
+        out('usage: pikkumies install | update | detect | doctor | generate | run [hermes args]');
 }
