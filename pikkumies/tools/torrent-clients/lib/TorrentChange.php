@@ -25,7 +25,11 @@ class TorrentChange
         ];
     }
 
-    /** recheck or reannounce the named torrents (Torrents::resolve rules), then their state read back. */
+    /**
+     * recheck or reannounce the named torrents (Torrents::resolve rules), then their state read once, right after the
+     * request: the client hashes or announces in the background, so the record says what was asked, not that it finished.
+     * reannounce `message`: the torrent's own message, else what its trackers say (trackerMessage), else null.
+     */
     public static function nudge(TorrentClient $c, array $args, $verb)
     {
         $targets = Torrents::resolve($c->torrents(), $args, 8);
@@ -45,11 +49,25 @@ class TorrentChange
             if ($verb === 'recheck') {
                 $r['done_before'] = $t['done']; // a recheck of data that is gone makes the torrent incomplete; it downloads again
             } else {
-                $r['message'] = isset($now[$t['id']]) ? $now[$t['id']]['message'] : '';
+                $msg = isset($now[$t['id']]) ? (string) $now[$t['id']]['message'] : '';
+                $r['message'] = $msg !== '' ? $msg : (isset($now[$t['id']]) ? self::trackerMessage($c, $t['native']) : null);
             }
             $out[] = $r;
         }
-        return $out;
+        return ['records' => $out, 'status' => ['read_back' => 'requested; state right after request: the client '
+            . ($verb === 'recheck' ? 'checks the data' : 'contacts the trackers') . ' in the background, so it may not have finished']];
+    }
+
+    /** "host: text" of each tracker that is not working and has a message (qBittorrent's torrents/trackers msg), or null. */
+    private static function trackerMessage(TorrentClient $c, $native)
+    {
+        $msgs = [];
+        foreach (TorrentTrackers::records($c, [['id' => '', 'native' => $native]]) as $tr) {
+            if ((string) $tr['message'] !== '' && $tr['status'] !== 'working') {
+                $msgs[] = $tr['tracker'] . ': ' . $tr['message'];
+            }
+        }
+        return $msgs ? implode('; ', $msgs) : null;
     }
 
     /**

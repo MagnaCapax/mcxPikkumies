@@ -28,9 +28,13 @@ class ArrLibrary
             'search' => function ($args, $opt) use ($app, $c) {
                 $targets = Arr::resolve($app, Arr::all($c(), $app), $args);
                 $s = $app['search'];
-                if ($s['list']) {
+                if ($s['list']) { // one command for the batch, one record per item with that command's fields, as below
                     $ids = array_map('intval', array_column($targets, 'id'));
-                    return ArrCommand::run($c(), $app, [[$s['name'], [$s['field'] => $ids], ['ids' => $ids]]]);
+                    $cmd = ArrCommand::run($c(), $app, [[$s['name'], [$s['field'] => $ids], ['ids' => $ids]]])[0];
+                    unset($cmd['ids']);
+                    return array_map(function ($t) use ($cmd) {
+                        return ['id' => (int) $t['id'], 'title' => ArrRecords::s($t, 'title')] + $cmd;
+                    }, $targets);
                 }
                 return ArrCommand::run($c(), $app, array_map(function ($t) use ($s) {
                     return [$s['name'], [$s['field'] => (int) $t['id']], ['id' => (int) $t['id'], 'title' => (string) $t['title']]];

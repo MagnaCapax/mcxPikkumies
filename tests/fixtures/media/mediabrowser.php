@@ -9,6 +9,8 @@
  * - Emby: X-Emby-Token, everything under /emby, PascalCase parameters, short numeric library ids;
  * - 204 for refresh and Playing/Stop, 404 for an unknown session; logs are plain text;
  * - test knobs: `forbid` (paths that answer 403 to a valid credential), `stop_fail` (session ids whose Stop answers 500),
+ *   `stop_ignored` (session ids whose Stop answers 204 and that keep playing, as a live 12.2.0 and 4.10.1 did for a
+ *   session made with POST /Sessions/Playing on 2026-10-14),
  *   `latest_many` (each library has that many recent items; the answer holds at most `limit` of them);
  * - /Items/Counts as the live servers answered with an API key for two movies: Jellyfin ItemCount 8, Emby ItemCount 0.
  * Every request is recorded (method, path without the base, query, body) for the tests to inspect.
@@ -137,7 +139,7 @@ if ($m === 'POST' && preg_match('#^/Sessions/([^/]+)/(Playing/Stop|Message)$#', 
     if ($x[2] === 'Playing/Stop' && in_array($x[1], isset($s['stop_fail']) ? $s['stop_fail'] : [], true)) {
         $out(500, 'stop failed');
     }
-    if ($x[2] === 'Playing/Stop') {
+    if ($x[2] === 'Playing/Stop' && !in_array($x[1], isset($s['stop_ignored']) ? $s['stop_ignored'] : [], true)) {
         unset($s['sessions'][$x[1]]);
     }
     $out(204);

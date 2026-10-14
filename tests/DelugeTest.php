@@ -45,14 +45,16 @@ return [
             file_put_contents($fx['dir'] . '/x.torrent', 'd4:infod4:name1:xee');
             mkdir($fx['home'] . '/data/new');
             list($code, $l, $out) = delugeRun($fx, ['add', "magnet:?xt=urn:btih:$hash&dn=Some+Name", $fx['dir'] . '/x.torrent', '/nope', '--paused', '--dir', $fx['home'] . '/data/new/']);
-            check($code === 0 && $l[0]['id'] === $hash && $l[0]['name'] === 'Some Name' && $l[0]['result'] === 'added paused', 'magnet: ' . $out);
-            check($l[1]['result'] === 'added paused' && strlen($l[1]['id']) === 40 && $l[2]['result'] === 'failed', 'file and bad item: ' . $out);
+            check($code === 0 && $l[0]['id'] === $hash && $l[0]['name'] === 'Some Name' && $l[0]['result'] === 'added'
+                && $l[0]['paused'] === true, 'magnet: ' . $out);
+            check($l[1]['result'] === 'added' && $l[1]['name'] === 'x' && strlen($l[1]['id']) === 40 && $l[2]['result'] === 'failed'
+                && $l[3]['verified'] === false, 'file and bad item: ' . $out);
             $m = delugeCalls($fx, 'core.add_torrent_magnet')[0]['params'];
             check($m[1] === ['add_paused' => true, 'download_location' => $fx['home'] . '/data/new'], 'options: ' . json_encode($m));
             $f = delugeCalls($fx, 'core.add_torrent_file')[0]['params'];
             check($f[0] === 'x.torrent' && base64_decode($f[1]) === 'd4:infod4:name1:xee', 'file contents: ' . json_encode($f));
             list($code, $l, $out) = delugeRun($fx, ['add', "magnet:?xt=urn:btih:$hash"]);
-            check($code === 1 && strpos($out, 'already in session') !== false, 'a duplicate-only add must fail: ' . $out);
+            check($code === 0 && $l[0]['result'] === 'already in the client' && $l[0]['id'] === $hash, 'a duplicate: ' . $out);
             list($code) = delugeRun($fx, ['add', 'magnet:?xt=urn:btih:' . $hash, '--dir', 'relative']);
             check($code === 1, 'a relative --dir was accepted');
         } finally {

@@ -1,8 +1,9 @@
 <?php
 /**
  * MediaDocker: a media server the user runs in their own rootless Docker (PMSS docs/docker-help.md:14-17:
- * DOCKER_HOST=unix:///run/user/<uid>/docker.sock). Only that socket is used, and only when this user
- * owns it, so every container it lists is the user's own. A container is matched by its image name
+ * DOCKER_HOST=unix:///run/user/<uid>/docker.sock). The socket is the one the *ARR units use (Host::dockerSocket):
+ * a unix:// DOCKER_HOST, else that PMSS path, and only when this user owns it, so every container it lists is the
+ * user's own; tcp:// and a root or another account's daemon are never used. A container is matched by its image name
  * and the port it publishes for the server's own port, never by a recipe's container name.
  */
 class MediaDocker
@@ -14,7 +15,7 @@ class MediaDocker
     public function __construct($uid, $sock = null, $timeout = 30)
     {
         $this->uid = (int) $uid;
-        $this->sock = $sock !== null ? $sock : "/run/user/{$this->uid}/docker.sock";
+        $this->sock = $sock !== null ? $sock : Host::dockerSocket($this->uid); // '': none of the user's own
         $this->timeout = $timeout;
     }
 

@@ -114,11 +114,22 @@ switch ($method) {
     case 'core.add_torrent_magnet':
     case 'core.add_torrent_url':
     case 'core.add_torrent_file':
-        $id = $method === 'core.add_torrent_magnet' && preg_match('/btih:([0-9a-fA-F]{40})/', $p[0], $m) ? strtolower($m[1]) : sha1($p[0] . (isset($p[1]) && is_string($p[1]) ? $p[1] : ''));
-        if (isset($s['torrents'][$id])) {
-            $out(null, ['code' => 4, 'message' => 'AddTorrentError: Torrent already in session (' . $id . ').']);
+        // The id: a magnet's btih; a file's info-hash (sha1 of the info dictionary, which the fixtures put last); a URL's sha1.
+        // The name: the magnet's dn, the file's info name, else "added".
+        $id = $method === 'core.add_torrent_magnet' && preg_match('/btih:([0-9a-fA-F]{40})/', $p[0], $m) ? strtolower($m[1]) : sha1($p[0]);
+        $name = $method === 'core.add_torrent_magnet' && preg_match('/[?&]dn=([^&]*)/', $p[0], $m) ? urldecode($m[1]) : 'added';
+        if ($method === 'core.add_torrent_file') {
+            $data = (string) base64_decode($p[1]);
+            $id = sha1(substr($data, strpos($data, '4:info') + 6, -1));
+            $name = preg_match('/4:name(\d+):/', $data, $m) ? substr($data, strpos($data, $m[0]) + strlen($m[0]), (int) $m[1]) : $name;
         }
-        $s['torrents'][$id] = ['hash' => $id, 'name' => 'added', 'state' => 'Downloading', 'progress' => 0.0, 'total_wanted' => 0, 'total_done' => 0,
+        if (isset($s['torrents'][$id])) { // Deluge 2.2.0 answers a duplicate this way (live de-add-A-again.txt, 2026-10-14)
+            $out(null, ['code' => 4, 'message' => 'Failure: [Failure instance: Traceback (failure with no frames): <class '
+                . "'deluge.error.AddTorrentError'>: Torrent already in session ($id).\n]"]);
+        }
+        $paused = isset($p[count($p) - 1]['add_paused']) && $p[count($p) - 1]['add_paused'];
+        $s['torrents'][$id] = ['hash' => $id, 'name' => $name, 'state' => $paused ? 'Paused' : 'Downloading', 'progress' => 0.0,
+            'total_wanted' => 0, 'total_done' => 0,
             'ratio' => -1.0, 'download_payload_rate' => 0, 'upload_payload_rate' => 0, 'time_added' => 1, 'download_location' => '/x', 'message' => 'OK',
             'tracker_status' => '', 'files' => []];
         $out($id);

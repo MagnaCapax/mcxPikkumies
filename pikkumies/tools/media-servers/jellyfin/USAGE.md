@@ -8,7 +8,7 @@ The user's own Jellyfin through its HTTP API. Same verbs and records as the othe
 | libraries | | no | One record per library: `id`, `name`, `type`, `paths`, `items` (video, audio, photo and book items), `scanning`, `progress`. |
 | scan | `<library>... \| --all` | yes | Starts a scan of each named library (`metadataRefreshMode` and `imageRefreshMode` `Default`, no `replaceAll*`). `result`: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play`, `transcode_reasons`, `hardware`, `bitrate`, `remote`; `address` only with `--addresses`. |
-| end-stream | `<session-id>... [--reason <text>]` | yes | Sends Stop to each session (and the reason as a message first, when given); `verified` when it left the list. A failed stop ends the call `ok:false` with each id's result. |
+| end-stream | `<session-id>... [--reason <text>]` | yes | Sends Stop to each session (and the reason as a message first, when given); `verified` when it left the list. A failed stop, or a session that still plays after it (the list is read up to 5 times, 0.4 s apart; a client may ignore the command), ends the call `ok:false` with each id's result. |
 | recent | `[--limit N]` | no | Recently added items across libraries: `title`, `type`, `library`, `added_at`. |
 | logs | `[--lines N] [--addresses]` | no | `file` and its last `lines` (default 50): the log file for a PMSS install, else the newest log the API lists. |
 | restart | | yes | PMSS: the installer's `--stop-app=jellyfin`, then `--start-app=jellyfin`; a container on the user's own rootless Docker: `docker restart`; waits up to 90 s for an answer. Elsewhere it refuses and prints the provider's way. |

@@ -24,7 +24,7 @@ These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `son
 | lookup | `<title\|tvdb:N\|tmdb:N\|imdb:ttN\|mbid:UUID>` | no | Searches the metadata database. Returns `meta_id` (`tvdb:` for Sonarr, `tmdb:` for Radarr, `mbid:` for Lidarr) and whether each title is already in the library. |
 | add | `<meta_id>... [--profile <name\|id>] [--root <path>] [--no-search]` | yes | Adds titles as monitored and starts the automatic search unless `--no-search`. Profile and root folder are needed unless exactly one exists. A title already there gives `exists`. |
 | remove | `<id>... [--with-data --expect <size>]` | yes | Takes items out of the library and keeps the files. `--with-data` deletes each item's whole folder (asks the user first). |
-| search | `<id>...` | yes | Asks the app to search the indexers now. It may grab and download, and an upgrade may replace an existing file. |
+| search | `<id>...` | yes | Asks the app to search the indexers now. One record per item in every app: `id`, `title`, `command_id`, `name`, `state`, `message` (an app that searches a batch with one command gives each item that command's fields). It may grab and download, and an upgrade may replace an existing file. |
 | queue | `[--limit N]` | no | Downloads the app is tracking, with status and messages. Read only: removing from the queue is not offered. |
 | wanted | `[--cutoff] [--limit N]` | no | Monitored items with no file (`--cutoff`: below the quality cutoff). |
 

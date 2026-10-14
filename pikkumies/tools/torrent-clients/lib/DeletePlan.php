@@ -65,11 +65,14 @@ class DeletePlan
         foreach ($files as $f) {
             $bytes += isset($f['skip']) || isset($f['same_as']) ? 0 : $f['bytes'];
         }
-        $freed = array_sum(DeleteFreed::byTorrent($inodes, $ids, function () {
+        // A client that moves the files to its trash frees nothing until the trash is emptied (qBittorrent 5 by default):
+        // the preview says so, as the delete does (DeleteRun::outcome).
+        $disposal = method_exists($c, 'disposal') ? $c->disposal() : 'deleted';
+        $freed = $disposal === 'trashed' ? 0 : array_sum(DeleteFreed::byTorrent($inodes, $ids, function () {
             return true;
         }));
         return ['files' => $files, 'inodes' => $inodes, 'bytes' => $bytes, 'freed' => $freed, 'shared' => $shared,
-            'unlisted' => $unlisted, 'expect' => self::label($bytes) . ':' . $bytes];
+            'unlisted' => $unlisted, 'expect' => self::label($bytes) . ':' . $bytes, 'disposal' => $disposal];
     }
 
     public static function summary(array $plan)
@@ -81,6 +84,10 @@ class DeletePlan
         }));
         if ($skipped) {
             $s['skipped_files'] = $skipped; // listed with `skip`: left on disk, not in bytes or freed_bytes
+        }
+        if (isset($plan['disposal']) && $plan['disposal'] === 'trashed') {
+            $s['disposal'] = 'trashed';
+            $s['note'] = 'the client moves the files to its trash: no disk space is freed until the trash is emptied';
         }
         $hints = $s['refused'] ? ['a file is shared with another torrent in this client: remove those torrents in the same call,'
             . ' or remove without --with-data'] : [];

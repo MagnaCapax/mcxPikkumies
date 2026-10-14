@@ -123,6 +123,9 @@ return [
             list($code, $l, $out) = arrRun($fx, ['search', '2', '1']);
             $cmds = array_values(arrState($fx)['commands']);
             check($code === 0 && count($cmds) === 1 && $cmds[0]['body'] === ['name' => 'MoviesSearch', 'movieIds' => [2, 1]], 'radarr search: ' . json_encode($cmds));
+            // One record per movie with id and title, as Sonarr and Lidarr give (live ra-search.txt had one record with ids:[1]).
+            check(array_column(array_slice($l, 0, 2), 'id') === [2, 1] && $l[0]['title'] !== '' && !isset($l[0]['ids'])
+                && $l[0]['command_id'] === $l[1]['command_id'] && $l[1]['state'] === 'completed', 'radarr records: ' . $out);
         } finally {
             arrDone($fx);
         }

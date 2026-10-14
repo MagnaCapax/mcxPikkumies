@@ -65,10 +65,9 @@ class MediaServers
                 $targets = self::pick($s($opt)->sessions(), $args, 'session', 'end-stream <session-id>... (ids from `sessions`)', false);
                 $reason = isset($opt['reason']) && is_string($opt['reason']) ? substr($opt['reason'], 0, 200) : '';
                 $done = $s($opt)->endStream($targets, $reason);
-                $left = array_column($s($opt)->sessions(), 'id');
-                foreach ($done as $i => $r) {
-                    $done[$i]['verified'] = !in_array($r['id'], $left, true); // read back: gone from the live list
-                }
+                $done = MediaEndStream::readBack($done, function () use ($s, $opt) {
+                    return $s($opt)->sessions(); // read back: gone from the live list
+                });
                 return $scrub(self::addresses(MediaEndStream::finish($done), false));
             },
             'recent' => function ($args, $opt) use ($s, $scrub) {

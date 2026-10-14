@@ -25,6 +25,8 @@ class RtorrentClient implements TorrentClient
     private $scgi = null;
     /** d.directory of each torrent from the last list (RtorrentFiles::many). */
     public $dirs = [];
+    /** d.state, d.is_active and d.is_open of each torrent from the last list, raw (pause/resume read them back). */
+    public $flags = [];
     private $byNative = [];
 
     public function __construct($family, $home, $uid)
@@ -65,6 +67,8 @@ class RtorrentClient implements TorrentClient
                 $r = RtorrentRecords::row($d);
                 $this->byNative[$r['native']] = $r;
                 $this->dirs[$r['native']] = rtrim((string) $d['d.directory='], '/');
+                $this->flags[$r['native']] = ['state' => (int) $d['d.state='], 'active' => (int) $d['d.is_active='],
+                    'open' => (int) $d['d.is_open=']];
             }
         }
         return array_values($this->byNative);

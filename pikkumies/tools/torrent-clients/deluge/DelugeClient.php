@@ -78,7 +78,7 @@ class DelugeClient implements TorrentClient
 
     public function add(array $items, array $opt)
     {
-        return DelugeAdd::run($this->rpc(), $items, $opt);
+        return DelugeAdd::run($this, $items, $opt);
     }
 
     public function remove(array $natives, $withData)

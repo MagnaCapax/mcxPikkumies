@@ -5,6 +5,8 @@
  * - auth: header X-API-KEY only here (api/utils.py:100-115 also takes ?apikey= and a form field: those are answered
  *   400 and logged as a violation, so a key in a URL or form fails the test);
  * - answers {data, total}; start/length paging; seriesid[] and radarrid[] filters;
+ * - GET providers (api/providers/providers.py): {data: [{name, status, retry}]}, status "Good" unless throttled; the
+ *   `providers` state replaces the one Good provider (an empty list = none enabled, as the live 1.6.2 had on 2026-10-14);
  * - PATCH series|movies with a form body seriesid|radarrid + action (series.py:243-273): only search-missing is allowed
  *   here, anything else is a violation; the restart/shutdown route (system/system.py) is a violation too.
  */
@@ -71,6 +73,9 @@ if ($method === 'GET' && $rel === 'movies') {
 }
 if ($method === 'GET' && in_array($rel, ['episodes/wanted', 'movies/wanted', 'episodes/history', 'movies/history'], true)) {
     $send(200, $page($s[$rel]));
+}
+if ($method === 'GET' && $rel === 'providers') { // one row per enabled provider: status "Good" or the throttle reason
+    $send(200, ['data' => isset($s['providers']) ? $s['providers'] : [['name' => 'opensubtitlescom', 'status' => 'Good', 'retry' => '-']]]);
 }
 if ($method === 'PATCH' && in_array($rel, ['series', 'movies'], true)) {
     $param = $rel === 'series' ? 'seriesid' : 'radarrid';

@@ -39,8 +39,11 @@ class RtorrentRecords
         if ((int) $d['d.hashing='] !== 0 || (int) $d['d.is_hash_checking='] !== 0) {
             return 'checking';
         }
+        // A tracker message on a torrent the user stopped (d.state 0, as d.stop leaves it) is stale: it stays `paused`, the
+        // text stays in `message`. ruTorrent's status text says paused there too and only the icon shows the error
+        // (webui.js:1776-1798). A started torrent (d.state 1) with a message is `error`.
         $msg = (string) $d['d.message='];
-        if ($msg !== '' && $msg !== 'Tracker: [Tried all trackers.]') {
+        if ((int) $d['d.state='] && $msg !== '' && $msg !== 'Tracker: [Tried all trackers.]') {
             return 'error';
         }
         if (!(int) $d['d.is_open='] || !(int) $d['d.state='] || !(int) $d['d.is_active=']) {

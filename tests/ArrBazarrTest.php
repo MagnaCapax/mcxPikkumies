@@ -75,6 +75,26 @@ return [
             arrP2Done($fx);
         }
     },
+    'bazarr: search with no usable subtitle provider says so and sends nothing; with one, `searched` names the providers' => function () {
+        // Live bz-search.txt: "state":"searched" while Bazarr logged "All providers are throttled" (none enabled).
+        $fx = arrOtherFixture('bazarr', ['providers' => []]);
+        try {
+            list($code, $l, $out) = arrRun($fx, ['search', 'movie:5']);
+            check($code === 1 && strpos($out, 'nothing searched: Bazarr has no subtitle provider enabled') !== false
+                && strpos($out, '"searched"') === false && !arrCalls($fx, 'PATCH', 'movies'), 'none enabled: ' . $out);
+            arrSet($fx, ['providers' => [['name' => 'opensubtitlescom', 'status' => 'TooManyRequests', 'retry' => 'in 2 hours']]]);
+            list($code, $l, $out) = arrRun($fx, ['search', 'movie:5']);
+            check($code === 1 && strpos($out, 'throttled: opensubtitlescom (TooManyRequests, until in 2 hours)') !== false
+                && !arrCalls($fx, 'PATCH', 'movies'), 'all throttled: ' . $out);
+            arrSet($fx, ['providers' => [['name' => 'opensubtitlescom', 'status' => 'TooManyRequests', 'retry' => 'in 2 hours'],
+                ['name' => 'podnapisi', 'status' => 'Good', 'retry' => '-']]]);
+            list($code, $l, $out) = arrRun($fx, ['search', 'movie:5']);
+            check($code === 0 && $l[0]['state'] === 'searched' && $l[1]['providers'] === ['podnapisi']
+                && strpos($l[1]['note'], 'accepted') !== false && count(arrCalls($fx, 'PATCH', 'movies')) === 1, 'one usable: ' . $out);
+        } finally {
+            arrP2Done($fx);
+        }
+    },
     'bazarr: the key never reaches the output (401, a 500 that echoes it, a dead port)' => function () {
         $fx = arrOtherFixture('bazarr', ['key' => 'another-key-bazarr-has-now-00000']);
         try {

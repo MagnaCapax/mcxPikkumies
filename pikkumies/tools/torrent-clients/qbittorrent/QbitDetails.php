@@ -14,7 +14,13 @@ class QbitDetails
         }
         $keep = ['total_size', 'piece_size', 'pieces_num', 'pieces_have', 'seeds', 'seeds_total', 'peers', 'peers_total', 'total_uploaded',
             'total_downloaded', 'time_elapsed', 'seeding_time', 'eta', 'creation_date', 'completion_date', 'comment', 'infohash_v1', 'infohash_v2'];
-        return array_intersect_key($p, array_flip($keep));
+        $out = array_intersect_key($p, array_flip($keep));
+        foreach (['creation_date', 'completion_date'] as $k) { // -1 = not known / not finished (live 5.1.4 creation_date -1)
+            if (isset($out[$k]) && (int) $out[$k] < 0) {
+                $out[$k] = null;
+            }
+        }
+        return $out;
     }
 
     /**

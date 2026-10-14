@@ -10,7 +10,7 @@ These are the servers that stream the user's own media to their devices: `jellyf
 | libraries | | no | all | One record per library: `id`, `name`, `type`, `paths`, `items`, `scanning`, `progress`. |
 | scan | `<library>... \| --all` | yes | all | Starts a scan of each library (an id or name from `libraries`). Jellyfin and Emby: explicit refresh modes `Default`, never `replaceAll*`; Plex: never `force`. Result per library: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | all | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play` (direct or transcode), `transcode_reasons`, `hardware`, `bitrate`, `remote`. Viewer addresses only with `--addresses`. |
-| end-stream | `<session-id>... [--reason <text>]` | yes | all | Ends viewers' playback. Ids come from a live `sessions` call, several per call, never "all"; reads the list back (`verified`). A stop that fails does not hide the ones that worked: the call ends `ok:false` with each id's result; after a refused credential nothing more is sent. Plex may refuse (its feature gate) and the tool says so. |
+| end-stream | `<session-id>... [--reason <text>]` | yes | all | Ends viewers' playback. Ids come from a live `sessions` call, several per call, never "all"; reads the list back (`verified`; up to 5 reads, 0.4 s apart, while a sent stop still shows). A stop that fails, or a session that still plays after its stop, does not hide the ones that worked: the call ends `ok:false` with each id's result; after a refused credential nothing more is sent. Plex may refuse (its feature gate) and the tool says so. |
 | recent | `[--limit N]` | no | all | Recently added items, newest first: `title`, `type`, `library`, `added_at`. Paged like every list: `--limit 0` gives as many as fit, `--offset` the next page (`truncated`, `next_offset`); one call reads at most the 500 newest (`note` says when that stops it). |
 | logs | `[--lines N] [--addresses]` | no | all | The last lines of the server log (default 50, at most 1000), with credentials removed and every IPv4/IPv6 address (with or without a port, bracketed, in a URL) replaced unless `--addresses`. Jellyfin and Emby: the log API, or the file for a native install; Plex: the files in its data directory. |
 | restart | | yes | all | Restarts the server the way this host runs it (below) and waits for it to answer. Loads and sends no credential. Elsewhere it refuses and prints the provider's way. |
@@ -46,7 +46,7 @@ One attempt per call. A refused key, password or token (HTTP 401 on a call the c
 | platform | jellyfin | emby | plex |
 |---|---|---|---|
 | PMSS media-stack install | refused while `~/.jellyfinDisable` exists; `bash ~/install-media-stack.sh --stop-app=jellyfin`, then `--start-app=jellyfin`, the PMSS panel's own steps; if it still answers 15 s after the stop: `stop not confirmed`, start not run | n/a | n/a |
-| the user's own rootless Docker | `docker restart <container>` on `unix:///run/user/<uid>/docker.sock` only | same | same |
+| the user's own rootless Docker | `docker restart <container>` on the user's own socket only (a `unix://` `DOCKER_HOST`, else `unix:///run/user/<uid>/docker.sock`, owned by the user) | same | same |
 | Ultra.cc, Feral, Whatbox, other | refused, with the provider's way as the hint | refused + hint | refused + hint |
 | never | `POST /System/Restart`, `--start-stopped`, `--uninstall`, an installer re-run | `POST /System/Restart` | `/updater/apply` |
 

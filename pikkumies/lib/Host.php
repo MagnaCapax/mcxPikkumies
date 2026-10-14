@@ -102,6 +102,18 @@ class Host
         return strlen($bin) === 4 ? [$hex, '0000000000000000FFFF0000' . $hex] : [$hex];
     }
 
+    /**
+     * The user's own Docker daemon socket: DOCKER_HOST when it is unix:// and the socket is this user's, else
+     * /run/user/<uid>/docker.sock (the address PMSS exports, etc/skel/.bashrc:284) when it is this user's. '' otherwise:
+     * tcp:// and a daemon run by root or another account are never used. The *ARR and media units share this rule.
+     */
+    public static function dockerSocket($uid)
+    {
+        $env = getenv('DOCKER_HOST');
+        $path = $env !== false && $env !== '' ? (strncmp($env, 'unix://', 7) === 0 ? substr($env, 7) : '') : "/run/user/$uid/docker.sock";
+        return $path !== '' && self::ownsSocket($path, $uid) ? $path : '';
+    }
+
     /** True when $path is a unix socket owned by $uid. */
     public static function ownsSocket($path, $uid)
     {

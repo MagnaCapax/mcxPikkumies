@@ -26,6 +26,18 @@ trait QbitExtras
             'uploaded' => $g('uploaded') === null ? null : (int) $g('uploaded')];
     }
 
+    /**
+     * What torrents/delete with deleteFiles does to the files here: `trashed` when torrent_content_remove_option is
+     * MoveToTrash (the 5.x default, appc.cpp:354, sessionimpl-5.0.0.cpp:529), else `deleted`. DeletePlan reads it for the
+     * preview, QbitChange for the delete, so both say the same.
+     */
+    public function disposal()
+    {
+        $prefs = $this->api->json('app/preferences');
+        $mode = isset($prefs['torrent_content_remove_option']) ? $prefs['torrent_content_remove_option'] : '';
+        return $mode === 'MoveToTrash' ? 'trashed' : 'deleted';
+    }
+
     /** POST torrents/recheck with the checked hashes, never "all" (tc-5.0.0.cpp:1260-1266; qbt-wiki-5.md:1744-1766). */
     public function recheck(array $natives)
     {

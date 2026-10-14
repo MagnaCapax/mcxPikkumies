@@ -39,16 +39,10 @@ class ArrShell
         return false;
     }
 
-    /**
-     * The user's own Docker daemon socket: DOCKER_HOST when it is unix:// and the socket is this user's,
-     * else /run/user/<uid>/docker.sock (the address PMSS exports, etc/skel/.bashrc:284) when it is this
-     * user's. '' otherwise: a daemon run by root or another account is never used.
-     */
+    /** The user's own Docker daemon socket, or '' (the rule the media units use too: lib/Host.php dockerSocket). */
     public static function dockerSocket($uid)
     {
-        $env = getenv('DOCKER_HOST');
-        $path = $env !== false && $env !== '' ? (strncmp($env, 'unix://', 7) === 0 ? substr($env, 7) : '') : "/run/user/$uid/docker.sock";
-        return $path !== '' && Host::ownsSocket($path, $uid) ? $path : '';
+        return Host::dockerSocket($uid);
     }
 
     /** `tmux has-session -t =<app>` as the user, the PMSS watchdog's own test: running, stopped or unknown. */

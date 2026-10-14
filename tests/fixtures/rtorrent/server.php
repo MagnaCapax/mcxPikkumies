@@ -134,7 +134,11 @@ function fakeAnswer(array &$state, $method, array $p)
         return 0;
     }
     if ($method === 'd.stop' || $method === 'd.start') {
-        $t['state'] = $t['open'] = $t['active'] = $method === 'd.start' ? 1 : 0;
+        if (empty($t['ignore_toggle'])) { // test knob: a torrent the call leaves as it was
+            // d.stop: d.state and d.is_active 0 (a live 0.16.22 read both back as 0), d.is_open left as it was; d.start: all 1
+            $t['state'] = $t['active'] = $method === 'd.start' ? 1 : 0;
+            $t['open'] = $method === 'd.start' ? 1 : (isset($t['open']) ? $t['open'] : 0);
+        }
         return 0;
     }
     if ($method === 'f.multicall') {

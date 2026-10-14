@@ -8,7 +8,7 @@ The user's own Plex Media Server through its local HTTP API (JSON). Same verbs a
 | libraries | | no | One record per library section: `id` (the section key), `name`, `type`, `paths`, `items`, `scanning`, `progress` (null). |
 | scan | `<library>... \| --all` | yes | Starts a scan of each named section (no `force`). `result`: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play`, `hardware`, `remote`; `address` and `public_address` only with `--addresses`. |
-| end-stream | `<session-id>... [--reason <text>]` | yes | Asks Plex to terminate each session, with the reason shown to the viewer; `verified` when it left the list. Plex may refuse (HTTP 401, its feature gate); nothing is ended then. A failed stop ends the call `ok:false` with each id's result. |
+| end-stream | `<session-id>... [--reason <text>]` | yes | Asks Plex to terminate each session, with the reason shown to the viewer; `verified` when it left the list. Plex may refuse (HTTP 401, its feature gate); nothing is ended then. A failed stop, or a session that still plays after it (the list is read up to 5 times, 0.4 s apart; a client may ignore the command), ends the call `ok:false` with each id's result. |
 | recent | `[--limit N]` | no | Recently added items: `title`, `type`, `library`, `added_at`. |
 | logs | `[--lines N] [--addresses]` | no | `file` (the newest `*.log` in the data directory's `Logs/`) and its last `lines` (default 50). |
 | restart | | yes | A container on the user's own rootless Docker: `docker restart`, then waits up to 90 s for an answer. Elsewhere it refuses and prints the provider's way. |

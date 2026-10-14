@@ -94,7 +94,11 @@ trait RtorrentExtras
         }
     }
 
-    /** pause/resume: $method on each id, then the states read back from a fresh list. */
+    /**
+     * pause/resume: $method on each id, then a fresh list read back. `verified` comes from the raw d.state and d.is_active
+     * (a live rTorrent 0.16.22 read 0 for both after d.stop, 2026-10-14), not from the state word, which a tracker message
+     * once turned into `error`; the message is its own field.
+     */
     private function toggle($method, array $natives)
     {
         $this->each($method, $natives);
@@ -102,11 +106,17 @@ trait RtorrentExtras
         foreach ($this->torrents() as $r) {
             $now[$r['native']] = $r;
         }
+        $pause = $method === 'd.stop';
         $out = [];
+        $ok = true;
         foreach ($natives as $n) {
-            $r = isset($now[$n]) ? $now[$n] : ['id' => strtolower($n), 'name' => '', 'state' => 'unknown'];
-            $out[] = ['id' => $r['id'], 'name' => $r['name'], 'state' => $r['state']];
+            $r = isset($now[$n]) ? $now[$n] : ['id' => strtolower($n), 'name' => '', 'state' => 'gone', 'message' => ''];
+            $f = isset($this->flags[$n]) ? $this->flags[$n] : null;
+            $done = $f !== null && ($pause ? ($f['state'] === 0 || $f['active'] === 0) : ($f['state'] === 1 && $f['active'] === 1));
+            $ok = $ok && $done;
+            $out[] = ['id' => $r['id'], 'name' => $r['name'], 'state' => $r['state'], 'message' => $r['message'],
+                'result' => $done ? ($pause ? 'paused' : 'resumed') : 'not changed yet'];
         }
-        return $out;
+        return ['records' => $out, 'status' => ['verified' => $ok]];
     }
 }

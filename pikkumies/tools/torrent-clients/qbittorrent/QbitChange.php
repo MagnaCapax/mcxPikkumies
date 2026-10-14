@@ -19,8 +19,7 @@ class QbitChange
     {
         $disposal = 'kept';
         if ($withData) {
-            $prefs = $this->c->api->json('app/preferences');
-            $disposal = (isset($prefs['torrent_content_remove_option']) && $prefs['torrent_content_remove_option'] === 'MoveToTrash') ? 'trashed' : 'deleted';
+            $disposal = $this->c->disposal();
         }
         $before = $this->c->byNative($this->c->torrents($natives));
         $this->c->api->post('torrents/delete', ['hashes' => QbittorrentClient::hashes($natives), 'deleteFiles' => $withData ? 'true' : 'false']);
