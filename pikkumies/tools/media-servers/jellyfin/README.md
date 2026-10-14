@@ -20,7 +20,7 @@ Every request goes only to a listener this user's uid owns in `/proc/net/tcp(6)`
 2. On PMSS: `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD` from the user's own `~/.media-stack-credentials.txt`, parsed as PMSS parses it (`KEY = value`; a value starting with `[` is a placeholder; `install-media-stack.sh:1470-1484`, written mode 600 at `:2018-2066`). One `POST /Users/AuthenticateByName`, as the installer itself makes (`install-media-stack.sh:1901`); the session token is kept in `local/secrets/jellyfin` and reused. ADR-0019 allows reading credentials from the user's own files; a login session is not a new API key.
 3. Otherwise the error's hint is `login`.
 
-A refused key or password is marked and never tried again until `login` (the account could be locked). A refused session is cleared and the next call logs in once more. Jellyfin keeps one token per device id (live 12.2.0: a second login with the same device id made the first token answer 401), so the tool uses its own stable device id and does not end the installer's or the user's sessions.
+A refused key or password is marked and never tried again until `login` (the account could be locked). A refused session is cleared and the next call logs in once more. Jellyfin keeps one token per device id (live 12.2.0: a second login with the same device id made the first token answer 401), so the tool uses its own stable device id and does not end the installer's or the user's sessions. The id is stored in `local/secrets/jellyfin` only when a request that carries it is about to be sent: a call refused before that (another account's port, nothing listening, no credential) writes nothing. With `--url`, the port's owner is checked before the credential is looked at, so another account's port is the error, not a missing credential.
 
 ## Jellyfin calls
 
@@ -29,7 +29,7 @@ Paths, methods, parameters and policies from the Jellyfin OpenAPI spec 12.2.0 (`
 | verb | calls |
 |---|---|
 | all | header `Authorization: MediaBrowser Client="pikkumies", Device="pikkumies", DeviceId="pikkumies-<hex>", Version="1", Token="<token>"` (live: 200; `X-Emby-Token` 401 on 12.2.0) |
-| stats | `GET /System/Info` (Version, ServerName, HasPendingRestart, HasUpdateAvailable), `GET /Items/Counts`, `GET /System/Configuration/encoding` (`HardwareAccelerationType`; live: `"none"`), `GET /ScheduledTasks` (State), `GET /Sessions` |
+| stats | `GET /System/Info` (Version, ServerName, HasPendingRestart, HasUpdateAvailable), `GET /Items/Counts` (the per-type counts of the spec's `ItemCounts`, MovieCount to BookCount; its `ItemCount` is not used: live, with an API key, it said 8, and 3 with a userId, for two movies), the libraries' counts as `libraries` reads them (`items`), `GET /System/Configuration/encoding` (`HardwareAccelerationType`; live: `"none"`), `GET /ScheduledTasks` (State), `GET /Sessions` |
 | libraries | `GET /Library/VirtualFolders` (Name, Locations, CollectionType, ItemId, RefreshProgress, RefreshStatus; live: `Idle`), `GET /Items?parentId&recursive&mediaTypes&limit=0` (TotalRecordCount) |
 | scan | `POST /Items/{ItemId}/Refresh?metadataRefreshMode=Default&imageRefreshMode=Default` (the spec defaults both to `None`; live, both a bare and a `Default` refresh found newly added files) |
 | sessions | `GET /Sessions`: only sessions with a `NowPlayingItem`; PlayState.PlayMethod (Transcode, DirectStream, DirectPlay), TranscodingInfo (Bitrate, HardwareAccelerationType, TranscodeReasons), RemoteEndPoint |

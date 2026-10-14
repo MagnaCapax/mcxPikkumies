@@ -43,7 +43,7 @@ $jfConnect = function (array $opt) use ($jfSeams, $jfHome, $jfUid, $jfSecret) {
     $found = JellyfinLocate::find($jfHome, $family, $jfUid, $url, new MediaDocker($jfUid, $jfSeams['docker_sock']), $jfSeams['tables']);
     $all = array_map(function ($base) use ($jfSeams, $jfUid, $jfSecret) {
         $http = new MediaHttp('Jellyfin', $base, Mediabrowser::ALLOW, $jfUid, $jfSeams['timeout'], $jfSeams['tables']);
-        return new Mediabrowser('jellyfin', $http, $jfSecret->deviceId());
+        return new Mediabrowser('jellyfin', $http, $jfSecret->deviceIdLater());
     }, $found['bases']);
     $pick = 0;
     foreach (count($all) > 1 ? $all : [] as $i => $mb) {
@@ -69,6 +69,9 @@ $jfConnect = function (array $opt) use ($jfSeams, $jfHome, $jfUid, $jfSecret) {
 
 MediaServers::run($argv, function (array $opt, $auth = true) use ($jfConnect, $jfSecret, $jfHome, $jfSeams) {
     list($mb, $found, $family) = $jfConnect($opt);
+    if ($auth) {
+        $mb->http->reachable(); // another account's port or a stopped server is the first thing to say, before any credential
+    }
     list($found['login_from'], $secrets) = $auth ? JellyfinAuth::load($mb, $jfSecret, $jfHome, $family, __FILE__) : ['', []];
     return new MediabrowserServer($mb, $found, $secrets, $jfSeams['wait']);
 }, function ($args, $opt) use ($jfConnect, $jfSecret) {

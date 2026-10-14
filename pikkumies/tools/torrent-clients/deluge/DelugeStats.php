@@ -21,7 +21,7 @@ class DelugeStats
         $r = ['client' => 'deluge', 'version' => self::quiet($rpc, 'daemon.get_version'), 'libtorrent' => self::quiet($rpc, 'core.get_libtorrent_version'),
             'pid' => $pids ? $pids[0] : null, 'uptime' => $pids ? self::uptime($pids[0]) : null,
             'listen_port' => self::quiet($rpc, 'core.get_listen_port'), 'torrents' => count($all)];
-        $r['by_state'] = $counts;
+        $r['by_state'] = array_filter($counts); // only states that have torrents, as every unit (../README.md)
         $at = $c->endpoint();
         $r['web_port'] = $at['port'];
         $r['found_in'] = $at['how'];

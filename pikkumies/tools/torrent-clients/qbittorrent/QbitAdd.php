@@ -1,8 +1,8 @@
 <?php
 /**
  * QbitAdd: `add` through torrents/add (multipart/form-data: `urls` one per line, or a `torrents` file
- * part; qbt-wiki-5.md:1792-1884). The answer is "Ok." or "Fails.", 415 for a bad file
- * (tc-5.0.0.cpp:693-806). The add-stopped field is `stopped` from API 2.11 (tc-5.0.0.cpp:702) and
+ * part; qbt-wiki-5.md:1792-1884). The answer is "Ok." or "Fails.", 415 for a bad file (tc-5.0.0.cpp:693-806);
+ * 5.2 answers JSON instead (QbitExtras::addAnswer). The add-stopped field is `stopped` from API 2.11 (tc-5.0.0.cpp:702) and
  * `paused` before (qbt-wiki-4.1.md:1912). qBittorrent does not return the new id, so it is computed:
  * the id is the v1 info-hash, or the v2 info-hash truncated to 40 hex for v2 and hybrid torrents
  * (tc-5.0.0.cpp:421-423); then the list is read back to confirm.
@@ -54,7 +54,10 @@ class QbitAdd
             }
             $boundary = '----pikkumies' . bin2hex(random_bytes(12));
             list($code, $body) = $api->post('torrents/add', [], self::multipart($parts, $boundary), 'multipart/form-data; boundary=' . $boundary);
-            $r['result'] = $code === 415 ? 'error: qBittorrent says this is not a valid torrent file' : ($body === 'Ok.' ? 'sent' : 'error: qBittorrent refused it (' . ($body !== '' ? $body : "HTTP $code") . ')');
+            list($r['result'], $ids) = QbittorrentClient::addAnswer($code, $body);
+            if ($r['id'] === '' && count($ids) === 1) {
+                $r['id'] = strtolower((string) $ids[0]); // a URL: 5.2 names the id it added
+            }
             $out[] = $r;
         }
         return $this->confirm($out);

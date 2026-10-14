@@ -33,10 +33,10 @@ class Torrents
             },
             'show' => function ($args, $opt) use ($c) {
                 $all = $c()->torrents();
-                $targets = self::resolve($all, $args, 8);
+                $targets = self::resolve($all, $args, 8, 'not found'); // a read: nothing would have changed anyway
                 $out = [];
-                foreach ($targets as $t) {
-                    $out[] = self::printable($c()->details($t['native']) + $t);
+                foreach ($targets as $t) { // the list fields first, in their order (README Records), the client's values win
+                    $out[] = self::printable(array_replace($t, $c()->details($t['native']) + $t));
                 }
                 if (!empty($opt['trackers'])) {
                     $out = array_merge($out, TorrentTrackers::records($c(), $targets));
@@ -85,8 +85,9 @@ class Torrents
     /**
      * The torrents $args name: full ids, or unique prefixes of at least $min hex characters.
      * One bad id fails the whole call, so a batch never half-runs. Never returns an empty list.
+     * $lead starts the error: what a change verb did (nothing changed); a read says `not found`.
      */
-    public static function resolve(array $all, array $args, $min)
+    public static function resolve(array $all, array $args, $min, $lead = 'nothing changed')
     {
         if (!$args) {
             throw new CliError('name at least one torrent id', 'ids come from `list` (find one by name with `list --search <text>`)');
@@ -114,7 +115,7 @@ class Torrents
             $out[$m[0]['id']] = $m[0];
         }
         if ($bad) {
-            throw new CliError('nothing changed: ' . implode('; ', $bad), 'ids come from `list` (find one by name with `list --search <text>`)');
+            throw new CliError($lead . ': ' . implode('; ', $bad), 'ids come from `list` (find one by name with `list --search <text>`)');
         }
         return array_values($out);
     }

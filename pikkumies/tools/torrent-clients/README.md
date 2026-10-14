@@ -12,7 +12,7 @@ Tools for the user's own torrent clients: `rtorrent`, `qbittorrent` and `deluge`
 | remove | `<id>... [--with-data --expect <size>]` | yes | Takes torrents out of the client and keeps the files. With `--with-data` the files are deleted too (asks the user first). |
 | pause | `<id>...` | yes | Pauses (qBittorrent 5: stops) torrents. |
 | resume | `<id>...` | yes | Resumes (qBittorrent 5: starts) torrents. |
-| stats | | no | Everything about the client: version, process, port, torrent counts by state, traffic, and the user's free space from the quota (`quota_free_bytes`; `fs_free_bytes` is the whole filesystem). |
+| stats | | no | Everything about the client: version, process (`pid`, `uptime`: `null` when unknown), port, torrent counts by state (`by_state`, only the states that have torrents), traffic, and the user's free space from the quota (`quota_free_bytes`; `fs_free_bytes` is the whole filesystem). |
 | traffic | | no | Current rates, totals since start, speed limits. |
 | restart | | yes | Restarts the client the way this provider does it, then checks it answers. |
 | recheck | `<id>...` | yes | Asks the client to hash-check the torrents' data again. Deletes nothing; data that is gone becomes missing and downloads again (`done_before` says what was there). |
@@ -25,7 +25,7 @@ The eight functions the operator named (list, details, add, remove, pause, full 
 
 - An id is the client's own 40-character hex id, exactly as `list` prints it (lower case). It is not a shared info-hash: for v2 and hybrid torrents qBittorrent uses a truncated v2 hash.
 - `show`, `pause`, `resume`, `recheck`, `reannounce`: a full id or a unique prefix of at least 8 characters. `remove`: full ids only.
-- Several ids per call. Every id is resolved against the live list first; one unknown, ambiguous or malformed id fails the whole call and nothing changes.
+- Several ids per call. Every id is resolved against the live list first; one unknown, ambiguous or malformed id fails the whole call and nothing changes. The error starts `not found:` for `show` and `nothing changed:` for the verbs that change something.
 - Names are never ids. To find a torrent by name: `list --search <text>`.
 - No "all": a verb never acts on every torrent; the client's own "all" value is never sent.
 
@@ -64,4 +64,4 @@ The shared-file check sees only the torrents of the client being called: when tw
 | qbittorrent | WebUI on 127.0.0.1, port in `~/.qbittorrentPort`; password set once by the user with `login` | `WebUI\Port` in `~/.config/qBittorrent/qBittorrent.conf` |
 | deluge | deluge-web on 127.0.0.1, port in `~/.delugeWebPort`; secret from `~/.config/deluge/auth` | `port` in `~/.config/deluge/web.conf` |
 
-A client on a port owned by another account is never contacted (ADR-0019). When a client cannot be reached, the error says which: not installed, not enabled, not running, busy (no answer in time: unknown, not down), refused, or the port belongs to another account.
+A client on a port owned by another account is never contacted (ADR-0019). When a client cannot be reached, the error says which: not installed, not enabled, not running (with the config file it found when that file names the client but no binary is on `PATH`: a stopped client, or one run in a container), busy (no answer in time: unknown, not down), refused, or the port belongs to another account.

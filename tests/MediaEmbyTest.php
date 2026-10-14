@@ -19,7 +19,7 @@ return [
             check(array_values(preg_grep('#/Refresh#', mediaCalls($fx))) === $want, 'refresh: ' . implode(', ', mediaCalls($fx)));
             list($code, $l, $out) = embyRun($fx, ['recent']);
             check($code === 0 && $l[0]['title'] === 'A Show - Pilot'
-                && (bool) preg_grep('#^GET /Users/u1/Items/Latest\?ParentId=3&Limit=20&Fields=DateCreated$#', mediaCalls($fx)),
+                && (bool) preg_grep('#^GET /Users/u1/Items/Latest\?ParentId=3&Limit=21&Fields=DateCreated$#', mediaCalls($fx)),
                 'recent: ' . $out . implode(', ', mediaCalls($fx)));
             list($code, $l, $out) = embyRun($fx, ['sessions']);
             check($code === 0 && $l[0]['hardware'] === true && $l[0]['play'] === 'transcode'

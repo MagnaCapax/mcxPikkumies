@@ -17,9 +17,12 @@ trait DelugeExtras
         $n = function ($k) use ($s) {
             return (int) self::v($s, $k);
         };
+        $swarm = function ($k) use ($n) { // -1 when the tracker sent no scrape (live 2.2.0, 2026-10-14): unknown, not a count
+            return $n($k) < 0 ? null : $n($k);
+        };
         return ['client_state' => self::v($s, 'state'), 'tracker' => self::v($s, 'tracker_host'),
             'tracker_status' => self::v($s, 'tracker_status'), 'seeds' => $n('num_seeds'), 'peers' => $n('num_peers'),
-            'swarm_seeds' => $n('total_seeds'), 'swarm_peers' => $n('total_peers'), 'eta' => $n('eta'),
+            'swarm_seeds' => $swarm('total_seeds'), 'swarm_peers' => $swarm('total_peers'), 'eta' => $n('eta'),
             'uploaded_bytes' => $n('total_uploaded'), 'total_size' => $n('total_size'), 'file_count' => $n('num_files')];
     }
 

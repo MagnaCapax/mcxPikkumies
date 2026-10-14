@@ -6,7 +6,7 @@
      "created": 1600000000, "seeds": 4, "nfiles": 2, "private": 1, "files": [["a.mkv", 2000], ["sub/b.nfo", 1000]],
      "finished": 1700100000, "up_total": 4500,
      "trackers": [{"url": "https://tracker.example:8443/a1b2c3d4e5f6a7b8c9d0e1f2/announce", "group": 0, "enabled": 1,
-                   "ok": 3, "bad": 1, "ok_at": 200, "bad_at": 100, "seeds": 7, "leechers": 3},
+                   "ok": 3, "bad": 1, "ok_at": 200, "bad_at": 100, "seeds": 7, "leechers": 3, "scrape_at": 200},
                   {"url": "udp://backup.example:6969/announce?passkey=SECRETPASSKEY123", "group": 1, "enabled": 1,
                    "ok": 0, "bad": 2, "ok_at": 0, "bad_at": 300, "seeds": 0, "leechers": 0},
                   {"url": "http://old.example/announce", "group": 2, "enabled": 0}]},

@@ -148,7 +148,7 @@ function fakeAnswer(array &$state, $method, array $p)
         $keys = ['t.url=' => 'url', 't.group=' => 'group', 't.is_enabled=' => 'enabled', 't.success_counter=' => 'ok',
             't.failed_counter=' => 'bad',
             't.success_time_last=' => 'ok_at', 't.failed_time_last=' => 'bad_at', 't.scrape_complete=' => 'seeds',
-                't.scrape_incomplete=' => 'leechers'];
+                't.scrape_incomplete=' => 'leechers', 't.scrape_time_last=' => 'scrape_at'];
         return array_map(function ($tr) use ($p, $keys) {
             return array_map(function ($col) use ($tr, $keys) {
                 if (!isset($keys[$col])) {

@@ -125,13 +125,24 @@ class Mediabrowser
         }
     }
 
-    /** The header line: Jellyfin's MediaBrowser scheme (the token in it when given), Emby's X-Emby-Token. */
+    /**
+     * The header line: Jellyfin's MediaBrowser scheme (the token in it when given), Emby's X-Emby-Token. A line with the
+     * device id is a Closure: MediaHttp::send makes it after its checks, and a callable $deviceId is resolved then, once.
+     */
     private function authHeader($token)
     {
-        $client = 'Client="pikkumies", Device="pikkumies", DeviceId="' . $this->deviceId . '", Version="1"';
-        if ($this->set['auth'] === 'x-emby-token') {
-            return $token !== null ? "X-Emby-Token: $token" : "X-Emby-Authorization: Emby $client";
+        if ($this->set['auth'] === 'x-emby-token' && $token !== null) {
+            return "X-Emby-Token: $token";
         }
-        return "Authorization: MediaBrowser $client" . ($token !== null ? ', Token="' . $token . '"' : '');
+        return function () use ($token) {
+            if ($this->deviceId instanceof Closure) {
+                $this->deviceId = call_user_func($this->deviceId);
+            }
+            $client = 'Client="pikkumies", Device="pikkumies", DeviceId="' . $this->deviceId . '", Version="1"';
+            if ($this->set['auth'] === 'x-emby-token') {
+                return "X-Emby-Authorization: Emby $client";
+            }
+            return "Authorization: MediaBrowser $client" . ($token !== null ? ', Token="' . $token . '"' : '');
+        };
     }
 }

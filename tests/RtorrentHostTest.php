@@ -11,7 +11,7 @@ return [
         $p = rtorrentServe($h);
         try {
             list($code, $out, $l) = rtorrentRun($h, ['stats']);
-            check($code === 0 && $l[0]['version'] === '0.9.8' && $l[0]['pid'] === 4242 && $l[0]['torrents'] === 6 && $l[0]['states']['seeding'] === 2, 'stats: ' . $out);
+            check($code === 0 && $l[0]['version'] === '0.9.8' && $l[0]['pid'] === 4242 && $l[0]['torrents'] === 6 && $l[0]['by_state']['seeding'] === 2 && !isset($l[0]['states']), 'stats: ' . $out);
             check(!isset($l[0]['uptime']) && $l[0]['up_limit'] === 512000 && $l[0]['endpoint'] === '~/.rtorrent.socket', 'stats fields: ' . $out);
             list($code, $out, $l) = rtorrentRun($h, ['traffic']);
             check($code === 0 && $l[0]['down_rate'] === 1000 && $l[0]['up_total'] === 20000 && $l[0]['down_limit'] === 0, 'traffic: ' . $out);

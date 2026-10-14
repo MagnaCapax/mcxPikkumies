@@ -60,7 +60,19 @@ class MediaSecret
         $this->save($d);
     }
 
-    /** A stable id for this tool's login sessions: a server keeps one token per device id. */
+    /**
+     * deviceId() for a header MediaHttp::send makes only when the request really goes out, so a read that is refused
+     * first (another account's port, nothing listening, no credential) writes nothing to local/secrets.
+     */
+    public function deviceIdLater()
+    {
+        $secret = $this;
+        return function () use ($secret) {
+            return $secret->deviceId();
+        };
+    }
+
+    /** A stable id for this tool's login sessions: a server keeps one token per device id. Stored on the first call. */
     public function deviceId()
     {
         $d = $this->load();

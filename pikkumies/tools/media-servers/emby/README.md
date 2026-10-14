@@ -20,7 +20,7 @@ Paths and parameters from the Emby OpenAPI spec 4.1.1.0 (`http://swagger.emby.me
 | verb | calls |
 |---|---|
 | all | base `/emby` (live: answers there, and at the bare path), header `X-Emby-Token` (live: 200; no credential: 401) |
-| stats | `GET /System/Info`, `GET /Items/Counts`, `GET /System/Configuration/encoding` (live: the hardware setting is `HardwareAccelerationMode`; there is no `HardwareAccelerationType`), `GET /ScheduledTasks`, `GET /Sessions` |
+| stats | `GET /System/Info`, `GET /Items/Counts` (the per-type counts, MovieCount to BookCount plus GameCount and GameSystemCount in the 4.1.1.0 spec; `ItemCount` is not used: live 4.10.1.0 said 0 with a key, a userId and a login session while MovieCount was 2), the libraries' counts as `libraries` reads them (`items`), `GET /System/Configuration/encoding` (live: the hardware setting is `HardwareAccelerationMode`; there is no `HardwareAccelerationType`), `GET /ScheduledTasks`, `GET /Sessions` |
 | libraries | `GET /Library/VirtualFolders` (live: `ItemId` is a short number, e.g. `3`), `GET /Items?ParentId&Recursive&MediaTypes&Limit=0` |
 | scan | `POST /Items/{Id}/Refresh?Recursive=true&MetadataRefreshMode=Default&ImageRefreshMode=Default` (live: 204) |
 | sessions | `GET /Sessions` (Session.SessionInfo; TranscodingInfo with VideoDecoderIsHardware / VideoEncoderIsHardware) |

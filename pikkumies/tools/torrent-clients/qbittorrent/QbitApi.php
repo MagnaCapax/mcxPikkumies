@@ -3,7 +3,9 @@
  * QbitApi: one WebUI API v2 session through lib/Http.php (never curl directly).
  * Sources (copies in /tmp/pkres1/src): every API call needs a session cookie except auth/login
  * (webapp-5.0.0.cpp:323-324, 403 otherwise); login answers "Ok." with a session cookie or "Fails.",
- * and 403 when the address is banned (qbt-wiki-5.md:133-160); the cookie name defaults to SID but is
+ * and 403 when the address is banned (qbt-wiki-5.md:133-160). qBittorrent 5.2 answers 204 with the cookie
+ * or 401 instead (release-5.2.4 authcontroller.cpp:43-60, webapplication.cpp:368-373, 424-425, 1016-1021;
+ * live 5.2.4 / API 2.15.1 smoke run 2026-10-14). The cookie name defaults to SID but is
  * configurable (webapp-5.0.0.cpp:73,174), so the first Set-Cookie is sent back as it came. No Origin
  * or Referer is sent: CSRF protection lets such requests through (webapp-5.0.0.cpp:781-786).
  * GET for reads, POST for changes (qbt-wiki-5.md:121-125, 405 since v4.4.4).
@@ -63,7 +65,8 @@ class QbitApi
         if ($r['code'] === 403) {
             throw new CliError('qBittorrent has banned this address after failed logins (by default for an hour); no login was tried', 'wait for the ban to end; the WebUI in the browser is locked out too until then');
         }
-        if ($r['code'] === 200 && trim($r['body']) === 'Ok.') {
+        $body = trim($r['body']);
+        if (($r['code'] === 200 && $body === 'Ok.') || $r['code'] === 204) { // 204: qBittorrent 5.2 and later
             $c = isset($r['headers']['set-cookie'][0]) ? explode(';', $r['headers']['set-cookie'][0])[0] : '';
             if (strpos($c, '=') === false) {
                 throw new CliError('qBittorrent accepted the login but sent no session cookie', 'report this; the WebUI may sit behind something that strips cookies');
@@ -71,7 +74,9 @@ class QbitApi
             $this->cookie = trim($c);
             return 'ok';
         }
-        if ($r['code'] === 200 && trim($r['body']) === 'Fails.') {
+        // 401: a wrong login on 5.2. The same code means a refused Host/Origin header, but then the session-less probe
+        // in open() gets 401 too and never reaches this login (webapplication.cpp:650-662 in 5.2.4).
+        if (($r['code'] === 200 && $body === 'Fails.') || $r['code'] === 401) {
             return 'fails';
         }
         throw new CliError("unexpected login answer: HTTP {$r['code']}", 'check that the port belongs to qBittorrent');

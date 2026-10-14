@@ -88,15 +88,15 @@ class QbitProc
         return $code === 0;
     }
 
-    /** Seconds since the process started (stat field 22, in clock ticks of 100 per second). */
+    /** Seconds since the process started (stat field 22, in clock ticks of 100 per second); null when unreadable. */
     public function uptime($pid)
     {
         $stat = @file_get_contents($this->root . "/$pid/stat");
         $up = @file_get_contents($this->root . '/uptime');
         if (!is_string($stat) || !is_string($up)) {
-            return 0;
+            return null;
         }
         $f = explode(' ', substr($stat, strrpos($stat, ')') + 2));
-        return isset($f[19]) ? max(0, (int) ((float) $up - ((int) $f[19]) / 100)) : 0;
+        return isset($f[19]) ? max(0, (int) ((float) $up - ((int) $f[19]) / 100)) : null;
     }
 }

@@ -29,7 +29,7 @@ class RtorrentLocate
         }
         list($kind, $value, $rc) = $found;
         if ($kind === 'local') {
-            return self::socket($value, $uid, $home, "$value (from $rc)");
+            return self::socket($value, $uid, $home, "$value (from $rc)", $rc);
         }
         if (!preg_match('/^(?:(localhost|127\.[0-9.]+|0\.0\.0\.0|\[::1\]|::1|\[::\])?):([0-9]{1,5})$/', $value, $m) || (int) $m[2] < 1 || (int) $m[2] > 65535) {
             throw new CliError("rtorrent's SCGI port in $rc is not on this machine ($value)", 'this tool talks only to an rtorrent on 127.0.0.1 or a unix socket');
@@ -48,10 +48,15 @@ class RtorrentLocate
         return 'tcp://' . (strpos($m[1], ':') !== false ? '[::1]' : '127.0.0.1') . ":$port";
     }
 
-    private static function socket($path, $uid, $home, $label)
+    /** $rc: the rc file that named the socket; with it, a missing binary means stopped (or run elsewhere), not absent. */
+    private static function socket($path, $uid, $home, $label, $rc = '')
     {
         clearstatcache(true, $path);
         if (!file_exists($path)) {
+            if (!self::installed() && $rc !== '') {
+                throw new CliError("rtorrent is not running: found $rc but $path does not exist, and no rtorrent binary is on PATH",
+                    'start rtorrent the way your provider says (it may run in a container or under another name)');
+            }
             if (!self::installed()) {
                 throw new CliError("rtorrent is not installed (no $label and no rtorrent binary)", 'ask the provider to install rtorrent');
             }

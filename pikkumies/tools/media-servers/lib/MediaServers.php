@@ -18,6 +18,8 @@ class MediaServers
     const VERBS = ['stats', 'libraries', 'scan', 'sessions', 'end-stream', 'recent', 'logs', 'restart', 'login'];
     /** Session fields that hold a viewer's network address. */
     const ADDRESS_FIELDS = ['address', 'public_address'];
+    /** Most recently added items one call reads: far more than 16 KiB of output holds; --offset pages up to it. */
+    const RECENT_CAP = 500;
 
     /**
      * $connect: fn(array $opt, bool $auth) => MediaServer, called only when a verb needs the server; $auth false
@@ -70,7 +72,10 @@ class MediaServers
                 return $scrub(self::addresses(MediaEndStream::finish($done), false));
             },
             'recent' => function ($args, $opt) use ($s, $scrub) {
-                return $scrub($s($opt)->recent(isset($opt['limit']) ? max(1, min(100, (int) $opt['limit'])) : Cli::LIMIT));
+                $items = $s($opt)->recent(self::need($opt));
+                $capped = count($items) >= self::RECENT_CAP;
+                return ['records' => $scrub($items), 'status' => $capped ? ['note' => 'read the ' . self::RECENT_CAP
+                    . ' most recently added items, the most one call reads; older ones: the server\'s own web UI'] : []];
             },
             'logs' => function ($args, $opt) use ($s) {
                 $n = isset($opt['lines']) ? (int) $opt['lines'] : 50;
@@ -87,6 +92,18 @@ class MediaServers
             },
             'login' => $login,
         ], $usage, ['all', 'addresses'], ['reason', 'lines', 'url']);
+    }
+
+    /**
+     * How many items `recent` reads so Cli::emit can apply --limit, --offset and its output budget as for every tool:
+     * offset + limit + 1 (one more than it may print, so Cli marks `truncated` with `next_offset`), RECENT_CAP for
+     * --limit 0 ("as many as fit", never one item) and at most RECENT_CAP. The same rule as tools/arr/lib/ArrPages.php.
+     */
+    public static function need(array $opt)
+    {
+        $limit = isset($opt['limit']) ? max(0, (int) $opt['limit']) : Cli::LIMIT;
+        $offset = isset($opt['offset']) ? max(0, (int) $opt['offset']) : 0;
+        return $limit > 0 ? min(self::RECENT_CAP, $offset + $limit + 1) : self::RECENT_CAP;
     }
 
     /**

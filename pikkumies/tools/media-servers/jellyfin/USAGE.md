@@ -4,7 +4,7 @@ The user's own Jellyfin through its HTTP API. Same verbs and records as the othe
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|
-| stats | | no | `version`, `server_name`, `found` (native, docker, url), `url`, `listen`, `libraries`, `items`, `streams`, `transcodes`, `transcode_bitrate`, `hardware_acceleration` (the setting as found), `running_tasks`, `pending_restart`, `update_available`, `pmss_status` (the PMSS watchdog's word), `login_from`. |
+| stats | | no | `version`, `server_name`, `found` (native, docker, url), `url`, `listen`, `libraries`, `items` (the sum of the libraries' counts, as `libraries` shows them; `null` when one is unknown or the credential may not list users), `item_counts` (the non-zero per-type counts of `/Items/Counts`, e.g. `movie`, `episode`, as the server gives them), `streams`, `transcodes`, `transcode_bitrate`, `hardware_acceleration` (the setting as found), `running_tasks`, `pending_restart`, `update_available`, `pmss_status` (the PMSS watchdog's word), `login_from`. |
 | libraries | | no | One record per library: `id`, `name`, `type`, `paths`, `items` (video, audio, photo and book items), `scanning`, `progress`. |
 | scan | `<library>... \| --all` | yes | Starts a scan of each named library (`metadataRefreshMode` and `imageRefreshMode` `Default`, no `replaceAll*`). `result`: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play`, `transcode_reasons`, `hardware`, `bitrate`, `remote`; `address` only with `--addresses`. |

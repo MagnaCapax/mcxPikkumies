@@ -9,6 +9,9 @@
  * add answers "Ok."/"Fails." and takes `stopped` (5.x) or `paused` (4.x) (tc-5.0.0.cpp:693-806); recheck and reannounce take
  * hashes (tc-5.0.0.cpp:1260-1274); the global limits are bytes/s kept as whole KiB/s (sessionimpl-5.0.0.cpp:3359-3373);
  * trackers rows (tc-5.0.0.cpp:506-530) start with the DHT/PeX/LSD rows (:175-245).
+ * With `v52` set it answers as qBittorrent 5.2 (release-5.2.4 source, and live 5.2.4 / API 2.15.1 on 2026-10-14): login
+ * 204 + cookie or 401; add a JSON object with added_torrent_ids and success_count, 409 when nothing was added; a URL
+ * http://fake.example/<40 hex>.torrent is added under that id.
  */
 $file = getenv('QBIT_FAKE_STATE');
 $s = json_decode((string) file_get_contents($file), true);
@@ -31,9 +34,9 @@ if ($api === 'auth/login') {
     $s['logins']++;
     if (isset($_POST['username'], $_POST['password']) && $_POST['username'] === $s['user'] && $_POST['password'] === $s['password']) {
         header('Set-Cookie: SID=fakesid; HttpOnly; path=/; SameSite=Strict');
-        $done(200, 'Ok.');
+        empty($s['v52']) ? $done(200, 'Ok.') : $done(204, '');
     }
-    $done(200, 'Fails.');
+    empty($s['v52']) ? $done(200, 'Fails.') : $done(401, '');
 }
 if ($s['auth'] && (!isset($_COOKIE['SID']) || $_COOKIE['SID'] !== 'fakesid')) {
     $done(403, 'Forbidden');
@@ -150,6 +153,9 @@ switch ($api) {
             $new[] = [strtolower($m[1]), 'magnet torrent'];
         } elseif (!empty($_POST['urls']) && preg_match('/btih:([A-Z2-7]{32})/', $_POST['urls'])) {
             $new[] = [$s['base32_hash'], 'base32 magnet'];
+        } elseif (!empty($s['v52']) && !empty($_POST['urls'])
+            && preg_match('#^http://fake\.example/([0-9a-f]{40})\.torrent$#', $_POST['urls'], $m)) {
+            $new[] = [$m[1], 'url torrent'];
         }
         if (isset($_FILES['torrents']['tmp_name'])) {
             $data = (string) file_get_contents($_FILES['torrents']['tmp_name']);
@@ -163,6 +169,10 @@ switch ($api) {
             $s['torrents'][] = ['hash' => $n[0], 'name' => $n[1], 'state' => !empty($_POST['stopped']) ? 'stoppedDL' : (!empty($_POST['paused']) ? 'pausedDL' : 'metaDL'),
                 'progress' => 0, 'size' => 0, 'completed' => 0, 'ratio' => 0, 'dlspeed' => 0, 'upspeed' => 0, 'added_on' => time(), 'category' => '',
                 'content_path' => '', 'save_path' => isset($_POST['savepath']) ? $_POST['savepath'] : '/tmp', 'files' => [], 'props' => []];
+        }
+        if (!empty($s['v52'])) {
+            $new ? $done(200, ['success_count' => count($new), 'failure_count' => 0, 'pending_count' => 0,
+                'added_torrent_ids' => array_column($new, 0)], true) : $done(409, '');
         }
         $done(200, $new ? 'Ok.' : 'Fails.');
 }

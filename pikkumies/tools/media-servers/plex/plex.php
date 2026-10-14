@@ -46,7 +46,7 @@ $plexConnect = function (array $opt) use ($plexSeams, $plexUid, $plexSecret) {
     $found = ['how' => $c !== null ? 'docker' : 'url', 'url' => $base, 'port' => $port, 'listen' => $listen,
         'data_dir' => $config !== '' ? "$config/Library/Application Support/Plex Media Server" : '', 'restart' => $restart];
     $http = new MediaHttp('Plex', $base, PlexClient::ALLOW, $plexUid, $plexSeams['timeout'], $plexSeams['tables']);
-    return [new PlexClient($http, $plexSecret->deviceId()), $found];
+    return [new PlexClient($http, $plexSecret->deviceIdLater()), $found];
 };
 
 $plexLoginHint = 'the user runs `php ' . __FILE__ . ' login` in a terminal and types the server\'s X-Plex-Token';

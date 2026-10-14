@@ -1,7 +1,9 @@
 <?php
 /**
  * CliHuman: the --human view of tool records (ADR-0017). Records arrive already cleaned by Cli.
- * One record prints as "key: value" lines, several as an aligned table. Units are converted by
+ * One record prints as "key: value" lines, several as an aligned table. A call that mixes kinds of record (a torrent,
+ * then its trackers, then its files) prints one block per run of the same kind, each with its own columns; the kind
+ * is the first two field names (records list their identifying fields first). Units are converted by
  * field name: *size / *bytes -> KiB..TiB, *_rate -> per second, *_at / added / time -> local date,
  * progress -> percent. Lines are cut to the terminal width (COLUMNS, else 120).
  */
@@ -12,8 +14,25 @@ class CliHuman
         if (!$records) {
             return '';
         }
-        $records = array_map([__CLASS__, 'flatten'], array_values($records));
         $width = (int) getenv('COLUMNS') > 20 ? (int) getenv('COLUMNS') : 120;
+        $blocks = [];
+        $kind = null;
+        foreach (array_map([__CLASS__, 'flatten'], array_values($records)) as $r) {
+            $k = implode("\n", array_slice(array_keys($r), 0, 2));
+            if ($k !== $kind || !$blocks) {
+                $blocks[] = [];
+                $kind = $k;
+            }
+            $blocks[count($blocks) - 1][] = $r;
+        }
+        return implode("\n", array_map(function ($b) use ($width) {
+            return self::block($b, $width);
+        }, $blocks));
+    }
+
+    /** One kind of record: "key: value" lines for one, an aligned table (the union of their fields) for several. */
+    private static function block(array $records, $width)
+    {
         if (count($records) === 1) {
             $out = '';
             foreach ($records[0] as $k => $v) {

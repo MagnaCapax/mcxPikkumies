@@ -63,8 +63,12 @@ class PlexClient
         if ($this->token === null) {
             throw new CliError('no credential loaded (a bug in the unit)', 'report it');
         }
-        $h = ['Accept: application/json', "X-Plex-Token: {$this->token}", "X-Plex-Client-Identifier: {$this->client}",
-            'X-Plex-Product: pikkumies'];
+        $h = ['Accept: application/json', "X-Plex-Token: {$this->token}", function () { // made by MediaHttp::send after its checks
+            if ($this->client instanceof Closure) {
+                $this->client = call_user_func($this->client); // the stored device id, written on first use only
+            }
+            return "X-Plex-Client-Identifier: {$this->client}";
+        }, 'X-Plex-Product: pikkumies'];
         try {
             $d = $this->http->json($method, $path, $query, null, $h);
         } catch (MediaAuthRejected $e) {

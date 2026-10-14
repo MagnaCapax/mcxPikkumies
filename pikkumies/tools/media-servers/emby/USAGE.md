@@ -4,7 +4,7 @@ The user's own Emby through its HTTP API (under `/emby`). Same verbs and records
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|
-| stats | | no | `version`, `server_name`, `found` (docker, url), `url`, `listen`, `libraries`, `items`, `streams`, `transcodes`, `transcode_bitrate`, `hardware_acceleration` (Emby's `HardwareAccelerationMode` as found), `running_tasks`, `pending_restart`, `update_available`, `login_from`. |
+| stats | | no | `version`, `server_name`, `found` (docker, url), `url`, `listen`, `libraries`, `items` (the sum of the libraries' counts, as `libraries` shows them; `null` when one is unknown or the credential may not list users), `item_counts` (the non-zero per-type counts of `/Items/Counts`, e.g. `movie`, `episode`, as the server gives them), `streams`, `transcodes`, `transcode_bitrate`, `hardware_acceleration` (Emby's `HardwareAccelerationMode` as found), `running_tasks`, `pending_restart`, `update_available`, `login_from`. |
 | libraries | | no | One record per library: `id`, `name`, `type`, `paths`, `items`, `scanning`, `progress`. |
 | scan | `<library>... \| --all` | yes | Starts a recursive scan of each named library (`MetadataRefreshMode` and `ImageRefreshMode` `Default`, no `ReplaceAll*`). `result`: `started` or `already scanning`. |
 | sessions | `[--addresses]` | no | What is playing: `id`, `user`, `client`, `device`, `title`, `progress`, `paused`, `play`, `transcode_reasons`, `hardware` (decoder or encoder in hardware), `bitrate`, `remote`; `address` only with `--addresses`. |

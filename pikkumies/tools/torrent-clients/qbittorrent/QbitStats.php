@@ -27,7 +27,7 @@ class QbitStats
         $proc = $this->c->restart->proc;
         $pids = $proc->pids();
         $r = ['client' => 'qbittorrent', 'version' => $api->text('app/version'), 'webapi' => $api->api,
-            'pid' => $pids ? $pids[0] : 0, 'uptime' => $pids ? $proc->uptime($pids[0]) : 0,
+            'pid' => $pids ? $pids[0] : null, 'uptime' => $pids ? $proc->uptime($pids[0]) : null, // null: not found, unknown
             'host' => $api->ep->family, 'webui_port' => $api->ep->port,
             'listen_port' => isset($prefs['listen_port']) ? (int) $prefs['listen_port'] : 0,
             'torrents' => count($all), 'by_state' => array_filter($counts),

@@ -8,7 +8,9 @@
  *   set, paths outside it answer 302 (PMSS install-media-stack.sh:1816-1818);
  * - Emby: X-Emby-Token, everything under /emby, PascalCase parameters, short numeric library ids;
  * - 204 for refresh and Playing/Stop, 404 for an unknown session; logs are plain text;
- * - test knobs: `forbid` (paths that answer 403 to a valid credential), `stop_fail` (session ids whose Stop answers 500).
+ * - test knobs: `forbid` (paths that answer 403 to a valid credential), `stop_fail` (session ids whose Stop answers 500),
+ *   `latest_many` (each library has that many recent items; the answer holds at most `limit` of them);
+ * - /Items/Counts as the live servers answered with an API key for two movies: Jellyfin ItemCount 8, Emby ItemCount 0.
  * Every request is recorded (method, path without the base, query, body) for the tests to inspect.
  */
 $dir = getenv('MEDIA_FAKE_DIR');
@@ -84,7 +86,8 @@ if ($route === 'GET /Library/VirtualFolders') {
     $out(200, array_map($lib, $s['libraries']));
 }
 if ($route === 'GET /Items/Counts') {
-    $out(200, ['MovieCount' => 2, 'SeriesCount' => 1, 'EpisodeCount' => 4, 'ItemCount' => 7]);
+    $out(200, $emby ? ['MovieCount' => 2, 'SeriesCount' => 0, 'EpisodeCount' => 0, 'GameCount' => 0, 'ItemCount' => 0]
+        : ['MovieCount' => 2, 'SeriesCount' => 1, 'EpisodeCount' => 4, 'ArtistCount' => 0, 'ItemCount' => 8]);
 }
 if ($route === 'GET /Items') {
     $out(200, ['Items' => [], 'TotalRecordCount' => $p('parentId') === $s['libraries'][0][0] ? 5 : 2]);
@@ -104,6 +107,14 @@ if ($route === 'GET /Sessions') {
     $out(200, array_values($s['sessions']));
 }
 if (($route === 'GET /Items/Latest' && !$emby && $p('userId') === 'u1') || ($emby && $route === 'GET /Users/u1/Items/Latest')) {
+    if (!empty($s['latest_many'])) {
+        $items = [];
+        for ($i = 0; $i < min((int) $s['latest_many'], (int) $p('limit')); $i++) {
+            $at = gmdate('Y-m-d\\TH:i:s\\Z', 1790000000 - $i * 60);
+            $items[] = ['Name' => $p('parentId') . "-$i", 'Type' => 'Movie', 'DateCreated' => $at];
+        }
+        $out(200, $items);
+    }
     $out(200, $p('parentId') === $s['libraries'][0][0]
         ? [['Name' => 'New Film', 'Type' => 'Movie', 'DateCreated' => '2026-10-13T10:00:00.0000000Z']]
         : [['Name' => 'Pilot', 'SeriesName' => 'A Show', 'Type' => 'Episode', 'DateCreated' => '2026-10-14T07:00:00Z']]);

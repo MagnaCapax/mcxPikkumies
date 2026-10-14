@@ -36,14 +36,39 @@ class MediabrowserServer implements MediaServer
         foreach ($this->mb->get('/Library/VirtualFolders') as $v) {
             $r = MediabrowserRecords::library((array) $v);
             if ($counts && $r['id'] !== '') {
-                $q = ['parentId' => $r['id'], 'recursive' => 'true', 'mediaTypes' => 'Video,Audio,Photo,Book', 'limit' => '0',
-                    'userId' => $this->admin()];
-                $c = $this->maybe('/Items', $q);
-                $r['items'] = isset($c['TotalRecordCount']) ? (int) $c['TotalRecordCount'] : null;
+                $r['items'] = $this->count($r['id']);
             }
             $out[] = $r;
         }
         return $out;
+    }
+
+    /**
+     * `stats` items: the sum of the libraries' counts, what `libraries` shows; null when one is unknown, or when the
+     * credential may not list the users (403: the per-user count needs the administrator's id). A 401 still fails.
+     */
+    public function itemTotal(array $libraries)
+    {
+        try {
+            $this->admin();
+        } catch (MediaAuthRejected $e) {
+            throw $e;
+        } catch (CliError $e) {
+            return null;
+        }
+        $n = array_map(function ($l) {
+            return $l['id'] !== '' ? $this->count($l['id']) : null;
+        }, $libraries);
+        return in_array(null, $n, true) ? null : array_sum($n);
+    }
+
+    /** A library's playable items (Video, Audio, Photo, Book), recursive; null when the server does not say. */
+    private function count($id)
+    {
+        $q = ['parentId' => $id, 'recursive' => 'true', 'mediaTypes' => 'Video,Audio,Photo,Book', 'limit' => '0',
+            'userId' => $this->admin()];
+        $c = $this->maybe('/Items', $q);
+        return isset($c['TotalRecordCount']) ? (int) $c['TotalRecordCount'] : null;
     }
 
     public function scan(array $libraries)

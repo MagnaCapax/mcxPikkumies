@@ -69,6 +69,7 @@ return [
                 'http://old.example'], 'hosts: ' . $out);
             check(array_column(array_slice($l, 1, 3), 'status') === ['working', 'failing', 'disabled'] && $l[1]['seeds'] === 7 &&
                 $l[1]['leechers'] === 3 && $l[2]['tier'] === 1 && $l[1]['message'] === null, 'fields: ' . $out);
+            check($l[2]['seeds'] === null && $l[2]['leechers'] === null, 'a tracker that never reported counts must give null: ' . $out);
             check(strpos($out, 'SECRETPASSKEY123') === false && strpos($out, 'a1b2c3d4') === false && strpos($out, 'announce') === false,
                 'a passkey or path was printed: ' . $out);
             check(rtorrentCalls($h, 't.multicall')[0][1] === str_repeat('A', 40), 't.multicall target');

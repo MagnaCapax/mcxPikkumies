@@ -43,7 +43,7 @@ class DelugeLocate
             throw new CliError("cannot check who owns port $port (/proc/net is not readable); not connecting", 'run the tool on the seedbox itself');
         }
         if ($owner === 'none') {
-            throw self::absent($home, $family, "deluge-web is not running (nothing listens on port $port from $how)");
+            throw self::absent($home, $family, "deluge-web is not running (nothing listens on port $port from $how)", $how);
         }
         $secret = self::secret($home);
         if ($secret === '') {
@@ -56,9 +56,12 @@ class DelugeLocate
         return ['url' => "http://127.0.0.1:$port/json", 'port' => $port, 'secret' => $secret, 'daemon_port' => $daemon, 'how' => $how];
     }
 
-    /** The error for a client that cannot be reached: not installed, not enabled, or $why. */
-    public static function absent($home, $family, $why)
+    /** The error for a client that cannot be reached: not installed, not enabled, or $why. $found: the config that named the port. */
+    public static function absent($home, $family, $why, $found = '')
     {
+        if (!self::installed($family) && $found !== '') { // a config but no binary: stopped, or run elsewhere (a container)
+            return new CliError("$why; found $found but no deluged binary is on PATH", 'start Deluge the way your provider documents it');
+        }
         if (!self::installed($family)) {
             return new CliError('Deluge is not installed on this machine', 'ask the provider; on PMSS Deluge comes with the server');
         }

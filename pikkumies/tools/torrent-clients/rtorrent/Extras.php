@@ -60,23 +60,25 @@ trait RtorrentExtras
      * t.multicall over the torrent's trackers (command_tracker.cc:115-155). rTorrent has no message per tracker (its text
      * is d.message, the torrent's `message`); the status comes from the success and failure counters and times:
      * disabled, not contacted (no answer and no failure yet), failing (the last event was a failure), working.
+     * seeds/leechers are null until the tracker reported counts: libtorrent sets t.scrape_time_last whenever an announce or
+     * scrape brings them (libtorrent 0.13.8 tracker_http.cc:338-341, tracker_udp.cc:388-390, tracker_list.cc:367), 0 before.
      */
     public function trackers($native)
     {
         $cols = ['t.url=', 't.group=', 't.is_enabled=', 't.success_counter=', 't.failed_counter=', 't.success_time_last=',
-            't.failed_time_last=', 't.scrape_complete=', 't.scrape_incomplete='];
+            't.failed_time_last=', 't.scrape_complete=', 't.scrape_incomplete=', 't.scrape_time_last='];
         $out = [];
         foreach ((array) $this->call('t.multicall', array_merge([$native, ''], $cols)) as $t) {
             if (!is_array($t) || count($t) !== count($cols)) {
                 continue;
             }
-            list($url, $group, $on, $ok, $bad, $okAt, $badAt, $seeds, $leechers) = $t;
+            list($url, $group, $on, $ok, $bad, $okAt, $badAt, $seeds, $leechers, $scrapedAt) = $t;
             $status = (int) $badAt > (int) $okAt ? 'failing' : 'working';
             if (!$on || ((int) $ok === 0 && (int) $bad === 0)) {
                 $status = !$on ? 'disabled' : 'not contacted';
             }
-            $out[] = ['url' => (string) $url, 'tier' => (int) $group, 'status' => $status, 'message' => null, 'seeds' => $seeds,
-                'leechers' => $leechers];
+            $out[] = ['url' => (string) $url, 'tier' => (int) $group, 'status' => $status, 'message' => null,
+                'seeds' => (int) $scrapedAt > 0 ? $seeds : null, 'leechers' => (int) $scrapedAt > 0 ? $leechers : null];
         }
         return $out;
     }

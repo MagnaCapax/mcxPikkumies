@@ -48,7 +48,7 @@ $embyConnect = function (array $opt) use ($embySeams, $embyUid, $embySecret) {
     $found = ['how' => $c !== null ? 'docker' : 'url', 'url' => $base, 'port' => $port, 'listen' => $listen, 'log_dir' => '',
         'pmss_status' => '', 'restart' => $restart];
     $http = new MediaHttp('Emby', $base, Mediabrowser::ALLOW, $embyUid, $embySeams['timeout'], $embySeams['tables']);
-    return [new Mediabrowser('emby', $http, $embySecret->deviceId()), $found];
+    return [new Mediabrowser('emby', $http, $embySecret->deviceIdLater()), $found];
 };
 
 $embyLoginHint = 'the user creates an API key in the Emby dashboard (under Advanced) and runs `php ' . __FILE__ . ' login` in a terminal';
@@ -57,6 +57,7 @@ MediaServers::run($argv, function (array $opt, $auth = true) use ($embyConnect, 
     if (!$auth) { // restart: public status and the user's own Docker only
         return new MediabrowserServer($mb, $found + ['login_from' => ''], [], $embySeams['wait']);
     }
+    $mb->http->reachable(); // another account's port or a stopped server is the first thing to say, before any credential
     $s = $embySecret->load();
     if (empty($s['key']) || !is_string($s['key'])) {
         throw new CliError('no Emby API key stored for this tool', $embyLoginHint);

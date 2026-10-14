@@ -81,14 +81,9 @@ class MediaHttp
         return '';
     }
 
-    /** One request. Returns ['code', 'body', 'headers']; connection failures throw CliError with the cause. */
-    public function send($method, $path, array $query = [], $body = null, array $headers = [], $timeout = null)
+    /** CliError unless this user owns the listener on the port (ADR-0019): another account's, unknown, or nothing listening. */
+    public function reachable()
     {
-        $refusal = $this->refusal($method, $path, $query);
-        if ($refusal !== '') {
-            throw new CliError("refused: $refusal; nothing was sent",
-                'the media units never delete, never create keys, never change settings');
-        }
         $owner = Host::ownsListener($this->port, $this->uid, $this->tables, [trim(parse_url($this->origin, PHP_URL_HOST), '[]')]);
         $p = $this->port;
         $why = [
@@ -99,6 +94,23 @@ class MediaHttp
         ];
         if (isset($why[$owner])) {
             throw new CliError($why[$owner][0], $why[$owner][1]);
+        }
+    }
+
+    /**
+     * One request. Returns ['code', 'body', 'headers']; connection failures throw CliError with the cause. A header given
+     * as a Closure is made only once every check passed, just before sending (a device id is stored on first use).
+     */
+    public function send($method, $path, array $query = [], $body = null, array $headers = [], $timeout = null)
+    {
+        $refusal = $this->refusal($method, $path, $query);
+        if ($refusal !== '') {
+            throw new CliError("refused: $refusal; nothing was sent",
+                'the media units never delete, never create keys, never change settings');
+        }
+        $this->reachable();
+        foreach ($headers as $i => $h) {
+            $headers[$i] = $h instanceof Closure ? $h() : $h;
         }
         $url = $this->origin . $this->prefix . $path . ($query ? '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : '');
         $t = $timeout !== null ? (int) $timeout : $this->timeout;

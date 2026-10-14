@@ -82,7 +82,7 @@ class RtorrentRecords
             $counts[$t['state']]++;
         }
         $s['torrents'] = array_sum($counts);
-        $s['states'] = array_filter($counts);
+        $s['by_state'] = array_filter($counts); // only states that have torrents, as every unit (../README.md)
         return $s + $c->traffic();
     }
 
