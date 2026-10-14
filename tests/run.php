@@ -28,7 +28,9 @@ function runPhp($script, array $args, $stdin = '')
     $out = stream_get_contents($pipes[1]);
     fclose($pipes[1]);
     fclose($pipes[2]);
-    return [proc_close($p), $out];
+    $code = proc_close($p);
+    clearstatcache(); // the script may have changed files; a stale stat cache made a CI test see a deleted folder (991bd61)
+    return [$code, $out];
 }
 
 $pass = 0;

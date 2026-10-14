@@ -101,6 +101,7 @@ function arrRun(array $fx, array $args, array $env = [])
     fclose($pipes[1]);
     fclose($pipes[2]);
     $code = proc_close($p);
+    clearstatcache(); // the tool or the fake app changed files in another process; never trust this process's stat cache
     check(stripos($out . $err, ARR_KEY) === false, 'the API key appeared in the output: ' . $out . $err);
     $calls = file_exists($fx['dir'] . '/state.json') ? arrState($fx) : ['violations' => []];
     check(empty($calls['violations']), 'the fake saw a violation: ' . json_encode($calls['violations']));

@@ -40,6 +40,7 @@ return [
             list($code, $l, $out) = arrRun($fx, ['remove', '1', '2', '--with-data', '--expect', '2.5KiB:2548']);
             check($code === 0 && $l[0]['disposal'] === 'deleted' && $l[0]['freed_bytes'] === 2048 && $l[1]['disposal'] === 'deleted' && $l[1]['freed_bytes'] === 0
                 && $l[2]['freed_bytes'] === 2048 && $l[0]['verified'] === true, 'delete: ' . $out);
+            clearstatcache(); // the fake app deleted it in another process; this process stat'ed $b above (lines 31-36)
             check(!is_dir($b), 'folder Film B not deleted: ' . json_encode(@scandir($b)) . ' out: ' . $out);
             check(is_file($fx['home'] . '/media/c-hardlink.mkv'), 'the other hard link was touched: ' . json_encode(@scandir($fx['home'] . '/media')) . ' out: ' . $out);
             check(arrCalls($fx, 'DELETE', 'movie/1')[0]['query'] === 'deleteFiles=true&addImportExclusion=false', 'delete params');
