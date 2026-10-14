@@ -43,7 +43,7 @@ switch ($cmd) {
         exit(0);
     case 'listremotes':
         foreach ($s['remotes'] as $name => $type) {
-            printf("%-*s %-*s %s\n", 8, $name . ':', 6, $type, '');
+            printf("%-8s %-6s %s\n", $name . ':', $type, ''); // no %*s: width arguments need PHP 8
         }
         exit(0);
     case 'lsf':
