@@ -45,10 +45,10 @@ class ArrVerbs
             return ArrIndexers::show($c, $targets);
         }
         $out = array_map(function ($i) use ($app) {
-            return ArrRecords::item($app, $i) + ['overview' => ArrRecords::cut(ArrRecords::s($i, 'overview'), 500),
+            $r = ArrRecords::item($app, $i) + ['overview' => ArrRecords::cut(ArrRecords::s($i, 'overview'), 500),
                 'root' => ArrRecords::s($i, 'rootFolderPath'),
-                'quality_profile_id' => isset($i['qualityProfileId']) ? (int) $i['qualityProfileId'] : 0,
-                'imdb' => ArrRecords::s($i, 'imdbId')];
+                'quality_profile_id' => isset($i['qualityProfileId']) ? (int) $i['qualityProfileId'] : 0];
+            return isset($app['titleField']) ? $r : $r + ['imdb' => ArrRecords::s($i, 'imdbId')]; // artists and authors have none
         }, $targets);
         if (empty($opt['files'])) {
             return $out;

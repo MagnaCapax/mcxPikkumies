@@ -28,6 +28,7 @@ class ArrAdd
         };
         $profile = self::pick((array) $c->call('GET', 'qualityprofile'), $want('profile'), 'name', 'quality profile', '--profile');
         $root = self::pick((array) $c->call('GET', 'rootfolder'), $want('root'), 'path', 'root folder', '--root');
+        $extra = empty($app['metadataProfile']) ? [] : ['metadataProfileId' => self::metadataProfile($c, $root)];
         $have = array_column(Arr::all($c, $app), 'id', $app['exists']);
         $search = empty($opt['no-search']);
         $out = [];
@@ -35,27 +36,29 @@ class ArrAdd
             list($prefix, $value) = $m;
             $field = $app['prefixes'][$prefix];
             $r = ['meta_id' => "$prefix:$value", 'result' => 'failed', 'id' => 0, 'title' => '', 'search' => false];
-            $found = null;
-            $hits = (array) $c->call('GET', $app['item'] . '/lookup', ['term' => "$prefix:$value"], null, ['timeout' => 60, 'raw' => true]);
-            foreach ($hits as $i) {
-                if (is_array($i) && isset($i[$field]) && strtolower((string) $i[$field]) === $value) {
-                    $found = $i;
-                    break;
+            try { // one id's lookup or add failing never hides what happened to the others
+                $found = null;
+                $hits = (array) $c->call('GET', $app['item'] . '/lookup', ['term' => "$prefix:$value"], null,
+                    ['timeout' => 60, 'raw' => true]);
+                foreach ($hits as $i) {
+                    if (is_array($i) && isset($i[$field]) && strtolower((string) $i[$field]) === $value) {
+                        $found = $i;
+                        break;
+                    }
                 }
-            }
-            if ($found === null) {
-                $out[] = $r + ['error' => 'not found in the metadata database'];
-                continue;
-            }
-            $r['title'] = ArrRecords::s($found, 'title');
-            if (!empty($found[$app['exists']]) && isset($have[$found[$app['exists']]])) {
-                $out[] = array_merge($r, ['result' => 'exists', 'id' => (int) $have[$found[$app['exists']]]]);
-                continue;
-            }
-            $body = array_merge($found, $app['addFields'], ['qualityProfileId' => (int) $profile['id'], 'rootFolderPath' => $root['path'],
-                'addOptions' => $app['addOptions'] + [$app['searchOption'] => $search]]);
-            unset($body['id']);
-            try {
+                if ($found === null) {
+                    $out[] = $r + ['error' => 'not found in the metadata database'];
+                    continue;
+                }
+                $r['title'] = ArrApps::title($app, $found);
+                if (!empty($found[$app['exists']]) && isset($have[$found[$app['exists']]])) {
+                    $out[] = array_merge($r, ['result' => 'exists', 'id' => (int) $have[$found[$app['exists']]]]);
+                    continue;
+                }
+                $body = array_merge($found, $app['addFields'], $extra, ['qualityProfileId' => (int) $profile['id'],
+                    'rootFolderPath' => $root['path'],
+                    'addOptions' => $app['addOptions'] + [$app['searchOption'] => $search]]);
+                unset($body['id']);
                 $made = $c->call('POST', $app['item'], [], $body);
                 $out[] = array_merge($r, ['result' => 'added', 'id' => isset($made['id']) ? (int) $made['id'] : 0, 'search' => $search]);
             } catch (CliError $e) {
@@ -71,6 +74,20 @@ class ArrAdd
         }
         $note = $search ? 'started for added items (may download; check `stats` free disk)' : 'not started (--no-search)';
         return ['records' => $out, 'status' => ['search' => $note]];
+    }
+
+    /** Lidarr: the root folder's default metadata profile (RootFolderResource), else the only one there is. */
+    private static function metadataProfile(ArrClient $c, array $root)
+    {
+        if (!empty($root['defaultMetadataProfileId'])) {
+            return (int) $root['defaultMetadataProfileId'];
+        }
+        $rows = array_values(array_filter((array) $c->call('GET', 'metadataprofile'), 'is_array'));
+        if (count($rows) !== 1) {
+            throw new CliError("nothing added: the root folder {$root['path']} has no default metadata profile, and there are "
+                . count($rows) . ' metadata profiles', 'the user sets a default metadata profile on the root folder in the app');
+        }
+        return (int) $rows[0]['id'];
     }
 
     /** The one profile or root folder to use: named by --profile/--root (id, name or path), or the only one there is. */

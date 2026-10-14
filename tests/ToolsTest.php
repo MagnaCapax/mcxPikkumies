@@ -56,6 +56,8 @@ return [
             'php $C copy ~/a remote:a --replace', 'php $R move ~/data/done gdrive:archive --expect 40', 'php $R sync ~/a b:c --expect=12',
             "curl -X DELETE 'https://host.example/public-u/jellyfin/Items/abc123?api_key=x'", 'curl --request DELETE http://127.0.0.1:8096/Items?ids=a,b',
             "curl -X DELETE http://127.0.0.1:32400/library/metadata/42", "requests.delete(f'{base}/Auth/Keys/{key}')",
+            "curl -X DELETE 'https://host.example/public-u/bazarr/api/episodes/subtitles?seriesid=1&episodeid=2'",
+            "curl -X DELETE https://host.example/public-u/autobrr/api/filters/7", "requests.delete(f'{b}/api/keys/{k}')",
         ] as $cmd) {
             $d = $ask($cmd);
             check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], $cmd) !== false, "no approval asked for: $cmd");

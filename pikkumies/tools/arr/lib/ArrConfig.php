@@ -8,6 +8,9 @@
 class ArrConfig
 {
     const MAX = 1048576; // PMSS reads at most 1 MiB of it (mediaStackPorts.php:48)
+    /** How ArrClient's errors name config.xml and its settings; Bazarr and Autobrr pass their own. */
+    const LABELS = ['base' => 'UrlBase', 'baseHint' => 'check <UrlBase> in config.xml', 'portHint' => 'check <Port> and <UrlBase> in',
+        'key' => 'ApiKey', 'keyHint' => 'the app may run from another data folder than this config.xml; check which one it was started with'];
 
     /**
      * ['port' => int (0 = none), 'urlBase' => '' or '/a/b', 'key' => string, 'bytes' => int, 'valid' => bool],

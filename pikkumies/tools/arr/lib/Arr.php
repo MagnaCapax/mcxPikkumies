@@ -1,15 +1,16 @@
 <?php
 /**
- * Arr: the shared entry of every *ARR unit (tools/arr/README.md). A unit calls Arr::run($argv, '<app>',
+ * Arr: the shared entry of every *ARR unit (tools/arr/README.md). A Servarr unit calls Arr::run($argv, '<app>',
  * $usage); the verbs of Table 1 live in ArrVerbs, the library verbs in ArrLibrary, Prowlarr's in ArrIndexers.
+ * Bazarr and Autobrr have their own APIs: they load the shared code from here and run their own verbs.
  * PIKKUMIES_PMSS_DIR, PIKKUMIES_ARR_TIMEOUT and PIKKUMIES_ARR_WAIT exist for the tests only.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
 foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Http'] as $f) {
     require_once "$lib/$f.php";
 }
-foreach (['ArrApps', 'ArrConfig', 'ArrShell', 'ArrLocate', 'ArrClient', 'ArrRecords', 'ArrCommand', 'ArrDelete', 'ArrRemove',
-    'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrIndexers'] as $f) {
+foreach (['ArrApps', 'ArrAppsMore', 'ArrConfig', 'ArrShell', 'ArrLocate', 'ArrClient', 'ArrErrorText', 'ArrRecords', 'ArrCommand',
+    'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrIndexers'] as $f) {
     require_once __DIR__ . "/$f.php";
 }
 
@@ -41,7 +42,10 @@ class Arr
         $verbs = ArrVerbs::shared($app, $c, $locate, $fresh);
         $flags = [];
         $options = ['search', 'since'];
-        if ($app['kind'] === 'library') {
+        if ($app['kind'] === 'library' && !empty($app['readOnly'])) { // Readarr: the read verbs only
+            $verbs += array_intersect_key(ArrLibrary::verbs($app, $c), array_flip(['queue', 'wanted']));
+            $flags = ['cutoff'];
+        } elseif ($app['kind'] === 'library') {
             $verbs += ArrLibrary::verbs($app, $c);
             $flags = ['files', 'with-data', 'no-search', 'cutoff'];
             $options = array_merge($options, ['expect', 'profile', 'root']);
@@ -56,7 +60,11 @@ class Arr
     public static function all(ArrClient $c, array $app)
     {
         $rows = $c->call('GET', $app['item'], $app['kind'] === 'library' ? $app['listBools'] : [], null, ['max' => ArrClient::LIST_MAX]);
-        return array_values(array_filter((array) $rows, 'is_array'));
+        $rows = array_values(array_filter((array) $rows, 'is_array'));
+        foreach (isset($app['titleField']) ? array_keys($rows) : [] as $n) {
+            $rows[$n]['title'] = ArrApps::title($app, $rows[$n]); // Lidarr artistName, Readarr authorName
+        }
+        return $rows;
     }
 
     public static function records(array $app, array $all)
@@ -79,7 +87,8 @@ class Arr
         foreach (array_unique($args) as $a) {
             if (!ctype_digit((string) $a) || (int) $a < 1) {
                 $meta = strpos((string) $a, ':') !== false;
-                $bad[] = "$a: not an id" . ($meta ? ' (tvdb:/tmdb:/imdb: ids are for `lookup` and `add`)' : '');
+                $what = isset($app['metaHint']) ? $app['metaHint'] : 'tvdb:/tmdb:/imdb: ids are for `lookup` and `add`';
+                $bad[] = "$a: not an id" . ($meta ? " ($what)" : '');
             } elseif (!isset($byId[(int) $a])) {
                 $bad[] = "$a: no such {$app['item']}";
             } else {

@@ -64,6 +64,10 @@ $approve = [
     // Media servers from anywhere (also the public proxy path): Jellyfin/Emby DELETE /Items[/{id}] deletes "from the
     // library and filesystem" (Jellyfin 12.2 and Emby 4.1 specs), Plex DELETE /library/metadata/{id}; /Auth/Keys/{key} revokes a key.
     '#^(?=.*((-X|--request)[\\s=]*["\']?DELETE\\b|\\.delete\\(|["\']DELETE["\']))(?=.*/(Items|library/metadata|Auth/Keys)(/|\\?|\\b))#si' => 'deletes media files or an API key through a media server',
+    // Bazarr DELETE /api/{episodes,movies}/subtitles deletes a subtitle file (frontend episodes.ts:77-82); autobrr
+    // DELETE /api/filters/{id} and /api/keys/{key} (internal/http/server.go:235,240, filter.go:57), also via the public proxy path.
+    '#^(?=.*((-X|--request)[\\s=]*["\']?DELETE\\b|\\.delete\\(|["\']DELETE["\']))(?=.*/api/(episodes/subtitles|movies/subtitles|filters/|keys/))#si'
+        => 'deletes subtitle files, an autobrr filter or an API key through a local app',
     '/delete[-_]local[-_]data/i'                                                              => 'deletes torrent data through a local app',
     // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file, and
     // `php $R sync|move|prune ... --expect <n>` names no rclone/restic/borg: every deleting tool verb carries --expect.

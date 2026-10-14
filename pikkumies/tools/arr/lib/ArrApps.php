@@ -1,6 +1,7 @@
 <?php
 /**
- * ArrApps: the per-app table every *ARR unit reads (tools/arr/README.md). Paths, parameter names and
+ * ArrApps: the per-app table every Servarr unit reads (tools/arr/README.md); Lidarr and Readarr are in
+ * ArrAppsMore. Paths, parameter names and
  * command names come from the upstream OpenAPI specs and command classes at the commits named in
  * each unit's README.md. Every boolean query parameter an endpoint declares is listed here and sent
  * explicitly, so no API default is ever inherited (queue removal's removeFromClient=true deletes data).
@@ -59,16 +60,22 @@ class ArrApps
 
     public static function get($app)
     {
-        if (!isset(self::APPS[$app])) {
-            throw new CliError("unknown *ARR app: $app", 'apps: ' . implode(', ', array_keys(self::APPS)));
+        $all = self::APPS + ArrAppsMore::APPS;
+        if (!isset($all[$app])) {
+            throw new CliError("unknown *ARR app: $app", 'apps: ' . implode(', ', array_keys($all)));
         }
-        return self::APPS[$app] + ['id' => $app];
+        return $all[$app] + ['id' => $app];
     }
 
-    /** "tmdb:603" -> ['tmdb', '603'] when the app takes that prefix, else null. imdb ids keep their tt. */
+    /**
+     * "tmdb:603" -> ['tmdb', '603'] when the app takes that prefix, else null. imdb ids keep their tt.
+     * mbid: takes a MusicBrainz id (a UUID), lower-cased.
+     */
     public static function parseMetaId(array $app, $s)
     {
-        if (!preg_match('/^(tvdb|tmdb|imdb):(tt[0-9]+|[0-9]+)$/i', trim((string) $s), $m)) {
+        $uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+        if (!preg_match('/^(tvdb|tmdb|imdb):(tt[0-9]+|[0-9]+)$/i', trim((string) $s), $m)
+            && !preg_match('/^(mbid):(' . $uuid . ')$/i', trim((string) $s), $m)) {
             return null;
         }
         $prefix = strtolower($m[1]);
@@ -77,6 +84,12 @@ class ArrApps
             return null;
         }
         return [$prefix, $value];
+    }
+
+    /** An item's title: `title`, or the app's own name field (Lidarr artistName, Readarr authorName). */
+    public static function title(array $app, array $item)
+    {
+        return ArrRecords::s($item, isset($app['titleField']) ? $app['titleField'] : 'title');
     }
 
     /** The prefixed metadata id of a library or lookup item: tvdb:81189, tmdb:603. */

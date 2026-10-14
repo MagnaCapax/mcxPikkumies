@@ -43,21 +43,17 @@ class ArrLocate
                 throw new CliError("{$app['name']} is turned off (~/.{$id}Disable exists)",
                     'the user turned it off in the PMSS panel; only the user turns it back on there');
             }
-            $port = $source !== 'docker' ? $c['port'] : ($lenient ? 0 : self::dockerPort($id, $c['port'], $where['docker']));
+            $port = self::ownPort($app, $source, $c['port'], $where, $path, $lenient, $tables);
             if ($port === 0 && !$lenient) {
                 throw new CliError("no <Port> in $path", 'the app writes it on start; on PMSS rerun `bash ~/install-media-stack.sh`');
-            }
-            if ($port !== 0 && Host::ownsListener($port, (int) $uid, $tables) === 'other') {
-                $from = $source === 'docker' ? "published by the Docker container $id" : "from $path";
-                throw new CliError("port $port ($from) belongs to another account; not connecting",
-                    "it is not this user's {$app['name']}; never work around that");
             }
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'key' => $c['key']];
         }
         $looked = implode(', ', array_map(function ($p) use ($home) {
             return str_replace($home, '~', $p);
         }, $tried));
-        throw new CliError("{$app['name']} is not installed for this user (no config.xml in $looked)", $family === 'pmss'
+        $installer = $family === 'pmss' && (!isset($app['installer']) || $app['installer']);
+        throw new CliError("{$app['name']} is not installed for this user (no config.xml in $looked)", $installer
             ? 'the user installs it with `bash ~/install-media-stack.sh`'
             : 'install it the way the provider documents, or name its config.xml in pikkumies/local/config.php:'
                 . " 'arr' => ['$id' => ['config' => '/path/config.xml']]");
@@ -77,6 +73,24 @@ class ArrLocate
         return is_array($pw) && isset($pw['dir']) && is_string($pw['dir']) ? rtrim($pw['dir'], '/') : '';
     }
 
+    /**
+     * The port to use: the configured one, or for Docker the host port published for it ($lenient: 0, not
+     * looked up). Refused before any key is sent when another account owns its listener. Bazarr and Autobrr
+     * use this too. $where needs uid and docker.
+     */
+    public static function ownPort(array $app, $source, $port, array $where, $path, $lenient = false, ?array $tables = null)
+    {
+        if ($source === 'docker') {
+            $port = $lenient ? 0 : self::dockerPort($app['id'], $port, $where['docker']);
+        }
+        if ($port !== 0 && Host::ownsListener($port, (int) $where['uid'], $tables) === 'other') {
+            $from = $source === 'docker' ? "published by the Docker container {$app['id']}" : "from $path";
+            throw new CliError("port $port ($from) belongs to another account; not connecting",
+                "it is not this user's {$app['name']}; never work around that");
+        }
+        return $port;
+    }
+
     /** source => config.xml path, in the order they are tried. */
     public static function candidates(array $app, $home, $family, array $override = [])
     {
@@ -84,7 +98,7 @@ class ArrLocate
         if (isset($override['config']) && is_string($override['config']) && $override['config'] !== '') {
             $out['override'] = $override['config'];
         }
-        if ($family === 'pmss') {
+        if ($family === 'pmss' && (!isset($app['installer']) || $app['installer'])) {
             $out['pmss'] = "$home/.config/{$app['id']}/config.xml"; // the installer's --data (install-media-stack.sh:2563-2565)
         }
         $out['servarr'] = "$home/.config/{$app['name']}/config.xml"; // AppFolderInfo.cs:26,36 (ApplicationData + AppName)

@@ -11,12 +11,21 @@
  *   new process (AppLifetime.cs:70-78), which leaves the tmux session the PMSS watchdog checks.
  * - Docker: `docker restart <app>` against the user's own daemon (a socket this uid owns).
  * - Elsewhere: refused, with a hint.
+ * $marker (Bazarr, Autobrr): fn() => ['at' => unix seconds or 0, 'id' => what changes on a restart], or null
+ * while the app does not answer; without it, system/status startTime must get newer.
  */
 class ArrRestart
 {
-    public static function run(array $app, array $where, callable $client)
+    public static function run(array $app, array $where, callable $client, ?callable $marker = null)
     {
-        $before = self::startTime($client);
+        $mark = function () use ($client, $marker) {
+            if ($marker !== null) {
+                return call_user_func($marker);
+            }
+            $t = self::startTime($client);
+            return $t === null ? null : ['at' => $t, 'id' => $t];
+        };
+        $before = $mark();
         $pmss = $where['source'] === 'pmss';
         if ($pmss) {
             $how = self::pmss($app, $where);
@@ -37,8 +46,9 @@ class ArrRestart
         $wait = (int) getenv('PIKKUMIES_ARR_WAIT');
         $deadline = microtime(true) + ($wait > 0 && $wait < ArrCommand::WAIT ? $wait : ArrCommand::WAIT);
         while (microtime(true) < $deadline) {
-            $t = $after !== null ? $after : self::startTime($client);
-            $after = $t !== null && ($before === null || $t > $before) ? $t : null;
+            $t = $after !== null ? $after : $mark();
+            $after = $t !== null && ($before === null || ($marker === null ? $t['at'] > $before['at'] : $t['id'] !== $before['id']))
+                ? $t : null;
             $tmux = $pmss ? ArrShell::tmuxState($app['id']) : null;
             if ($after !== null && $tmux !== 'stopped') {
                 break;
@@ -50,8 +60,8 @@ class ArrRestart
                 . ' so the PMSS panel and watchdog see it as stopped',
                 'the user restarts it in the PMSS panel (Media stack); do not start a second copy');
         }
-        $out = ['how' => $how, 'answered' => $after !== null, 'started_at' => $after !== null ? $after : 0,
-            'previous_started_at' => $before !== null ? $before : 0];
+        $out = ['how' => $how, 'answered' => $after !== null, 'started_at' => $after !== null ? $after['at'] : 0,
+            'previous_started_at' => $before !== null ? $before['at'] : 0];
         if ($pmss) {
             $out['tmux'] = $tmux;
         }

@@ -47,13 +47,17 @@ class ArrRecords
     public static function item(array $app, array $i)
     {
         $st = isset($i['statistics']) && is_array($i['statistics']) ? $i['statistics'] : [];
-        $r = ['id' => (int) $i['id'], 'title' => self::s($i, 'title'), 'year' => isset($i['year']) ? (int) $i['year'] : 0,
+        $r = ['id' => (int) $i['id'], 'title' => ArrApps::title($app, $i), 'year' => isset($i['year']) ? (int) $i['year'] : 0,
             'meta_id' => ArrApps::metaId($app, $i), 'monitored' => !empty($i['monitored']), 'status' => self::s($i, 'status'),
             'size' => (int) (isset($st['sizeOnDisk']) ? $st['sizeOnDisk'] : (isset($i['sizeOnDisk']) ? $i['sizeOnDisk'] : 0)),
             'path' => self::s($i, 'path'), 'added_at' => self::time($i, 'added')];
         if ($app['id'] === 'sonarr') {
             $r['episodes'] = isset($st['episodeFileCount']) ? (int) $st['episodeFileCount'] : 0;
             $r['episodes_total'] = isset($st['episodeCount']) ? (int) $st['episodeCount'] : 0;
+        } elseif (isset($app['counts'])) { // Lidarr albums and tracks, Readarr books
+            foreach ($app['counts'] as $field => $stat) {
+                $r[$field] = isset($st[$stat]) ? (int) $st[$stat] : 0;
+            }
         } else {
             $r['has_file'] = !empty($i['hasFile']);
         }

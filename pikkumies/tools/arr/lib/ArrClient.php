@@ -6,6 +6,8 @@
  * the local port, no redirects, pinned address). Failures are named in the order of tools/arr/README.md
  * "When it cannot reach the app" (steps 5-12; steps 1-4 are ArrLocate's). An answer Http could not read
  * whole (over the size cap) or an empty GET answer is an error, never an empty list.
+ * Bazarr and Autobrr reuse it: $where may name 'apiBase' (the path before the API route), 'header' (the
+ * key header) and 'labels' (the config names used in errors, ArrConfig::LABELS).
  */
 class ArrClient
 {
@@ -34,7 +36,8 @@ class ArrClient
 
     /**
      * GET/POST/PUT/DELETE an API path ('movie/5'); $query values: bool -> true|false, list -> repeated.
-     * $o: accept (codes returned as [code, data]), missing (the 404 text), raw, timeout, max. Returns decoded JSON.
+     * $o: accept (codes returned as [code, data]), missing (the 404 text), raw, timeout, max, form (a body sent as
+     * a web form), text (the body as text, not JSON). Returns decoded JSON.
      */
     public function call($method, $path, array $query = [], $body = null, array $o = [])
     {
@@ -58,12 +61,11 @@ class ArrClient
         }
         if ($code >= 300 && $code < 400) {
             $base = $this->where['urlBase'] === '' ? '(empty)' : $this->where['urlBase'];
-            throw new CliError("the app answered HTTP $code: wrong base path (UrlBase $base from $cfg)",
-                'check <UrlBase> in config.xml; the tool never follows redirects');
+            throw new CliError("the app answered HTTP $code: wrong base path ({$this->label('base')} $base from $cfg)",
+                $this->label('baseHint') . '; the tool never follows redirects');
         }
         if ($code === 401) {
-            throw new CliError("the app rejected the ApiKey from $cfg (HTTP 401)",
-                'the app may run from another data folder than this config.xml; check which one it was started with');
+            throw new CliError("the app rejected the {$this->label('key')} from $cfg (HTTP 401)", $this->label('keyHint'));
         }
         if ($code === 404 && !empty($o['missing'])) {
             throw new CliError($o['missing'], 'ids come from `list`');
@@ -74,11 +76,14 @@ class ArrClient
             throw new CliError($what . ($msg !== '' ? ": $msg" : ''),
                 $code < 500 ? 'fix what the message says and try again' : 'see the app\'s own log (System, Logs); try again later');
         }
+        if (!empty($o['text'])) {
+            return $r['body'];
+        }
         $data = json_decode($r['body'], true);
         $empty = $r['body'] === '' && $method === 'GET'; // the API always answers a GET with JSON
         if ($empty || ($r['body'] !== '' && $data === null && trim($r['body']) !== 'null')) {
             throw new CliError("port $port answered, but not with the app's API (HTTP $code, " . ($empty ? 'empty' : 'not JSON') . ')',
-                "check <Port> and <UrlBase> in $cfg");
+                $this->label('portHint') . " $cfg");
         }
         return empty($o['raw']) ? ArrRecords::scrub($data) : $data;
     }
@@ -86,19 +91,21 @@ class ArrClient
     private function send($method, $path, array $query, $body, array $o)
     {
         $w = $this->where;
-        $url = 'http://127.0.0.1:' . $w['port'] . $w['urlBase'] . '/api/' . $this->api . '/' . ltrim($path, '/');
+        $base = isset($w['apiBase']) ? $w['apiBase'] : $w['urlBase'] . '/api/' . $this->api . '/';
+        $url = 'http://127.0.0.1:' . $w['port'] . $base . ltrim($path, '/');
         $q = [];
         foreach ($query as $k => $v) {
             foreach (is_array($v) ? $v : [$v] as $one) {
                 $q[] = rawurlencode($k) . '=' . rawurlencode(is_bool($one) ? ($one ? 'true' : 'false') : (string) $one);
             }
         }
-        $headers = ['X-Api-Key: ' . $w['key'], 'Accept: application/json'];
-        if ($body !== null) {
-            $headers[] = 'Content-Type: application/json';
+        $headers = [(isset($w['header']) ? $w['header'] : 'X-Api-Key') . ': ' . $w['key'], 'Accept: application/json'];
+        $form = isset($o['form']); // Bazarr reads its parameters from a form, as its own web page sends them
+        if ($form || $body !== null) {
+            $body = $form ? http_build_query($o['form'], '', '&', PHP_QUERY_RFC3986) : json_encode($body, JSON_UNESCAPED_SLASHES);
+            $headers[] = 'Content-Type: ' . ($form ? 'application/x-www-form-urlencoded' : 'application/json');
         }
-        $opts = ['headers' => $headers, 'timeout' => isset($o['timeout']) ? $o['timeout'] : $this->timeout,
-            'body' => $body === null ? null : json_encode($body, JSON_UNESCAPED_SLASHES)];
+        $opts = ['headers' => $headers, 'timeout' => isset($o['timeout']) ? $o['timeout'] : $this->timeout, 'body' => $body];
         if (isset($o['max'])) {
             $opts['max'] = (int) $o['max'];
         }
@@ -122,23 +129,15 @@ class ArrClient
             $pmss ? 'start it with `restart`, or in the PMSS panel' : 'start it the way the provider documents (or `restart`)');
     }
 
-    /** The app's own message from an error body: ErrorModel {message} or a list of {errorMessage} (RadarrErrorPipeline.cs:33-52). */
+    /** The app's own message from an error body (ArrErrorText::from), with the key replaced. */
     public function message($body)
     {
-        $d = json_decode((string) $body, true);
-        $parts = [];
-        if (is_array($d) && isset($d['message']) && is_string($d['message'])) {
-            $parts[] = $d['message'];
-        } elseif (is_array($d)) {
-            foreach ($d as $e) {
-                if (is_array($e) && isset($e['errorMessage'])) {
-                    $parts[] = (isset($e['propertyName']) ? $e['propertyName'] . ': ' : '') . $e['errorMessage'];
-                }
-            }
-        } else {
-            $parts[] = substr(trim(strip_tags((string) $body)), 0, 300);
-        }
-        return $this->redact(substr(implode('; ', array_filter($parts, 'strlen')), 0, 600));
+        return $this->redact(ArrErrorText::from($body));
+    }
+
+    private function label($k)
+    {
+        return isset($this->where['labels'][$k]) ? $this->where['labels'][$k] : ArrConfig::LABELS[$k];
     }
 
     public function redact($s)

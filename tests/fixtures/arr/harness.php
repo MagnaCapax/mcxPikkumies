@@ -5,6 +5,7 @@
  * The oracle is the literal key string, not a copy of the tools' redaction.
  */
 require_once __DIR__ . '/seed.php';
+require_once __DIR__ . '/seed-v1.php';
 require_once dirname(__DIR__, 3) . '/pikkumies/tools/arr/lib/Arr.php';
 
 const ARR_KEY = '0123456789abcdef0123456789abcdef';
@@ -18,7 +19,7 @@ function arrFreePort()
 }
 
 /**
- * $app: sonarr|radarr|prowlarr. $over: changes to the fake's state; 'where' => pmss|servarr|docker|none
+ * $app: sonarr|radarr|prowlarr|lidarr|readarr. $over: changes to the fake's state; 'where' => pmss|servarr|docker|none
  * picks where config.xml goes; 'config' => raw config.xml text (default a valid one); 'start' => false.
  */
 function arrFixture($app, array $over = [])
@@ -38,7 +39,7 @@ function arrFixture($app, array $over = [])
     chmod("$dir/bin/tmux", 0700);
     link("$home/media/Film C/c.mkv", "$home/media/c-hardlink.mkv"); // a second hard link: frees nothing
     $port = arrFreePort();
-    $api = $app === 'prowlarr' ? 'v1' : 'v3';
+    $api = in_array($app, ['prowlarr', 'lidarr', 'readarr'], true) ? 'v1' : 'v3';
     $base = array_key_exists('base', $over) ? $over['base'] : '/public-fake/' . $app;
     $where = isset($over['where']) ? $over['where'] : 'pmss';
     $cfgPath = ['pmss' => "$home/.config/$app/config.xml", 'servarr' => "$home/.config/" . ucfirst($app) . '/config.xml',
@@ -51,7 +52,8 @@ function arrFixture($app, array $over = [])
     @mkdir("$dir/pmss", 0700); // PMSS unless a test points PIKKUMIES_PMSS_DIR elsewhere
     $state = ['app' => $app, 'api' => $api, 'base' => $base, 'key' => ARR_KEY, 'dir' => $dir, 'mode' => '', 'sleep' => 0,
         'recycleBin' => '', 'refuse' => false, 'commandMode' => 'complete', 'commands' => [], 'calls' => [], 'violations' => []];
-    $state = array_merge($state, arrSeedFor($app, $home), array_diff_key($over, array_flip(['where', 'config', 'start', 'base'])));
+    $seed = in_array($app, ['lidarr', 'readarr'], true) ? arrSeedV1($app, $home) : arrSeedFor($app, $home);
+    $state = array_merge($state, $seed, array_diff_key($over, array_flip(['where', 'config', 'start', 'base'])));
     file_put_contents("$dir/state.json", json_encode($state));
     $proc = null;
     if (!isset($over['start']) || $over['start']) {
@@ -91,7 +93,7 @@ function arrRun(array $fx, array $args, array $env = [])
 {
     $env += ['HOME' => $fx['home'], 'PATH' => $fx['dir'] . '/bin:/usr/bin:/bin', 'PIKKUMIES_PMSS_DIR' => $fx['dir'] . '/pmss',
         'PIKKUMIES_ARR_TIMEOUT' => '5', 'PIKKUMIES_ARR_WAIT' => '3', 'DOCKER_HOST' => 'unix://' . $fx['dir'] . '/no-docker.sock'];
-    $script = dirname(__DIR__, 3) . "/pikkumies/tools/arr/{$fx['app']}/{$fx['app']}.php";
+    $script = isset($fx['script']) ? $fx['script'] : dirname(__DIR__, 3) . "/pikkumies/tools/arr/{$fx['app']}/{$fx['app']}.php";
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . implode('', array_map(function ($a) {
         return ' ' . escapeshellarg($a);
     }, $args));

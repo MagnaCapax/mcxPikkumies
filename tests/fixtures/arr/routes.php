@@ -4,7 +4,8 @@
  * REQUIRED: the boolean query parameters each spec declares with a default (OpenAPI files of the
  * commits in the unit READMEs); a request missing one is a test failure.
  */
-$item = $s['app'] === 'sonarr' ? 'series' : ($s['app'] === 'radarr' ? 'movie' : 'indexer');
+$item = ['sonarr' => 'series', 'radarr' => 'movie', 'lidarr' => 'artist', 'readarr' => 'author', 'prowlarr' => 'indexer'][$s['app']];
+$metaField = ['sonarr' => 'tvdbId', 'radarr' => 'tmdbId', 'lidarr' => 'foreignArtistId', 'readarr' => 'foreignAuthorId', 'prowlarr' => 'id'][$s['app']];
 $REQUIRED = [
     'sonarr' => ['GET series' => ['includeSeasonImages'], 'DELETE series/#' => ['deleteFiles', 'addImportListExclusion'],
         'GET queue' => ['includeUnknownSeriesItems', 'includeSeries', 'includeEpisode'],
@@ -15,6 +16,13 @@ $REQUIRED = [
         'GET queue' => ['includeUnknownMovieItems', 'includeMovie'], 'GET wanted/missing' => ['monitored'], 'GET wanted/cutoff' => ['monitored'],
         'GET history/since' => ['includeMovie']],
     'prowlarr' => ['POST indexer/test' => ['forceTest']],
+    // Lidarr 0cfa30b9 and Readarr 0b79d300 (lidarr and readarr READMEs)
+    'lidarr' => ['DELETE artist/#' => ['deleteFiles', 'addImportListExclusion'], 'GET queue' => ['includeUnknownArtistItems', 'includeArtist', 'includeAlbum'],
+        'GET wanted/missing' => ['includeArtist', 'monitored'], 'GET wanted/cutoff' => ['includeArtist', 'monitored'],
+        'GET history' => ['includeArtist', 'includeAlbum', 'includeTrack'], 'GET history/since' => ['includeArtist', 'includeAlbum', 'includeTrack']],
+    'readarr' => ['GET queue' => ['includeUnknownAuthorItems', 'includeAuthor', 'includeBook'], 'GET wanted/missing' => ['includeAuthor', 'monitored'],
+        'GET wanted/cutoff' => ['includeAuthor', 'monitored'], 'GET history' => ['includeAuthor', 'includeBook'],
+        'GET history/since' => ['includeAuthor', 'includeBook']],
 ];
 $route = $method . ' ' . preg_replace('#/[0-9]+$#', '/#', $rel);
 foreach (isset($REQUIRED[$s['app']][$route]) ? $REQUIRED[$s['app']][$route] : [] as $b) {
@@ -55,14 +63,14 @@ if ($method === 'GET' && $rel === 'health' && $s['mode'] === 'huge') { // more t
 if ($method === 'GET' && $rel === $item && $s['mode'] === 'empty') {
     $send(200, '', 'text/plain');
 }
-if ($method === 'GET' && in_array($rel, ['health', 'diskspace', 'qualityprofile', 'rootfolder'], true)) {
+if ($method === 'GET' && in_array($rel, ['health', 'diskspace', 'qualityprofile', 'rootfolder', 'metadataprofile'], true)) {
     $send(200, $s[$rel]);
 }
 if ($method === 'GET' && $rel === 'config/mediamanagement') {
     $send(200, ['id' => 1, 'recycleBin' => $s['recycleBin'], 'recycleBinCleanupDays' => 7]);
 }
 if ($method === 'GET' && $rel === $item) {
-    $f = $s['app'] === 'sonarr' ? 'tvdbId' : 'tmdbId';
+    $f = $metaField;
     $rows = array_values(array_filter($s['items'], function ($i) use ($one, $f) {
         return $one($f) === null || (string) $i[$f] === $one($f);
     }));
@@ -89,16 +97,22 @@ if (preg_match("#^$item/([0-9]+)$#", $rel, $m) && ($i = $byId($m[1])) !== null) 
 }
 if ($method === 'GET' && $rel === "$item/lookup") {
     $term = strtolower((string) $one('term'));
-    $send(200, array_values(array_filter($s['lookup'], function ($l) use ($term) {
-        if (preg_match('/^(tvdb|tmdb|imdb):(.+)$/', $term, $m)) {
-            return strtolower((string) $l[$m[1] . 'Id']) === $m[2];
+    foreach (isset($s['failLookup']) ? (array) $s['failLookup'] : [] as $bad) { // a metadata service that fails for this term
+        if (strpos($term, $bad) !== false) {
+            $send(503, ['message' => 'metadata service unavailable']);
         }
-        return strpos(strtolower($l['title']), $term) !== false;
+    }
+    $send(200, array_values(array_filter($s['lookup'], function ($l) use ($term) {
+        if (preg_match('/^(tvdb|tmdb|imdb|mbid|lidarr):(.+)$/', $term, $m)) { // Lidarr: SkyHookProxy.cs:433-436
+            return strtolower((string) $l[in_array($m[1], ['mbid', 'lidarr'], true) ? 'foreignArtistId' : $m[1] . 'Id']) === $m[2];
+        }
+        return strpos(strtolower(isset($l['title']) ? $l['title'] : $l['artistName']), $term) !== false;
     })));
 }
 if ($method === 'POST' && $rel === $item && $s['app'] !== 'prowlarr') {
-    $f = $s['app'] === 'sonarr' ? 'tvdbId' : 'tmdbId';
-    if (empty($body['qualityProfileId']) || empty($body['rootFolderPath'])) {
+    $f = $metaField;
+    if (empty($body['qualityProfileId']) || empty($body['rootFolderPath'])
+        || ($s['app'] === 'lidarr' && empty($body['metadataProfileId']))) { // Lidarr ArtistController.cs:80
         $send(400, [['propertyName' => 'QualityProfileId', 'errorMessage' => 'Must be set']]);
     }
     foreach ($s['items'] as $it) {
@@ -108,7 +122,7 @@ if ($method === 'POST' && $rel === $item && $s['app'] !== 'prowlarr') {
     }
     $new = $body + ['id' => 0];
     $new['id'] = 100 + count($s['items']);
-    $new['path'] = rtrim($body['rootFolderPath'], '/') . '/' . $body['title'];
+    $new['path'] = rtrim($body['rootFolderPath'], '/') . '/' . (isset($body['title']) ? $body['title'] : $body['artistName']);
     $s['items'][] = $new;
     $s['added'][] = $body;
     $send(200, $new);
@@ -120,11 +134,18 @@ if ($method === 'GET' && $rel === 'history/since') {
     $send(200, $s['history']);
 }
 if ($method === 'POST' && $rel === 'command') {
+    $s['commandPosts'] = (isset($s['commandPosts']) ? $s['commandPosts'] : 0) + 1;
+    if (isset($s['failCommandAt']) && $s['commandPosts'] === $s['failCommandAt']) { // the n-th POST command: nothing queued
+        $send(500, ['message' => 'Database is locked']);
+    }
     $id = 1000 + count($s['commands']);
     $s['commands'][$id] = ['id' => $id, 'name' => $body['name'], 'body' => $body, 'status' => 'queued', 'polls' => 0];
     $send(200, $s['commands'][$id]);
 }
 if ($method === 'GET' && preg_match('#^command/([0-9]+)$#', $rel, $m) && isset($s['commands'][$m[1]])) {
+    if (!empty($s['failPoll'])) { // the command was queued, but reading its state fails
+        $send(500, ['message' => 'Database is locked']);
+    }
     $c = &$s['commands'][$m[1]];
     $c['polls']++;
     $done = $s['commandMode'] === 'fail' ? 'failed' : 'completed';

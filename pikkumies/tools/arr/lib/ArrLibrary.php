@@ -57,21 +57,27 @@ class ArrLibrary
     public static function lookup(ArrClient $c, array $app, $term)
     {
         if ($term === '') {
-            throw new CliError('lookup needs a title or an id', 'lookup "the matrix"   or   lookup ' . key($app['prefixes']) . ':603');
+            throw new CliError('lookup needs a title or an id',
+                isset($app['example']) ? $app['example'] : 'lookup "the matrix"   or   lookup ' . key($app['prefixes']) . ':603');
         }
         $have = array_column(Arr::all($c, $app), 'id', $app['exists']);
         $hits = (array) $c->call('GET', $app['item'] . '/lookup', ['term' => $term], null, ['timeout' => 60]);
         return array_map(function ($i) use ($app, $have) {
             $in = !empty($i[$app['exists']]) && isset($have[$i[$app['exists']]]);
-            return ['meta_id' => ArrApps::metaId($app, $i), 'title' => ArrRecords::s($i, 'title'),
+            return ['meta_id' => ArrApps::metaId($app, $i), 'title' => ArrApps::title($app, $i),
                 'year' => isset($i['year']) ? (int) $i['year'] : 0, 'in_library' => $in, 'id' => $in ? (int) $have[$i[$app['exists']]] : 0,
                 'overview' => ArrRecords::cut(ArrRecords::s($i, 'overview'), 200)];
         }, array_values(array_filter($hits, 'is_array')));
     }
 
-    /** A wanted row: the movie record for Radarr, the episode for Sonarr. */
+    /** A wanted row: the movie record for Radarr, the episode for Sonarr, the album or book for Lidarr and Readarr. */
     private static function wanted(array $app, array $w)
     {
+        if (isset($app['wantedRow'])) {
+            $ref = $app['wantedRow']['ref'];
+            return ['id' => (int) $w['id'], 'item' => isset($w[$ref]) ? (int) $w[$ref] : 0, 'title' => ArrRecords::s($w, 'title'),
+                'released_at' => ArrRecords::time($w, $app['wantedRow']['date'])];
+        }
         if ($app['id'] !== 'sonarr') {
             return ArrRecords::item($app, $w);
         }
