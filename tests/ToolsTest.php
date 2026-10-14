@@ -54,6 +54,8 @@ return [
             'borg check --repair ~/repo', 'borg extract ~/repo::a', 'kopia snapshot restore k1 ~/x', 'duplicacy restore -r 3 -overwrite',
             'rsync -a' . ' --delete ~/a/ host:b/', "lftp -e 'mirror -R --Remove-source-files a b'", 'rclone serve http ~/data --addr :8080',
             'php $C copy ~/a remote:a --replace',
+            "curl -X DELETE 'https://host.example/public-u/jellyfin/Items/abc123?api_key=x'", 'curl --request DELETE http://127.0.0.1:8096/Items?ids=a,b',
+            "curl -X DELETE http://127.0.0.1:32400/library/metadata/42", "requests.delete(f'{base}/Auth/Keys/{key}')",
         ] as $cmd) {
             $d = $ask($cmd);
             check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], $cmd) !== false, "no approval asked for: $cmd");
@@ -87,7 +89,8 @@ return [
         foreach (['rclone ls remote:', 'rclone copy ~/a remote:a', 'restic snapshots', 'borg list ~/repo', 'curl http://127.0.0.1:8080/api/v2/torrents/info',
             'php $Q remove abc', 'php $Q list --search firmware', 'grep -r term ~/notes', 'bash ~/install-media-stack.sh --stop-app=sonarr && bash ~/install-media-stack.sh --start-app=sonarr',
             'ls -la ~/data', 'git status', 'borgmatic list', 'rclone serve http ~/data --addr 127.0.0.1:8080', 'rclone rc core/stats', 'restic snapshots --json',
-            'rclone config file', 'rclone listremotes --long'] as $cmd) {
+            'rclone config file', 'rclone listremotes --long', 'curl http://127.0.0.1:8096/Items/Latest?userId=u',
+            "curl -X POST 'http://127.0.0.1:8096/Items/abc/Refresh?metadataRefreshMode=Default'"] as $cmd) {
             $out = $ask($cmd);
             check($out === null, "read-only command flagged: $cmd");
         }

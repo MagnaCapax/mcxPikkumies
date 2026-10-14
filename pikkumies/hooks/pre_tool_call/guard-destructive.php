@@ -61,6 +61,9 @@ $approve = [
     // *arr items deleted by HTTP from anywhere (also the public proxy path): library items and their files.
     '#^(?=.*(-X|--request|\\.delete\\(|["\']DELETE["\']))(?=.*/api/v[0-9]+/(queue|movie|series|artist|author|book|episodefile|moviefile|trackfile|bookfile)\\b)#si' => 'deletes media or downloads through an *arr app',
     '#["\']name["\']\\s*:\\s*["\'](DeleteSeriesFiles|ResetApiKey|ApplicationUpdate)["\']#i'      => 'runs an *arr command that deletes files, resets the API key or replaces the app',
+    // Media servers from anywhere (also the public proxy path): Jellyfin/Emby DELETE /Items[/{id}] deletes "from the
+    // library and filesystem" (Jellyfin 12.2 and Emby 4.1 specs), Plex DELETE /library/metadata/{id}; /Auth/Keys/{key} revokes a key.
+    '#^(?=.*((-X|--request)[\\s=]*["\']?DELETE\\b|\\.delete\\(|["\']DELETE["\']))(?=.*/(Items|library/metadata|Auth/Keys)(/|\\?|\\b))#si' => 'deletes media files or an API key through a media server',
     '/delete[-_]local[-_]data/i'                                                              => 'deletes torrent data through a local app',
     // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file.
     '/(^|[\s"\',\[(])--(with-data|delete-files)\b/'                                          => 'deletes data through a Pikkumies tool',
