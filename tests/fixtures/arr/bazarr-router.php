@@ -52,7 +52,8 @@ $page = function (array $rows, $idKey = null, $idParam = null) use ($q) {
         }));
     }
     $length = isset($q['length']) ? (int) $q['length'][0] : -1;
-    return ['data' => $length < 0 ? $rows : array_slice($rows, 0, $length), 'total' => count($rows)];
+    $start = isset($q['start']) ? (int) $q['start'][0] : 0;
+    return ['data' => array_slice($rows, $start, $length < 0 ? null : $length), 'total' => count($rows)];
 };
 if ($method === 'GET' && $rel === 'system/status') {
     $restarts = count(array_filter(explode("\n", (string) @file_get_contents($s['dir'] . '/restarts')), 'strlen'));

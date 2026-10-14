@@ -130,4 +130,27 @@ return [
             arrP2Done($fx);
         }
     },
+    'bazarr: wanted and history read page by page (start, length); --limit 0 is never one record' => function () {
+        $fx = arrOtherFixture('bazarr');
+        try {
+            $e = arrState($fx)['episodes/wanted'][0];
+            $rows = [];
+            for ($i = 1; $i <= 230; $i++) {
+                $rows[] = ['sonarrEpisodeId' => $i] + $e;
+            }
+            $h = arrState($fx)['episodes/history'][0];
+            arrSet($fx, ['episodes/wanted' => $rows, 'episodes/history' => [$h, $h, $h]]);
+            list($code, $l, $out) = arrRun($fx, ['wanted', '--limit', '0']);
+            $q = array_values(array_map(function ($c) {
+                return $c['query'];
+            }, arrCalls($fx, 'GET', 'episodes/wanted')));
+            $st = end($l);
+            check($code === 0 && $q === ['start=0&length=200', 'start=200&length=200'] && $st['episodes_wanted'] === 230
+                && $st['truncated'] === true && $st['total'] === 231, 'wanted --limit 0: ' . json_encode($q) . $out);
+            list($code, $l, $out) = arrRun($fx, ['history', '--limit', '0']);
+            check($code === 0 && count($l) === 5, 'history --limit 0 read one record of each kind: ' . $out);
+        } finally {
+            arrP2Done($fx);
+        }
+    },
 ];

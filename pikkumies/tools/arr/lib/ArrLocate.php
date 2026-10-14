@@ -17,10 +17,12 @@ class ArrLocate
     {
         $id = $app['id'];
         $tried = [];
+        $skipped = '';
         foreach (self::candidates($app, $home, $family, $override) as $source => $path) {
             $sock = $source === 'docker' ? ArrShell::dockerSocket($uid) : '';
             if ($source === 'docker' && $sock === '') {
-                continue; // no Docker daemon of this user's own: its folder is not looked at
+                $skipped = ArrLocate::skippedDocker($path, $home, $uid); // never read: said in "not installed"
+                continue;
             }
             $tried[] = $path;
             $c = ArrConfig::read($path);
@@ -53,10 +55,18 @@ class ArrLocate
             return str_replace($home, '~', $p);
         }, $tried));
         $installer = $family === 'pmss' && (!isset($app['installer']) || $app['installer']);
-        throw new CliError("{$app['name']} is not installed for this user (no config.xml in $looked)", $installer
+        throw new CliError("{$app['name']} is not installed for this user (no config.xml in $looked)$skipped", $installer
             ? 'the user installs it with `bash ~/install-media-stack.sh`'
             : 'install it the way the provider documents, or name its config.xml in pikkumies/local/config.php:'
                 . " 'arr' => ['$id' => ['config' => '/path/config.xml']]");
+    }
+
+    /** '; <folder> holds <file>, but ...' when a Docker folder has a config while Docker is not this user's own daemon. */
+    public static function skippedDocker($path, $home, $uid)
+    {
+        return file_exists($path) ? '; ' . str_replace($home, '~', dirname($path)) . ' holds ' . basename($path)
+            . ", but Docker is not this user's own daemon (no socket uid $uid owns at DOCKER_HOST or /run/user/$uid/docker.sock);"
+            . ' not used' : '';
     }
 
     /**

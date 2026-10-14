@@ -3,17 +3,20 @@
  * AutobrrSecret: the autobrr API key, typed once by the user at a terminal (ADR-0019), the same pattern as
  * torrent-clients/qbittorrent/QbitSecret.php and backup/lib/BackupStore.php: never in the chat, never on a
  * command line; stored in local/secrets/autobrr (directory 0700, file 0600, written to a temporary file and
- * renamed). autobrr answers a wrong key with 401 and nothing more (internal/http/middleware.go:71-85), so there
- * is no "rejected" mark as for qBittorrent; a rejected key is an error that names `login`. The three classes
- * should become one pikkumies/lib class.
+ * renamed: lib/SecretFile.php, which also refuses a file another account owns). autobrr answers a wrong key with 401
+ * and nothing more (internal/http/middleware.go:71-85), so there is no "rejected" mark as for qBittorrent; a rejected
+ * key is an error that names `login`.
  */
 class AutobrrSecret
 {
     private $file;
+    private $uid;
 
-    public function __construct($dir)
+    /** $uid: the owner the file must have (a test seam; this account's uid by default). */
+    public function __construct($dir, $uid = null)
     {
         $this->file = rtrim($dir, '/') . '/autobrr';
+        $this->uid = $uid;
     }
 
     public function path()
@@ -24,26 +27,14 @@ class AutobrrSecret
     /** The stored key, or '' when none is stored. */
     public function load()
     {
-        $raw = is_file($this->file) && !is_link($this->file) ? @file_get_contents($this->file, false, null, 0, 4096) : false;
+        $raw = SecretFile::read($this->file, 'the user runs `php ' . dirname(__FILE__) . '/autobrr.php login` in a terminal', $this->uid);
         $d = is_string($raw) ? json_decode($raw, true) : null;
         return is_array($d) && isset($d['key']) && is_string($d['key']) ? ArrConfig::key($d['key']) : '';
     }
 
     public function save($key)
     {
-        $dir = dirname($this->file);
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-            throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');
-        }
-        @chmod($dir, 0700);
-        $tmp = $this->file . '.tmp' . getmypid();
-        $old = umask(0077);
-        $ok = @file_put_contents($tmp, json_encode(['key' => $key, 'saved_at' => time()])) !== false;
-        umask($old);
-        if (!$ok || !@chmod($tmp, 0600) || !@rename($tmp, $this->file)) {
-            @unlink($tmp);
-            throw new CliError('cannot store the autobrr API key', "check that $dir is writable");
-        }
+        SecretFile::write($this->file, ['key' => $key], 'autobrr API key');
     }
 
     /** Reads the key from the terminal without echo; refuses when stdin is not a terminal. */

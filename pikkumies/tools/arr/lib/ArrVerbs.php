@@ -24,7 +24,7 @@ class ArrVerbs
             'health' => function ($args, $opt) use ($c) {
                 return array_map(function ($h) {
                     return ['source' => ArrRecords::s($h, 'source'), 'type' => ArrRecords::s($h, 'type'),
-                        'message' => ArrRecords::s($h, 'message'), 'wiki' => ArrRecords::s($h, 'wikiUrl')];
+                        'message' => ArrErrorText::urls(ArrRecords::s($h, 'message')), 'wiki' => ArrRecords::s($h, 'wikiUrl')];
                 }, (array) $c()->call('GET', 'health'));
             },
             'history' => function ($args, $opt) use ($c, $app) {
@@ -40,7 +40,7 @@ class ArrVerbs
     public static function show(ArrClient $c, array $app, array $args, array $opt)
     {
         $all = Arr::all($c, $app);
-        $targets = Arr::resolve($app, $all, $args);
+        $targets = Arr::resolve($app, $all, $args, true);
         if ($app['kind'] === 'indexer') {
             return ArrIndexers::show($c, $targets);
         }
@@ -65,13 +65,13 @@ class ArrVerbs
                 throw new CliError('--since needs a time, e.g. 2026-10-01 or "-2 days"', 'nothing was read');
             }
             $rows = (array) $c->call('GET', 'history/since', ['date' => gmdate('Y-m-d\TH:i:s\Z', $t)] + $app['historyBools']);
+            $status = [];
         } else {
-            $q = ['page' => 1, 'pageSize' => Arr::limit($opt), 'sortKey' => 'date', 'sortDirection' => 'descending'];
-            $page = $c->call('GET', 'history', $q + $app['historyBools']);
-            $rows = isset($page['records']) ? (array) $page['records'] : [];
+            $q = ['sortKey' => 'date', 'sortDirection' => 'descending'] + $app['historyBools'];
+            list($rows, $status) = ArrPages::get($c, 'history', ArrPages::SERVARR, $q, $opt);
         }
-        return array_map(function ($h) use ($app) {
+        return ['records' => array_map(function ($h) use ($app) {
             return ArrRecords::history($app, $h);
-        }, array_values(array_filter($rows, 'is_array')));
+        }, array_values(array_filter($rows, 'is_array'))), 'status' => $status];
     }
 }

@@ -69,7 +69,7 @@ class ArrRecords
     {
         return ['id' => (int) $i['id'], 'name' => self::s($i, 'name'), 'enabled' => !empty($i['enable']), 'protocol' => self::s($i, 'protocol'),
             'privacy' => self::s($i, 'privacy'), 'priority' => isset($i['priority']) ? (int) $i['priority'] : 0, 'implementation' => self::s($i, 'implementation'),
-            'message' => isset($i['message']['message']) ? (string) $i['message']['message'] : ''];
+            'message' => isset($i['message']['message']) ? ArrErrorText::urls($i['message']['message']) : ''];
     }
 
     public static function history(array $app, array $h)
@@ -92,7 +92,7 @@ class ArrRecords
         return ['id' => (int) $q['id'], 'item' => isset($q[$app['ref']]) ? (int) $q[$app['ref']] : 0, 'title' => self::s($q, 'title'), 'status' => self::s($q, 'status'),
             'tracked' => self::s($q, 'trackedDownloadState'), 'size' => $size, 'left_bytes' => isset($q['sizeleft']) ? (int) $q['sizeleft'] : 0,
             'finishes_at' => self::time($q, 'estimatedCompletionTime'), 'client' => self::s($q, 'downloadClient'), 'protocol' => self::s($q, 'protocol'),
-            'message' => trim(self::s($q, 'errorMessage') . ' ' . implode('; ', $msgs))];
+            'message' => ArrErrorText::urls(trim(self::s($q, 'errorMessage') . ' ' . implode('; ', $msgs)))];
     }
 
     public static function s(array $a, $k)

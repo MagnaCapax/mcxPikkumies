@@ -14,7 +14,7 @@ return [
             list($code, $l, $out) = arrRun($fx, ['queue']);
             check($code === 0 && $l[0]['id'] === 77 && $l[0]['left_bytes'] === 1000 && $l[0]['message'] === 'Stalled: no peers' && $l[1]['in_queue'] === 1, 'queue: ' . $out);
             list($code, $l, $out) = arrRun($fx, ['wanted', '--limit', '5']);
-            check($code === 0 && $l[0]['meta_id'] === 'tmdb:605' && strpos(arrCalls($fx, 'GET', 'wanted/missing')[0]['query'], 'pageSize=5') !== false, 'wanted: ' . $out);
+            check($code === 0 && $l[0]['meta_id'] === 'tmdb:605' && strpos(arrCalls($fx, 'GET', 'wanted/missing')[0]['query'], 'pageSize=6') !== false, 'wanted: ' . $out);
             list($code, $l, $out) = arrRun($fx, ['history', '--since', '2026-10-01']);
             check($code === 0 && $l[0]['event'] === 'grabbed' && strpos(arrCalls($fx, 'GET', 'history/since')[0]['query'], 'date=2026-10-01T00%3A00%3A00Z') !== false, 'history: ' . $out);
             list($code, $l, $out) = arrRun($fx, ['show', '1', 'tmdb:603']);
@@ -27,17 +27,18 @@ return [
         $fx = arrFixture('radarr');
         $b = $fx['home'] . '/media/Film B';
         try {
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '99', '--with-data', '--expect', '2.0KiB:2048']);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '99', '--with-data', '--expect', '2.0KiB:2048:356a19']);
             check($code === 1 && strpos($out, '99: no such movie') !== false && is_dir($b) && !arrCalls($fx, 'DELETE', 'movie/1'), 'one bad id must stop the batch: ' . $out);
             list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data']);
             check($code === 1 && strpos($out, '--expect 2.0KiB') !== false && is_dir($b), 'missing --expect: ' . $out);
-            foreach (['1GiB', '2.0KiB', '2.0KiB:2047'] as $wrong) { // the label alone, or a change the rounding hides, refuses
+            // the label alone, a change the rounding hides, no id check (the old format), another id set's check: all refuse
+            foreach (['1GiB', '2.0KiB', '2.0KiB:2047:356a19', '2.0KiB:2048', '2.0KiB:2048:2219fe', '2.0KiB:2048:356A19'] as $wrong) {
                 list($code) = arrRun($fx, ['remove', '1', '--with-data', '--expect', $wrong]);
                 check($code === 1 && is_dir($b) && !arrCalls($fx, 'DELETE', 'movie/1'), "--expect $wrong deleted something");
             }
             list($code, $l, $out) = arrRun($fx, ['show', '1', '2', '--files']);
-            check($code === 0 && $l[count($l) - 1]['expect'] === '2.5KiB:2548' && $l[count($l) - 1]['freed_bytes'] === 2048, 'preview: ' . $out);
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '2', '--with-data', '--expect', '2.5KiB:2548']);
+            check($code === 0 && $l[count($l) - 1]['expect'] === '2.5KiB:2548:2219fe' && $l[count($l) - 1]['freed_bytes'] === 2048, 'preview: ' . $out);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '2', '--with-data', '--expect', '2.5KiB:2548:2219fe']);
             check($code === 0 && $l[0]['disposal'] === 'deleted' && $l[0]['freed_bytes'] === 2048 && $l[1]['disposal'] === 'deleted' && $l[1]['freed_bytes'] === 0
                 && $l[2]['freed_bytes'] === 2048 && $l[0]['verified'] === true, 'delete: ' . $out);
             clearstatcache(); // the fake app deleted it in another process; this process stat'ed $b above (lines 31-36)
@@ -60,17 +61,17 @@ return [
         $fx = arrFixture('radarr');
         arrSet($fx, ['recycleBin' => $fx['dir'] . '/recycle']);
         try {
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2048']);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2048:356a19']);
             check($code === 0 && $l[0]['disposal'] === 'recycled' && $l[0]['freed_bytes'] === 0 && is_dir($fx['dir'] . '/recycle/Film B'), 'recycled: ' . $out);
             arrSet($fx, ['recycleBin' => '', 'refuse' => true]);
-            list($code, $l, $out) = arrRun($fx, ['remove', '2', '--with-data', '--expect', '500B:500']);
+            list($code, $l, $out) = arrRun($fx, ['remove', '2', '--with-data', '--expect', '500B:500:da4b92']);
             check($code === 0 && $l[0]['disposal'] === 'refused' && $l[0]['verified'] === false && is_dir($fx['home'] . '/media/Film C'), 'refused: ' . $out);
         } finally {
             arrDone($fx);
         }
         $fx = arrFixture('sonarr');
         try {
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '3.9KiB:4000']);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '3.9KiB:4000:356a19']);
             check($code === 1 && strpos($out, 'contains the folder of 2') !== false && !arrCalls($fx, 'DELETE', 'series/1'), 'overlap: ' . $out);
         } finally {
             arrDone($fx);
@@ -122,6 +123,41 @@ return [
             list($code, $l, $out) = arrRun($fx, ['search', '2', '1']);
             $cmds = array_values(arrState($fx)['commands']);
             check($code === 0 && count($cmds) === 1 && $cmds[0]['body'] === ['name' => 'MoviesSearch', 'movieIds' => [2, 1]], 'radarr search: ' . json_encode($cmds));
+        } finally {
+            arrDone($fx);
+        }
+    },
+    'arr library: history, queue and wanted read page by page; --limit 0 is "as many as fit", truncation is marked' => function () {
+        $fx = arrFixture('radarr');
+        $history = [];
+        for ($i = 1; $i <= 1200; $i++) {
+            $history[] = ['id' => $i, 'movieId' => 1, 'sourceTitle' => "Release.$i", 'date' => '2026-10-13T10:00:00Z', 'eventType' => 'grabbed'];
+        }
+        $pages = function ($fx, $from) {
+            return array_map(function ($c) {
+                return $c['query'];
+            }, array_slice(arrCalls($fx, 'GET', 'history'), $from));
+        };
+        try {
+            arrSet($fx, ['history' => array_slice($history, 0, 450), 'queue' => []]);
+            list($code, $l, $out) = arrRun($fx, ['history', '--limit', '0']);
+            $st = end($l);
+            $q = $pages($fx, 0);
+            check($code === 0 && count($q) === 3 && strpos($q[2], 'page=3&pageSize=200&') === 0 && $l[0]['id'] === 1
+                && $st['truncated'] === true && $st['total'] === 450 && $st['next_offset'] === count($l) - 1,
+                '--limit 0: ' . json_encode($q) . $out);
+            list($code, $l, $out) = arrRun($fx, ['history', '--limit', '5', '--offset', '300']);
+            $st = end($l);
+            $q = $pages($fx, 3);
+            check($code === 0 && count($q) === 2 && strpos($q[1], 'page=2&pageSize=200&') === 0 && $l[0]['id'] === 301 && count($l) === 6
+                && $st['truncated'] === true && $st['next_offset'] === 305, '--offset 300: ' . json_encode($q) . $out);
+            arrSet($fx, ['history' => $history]);
+            list($code, $l, $out) = arrRun($fx, ['history', '--limit', '0', '--offset', '995']);
+            $st = end($l);
+            check($code === 0 && count($l) === 6 && $l[0]['id'] === 996 && strpos($st['note'], 'first 1000 of 1200') !== false,
+                'the cap: ' . $out);
+            list($code, $l, $out) = arrRun($fx, ['queue', '--limit', '500']);
+            check($code === 0 && strpos(arrCalls($fx, 'GET', 'queue')[0]['query'], 'page=1&pageSize=200&') === 0, 'queue page size: ' . $out);
         } finally {
             arrDone($fx);
         }

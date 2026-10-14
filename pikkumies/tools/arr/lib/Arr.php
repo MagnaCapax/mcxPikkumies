@@ -10,7 +10,7 @@ foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Http'] as $f) {
     require_once "$lib/$f.php";
 }
 foreach (['ArrApps', 'ArrAppsMore', 'ArrConfig', 'ArrShell', 'ArrLocate', 'ArrClient', 'ArrErrorText', 'ArrRecords', 'ArrCommand',
-    'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrIndexers'] as $f) {
+    'ArrPages', 'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrIndexers'] as $f) {
     require_once __DIR__ . "/$f.php";
 }
 
@@ -74,8 +74,8 @@ class Arr
         }, $all);
     }
 
-    /** The items $args name: internal ids only, each resolved against the live list. One bad id fails the call. */
-    public static function resolve(array $app, array $all, array $args)
+    /** The items $args name: internal ids only, each resolved against the live list. One bad id fails the call; $read: a read verb. */
+    public static function resolve(array $app, array $all, array $args, $read = false)
     {
         $hint = 'ids are the `id` values `list` prints (find one with `list --search <text>`)';
         if (!$args) {
@@ -96,13 +96,14 @@ class Arr
             }
         }
         if ($bad) {
-            throw new CliError('nothing changed: ' . implode('; ', $bad), $hint);
+            throw new CliError(($read ? 'not found: ' : 'nothing changed: ') . implode('; ', $bad), $hint);
         }
         return array_values($out);
     }
 
+    /** Records to ask for in one request that cannot page (a search): ArrPages::need, at most one page. */
     public static function limit(array $opt)
     {
-        return isset($opt['limit']) ? max(1, min(200, (int) $opt['limit'])) : Cli::LIMIT;
+        return min(ArrPages::PAGE, ArrPages::need($opt));
     }
 }

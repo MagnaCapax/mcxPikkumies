@@ -25,7 +25,7 @@ return [
                 check($code === 0, implode(' ', $args) . ': ' . $out);
             }
             check(arrCalls($fx, 'DELETE', 'artist/2')[0]['query'] === 'deleteFiles=false&addImportListExclusion=false', 'remove params');
-            check(arrCalls($fx, 'GET', 'history')[0]['query'] === 'page=1&pageSize=20&sortKey=date&sortDirection=descending'
+            check(arrCalls($fx, 'GET', 'history')[0]['query'] === 'page=1&pageSize=21&sortKey=date&sortDirection=descending'
                 . '&includeArtist=false&includeAlbum=false&includeTrack=false', 'history params');
         } finally {
             arrDone($fx);
@@ -89,11 +89,11 @@ return [
         $fx = arrFixture('lidarr', ['where' => 'servarr']);
         $b = $fx['home'] . '/media/Film B';
         try {
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2047']);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2047:356a19']);
             check($code === 1 && is_dir($b) && !arrCalls($fx, 'DELETE', 'artist/1'), 'a wrong --expect deleted: ' . $out);
             list($code, $l, $out) = arrRun($fx, ['show', '1', '2', '--files']);
-            check($code === 0 && $l[count($l) - 1]['expect'] === '2.5KiB:2548', 'preview: ' . $out);
-            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2048']);
+            check($code === 0 && $l[count($l) - 1]['expect'] === '2.5KiB:2548:2219fe', 'preview: ' . $out);
+            list($code, $l, $out) = arrRun($fx, ['remove', '1', '--with-data', '--expect', '2.0KiB:2048:356a19']);
             clearstatcache();
             check($code === 0 && $l[0]['disposal'] === 'deleted' && !is_dir($b)
                 && arrCalls($fx, 'DELETE', 'artist/1')[0]['query'] === 'deleteFiles=true&addImportListExclusion=false', 'delete: ' . $out);

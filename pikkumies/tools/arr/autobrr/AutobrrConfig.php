@@ -80,9 +80,11 @@ class AutobrrConfig
     public static function find($home, $family, $uid, AutobrrSecret $secret, array $override = [], $lenient = false, ?array $tables = null)
     {
         $tried = [];
+        $skipped = '';
         foreach (self::candidates($home, $family, $override) as $source => $path) {
             $sock = $source === 'docker' ? ArrShell::dockerSocket($uid) : '';
             if ($source === 'docker' && $sock === '') {
+                $skipped = ArrLocate::skippedDocker($path, $home, $uid); // never read: said in "not installed"
                 continue;
             }
             $tried[] = str_replace($home, '~', $path);
@@ -99,7 +101,14 @@ class AutobrrConfig
                     $family === 'pmss' ? 'the user reruns `bash ~/install-media-stack.sh`; this tool never edits config.toml'
                         : 'check the file; this tool never edits config.toml');
             }
-            $key = $secret->load();
+            try {
+                $key = $secret->load();
+            } catch (CliError $e) { // a secrets file this tool will not trust: login (and restart) go on without it
+                if ($lenient === false) {
+                    throw $e;
+                }
+                $key = '';
+            }
             if ($key === '' && $lenient === false) {
                 throw new CliError('no autobrr API key is stored for this tool',
                     'the user creates an API key in autobrr (Settings, API keys)'
@@ -112,7 +121,8 @@ class AutobrrConfig
             $port = ArrLocate::ownPort(self::APP, $source, $c['port'], $where, $path, $lenient === true, $tables);
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'apiBase' => $c['apiBase'], 'key' => $key];
         }
-        throw new CliError('autobrr is not installed for this user (no config.toml in ' . implode(', ', $tried) . ')', $family === 'pmss'
+        $why = 'autobrr is not installed for this user (no config.toml in ' . implode(', ', $tried) . ")$skipped";
+        throw new CliError($why, $family === 'pmss'
             ? 'the user installs it with `bash ~/install-media-stack.sh`'
             : 'install it the way the provider documents, or name its config.toml in pikkumies/local/config.php:'
                 . " 'arr' => ['autobrr' => ['config' => '/path/config.toml']]");

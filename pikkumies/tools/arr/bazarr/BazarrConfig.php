@@ -81,10 +81,12 @@ class BazarrConfig
     public static function find($home, $family, $uid, array $override = [], $lenient = false, ?array $tables = null)
     {
         $tried = [];
+        $skipped = '';
         foreach (self::candidates($home, $override) as $source => $path) {
             $sock = $source === 'docker' ? ArrShell::dockerSocket($uid) : '';
             if ($source === 'docker' && $sock === '') {
-                continue; // no Docker daemon of this user's own: its folder is not looked at
+                $skipped = ArrLocate::skippedDocker($path, $home, $uid); // never read: said in "not installed"
+                continue;
             }
             $tried[] = str_replace($home, '~', $path);
             $c = self::read($path);
@@ -106,7 +108,7 @@ class BazarrConfig
             }
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'key' => $c['key'], 'apiBase' => $c['urlBase'] . '/api/'];
         }
-        throw new CliError('Bazarr is not installed for this user (no config.yaml in ' . implode(', ', $tried) . ')',
+        throw new CliError('Bazarr is not installed for this user (no config.yaml in ' . implode(', ', $tried) . ")$skipped",
             "name its config.yaml in pikkumies/local/config.php: 'arr' => ['bazarr' => ['config' => '/path/config/config.yaml']]");
     }
 }

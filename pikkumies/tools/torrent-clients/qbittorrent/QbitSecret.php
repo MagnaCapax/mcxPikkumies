@@ -2,7 +2,8 @@
 /**
  * QbitSecret: the qBittorrent WebUI password, typed once by the user at a terminal (ADR-0019).
  * PMSS keeps only a PBKDF2 hash of it in qBittorrent.conf (PMSS scripts/lib/user/qbittorrent.php:167-173),
- * so it cannot be read from disk. Stored in local/secrets/qbittorrent (dir 0700, file 0600). After a
+ * so it cannot be read from disk. Stored in local/secrets/qbittorrent (dir 0700, file 0600, lib/SecretFile.php,
+ * which also refuses a file another account owns). After a
  * rejected login the password is marked rejected and never tried again until the user runs `login`:
  * qBittorrent bans the address after 5 failed logins (research torrent-clients.md §2.2), and the
  * panel proxy shares that address, so retrying would lock the user out of their own WebUI.
@@ -10,10 +11,13 @@
 class QbitSecret
 {
     private $file;
+    private $uid;
 
-    public function __construct($dir)
+    /** $uid: the owner the file must have (a test seam; this account's uid by default). */
+    public function __construct($dir, $uid = null)
     {
         $this->file = rtrim($dir, '/') . '/qbittorrent';
+        $this->uid = $uid;
     }
 
     public function path()
@@ -24,7 +28,7 @@ class QbitSecret
     /** ['password' => string, 'rejected' => bool], or null when none is stored. */
     public function load()
     {
-        $raw = is_file($this->file) ? @file_get_contents($this->file) : false;
+        $raw = SecretFile::read($this->file, 'the user runs `php ' . self::script() . ' login` in a terminal', $this->uid);
         $d = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($d) || !isset($d['password']) || !is_string($d['password']) || $d['password'] === '') {
             return null;
@@ -34,19 +38,7 @@ class QbitSecret
 
     public function save($password, $rejected = false)
     {
-        $dir = dirname($this->file);
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-            throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');
-        }
-        @chmod($dir, 0700);
-        $tmp = $this->file . '.tmp' . getmypid();
-        $old = umask(0077);
-        $ok = @file_put_contents($tmp, json_encode(['password' => $password, 'rejected' => (bool) $rejected, 'saved_at' => time()])) !== false;
-        umask($old);
-        if (!$ok || !@chmod($tmp, 0600) || !@rename($tmp, $this->file)) {
-            @unlink($tmp);
-            throw new CliError('cannot store the qBittorrent password', "check that $dir is writable");
-        }
+        SecretFile::write($this->file, ['password' => $password, 'rejected' => (bool) $rejected], 'qBittorrent password');
     }
 
     /** Never try this password again (the next attempt could get the address banned). */

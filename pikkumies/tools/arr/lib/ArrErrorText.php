@@ -1,7 +1,8 @@
 <?php
 /**
  * ArrErrorText: the app's own message from an error body: ErrorModel {message} or a list of {errorMessage}
- * (RadarrErrorPipeline.cs:33-52). Moved out of ArrRecords to keep each file small.
+ * (RadarrErrorPipeline.cs:33-52), and urls() for every text the app writes (errors, health, command and
+ * indexer test messages). Moved out of ArrRecords to keep each file small.
  */
 class ArrErrorText
 {
@@ -21,6 +22,17 @@ class ArrErrorText
         } else {
             $parts[] = substr(trim(strip_tags((string) $body)), 0, 300);
         }
-        return substr(implode('; ', array_filter($parts, 'strlen')), 0, 600);
+        return self::urls(substr(implode('; ', array_filter($parts, 'strlen')), 0, 600));
+    }
+
+    /**
+     * Every http(s) URL in app text keeps scheme://host/path; its query and fragment become `?…`. Prowlarr puts
+     * the request URL in an indexer test failure (HttpIndexerBase.cs:815-818, HttpException.cs:18), and a tracker
+     * key can sit in any query parameter. Cli::cleanString later removes the named key parameters, user:password@
+     * and long path tokens; this removes the rest of the query, which only the app's own texts need.
+     */
+    public static function urls($s)
+    {
+        return (string) preg_replace('#(\bhttps?://[^\s?\#"\'<>]*)[?\#][^\s"\'<>]*#i', '$1?…', (string) $s);
     }
 }

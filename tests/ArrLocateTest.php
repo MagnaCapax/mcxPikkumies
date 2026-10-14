@@ -1,6 +1,9 @@
 <?php
 /** Discovery order, the connection errors in their order, Docker, and the owner of the port (tests/fixtures/arr/). */
 require_once __DIR__ . '/fixtures/arr/harness.php';
+foreach (['bazarr/BazarrConfig', 'autobrr/AutobrrSecret', 'autobrr/AutobrrConfig'] as $c) {
+    require_once dirname(__DIR__) . "/pikkumies/tools/arr/$c.php";
+}
 
 /** A fake `docker` (port answers from docker-port.txt, restart counts a start) and a socket this user owns. */
 function arrDocker(array $fx, $portOut)
@@ -61,9 +64,12 @@ return [
             $log = (string) file_get_contents($fx['dir'] . '/docker.log');
             check(strpos($log, "unix://{$fx['dir']}/docker.sock port radarr 8989/tcp") !== false && stripos($log, ARR_KEY) === false,
                 'docker argv: ' . $log);
+            $log = (string) file_get_contents($fx['dir'] . '/docker.log');
             list($code, $l, $out) = arrRun($fx, ['stats']); // DOCKER_HOST at a path that is no socket of ours
-            check($code === 1 && strpos($out, 'not installed') !== false && strpos($out, 'docker') === false,
+            check($code === 1 && strpos($out, 'not installed') !== false && (string) file_get_contents($fx['dir'] . '/docker.log') === $log,
                 'a foreign daemon was used: ' . $out);
+            check(strpos($out, "~/docker/radarr/config holds config.xml, but Docker is not this user's own daemon") !== false,
+                'the skipped Docker folder is not named: ' . $out);
             file_put_contents($fx['dir'] . '/docker-port.txt', "0.0.0.0:99999\n");
             list($code, $l, $out) = arrRun($fx, ['stats'], $env);
             check($code === 1 && strpos($out, 'not a port') !== false, 'port 99999 accepted: ' . $out);
@@ -136,6 +142,35 @@ return [
             putenv($path === false ? 'PATH' : "PATH=$path");
             putenv($host === false ? 'DOCKER_HOST' : "DOCKER_HOST=$host");
             arrDone($fx);
+        }
+    },
+    'arr locate: a Docker folder with a config, skipped for want of a daemon of this user, is named (bazarr, autobrr)' => function () {
+        $home = sys_get_temp_dir() . '/pk-arr-dock-' . getmypid();
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        @mkdir("$home/docker/bazarr/config/config", 0700, true);
+        @mkdir("$home/docker/autobrr/config", 0700, true);
+        file_put_contents("$home/docker/bazarr/config/config/config.yaml", "auth:\n  apikey: x\n");
+        file_put_contents("$home/docker/autobrr/config/config.toml", "port = 7474\n");
+        $old = getenv('DOCKER_HOST');
+        putenv("DOCKER_HOST=unix://$home/no-docker.sock");
+        try {
+            $finds = ['bazarr/config/config holds config.yaml' => function () use ($home, $uid) {
+                BazarrConfig::find($home, 'generic', $uid);
+            }, 'autobrr/config holds config.toml' => function () use ($home, $uid) {
+                AutobrrConfig::find($home, 'generic', $uid, new AutobrrSecret("$home/secrets"));
+            }];
+            foreach ($finds as $named => $find) {
+                try {
+                    $find();
+                    check(false, "$named: a config behind a foreign daemon was used");
+                } catch (CliError $e) {
+                    check(strpos($e->getMessage(), 'is not installed') !== false
+                        && strpos($e->getMessage(), "~/docker/$named, but Docker is not this user's own daemon") !== false, $e->getMessage());
+                }
+            }
+        } finally {
+            putenv($old === false ? 'DOCKER_HOST' : "DOCKER_HOST=$old");
+            exec('rm -rf ' . escapeshellarg($home));
         }
     },
 ];

@@ -64,12 +64,12 @@ class BazarrRun
             'health' => function ($args, $opt) use ($c) {
                 $h = $c()->call('GET', 'system/health');
                 return array_map(function ($i) {
-                    return ['source' => ArrRecords::s($i, 'object'), 'type' => 'warning', 'message' => ArrRecords::s($i, 'issue'),
-                        'wiki' => ''];
+                    return ['source' => ArrRecords::s($i, 'object'), 'type' => 'warning',
+                        'message' => ArrErrorText::urls(ArrRecords::s($i, 'issue')), 'wiki' => ''];
                 }, array_values(array_filter(isset($h['data']) ? (array) $h['data'] : [], 'is_array')));
             },
             'history' => function ($args, $opt) use ($c) {
-                return self::history($c(), Arr::limit($opt));
+                return self::history($c(), $opt);
             },
             'restart' => function ($args, $opt) use ($locate, $fresh) {
                 $marker = function () use ($fresh) {
@@ -114,12 +114,14 @@ class BazarrRun
     }
 
     /** Newest subtitle events of both kinds. Times: Bazarr sends local-format text; event_at is 0 when it does not parse. */
-    private static function history(ArrClient $c, $n)
+    private static function history(ArrClient $c, array $opt)
     {
         $out = [];
+        $note = [];
         foreach (['episodes' => 'series', 'movies' => 'movie'] as $path => $kind) {
-            $p = $c->call('GET', "$path/history", ['start' => 0, 'length' => $n]);
-            foreach (array_filter(isset($p['data']) ? (array) $p['data'] : [], 'is_array') as $h) {
+            list($rows, $more) = ArrPages::get($c, "$path/history", ['start', 'length', 'data', 'total'], [], $opt);
+            $note += $more;
+            foreach ($rows as $h) {
                 $id = $kind === 'series' ? ArrRecords::s($h, 'sonarrSeriesId') : ArrRecords::s($h, 'radarrId');
                 $at = strtotime(ArrRecords::s($h, 'parsed_timestamp'));
                 $out[] = ['event_at' => $at === false ? 0 : $at, 'when' => ArrRecords::s($h, 'timestamp'), 'item' => "$kind:" . (int) $id,
@@ -133,6 +135,6 @@ class BazarrRun
         usort($out, function ($a, $b) {
             return $b['event_at'] - $a['event_at'];
         });
-        return array_slice($out, 0, $n);
+        return ['records' => array_slice($out, 0, ArrPages::need($opt)), 'status' => $note];
     }
 }

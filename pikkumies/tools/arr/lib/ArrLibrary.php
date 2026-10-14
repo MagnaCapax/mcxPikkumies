@@ -37,18 +37,18 @@ class ArrLibrary
                 }, $targets));
             },
             'queue' => function ($args, $opt) use ($app, $c) {
-                $page = $c()->call('GET', 'queue', ['page' => 1, 'pageSize' => Arr::limit($opt)] + $app['queueBools']);
+                list($rows, $status, $total) = ArrPages::get($c(), 'queue', ArrPages::SERVARR, $app['queueBools'], $opt);
                 return ['records' => array_map(function ($q) use ($app) {
                     return ArrRecords::queue($app, $q);
-                }, self::rows($page)), 'status' => ['in_queue' => isset($page['totalRecords']) ? (int) $page['totalRecords'] : 0]];
+                }, $rows), 'status' => ['in_queue' => $total] + $status];
             },
             'wanted' => function ($args, $opt) use ($app, $c) {
                 $cutoff = !empty($opt['cutoff']);
-                $q = ['page' => 1, 'pageSize' => Arr::limit($opt)] + $app[$cutoff ? 'cutoffBools' : 'wantedBools'];
-                $page = $c()->call('GET', $cutoff ? 'wanted/cutoff' : 'wanted/missing', $q);
+                list($rows, $status, $total) = ArrPages::get($c(), $cutoff ? 'wanted/cutoff' : 'wanted/missing', ArrPages::SERVARR,
+                    $app[$cutoff ? 'cutoffBools' : 'wantedBools'], $opt);
                 return ['records' => array_map(function ($w) use ($app) {
                     return self::wanted($app, $w);
-                }, self::rows($page)), 'status' => ['wanted' => isset($page['totalRecords']) ? (int) $page['totalRecords'] : 0]];
+                }, $rows), 'status' => ['wanted' => $total] + $status];
             },
         ];
     }
@@ -85,10 +85,5 @@ class ArrLibrary
             'season' => isset($w['seasonNumber']) ? (int) $w['seasonNumber'] : 0,
             'episode' => isset($w['episodeNumber']) ? (int) $w['episodeNumber'] : 0,
             'aired_at' => ArrRecords::time($w, 'airDateUtc')];
-    }
-
-    private static function rows($page)
-    {
-        return array_values(array_filter(isset($page['records']) ? (array) $page['records'] : [], 'is_array'));
     }
 }

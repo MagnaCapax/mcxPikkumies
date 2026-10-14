@@ -36,7 +36,9 @@ $one = function ($k) use ($q) {
 };
 $paging = function (array $rows) use ($one) {
     $size = (int) ($one('pageSize') ?: 10);
-    return ['page' => 1, 'pageSize' => $size, 'totalRecords' => count($rows), 'records' => array_slice($rows, 0, $size)];
+    $page = max(1, (int) ($one('page') ?: 1));
+    return ['page' => $page, 'pageSize' => $size, 'totalRecords' => count($rows),
+        'records' => array_slice($rows, ($page - 1) * $size, $size)];
 };
 $started = 1760000000 + 60 * count(array_filter(explode("\n", (string) @file_get_contents($s['dir'] . '/restarts')), 'strlen'));
 $byId = function ($id) use (&$s) {
@@ -136,7 +138,7 @@ if ($method === 'GET' && $rel === 'history/since') {
 if ($method === 'POST' && $rel === 'command') {
     $s['commandPosts'] = (isset($s['commandPosts']) ? $s['commandPosts'] : 0) + 1;
     if (isset($s['failCommandAt']) && $s['commandPosts'] === $s['failCommandAt']) { // the n-th POST command: nothing queued
-        $send(500, ['message' => 'Database is locked']);
+        $send(500, ['message' => isset($s['appText']) ? $s['appText'] : 'Database is locked']);
     }
     $id = 1000 + count($s['commands']);
     $s['commands'][$id] = ['id' => $id, 'name' => $body['name'], 'body' => $body, 'status' => 'queued', 'polls' => 0];
@@ -151,7 +153,7 @@ if ($method === 'GET' && preg_match('#^command/([0-9]+)$#', $rel, $m) && isset($
     $done = $s['commandMode'] === 'fail' ? 'failed' : 'completed';
     $c['status'] = $s['commandMode'] === 'stuck' || $c['polls'] < 2 ? 'started' : $done;
     if ($c['status'] === 'failed') {
-        $c['exception'] = "Indexer error\n  at stack";
+        $c['exception'] = (isset($s['appText']) ? $s['appText'] : 'Indexer error') . "\n  at stack";
     }
     $send(200, $c);
 }

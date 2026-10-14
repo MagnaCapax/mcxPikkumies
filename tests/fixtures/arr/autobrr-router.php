@@ -76,7 +76,7 @@ if (preg_match('#^filters/([0-9]+)(/enabled)?$#', $rel, $m)) {
 }
 if ($method === 'GET' && $rel === 'release') {
     $limit = isset($q['limit']) ? (int) $q['limit'] : 20;
-    $send(200, ['data' => array_slice($s['releases'], 0, $limit), 'count' => count($s['releases']), 'next_cursor' => 0]);
+    $send(200, ['data' => array_slice($s['releases'], isset($q['offset']) ? (int) $q['offset'] : 0, $limit), 'count' => count($s['releases']), 'next_cursor' => 0]);
 }
 if ($method === 'GET' && $rel === 'release/stats') {
     $send(200, $s['releaseStats']);

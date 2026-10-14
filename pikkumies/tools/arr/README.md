@@ -15,6 +15,8 @@ These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `son
 | history | `[--since <time>] [--limit N]` | no | Recent events: grabbed, imported, failed, deleted (Prowlarr: queries and grabs). |
 | restart | | yes | Restarts the app the provider's way, then checks it answers with a newer start time (PMSS: and runs in its tmux session). PMSS: refused while the user has it turned off. |
 
+`history`, `queue` and `wanted` read the app's list page by page (200 records a request, at most 1000 a call, `lib/ArrPages.php`): `--limit 0` prints as many as fit in the 16 KiB output, and `truncated` with `next_offset` says when there are more.
+
 ## Library apps (sonarr, radarr, lidarr; readarr: queue and wanted only)
 
 | verb | arguments | changes | what it does |
@@ -62,8 +64,8 @@ Library items: `id`, `title`, `year`, `meta_id`, `monitored`, `status`, `size` (
 
 ## Deleting data
 
-1. `show <id>... --files --limit 0` lists every file in each item's folder, the hard links, `freed_bytes`, and the exact `--expect` value: the size and the exact byte count, e.g. `41.2GiB:44239978905`. Without `--limit 0` only the first 20 records are printed. When the status line says `"truncated":true` (the 16 KiB output budget), print the rest with `--offset <next_offset>` until every file has been shown; the user approves only after seeing all of them.
-2. `remove <id>... --with-data --expect <size>` deletes, in one call and one approval: the tool recomputes the plan, refuses unless the exact byte count is unchanged (a change the rounding hides counts), refuses when a folder is missing, and refuses when a folder is also, or contains, another item's folder (the app would silently delete nothing). After the call it checks each folder: `disposal` is `deleted` (gone), `recycled` (moved to the app's recycle bin) or `refused` (still there); `freed_bytes` counts only files with no other hard link.
+1. `show <id>... --files --limit 0` lists every file in each item's folder, the hard links, `freed_bytes`, and the exact `--expect` value: the size, the exact byte count and a check of the ids shown, e.g. `41.2GiB:44239978905:7b5200`. Without `--limit 0` only the first 20 records are printed. When the status line says `"truncated":true` (the 16 KiB output budget), print the rest with `--offset <next_offset>` until every file has been shown; the user approves only after seeing all of them.
+2. `remove <id>... --with-data --expect <size>` deletes, in one call and one approval, with the same ids as the `show`: the tool recomputes the plan, refuses unless the exact byte count is unchanged (a change the rounding hides counts) and the ids are the ones previewed (an extra item with an empty folder changes no bytes), refuses when a folder is missing, and refuses when a folder is also, or contains, another item's folder (the app would silently delete nothing). After the call it checks each folder: `disposal` is `deleted` (gone), `recycled` (moved to the app's recycle bin) or `refused` (still there); `freed_bytes` counts only files with no other hard link.
 3. Items are removed one at a time, and the first one the app fails stops the call: that item is `failed`, the ones after it `not_sent` (nothing was asked for them), the ones before it are checked as above. The call then ends `ok:false`, and its error names what happened to every item, so a half-done removal is never reported as done. Plain `remove` follows the same rule.
 
 ## Safety

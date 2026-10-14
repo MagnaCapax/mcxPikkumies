@@ -145,4 +145,54 @@ return [
             arrP2Done($fx);
         }
     },
+    'autobrr: a stored key others can read is set back to 0600; another owner or a symlink is refused, login still works' => function () {
+        $fx = arrOtherFixture('autobrr');
+        $file = $fx['dir'] . '/secrets/autobrr';
+        abLogin($fx);
+        try {
+            chmod($file, 0644);
+            list($code, $l, $out, $err) = abRun($fx, ['stats']);
+            clearstatcache();
+            check($code === 0 && (fileperms($file) & 0777) === 0600 && strpos($err, 'set to 0600') !== false, 'a 0644 key file: ' . $out . $err);
+            try {
+                (new AutobrrSecret(dirname($file), arrUid() + 1))->load();
+                check(false, 'a key file another account owns was trusted');
+            } catch (CliError $e) {
+                check(strpos($e->getMessage(), 'belongs to uid') !== false && strpos($e->hint, 'autobrr.php login') !== false,
+                    'owner: ' . $e->getMessage());
+            }
+            rename($file, "$file.real");
+            symlink("$file.real", $file);
+            list($code, $l, $out) = abRun($fx, ['stats']);
+            check($code === 1 && strpos($out, 'is a symlink') !== false && strpos($out, 'login') !== false, 'a symlinked key file: ' . $out);
+            list($code, $l, $out) = abRun($fx, ['login'], ARR_KEY);
+            clearstatcache();
+            check($code === 0 && !is_link($file) && (fileperms($file) & 0777) === 0600, 'login replaces a refused file: ' . $out);
+        } finally {
+            arrP2Done($fx);
+        }
+    },
+    'autobrr: history reads page by page (offset, limit); --limit 0 is "as many as fit" and marks truncation' => function () {
+        $fx = arrOtherFixture('autobrr');
+        abLogin($fx);
+        try {
+            $r = arrState($fx)['releases'][0];
+            $rows = [];
+            for ($i = 1; $i <= 250; $i++) {
+                $rows[] = ['id' => $i] + $r;
+            }
+            arrSet($fx, ['releases' => $rows]);
+            list($code, $l, $out) = abRun($fx, ['history', '--limit', '0']);
+            $q = array_values(array_map(function ($c) {
+                return $c['query'];
+            }, array_filter(arrState($fx)['calls'], function ($c) {
+                return $c['path'] === 'release';
+            })));
+            $st = end($l);
+            check($code === 0 && $q === ['offset=0&limit=200', 'offset=200&limit=200'] && $st['releases'] === 250
+                && $st['truncated'] === true && $st['total'] === 250, 'history --limit 0: ' . json_encode($q) . $out);
+        } finally {
+            arrP2Done($fx);
+        }
+    },
 ];

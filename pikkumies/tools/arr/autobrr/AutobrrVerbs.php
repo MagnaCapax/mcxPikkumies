@@ -51,8 +51,8 @@ class AutobrrVerbs
             'actions' => array_map(function ($a) {
                 return ['action' => ArrRecords::s($a, 'action'), 'type' => ArrRecords::s($a, 'type'),
                     'client' => ArrRecords::s($a, 'client'),
-                    'status' => ArrRecords::s($a, 'status'), 'rejections' => array_values(array_filter(isset($a['rejections'])
-                        ? (array) $a['rejections'] : [], 'is_string'))];
+                    'status' => ArrRecords::s($a, 'status'), 'rejections' => array_map(['ArrErrorText', 'urls'],
+                        array_values(array_filter(isset($a['rejections']) ? (array) $a['rejections'] : [], 'is_string')))];
             }, array_values(array_filter(isset($r['action_status']) ? (array) $r['action_status'] : [], 'is_array')))];
     }
 
@@ -64,7 +64,7 @@ class AutobrrVerbs
             $type = empty($n['enabled']) ? 'notice' : (!empty($n['healthy']) ? 'ok' : 'warning');
             $state = empty($n['enabled']) ? 'disabled' : (!empty($n['connected']) ? 'connected' : 'not connected');
             return ['source' => 'irc ' . ArrRecords::s($n, 'name'), 'type' => $type,
-                'message' => $state . ($errors ? ': ' . implode('; ', $errors) : ''), 'wiki' => ''];
+                'message' => ArrErrorText::urls($state . ($errors ? ': ' . implode('; ', $errors) : '')), 'wiki' => ''];
         }, array_values(array_filter((array) $c->call('GET', 'irc'), 'is_array')));
     }
 
@@ -76,7 +76,7 @@ class AutobrrVerbs
         } catch (CliError $e) {
             $ready = $e->getMessage();
         }
-        $db = ['source' => 'database', 'type' => $ready === 'OK' ? 'ok' : 'error', 'message' => $ready, 'wiki' => ''];
+        $db = ['source' => 'database', 'type' => $ready === 'OK' ? 'ok' : 'error', 'message' => ArrErrorText::urls($ready), 'wiki' => ''];
         return array_merge([$db], self::networks($c));
     }
 

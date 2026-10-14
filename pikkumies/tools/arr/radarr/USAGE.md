@@ -24,7 +24,7 @@ php $T lookup "the matrix"
 php $T add tmdb:603 --profile HD-1080p --no-search
 php $T stats --human
 php $T show 12 --files --limit 0         # show the user every file and the expect value
-php $T remove 12 --with-data --expect 41.2GiB:44239978905
+php $T remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $T history --since "-2 days"
 ```
 

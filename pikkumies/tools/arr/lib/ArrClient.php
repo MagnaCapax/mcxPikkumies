@@ -2,7 +2,7 @@
 /**
  * ArrClient: every API call of an *ARR unit. The key goes only in the X-Api-Key header, never in the
  * URL (where proxy logs keep it), never on a command line, never in output: any text that came back
- * from the app has the key replaced before it is shown. Calls go through lib/Http.php (owner check of
+ * from the app has the key replaced and URL queries cut (redact) before it is shown. Calls go through lib/Http.php (owner check of
  * the local port, no redirects, pinned address). Failures are named in the order of tools/arr/README.md
  * "When it cannot reach the app" (steps 5-12; steps 1-4 are ArrLocate's). An answer Http could not read
  * whole (over the size cap) or an empty GET answer is an error, never an empty list.
@@ -143,6 +143,7 @@ class ArrClient
     public function redact($s)
     {
         $key = isset($this->where['key']) ? (string) $this->where['key'] : '';
-        return $key === '' ? (string) $s : str_ireplace($key, 'REDACTED', (string) $s);
+        $s = ArrErrorText::urls($s); // app text: a URL keeps no query (a tracker key can be in any parameter)
+        return $key === '' ? $s : str_ireplace($key, 'REDACTED', $s);
     }
 }

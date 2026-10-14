@@ -49,7 +49,7 @@ class ArrDelete
         }
         $bytes = array_sum(array_column($files, 'bytes'));
         return ['files' => $files, 'bytes' => $bytes, 'freed' => array_sum(array_column($per, 'freed')), 'per' => $per,
-            'refused' => $refused, 'expect' => self::label($bytes) . ':' . $bytes];
+            'refused' => $refused, 'expect' => self::label($bytes) . ':' . $bytes . ':' . self::idHash(array_column($targets, 'id'))];
     }
 
     public static function summary(array $plan)
@@ -77,13 +77,17 @@ class ArrDelete
             throw new CliError('nothing deleted: --expect is missing',
                 'run `show <ids> --files --limit 0` first, show the user every file, then add --expect ' . $plan['expect']);
         }
-        if (!preg_match('/^(?:[0-9.,]+\s*[a-z]*:)?([0-9]+)$/i', trim($expect), $m)) {
+        $again = 'run `show <ids> --files --limit 0` again with exactly these ids and show the user the new list';
+        if (!preg_match('/^[0-9.]+[a-z]*:([0-9]+):([0-9a-f]{6})$/i', trim($expect), $m)) {
             throw new CliError("nothing deleted: --expect $expect is not the value `show --files` printed ({$plan['expect']})",
-                'give it as printed: size and exact bytes');
+                'give it as printed: size, exact bytes and the id check');
         }
         if ((string) (int) $m[1] !== (string) $plan['bytes']) {
-            throw new CliError("nothing deleted: the folders now total {$plan['expect']}, not $expect",
-                'run `show <ids> --files --limit 0` again and show the user the new list');
+            throw new CliError("nothing deleted: the folders now total {$plan['expect']}, not $expect", $again);
+        }
+        if (trim($expect) !== $plan['expect']) { // same bytes: the preview was of another set of ids
+            $ids = implode(' ', array_column($targets, 'id'));
+            throw new CliError("nothing deleted: --expect $expect was printed for other ids than $ids ({$plan['expect']})", $again);
         }
         $cfg = $c->call('GET', 'config/mediamanagement');
         $bin = isset($cfg['recycleBin']) && is_string($cfg['recycleBin']) ? rtrim($cfg['recycleBin'], '/') : '';
@@ -100,11 +104,20 @@ class ArrDelete
     }
 
     /**
-     * The size as the user sees it, without spaces: 41.2GiB. `expect` is <label>:<exact bytes> and only the exact bytes
-     * count, the same rule as torrent-clients/lib/DeletePlan.php mismatch(), so a change hidden by rounding refuses.
+     * The size as the user sees it, without spaces: 41.2GiB. `expect` is <label>:<exact bytes>:<id check>; the exact
+     * bytes count, as in torrent-clients/lib/DeletePlan.php mismatch(), so a change hidden by rounding refuses, and the
+     * id check binds it to the ids the user saw: an extra item with an empty folder leaves the bytes unchanged.
      */
     public static function label($bytes)
     {
         return str_replace(' ', '', CliHuman::bytes($bytes));
+    }
+
+    /** 6 hex of sha1 over the sorted target ids: `show 1` and `remove 1 3` differ (a chance match: 1 in 16.7 million). */
+    public static function idHash(array $ids)
+    {
+        $ids = array_unique(array_map('intval', $ids));
+        sort($ids);
+        return substr(sha1(implode(',', $ids)), 0, 6);
     }
 }

@@ -9,6 +9,7 @@ $lib = dirname(__DIR__, 3) . '/lib';
 require_once "$lib/Config.php";
 require_once "$lib/Host.php";
 require_once "$lib/Http.php";
+require_once "$lib/SecretFile.php";
 require_once dirname(__DIR__) . '/lib/Torrents.php';
 require_once dirname(__DIR__) . '/lib/Bencode.php';
 foreach (['QbitSecret', 'QbitEndpoint', 'QbitApi', 'QbitProc', 'QbitRestart', 'QbitStats', 'QbitAdd', 'QbitChange', 'QbitDetails',

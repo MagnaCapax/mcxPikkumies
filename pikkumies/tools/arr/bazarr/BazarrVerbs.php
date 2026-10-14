@@ -76,22 +76,20 @@ class BazarrVerbs
     /** Wanted episodes and movies: the items with missing subtitles. */
     public static function wanted(ArrClient $c, array $opt)
     {
-        $n = Arr::limit($opt);
-        $ep = $c->call('GET', 'episodes/wanted', ['start' => 0, 'length' => $n]);
-        $mv = $c->call('GET', 'movies/wanted', ['start' => 0, 'length' => $n]);
+        list($ep, $epNote, $epTotal) = ArrPages::get($c, 'episodes/wanted', ['start', 'length', 'data', 'total'], [], $opt);
+        list($mv, $mvNote, $mvTotal) = ArrPages::get($c, 'movies/wanted', ['start', 'length', 'data', 'total'], [], $opt);
         $out = [];
-        foreach (isset($ep['data']) ? array_filter((array) $ep['data'], 'is_array') : [] as $e) {
+        foreach ($ep as $e) {
             $out[] = ['kind' => 'episode', 'item' => 'series:' . (int) ArrRecords::s($e, 'sonarrSeriesId'),
                 'episode_id' => (int) ArrRecords::s($e, 'sonarrEpisodeId'), 'title' => ArrRecords::s($e, 'seriesTitle'),
                 'episode' => ArrRecords::s($e, 'episode_number'), 'episode_title' => ArrRecords::s($e, 'episodeTitle'),
                 'missing_languages' => self::languages(isset($e['missing_subtitles']) ? $e['missing_subtitles'] : [])];
         }
-        foreach (isset($mv['data']) ? array_filter((array) $mv['data'], 'is_array') : [] as $m) {
+        foreach ($mv as $m) {
             $out[] = ['kind' => 'movie', 'item' => 'movie:' . (int) ArrRecords::s($m, 'radarrId'), 'title' => ArrRecords::s($m, 'title'),
                 'missing_languages' => self::languages(isset($m['missing_subtitles']) ? $m['missing_subtitles'] : [])];
         }
-        return ['records' => $out, 'status' => ['episodes_wanted' => isset($ep['total']) ? (int) $ep['total'] : 0,
-            'movies_wanted' => isset($mv['total']) ? (int) $mv['total'] : 0]];
+        return ['records' => $out, 'status' => ['episodes_wanted' => $epTotal, 'movies_wanted' => $mvTotal] + $epNote + $mvNote];
     }
 
     /** Language names, with ":forced" / ":hi" when the subtitle is that kind. */

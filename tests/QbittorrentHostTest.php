@@ -136,4 +136,27 @@ return [
             exec('rm -rf ' . escapeshellarg($root));
         }
     },
+    'qbittorrent: a stored password others can read is set back to 0600; another owner or a symlink is refused' => function () {
+        qbitWith([], function ($fx) {
+            $f = $fx['dir'] . '/secrets/qbittorrent';
+            chmod($f, 0644);
+            list($code, $out) = qbitRun($fx, ['stats']);
+            clearstatcache();
+            check($code === 0 && (fileperms($f) & 0777) === 0600, 'a 0644 password file: ' . $out);
+            $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+            try {
+                (new QbitSecret(dirname($f), $uid + 1))->usable();
+                check(false, 'a password file another account owns was trusted');
+            } catch (CliError $e) {
+                check(strpos($e->getMessage(), 'belongs to uid') !== false && strpos($e->hint, 'qbittorrent.php login') !== false,
+                    'owner: ' . $e->getMessage());
+            }
+            $logins = qbitState($fx)['logins'];
+            rename($f, "$f.real");
+            symlink("$f.real", $f);
+            list($code, $out) = qbitRun($fx, ['stats']);
+            check($code === 1 && strpos($out, 'is a symlink') !== false && qbitState($fx)['logins'] === $logins,
+                'a symlinked password file: ' . $out);
+        });
+    },
 ];

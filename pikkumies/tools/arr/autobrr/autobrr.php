@@ -7,6 +7,7 @@
  * read from the environment except the shared PIKKUMIES_PMSS_DIR, PIKKUMIES_ARR_TIMEOUT and PIKKUMIES_ARR_WAIT.
  */
 require_once dirname(__DIR__) . '/lib/Arr.php';
+require_once dirname(__DIR__, 3) . '/lib/SecretFile.php';
 foreach (['AutobrrSecret', 'AutobrrConfig', 'AutobrrVerbs', 'AutobrrChange', 'AutobrrRun'] as $autobrrClass) {
     require_once __DIR__ . "/$autobrrClass.php";
 }

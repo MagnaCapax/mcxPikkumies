@@ -22,7 +22,7 @@ class ArrIndexers
                     })) {
                         throw new CliError('--indexer takes indexer ids from `list`, e.g. --indexer 3,5', 'nothing was searched');
                     }
-                    Arr::resolve($app, Arr::all($c(), $app), $ids); // unknown ids fail before anything is searched
+                    Arr::resolve($app, Arr::all($c(), $app), $ids, true); // unknown ids fail before anything is searched
                     $q['indexerIds'] = array_map('intval', $ids);
                 }
                 $rows = array_values(array_filter((array) $c()->call('GET', 'search', $q, null, ['timeout' => 60]), 'is_array'));
@@ -49,7 +49,7 @@ class ArrIndexers
                     }, array_values(array_filter($rows, 'is_array')));
                 }
                 $out = [];
-                foreach (Arr::resolve($app, $all, $args) as $t) {
+                foreach (Arr::resolve($app, $all, $args, true) as $t) {
                     $full = $c()->call('GET', "indexer/{$t['id']}", [], null, ['raw' => true, 'missing' => "no indexer {$t['id']}"]); // sent back as is, never printed
                     $r = $c()->call('POST', 'indexer/test', ['forceTest' => false], $full, ['accept' => [400], 'timeout' => 60]);
                     $code = isset($r['code']) ? $r['code'] : 200;
@@ -77,7 +77,8 @@ class ArrIndexers
         $out = [];
         foreach (is_array($list) ? $list : [] as $f) {
             if (is_array($f) && isset($f['errorMessage'])) {
-                $out[] = (isset($f['propertyName']) && $f['propertyName'] !== '' ? $f['propertyName'] . ': ' : '') . $f['errorMessage'];
+                $out[] = ArrErrorText::urls((isset($f['propertyName']) && $f['propertyName'] !== '' ? $f['propertyName'] . ': ' : '')
+                    . $f['errorMessage']); // the message can hold the tracker's request URL
             }
         }
         return $out;
