@@ -1,0 +1,19 @@
+{
+  "_comment": "Torrents the fake rTorrent (server.php) serves. {HOME} is replaced by the test's temporary home. Field values follow rTorrent 0.9.8: hash upper case (command_download.cc:676), ratio in thousandths (:229-237), d.directory is the torrent's folder for multi-file torrents and the containing folder for single files (:181-188, :886), f.path is relative to it (command_file.cc:132), labels URI-encoded by ruTorrent (PMSS rutorrent/js/rtorrent.js:1100).",
+  "torrents": [
+    {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "name": "Multi", "size": 3000, "done": 3000, "complete": 1, "state": 1, "open": 1, "active": 1,
+     "ratio": 1500, "up_rate": 300, "addtime": 1700000000, "load_date": 1750000000, "label": "TV%20Shows", "dir": "{HOME}/data/Multi", "multi": 1, "peers": 2,
+     "created": 1600000000, "seeds": 4, "nfiles": 2, "private": 1, "files": [["a.mkv", 2000], ["sub/b.nfo", 1000]]},
+    {"hash": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", "name": "single.mkv", "size": 500, "done": 500, "complete": 1, "state": 0, "open": 0, "active": 0,
+     "dir": "{HOME}/data", "multi": 0, "files": [["single.mkv", 500]]},
+    {"hash": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "name": "Checking", "size": 100, "done": 10, "state": 1, "open": 1, "active": 1, "hashing": 1,
+     "dir": "{HOME}/data/Checking", "multi": 1, "files": []},
+    {"hash": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", "name": "Broken", "size": 100, "done": 0, "state": 1, "open": 1, "active": 1,
+     "message": "Tracker: [Failure reason \"unregistered torrent\"]", "dir": "{HOME}/data/Broken", "multi": 1, "files": []},
+    {"hash": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", "name": "Linked", "size": 1300, "done": 1300, "complete": 1, "state": 1, "open": 1, "active": 1,
+     "dir": "{HOME}/data/Linked", "multi": 1, "files": [["real.mkv", 1000], ["lnk/victim.mkv", 300]]},
+    {"hash": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "name": "Fetching", "size": 1000, "done": 250, "state": 1, "open": 1, "active": 1, "down_rate": 4096,
+     "peers": 3, "message": "Tracker: [Tried all trackers.]", "dir": "{HOME}/data/Fetching", "multi": 1, "files": []}
+  ],
+  "calls": []
+}

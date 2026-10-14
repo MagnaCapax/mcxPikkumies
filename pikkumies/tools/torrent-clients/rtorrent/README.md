@@ -1,0 +1,70 @@
+# rtorrent
+
+Controls the user's own rTorrent: list, inspect, add, remove, pause and resume torrents, read stats and traffic, and restart it on PMSS. It speaks XML-RPC over rTorrent's SCGI socket, as the user, without root. rTorrent's SCGI interface has no password and can run commands, so the tool connects only to a socket or port owned by the user's own account.
+
+Sources: rTorrent 0.9.8 source files (`rakshasa/rtorrent` tag v0.9.8, copies fetched 2026-10-14), PMSS at commit `b41091da683e` (read-only), and the providers' public pages (fetched 2026-10-14). File and line numbers below refer to those.
+
+## Where rTorrent is found
+
+1. **Host.** PMSS when `/etc/seedbox/config` exists, else the provider from the hostname, else generic (`lib/Host.php`).
+2. **PMSS:** the unix socket `~/.rtorrent.socket` (PMSS `etc/seedbox/config/template.rtorrent.rc:28`, chmod 770 at `:10`; ruTorrent uses the same socket).
+3. **Other hosts:** the last `network.scgi.open_local` / `scgi_local` (unix socket) or `network.scgi.open_port` / `scgi_port` (TCP) line of `~/.rtorrent.rc` (Feral, SeedHost), then `~/.config/rtorrent/rtorrent.rc` (Whatbox), following one level of `import` / `try_import`. The old names are redirects of the new ones (rtorrent `main.cc:408-409`; `command_network.cc:295-296`). `~` is expanded as rTorrent does; a relative path is read from `$HOME`.
+4. **Owner check.** A socket must be a socket owned by the user (`Host::ownsSocket`). A TCP port must be on 127.0.0.1, `::1`, `localhost` or all addresses, and its listener must belong to the user in `/proc/net/tcp(6)` (`Host::ownsListener`, ADR-0019); another account's port is never contacted.
+
+Errors name the cause: not installed (no socket or rc file and no `rtorrent` in `/usr/local/bin`, `/usr/bin` or `PATH`; PMSS installs to `/usr/local/bin`, `scripts/lib/update/apps/rtorrent.php:78`), not enabled (PMSS `~/.rtorrentDisable`, or no SCGI line in the rc file), not running (no socket, or nothing accepts on it), busy (no answer within 5 s: state unknown, not down; a busy rTorrent stops accepting, which PMSS watches for in `scripts/lib/rtorrent/scgi/queue.php:46-75`), refused, or the socket or port belongs to another account.
+
+## Protocol
+
+- **SCGI.** A netstring header whose first field is `CONTENT_LENGTH`, then the XML body (rtorrent `rpc/scgi_task.cc:139-146`); the same bytes PMSS sends (`scripts/lib/rtorrent/scgi/xmlrpc.php:9-13`). The reply starts with `Status: 200 OK` headers (`scgi_task.cc:234`). One connection per call, 5 s timeout, replies capped at 64 MiB.
+- **XML-RPC.** Own encoder and decoder for int, i8, boolean, double, string, base64, array and struct (`XmlRpc.php`). rTorrent accepts base64 parameters (`rpc/xmlrpc.cc:292`). A `<fault>` becomes an error naming the method and rTorrent's fault text.
+- **Target rule.** The first parameter of a call with arguments is the target: `""` for global commands, or the hash exactly as `d.hash` returns it, upper case (`command_download.cc:676`). The tool always sends the hash from rTorrent's own list, never a re-cased copy.
+
+## rTorrent calls (0.9.8 source)
+
+| verb | call | source |
+|---|---|---|
+| list | `d.multicall2("", "main", d.hash=, d.name=, d.size_bytes=, d.completed_bytes=, d.complete=, d.state=, d.is_open=, d.is_active=, d.hashing=, d.is_hash_checking=, d.ratio=, d.down.rate=, d.up.rate=, d.custom=addtime, d.load_date=, d.custom1=, d.directory=, d.base_path=, d.is_multi_file=, d.message=, d.peers_connected=)` | `command_events.cc:273-303, 397`; `command_download.cc:676-886` |
+| show | `d.creation_date`, `d.timestamp.started`, `d.timestamp.finished`, `d.down.total`, `d.up.total`, `d.peers_connected`, `d.peers_complete`, `d.size_files`, `d.is_private`, `d.priority`; `t.multicall(hash, "", t.url=, t.is_enabled=, t.scrape_complete=, t.scrape_incomplete=)` | `command_download.cc:684, 692-694, 720, 792-793, 840-843, 860, 891, 911`; `command_tracker.cc:115-155` |
+| files | `d.directory` + `f.multicall(hash, "", f.path=, f.size_bytes=)`; `d.directory` is the torrent's folder for a multi-file torrent and the containing folder for a single file, `f.path` is relative to it | `command_download.cc:181-188, 379-401, 886, 909`; `command_file.cc:121, 132` |
+| add | `load.start` / `load.normal` (`--paused`) for magnets and URLs, `load.raw_start` / `load.raw` with the .torrent contents as base64; `--dir` adds the command `d.directory.set=<dir>`. Loading is asynchronous and returns 0. | `command_events.cc:198-213, 383-392`; `download_factory.cc:68-95` (http, https, ftp, `magnet:?`) |
+| pause, resume | `d.stop`, `d.start`, as ruTorrent's pause and resume | `command_download.cc:705-706`; PMSS `etc/skel/www/rutorrent/js/rtorrent.js:411, 421` |
+| remove | `d.custom5.set(hash, "")` when ruTorrent's delete-data flag is set, then `d.erase`, then `download_list` to confirm. rTorrent's default erased hook already deletes the tied watch-dir .torrent, so `d.delete_tied` is never called. | `command_download.cc:664-668, 731, 756`; `main.cc:282`; `command_events.cc:396`; PMSS `rutorrent/plugins/erasedata/init.php:10-22` |
+| stats | `system.client_version`, `system.library_version`, `system.pid`, `system.time`, `system.startup_time` (defined by the PMSS rc, optional), `network.listen.port` | `command_local.cc:238-243, 263`; PMSS `template.rtorrent.rc:55`; `command_network.cc:245` |
+| traffic | `throttle.global_down.rate`, `throttle.global_up.rate`, `.total`, `.max_rate` | `command_throttle.cc:208-215` |
+
+**Records.** `state` follows ruTorrent's reading of the same fields (PMSS `rutorrent/js/rtorrent.js:1072-1083`): hashing or hash checking → `checking`; a message other than `Tracker: [Tried all trackers.]` → `error`; closed, stopped, or started but not active → `paused`; complete → `seeding`; else `downloading`, or `stalled` when nothing comes in and no peer is connected. `ratio` is `d.ratio` / 1000 (`command_download.cc:229-237`). `label` is `d.custom1` URI-decoded, as ruTorrent stores it (`rtorrent.js:1100`). `added_at` is ruTorrent's `addtime` (`plugins/seedingtime/init.php:6-7`), else `d.load_date`. `path` is `d.base_path`, or, when rTorrent has not opened the torrent yet, the folder (multi-file) or file (single) under `d.directory`. `id` is the hash in lower case; the upper-case hash stays internal for calls back to rTorrent.
+
+**add ids.** A magnet's id is its `btih` (hex, or base32 converted to hex). A .torrent file's id is the SHA-1 of its bencoded `info` dictionary, which is how rTorrent names it; files over 3 MiB are refused (base64 must stay under the 4 MiB XML-RPC limit PMSS sets, `template.rtorrent.rc:35`). A URL is fetched by rTorrent, so its id is not known until it shows up in `list`. After sending, the tool reads `download_list` and says `added` only for ids rTorrent lists. `--dir` must be an existing folder inside `$HOME` (checked for every client in `lib/Torrents.php`) and may not contain `, ; " ' { } ( ) $ \`, because it goes into an rTorrent command string.
+
+## Deleting data
+
+rTorrent has no command that deletes data (`d.erase` only takes the download out, `command_download.cc:731`), so the unit deletes the files itself after the shared plan (`lib/DeletePlan.php`: the exact `--expect` byte total and the shared-file check, against the other torrents in rTorrent). The preview (`show --files`) uses the same rules (`rtorrent/Files.php`): it refuses a torrent step 1 refuses, and marks the files step 4 will leave as `skip`, out of `expect` and `freed_bytes` (`RtorrentFiles::unsafe`). For the shared-file check the other torrents' folders come from the list (`d.directory` in `d.multicall2`) and their files from one `f.multicall` each, answered locally; rTorrent has no call that lists several torrents' files. Order, so the disk is really freed and nothing outside the torrent is touched:
+
+1. For every torrent first: `d.directory` (refused when empty or outside `$HOME`), `d.is_multi_file`, and `f.path` of each file (refused when a path is absolute or contains `..`). Nothing is erased, and no flag below is cleared, when one torrent is refused.
+2. ruTorrent's erasedata plugin registers erase hooks that delete the data when `d.custom5` is set (PMSS `rutorrent/plugins/erasedata/init.php:10-22`, `update.php:21-57`); a flag left by a failed ruTorrent "delete with data" would make even a plain `remove` delete files. So `d.custom5` is emptied once every torrent's step 1 has passed, before any erase (refused, with nothing erased, if it stays set): the unit alone decides what is deleted.
+3. `d.erase` each torrent, then `download_list`: a torrent still listed keeps its files. Erasing first matters: files unlinked while rTorrent holds them open keep using the disk until it restarts.
+4. Unlink each file at its own path (a symlinked file loses only the link), only when no folder on the way is a symlink and its parent's real path is inside the torrent's folder and inside `$HOME`. Files that fail that check stay and are listed as `orphans` (the preview showed them as `skip`); a file whose unlink fails is an orphan and an `errors` entry. `disposal` is then `partial`. `freed_bytes` counts each file that is gone afterwards, once per inode (`lib/DeleteRun.php`, `lib/DeleteFreed.php`), and any `errors` end the call with `ok: false`.
+5. Remove folders left empty, deepest first, only below the torrent's folder; a multi-file torrent's own folder goes too when it is empty and named after the torrent (`d.directory.set` appends the name, `command_download.cc:181-188`), never `$HOME`. A single-file torrent's containing folder is never removed. Other files in those folders (subtitles, .nfo) are left alone.
+
+## Restart
+
+- **PMSS**, as PMSS userTransfer does it (`scripts/lib/userTransfer/postSetup.php:87-139`): refused while `~/.rtorrentDisable` exists, because the user stopped rTorrent in the panel and the watchdog keeps it stopped (`scripts/cron/checkRtorrent.php:72-80`; the panel's stop/start/restart, `etc/skel/www/rtorrentRestart.php:14-24`). Otherwise the tool touches `~/www/.rtorrentRestart` and runs `php ./.rtorrentRestart.php` from `$HOME`. That PMSS script consumes the marker, sends SIGTERM to the user's own rtorrent, SIGKILL to survivors after 5 s, waits 15 s and starts `.rtorrentExecute.php` in screen (`etc/skel/.rtorrentRestart.php:12-13, 106-140`). Then the tool polls `system.client_version` for up to 30 s, as userTransfer polls `download_list` (`postSetup.php:152-178`). It never kills processes itself.
+- **Other hosts**: refused, with the provider's own way from its public documentation: Ultra.cc `app-rtorrent restart` (docs.ultra.cc/applications/rtorrent-rutorrent); Whatbox's Manage page (whatbox.ca/wiki/bittorrent_clients); Feral restarts rtorrent by itself within five minutes (feralhosting.com/wiki/software/rutorrent); SeedHost's Client Area (seedhost.eu knowledgebase 211); elsewhere the way it was started.
+
+## Tests
+
+`tests/Rtorrent*Test.php` (helpers in `tests/fixtures/rtorrent/helpers.php`) run the unit against a fake rTorrent (`tests/fixtures/rtorrent/server.php`, a PHP SCGI server on a unix socket or a 127.0.0.1 port) with `HOME` in a temporary directory and the torrents of `tests/fixtures/rtorrent/torrents.json`. PMSS and other host families are tested through a small generated script that builds `RtorrentClient` with the family fixed; the unit has no test-only switches.
+
+## Unverified
+
+- [UNVERIFIED] Only rTorrent 0.9.8 source was read. PMSS hosts on Debian older than 10 run 0.9.6 (PMSS `scripts/lib/update/apps/rtorrent.php:35-53`); method names there were not checked.
+- [UNVERIFIED] Whether rTorrent accepts a lower-case hash as target. The tool never relies on it: it sends `d.hash`'s own string.
+- [UNVERIFIED] `d.load_date` (the `added_at` fallback when ruTorrent's `addtime` is missing) may be the time the torrent was loaded in the current session rather than first added; libtorrent's source was not read.
+- [UNVERIFIED] Whether `d.directory` can be empty for a loaded torrent. The tool refuses to list files or delete data for such a torrent rather than guessing a path.
+- [UNVERIFIED] rTorrent's `branch=` treats an empty `d.custom5` as false, so ruTorrent's erase hooks do nothing after it is emptied; the `branch` command's source was not among the local copies.
+- [UNVERIFIED] The XML-RPC fault codes rTorrent's xmlrpc-c returns; the tool uses only `faultString`.
+- [UNVERIFIED] Where Feral and Ultra.cc put the SCGI socket or port: their pages do not say. The tool reads the rc file; Ultra.cc's exact rc path under `~/.config/rtorrent` was not confirmed (only `~/.config/rtorrent/rtorrent.rc` and `~/.rtorrent.rc` are tried).
+- [UNVERIFIED] SeedHost's TCP SCGI on localhost is inferred from its multi-instance guide (`scgi_port = localhost:<port>`); handled by the TCP path.
+- [UNVERIFIED] A relative socket path in an rc file is read from `$HOME`; rTorrent resolves it from its own working directory, which is `$HOME` on PMSS (`etc/seedbox/config/user.crontab.default:1-2` starts it from `~`) but not known elsewhere.
+- [UNVERIFIED] The real `.rtorrentRestart.php` run takes about 20 s plus start-up; the 30 s poll after it was taken from userTransfer, not timed on a live host.
+- Free space is the user's quota (`quota_free_bytes`, from `lib/Quota.php`); `fs_free_bytes` is the whole filesystem, which on shared servers is far more than the user may use.
