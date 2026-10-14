@@ -1,7 +1,7 @@
 <?php
 /**
- * QbitDetails: what `show` adds to a list record (torrents/properties and torrents/trackers,
- * qbt-wiki-5.md:1340-1440) and the torrent's files with absolute paths for the delete preview
+ * QbitDetails: what `show` adds to a list record (torrents/properties, qbt-wiki-5.md:1340-1440; the trackers are
+ * `show --trackers`, in QbitExtras) and the torrent's files with absolute paths for the delete preview
  * (torrents/files, :1540-1600).
  */
 class QbitDetails
@@ -14,14 +14,7 @@ class QbitDetails
         }
         $keep = ['total_size', 'piece_size', 'pieces_num', 'pieces_have', 'seeds', 'seeds_total', 'peers', 'peers_total', 'total_uploaded',
             'total_downloaded', 'time_elapsed', 'seeding_time', 'eta', 'creation_date', 'completion_date', 'comment', 'infohash_v1', 'infohash_v2'];
-        $out = array_intersect_key($p, array_flip($keep));
-        $out['trackers'] = [];
-        foreach ((array) $c->api->json('torrents/trackers', ['hash' => $native]) as $t) {
-            if (isset($t['url']) && strpos((string) $t['url'], '** [') !== 0) { // skip the DHT/PeX/LSD rows (tc-5.0.0.cpp:175-245)
-                $out['trackers'][] = ['url' => (string) $t['url'], 'status' => isset($t['status']) ? (int) $t['status'] : 0, 'message' => isset($t['msg']) ? (string) $t['msg'] : ''];
-            }
-        }
-        return $out;
+        return array_intersect_key($p, array_flip($keep));
     }
 
     /**

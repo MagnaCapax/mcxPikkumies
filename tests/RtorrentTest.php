@@ -26,13 +26,16 @@ return [
             rtorrentDone($h, $p);
         }
     },
-    'rtorrent: show gives details and trackers with the passkey removed; the hash goes to rtorrent as d.hash prints it' => function () {
+    'rtorrent: show gives details (trackers only with --trackers); the hash goes to rtorrent as d.hash prints it' => function () {
         $h = rtorrentHome();
         $p = rtorrentServe($h);
         try {
             list($code, $out, $l) = rtorrentRun($h, ['show', 'aaaaaaaa']);
             check($code === 0 && $l[0]['id'] === str_repeat('a', 40) && array_keys($l[0])[0] === 'id' && $l[0]['seeds'] === 4 && $l[0]['private'] === true && $l[0]['file_count'] === 2, 'show: ' . $out);
-            check(strpos($out, 'SECRETPASSKEY123') === false && strpos($l[0]['trackers'][0]['url'], 'REDACTED') !== false, 'passkey leaked: ' . $out);
+            check(!isset($l[0]['trackers']) && !rtorrentCalls($h, 't.multicall') && strpos($out, 'SECRETPASSKEY123') === false,
+                'show without --trackers read the trackers: ' . $out);
+            check($l[0]['completed_at'] === 1700100000 && $l[0]['uploaded'] === 4500 && $l[0]['seeding_time'] === null,
+                'list fields in show: ' . $out);
             check(rtorrentCalls($h, 'd.creation_date')[0][1] === str_repeat('A', 40), 'the target must be the upper-case hash');
             list($code, $out, $l) = rtorrentRun($h, ['show', str_repeat('a', 40), '--files']);
             $s = $l[count($l) - 1];

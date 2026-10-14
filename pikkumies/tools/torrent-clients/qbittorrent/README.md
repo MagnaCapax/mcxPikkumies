@@ -1,6 +1,6 @@
 # qbittorrent
 
-Controls the user's own qBittorrent (qbittorrent-nox): list, inspect, add, remove, pause and resume torrents, read stats and traffic, and restart it on PMSS and Ultra.cc. It talks to the WebUI API v2 on 127.0.0.1 through `lib/Http.php`, as the user, without root. It never changes qBittorrent's login settings (no localhost bypass, no subnet whitelist, no new credentials).
+Controls the user's own qBittorrent (qbittorrent-nox): list, inspect, add, remove, pause and resume torrents, recheck and reannounce them, read stats and traffic, read and set the global speed limits, and restart it on PMSS and Ultra.cc. It talks to the WebUI API v2 on 127.0.0.1 through `lib/Http.php`, as the user, without root. It never changes qBittorrent's login settings (no localhost bypass, no subnet whitelist, no new credentials).
 
 Sources below: `PMSS:` = the PMSS clone at commit `5b493872` (2026-10-08), read-only; qBittorrent source and wiki copies fetched 2026-10-14 (`tc-5.0.0.cpp` = release-5.0.0 `torrentscontroller.cpp`, `webapp-5.0.0.cpp` = `webapplication.cpp`, `appc.cpp` = `appcontroller.cpp`, `tcr.cpp` = `torrentcontentremover.cpp`, `qbt-wiki-5.md` = the WebUI API (qBittorrent 5.0) wiki page); research notes `torrent-clients.md` (2026-10-14).
 
@@ -27,7 +27,12 @@ Errors name the cause: not installed (no port anywhere), not enabled (PMSS witho
 |---|---|---|
 | version | `GET app/webapiVersion`, `GET app/version` | `qbt-wiki-5.md:185-215`; `appc.cpp:72-80` |
 | list | `GET torrents/info` in pages of 500 (`sort=hash`, `limit`, `offset`; a row seen twice counts once), or `hashes=H1\|H2` for named torrents. Pages keep each answer far below `lib/Http.php`'s 5 MiB limit; an answer over it is reported as such, not as "not JSON" | `qbt-wiki-5.md:1202-1338, 1213-1216` |
-| show | `GET torrents/properties?hash=H`, `GET torrents/trackers?hash=H` (the DHT/PeX/LSD rows are skipped) | `qbt-wiki-5.md:1340-1500`; `tc-5.0.0.cpp:175-245, 410-423` |
+| show | `GET torrents/properties?hash=H` | `qbt-wiki-5.md:1340-1440`; `tc-5.0.0.cpp:410-423` |
+| show --trackers | `GET torrents/trackers?hash=H`: `url`, `status` (0 disabled, 1 not contacted, 2 working, 3 updating, 4 not working), `tier`, `num_seeds`, `num_leeches`, `msg`; the DHT/PeX/LSD rows (`** [DHT] **`...) are skipped | `qbt-wiki-5.md:1444-1490`; `tc-5.0.0.cpp:175-245, 506-530` |
+| list fields | `completion_on` (`completed_at`; `null` unless above 0 and at most a day in the future), `seeding_time` (API 2.8.1 and later), `isPrivate` (5.0.0 and later), `uploaded` (all time); a field the version lacks is `null` | `qbt-wiki-5.md:1241, 1251, 1267, 1279`; `qbt-wiki-4.1.md:215` |
+| recheck | `POST torrents/recheck` with `hashes=H1\|H2` | `qbt-wiki-5.md:1744-1766`; `tc-5.0.0.cpp:1260-1266` |
+| reannounce | `POST torrents/reannounce` with `hashes=H1\|H2` | `qbt-wiki-5.md:1768-1790`; `tc-5.0.0.cpp:1268-1274` |
+| limit | read: `dl_rate_limit`, `up_rate_limit` of `transfer/info` (as `traffic`); set: `GET transfer/speedLimitsMode` (1 = alternative limits on), then `POST transfer/setDownloadLimit` / `transfer/setUploadLimit` with `limit` in bytes/s, 0 = none. qBittorrent keeps whole KiB/s (1 to 1024 becomes 1 KiB/s, more is cut to whole KiB), and with alternative limits on the same calls change the alternative limits | `qbt-wiki-5.md:1088-1102, 1134-1180`; `sessionimpl-5.0.0.cpp:477-480, 3359-3373, 3452-3464` |
 | files | `GET torrents/files?hash=H`; names are relative to the torrent's base folder: `content_path` minus the single file's name or the common root folder, or `content_path` itself for several files without a root folder (where the data is, the incomplete folder while downloading); `save_path` only when `content_path` is empty | `qbt-wiki-5.md:1242, 1540-1600` |
 | shared-file check | the rows of the paged list, then `GET torrents/files?hash=H` for each other torrent: it takes one hash, and the API has no call for several torrents' files | `qbt-wiki-5.md:1540-1551` |
 | add | `POST torrents/add`, multipart: `urls` or a `torrents` file part, `savepath`, and `stopped=true` (API ≥ 2.11) or `paused=true` (older); answer `Ok.`/`Fails.`, 415 for a bad file | `qbt-wiki-5.md:1792-1884`; `tc-5.0.0.cpp:693-806`; `qbt-wiki-4.1.md:1912` |
@@ -70,4 +75,7 @@ States map as `downloading`, `forcedDL`, `metaDL`, `forcedMetaDL`, `allocating` 
 - [UNVERIFIED] Uptime assumes 100 clock ticks per second in `/proc/<pid>/stat` (USER_HZ).
 - [UNVERIFIED] Feral and Ultra.cc: whether `WebUI\Port` in the user's `qBittorrent.conf` is the port reachable on 127.0.0.1 (Feral runs qBittorrent in a container with port 9001), and whether the WebUI login there is the slot login.
 - [UNVERIFIED] That `app-qbittorrent restart` exits 0 on success.
+- [UNVERIFIED] What `completion_on` holds for a torrent that has not finished (the wiki does not say; values of 0 or below, and values more than a day in the future such as 4294967295, print as `null`), and whether `num_seeds`/`num_leeches` are -1 when the tracker sent no scrape (values below 0 print as `null`).
+- [UNVERIFIED] Whether a limit set through the API is written to qBittorrent's config at once: the values are session settings (`sessionimpl-5.0.0.cpp:477-480`), but the settings storage code is not in the local copies, so the record has no `persists` field.
+- The 4.1 wiki copy has the same calls: `speedLimitsMode` (`qbt-wiki-4.1.md:1130`), `setDownloadLimit` (:1176), `setUploadLimit` (:1208), `recheck` (:1787), `reannounce` (:1811). [UNVERIFIED] on a running 4.x client.
 - Timeouts: `lib/Http.php` fixes the connect timeout at 10 s; the tool sets the whole request to 5 s for the version probe and login (the brief asked for a 5 s connect timeout) and 20 s for other calls.

@@ -9,7 +9,8 @@ class RtorrentRecords
     /** d.multicall2 columns, in the order row() reads them (command_download.cc and command_events.cc:273-303). */
     const FIELDS = ['d.hash=', 'd.name=', 'd.size_bytes=', 'd.completed_bytes=', 'd.complete=', 'd.state=', 'd.is_open=',
         'd.is_active=', 'd.hashing=', 'd.is_hash_checking=', 'd.ratio=', 'd.down.rate=', 'd.up.rate=', 'd.custom=addtime',
-        'd.load_date=', 'd.custom1=', 'd.directory=', 'd.base_path=', 'd.is_multi_file=', 'd.message=', 'd.peers_connected='];
+        'd.load_date=', 'd.custom1=', 'd.directory=', 'd.base_path=', 'd.is_multi_file=', 'd.message=', 'd.peers_connected=',
+        'd.timestamp.finished=', 'd.is_private=', 'd.up.total='];
 
     /** The shared record (tools/torrent-clients/README.md "Records") from one d.multicall2 row. */
     public static function row(array $d)
@@ -24,7 +25,12 @@ class RtorrentRecords
             'size' => $size, 'done' => $done, 'ratio' => round((int) $d['d.ratio='] / 1000, 3), // d.ratio is in thousandths (command_download.cc:229-237)
             'down_rate' => (int) $d['d.down.rate='], 'up_rate' => (int) $d['d.up.rate='],
             'added_at' => $added > 0 ? $added : (int) $d['d.load_date='], 'label' => rawurldecode((string) $d['d.custom1=']), // ruTorrent URI-encodes labels (rtorrent.js:1100)
-            'path' => $path, 'message' => (string) $d['d.message=']];
+            'path' => $path, 'message' => (string) $d['d.message='],
+            // finished: set once, when the download finishes or a hash check finds it complete (default hooks, main.cc:284-285),
+            // 0 before. rTorrent keeps no seeding-time counter (no such command in 0.9.8), and "now minus finished" would
+            // count stopped days as seeding, so null.
+            'completed_at' => (int) $d['d.timestamp.finished='] > 0 ? (int) $d['d.timestamp.finished='] : null, 'seeding_time' => null,
+            'private' => (bool) $d['d.is_private='], 'uploaded' => (int) $d['d.up.total=']];
     }
 
     /** ruTorrent's own reading of the same fields (PMSS etc/skel/www/rutorrent/js/rtorrent.js:1072-1083), mapped to the shared words. */
@@ -46,7 +52,7 @@ class RtorrentRecords
         return ((int) $d['d.down.rate='] === 0 && (int) $d['d.peers_connected='] === 0) ? 'stalled' : 'downloading';
     }
 
-    /** show: the list record plus details and trackers (command_download.cc; command_tracker.cc). */
+    /** show: the list record plus details (command_download.cc); the trackers are `show --trackers` (in Extras.php). */
     public static function details(RtorrentClient $c, $native)
     {
         $r = $c->record($native);
@@ -56,10 +62,6 @@ class RtorrentRecords
             $r[$k] = $c->call($m, [$native]);
         }
         $r['private'] = (bool) $r['private'];
-        $r['trackers'] = [];
-        foreach ((array) $c->call('t.multicall', [$native, '', 't.url=', 't.is_enabled=', 't.scrape_complete=', 't.scrape_incomplete=']) as $t) {
-            $r['trackers'][] = ['url' => (string) $t[0], 'enabled' => (bool) $t[1], 'seeders' => (int) $t[2], 'leechers' => (int) $t[3]];
-        }
         return $r;
     }
 

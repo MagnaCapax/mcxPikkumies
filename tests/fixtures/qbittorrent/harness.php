@@ -38,10 +38,12 @@ function qbitFixture(array $over = [], $start = true)
     $states = ['checkingUP' => 'e', 'queuedDL' => 'f', 'error' => '0', 'metaDL' => '1', 'moving' => '2', 'stalledDL' => 'd', 'missingFiles' => '3'];
     $torrents = [
         $t(str_repeat('a', 40), 'Alpha', 'uploading', 1, ['size' => 3000, 'completed' => 3000, 'content_path' => "$data/Alpha.mkv",
+            'completion_on' => 1700000900, 'seeding_time' => 7200, 'isPrivate' => true, 'uploaded' => 9000,
             'files' => [['index' => 0, 'name' => 'Alpha.mkv', 'size' => 3000]], 'props' => ['total_size' => 3000, 'seeds' => 4, 'comment' => 'hi', 'infohash_v1' => str_repeat('a', 40), 'save_path' => $data]]),
         $t(str_repeat('B', 40), 'Beta', 'stoppedUP', 1, ['size' => 6000, 'completed' => 6000,
             'files' => [['index' => 0, 'name' => 'Beta/x.bin', 'size' => 5000], ['index' => 1, 'name' => 'Beta/sub/y.bin', 'size' => 1000]]]),
-        $t(str_repeat('c', 40), 'Gamma', 'pausedDL', 0.5),
+        $t(str_repeat('c', 40), 'Gamma', 'pausedDL', 0.5, ['completion_on' => 4294967295]),
+            // an unfinished torrent as qBittorrent 4.x reports it [UNVERIFIED]
     ];
     foreach ($states as $state => $ch) {
         $torrents[] = $t(str_repeat($ch, 40), "T-$state", $state, 0.2);

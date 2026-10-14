@@ -7,11 +7,14 @@
  */
 class DelugeClient implements TorrentClient
 {
+    use DelugeExtras; // show details, recheck, reannounce, limits, trackers, the newer list fields
+
     /** Deluge state words -> the shared ones (torrent.py:51-60, 640-655). Moving has no shared word. */
     const STATES = ['Downloading' => 'downloading', 'Seeding' => 'seeding', 'Paused' => 'paused', 'Checking' => 'checking',
         'Allocating' => 'checking', 'Queued' => 'queued', 'Error' => 'error'];
     const KEYS = ['hash', 'name', 'state', 'progress', 'total_wanted', 'total_done', 'ratio', 'download_payload_rate',
-        'upload_payload_rate', 'time_added', 'download_location', 'message', 'tracker_status'];
+        'upload_payload_rate', 'time_added', 'download_location', 'message', 'tracker_status', 'completed_time', 'seeding_time', 'private',
+            'total_uploaded'];
 
     private $home;
     private $family;
@@ -58,20 +61,9 @@ class DelugeClient implements TorrentClient
                 'ratio' => max(0.0, round((float) self::v($s, 'ratio'), 3)), // -1 means nothing downloaded yet (torrent.py:747-757)
                 'down_rate' => (int) self::v($s, 'download_payload_rate'), 'up_rate' => (int) self::v($s, 'upload_payload_rate'),
                 'added_at' => (int) self::v($s, 'time_added'), 'label' => '', 'path' => rtrim((string) self::v($s, 'download_location'), '/'),
-                'message' => $msg];
+                'message' => $msg] + self::listFields($s);
         }
         return $out;
-    }
-
-    public function details($native)
-    {
-        $s = (array) $this->rpc()->call('core.get_torrent_status', [$native, ['state', 'tracker_host', 'tracker_status', 'num_seeds', 'num_peers',
-            'total_seeds', 'total_peers', 'eta', 'total_uploaded', 'total_size', 'num_files', 'private', 'completed_time', 'seeding_time']]); // core.py:758
-        return ['client_state' => self::v($s, 'state'), 'tracker' => self::v($s, 'tracker_host'), 'tracker_status' => self::v($s, 'tracker_status'),
-            'seeds' => (int) self::v($s, 'num_seeds'), 'peers' => (int) self::v($s, 'num_peers'), 'swarm_seeds' => (int) self::v($s, 'total_seeds'),
-            'swarm_peers' => (int) self::v($s, 'total_peers'), 'eta' => (int) self::v($s, 'eta'), 'uploaded_bytes' => (int) self::v($s, 'total_uploaded'),
-            'total_size' => (int) self::v($s, 'total_size'), 'file_count' => (int) self::v($s, 'num_files'), 'private' => (bool) self::v($s, 'private'),
-            'completed_at' => (int) self::v($s, 'completed_time'), 'seeding_time' => (int) self::v($s, 'seeding_time')];
     }
 
     public function files($native)

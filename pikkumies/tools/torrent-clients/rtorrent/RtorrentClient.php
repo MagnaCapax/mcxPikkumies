@@ -13,9 +13,12 @@ require_once __DIR__ . '/Add.php';
 require_once __DIR__ . '/Deleter.php';
 require_once __DIR__ . '/Files.php';
 require_once __DIR__ . '/Restart.php';
+require_once __DIR__ . '/Extras.php';
 
 class RtorrentClient implements TorrentClient
 {
+    use RtorrentExtras; // pause, resume, recheck, reannounce, limits, trackers
+
     public $family;
     public $home;
     public $uid;
@@ -103,31 +106,6 @@ class RtorrentClient implements TorrentClient
     public function remove(array $natives, $withData)
     {
         return RtorrentDeleter::remove($this, $natives, (bool) $withData);
-    }
-
-    public function pause(array $natives)
-    {
-        return $this->each('d.stop', $natives); // ruTorrent's pause (rtorrent.js:407-414; command_download.cc:706)
-    }
-
-    public function resume(array $natives)
-    {
-        return $this->each('d.start', $natives); // ruTorrent's resume (rtorrent.js:417-424; command_download.cc:705)
-    }
-
-    /** Calls $method on each id (never an empty list: Torrents::natives guarantees one), then reads the states back. */
-    private function each($method, array $natives)
-    {
-        foreach ($natives as $n) {
-            $this->call($method, [$n]);
-        }
-        $this->torrents();
-        $out = [];
-        foreach ($natives as $n) {
-            $r = isset($this->byNative[$n]) ? $this->byNative[$n] : ['id' => strtolower($n), 'name' => '', 'state' => 'unknown'];
-            $out[] = ['id' => $r['id'], 'name' => $r['name'], 'state' => $r['state']];
-        }
-        return $out;
     }
 
     public function stats()

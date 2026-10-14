@@ -6,7 +6,9 @@
  * else 403 (webapp-5.0.0.cpp:323-324); GET reads / POST changes, 405 otherwise (qbt-wiki-5.md:121-125);
  * torrents/info rows (:1202-1338), properties (:1340-1440), files (:1540-1600), transfer/info
  * (:1028-1086); stop/start exist from API 2.11, pause/resume before (tc-5.0.0.cpp:928-942, research §2.3);
- * add answers "Ok."/"Fails." and takes `stopped` (5.x) or `paused` (4.x) (tc-5.0.0.cpp:693-806).
+ * add answers "Ok."/"Fails." and takes `stopped` (5.x) or `paused` (4.x) (tc-5.0.0.cpp:693-806); recheck and reannounce take
+ * hashes (tc-5.0.0.cpp:1260-1274); the global limits are bytes/s kept as whole KiB/s (sessionimpl-5.0.0.cpp:3359-3373);
+ * trackers rows (tc-5.0.0.cpp:506-530) start with the DHT/PeX/LSD rows (:175-245).
  */
 $file = getenv('QBIT_FAKE_STATE');
 $s = json_decode((string) file_get_contents($file), true);
@@ -37,7 +39,9 @@ if ($s['auth'] && (!isset($_COOKIE['SID']) || $_COOKIE['SID'] !== 'fakesid')) {
     $done(403, 'Forbidden');
 }
 $v5 = version_compare($s['api'], '2.11', '>=');
-$writes = ['torrents/stop', 'torrents/start', 'torrents/pause', 'torrents/resume', 'torrents/delete', 'torrents/add'];
+$writes = ['torrents/stop', 'torrents/start', 'torrents/pause', 'torrents/resume', 'torrents/delete', 'torrents/add', 'torrents/recheck',
+    'torrents/reannounce',
+    'transfer/setDownloadLimit', 'transfer/setUploadLimit'];
 if (in_array($api, $writes, true) !== ($method === 'POST')) {
     $done(405, 'Method Not Allowed');
 }
@@ -91,8 +95,29 @@ switch ($api) {
             $done(404, 'Not Found');
         }
         $t = $s['torrents'][$i];
-        $done(200, $api === 'torrents/files' ? $t['files'] : ($api === 'torrents/trackers' ? [['url' => '** [DHT] **', 'status' => 2, 'msg' => ''],
-            ['url' => 'https://tracker.example/announce?passkey=SECRETKEY123', 'status' => 2, 'msg' => 'working']] : $t['props']), true);
+        $done(200, $api === 'torrents/files' ? $t['files'] : ($api === 'torrents/trackers' ? [['url' => '** [DHT] **', 'status' => 0,
+            'tier' => -1, 'msg' => ''],
+            ['url' => 'https://tracker.example/announce?passkey=SECRETKEY123', 'status' => 2, 'tier' => 0, 'num_seeds' => 9,
+                'num_leeches' => 2, 'msg' => 'working'],
+            ['url' => 'http://tracker2.example:2710/SECRETPATHKEY4567abcd/announce', 'status' => 4, 'tier' => 1, 'num_seeds' => -1,
+                'num_leeches' => -1, 'msg' => 'unregistered torrent']] : $t['props']), true);
+    case 'torrents/recheck':
+    case 'torrents/reannounce':
+        foreach ($hashes as $h) {
+            if ($api === 'torrents/recheck' && ($i = $find($h)) >= 0) {
+                $s['torrents'][$i]['state'] = $s['torrents'][$i]['progress'] >= 1 ? 'checkingUP' : 'checkingDL';
+            }
+        }
+        $done(200, '');
+    case 'transfer/speedLimitsMode':
+        $done(200, empty($s['alt']) ? '0' : '1');
+    case 'transfer/setDownloadLimit':
+    case 'transfer/setUploadLimit': // bytes/s in, kept as whole KiB/s: <= 0 none, <= 1024 one KiB, else limit / 1024
+        // (sessionimpl-5.0.0.cpp:3359-3373)
+        $l = isset($in['limit']) ? (int) $in['limit'] : 0;
+        $key = $api === 'transfer/setDownloadLimit' ? 'dl_rate_limit' : 'up_rate_limit';
+        $s['transfer'][$key] = $l <= 0 ? 0 : ($l <= 1024 ? 1024 : intdiv($l, 1024) * 1024);
+        $done(200, '');
     case 'torrents/stop':
     case 'torrents/start':
     case 'torrents/pause':

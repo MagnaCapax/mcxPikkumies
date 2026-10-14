@@ -12,6 +12,9 @@ require_once __DIR__ . '/TorrentClient.php';
 require_once __DIR__ . '/DeleteFreed.php';
 require_once __DIR__ . '/DeletePlan.php';
 require_once __DIR__ . '/DeleteRun.php';
+require_once __DIR__ . '/TorrentList.php';
+require_once __DIR__ . '/TorrentChange.php';
+require_once __DIR__ . '/TorrentTrackers.php';
 
 class Torrents
 {
@@ -26,15 +29,7 @@ class Torrents
         };
         Cli::run($argv, [
             'list' => function ($args, $opt) use ($c) {
-                $all = $c()->torrents();
-                $state = isset($opt['state']) && is_string($opt['state']) ? strtolower($opt['state']) : null;
-                if ($state !== null && !in_array($state, self::STATES, true)) {
-                    throw new CliError("unknown state: $state", 'states: ' . implode(', ', self::STATES));
-                }
-                $search = isset($opt['search']) && is_string($opt['search']) ? strtolower($opt['search']) : null;
-                return array_values(array_filter(array_map([__CLASS__, 'printable'], $all), function ($r) use ($state, $search) {
-                    return ($state === null || $r['state'] === $state) && ($search === null || strpos(strtolower($r['name']), $search) !== false);
-                }));
+                return TorrentList::run($c()->torrents(), $opt);
             },
             'show' => function ($args, $opt) use ($c) {
                 $all = $c()->torrents();
@@ -42,6 +37,9 @@ class Torrents
                 $out = [];
                 foreach ($targets as $t) {
                     $out[] = self::printable($c()->details($t['native']) + $t);
+                }
+                if (!empty($opt['trackers'])) {
+                    $out = array_merge($out, TorrentTrackers::records($c(), $targets));
                 }
                 if (!empty($opt['files'])) {
                     $plan = DeletePlan::build($c(), $all, $targets);
@@ -80,7 +78,8 @@ class Torrents
             'restart' => function ($args, $opt) use ($c) {
                 return [$c()->restart()];
             },
-        ], $usage, ['with-data', 'files', 'paused'], ['state', 'search', 'dir', 'expect']);
+        ] + TorrentChange::verbs($c), $usage, ['with-data', 'files', 'paused', 'trackers', 'reverse'], ['state', 'search', 'dir', 'expect',
+            'sort', 'down', 'up']);
     }
 
     /**

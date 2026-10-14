@@ -8,6 +8,8 @@
  */
 class QbittorrentClient implements TorrentClient
 {
+    use QbitExtras; // recheck, reannounce, limits, trackers, the newer list fields
+
     const STATES = [
         'downloading' => 'downloading', 'forcedDL' => 'downloading', 'metaDL' => 'downloading', 'forcedMetaDL' => 'downloading', 'allocating' => 'downloading',
         'uploading' => 'seeding', 'forcedUP' => 'seeding', 'stalledUP' => 'seeding',
@@ -66,7 +68,8 @@ class QbittorrentClient implements TorrentClient
             'size' => (int) $g('size'), 'done' => (int) $g('completed'), 'ratio' => round((float) $g('ratio'), 3),
             'down_rate' => (int) $g('dlspeed'), 'up_rate' => (int) $g('upspeed'), 'added_at' => (int) $g('added_on'),
             'label' => (string) $g('category'), 'path' => (string) ($g('content_path') ?: $g('save_path')),
-            'message' => $raw === 'missingFiles' ? 'files missing' : ($raw === 'error' ? 'error (see the qBittorrent log)' : '')];
+            'message' => $raw === 'missingFiles' ? 'files missing' : ($raw === 'error' ? 'error (see the qBittorrent log)' : '')]
+            + self::listFields($t);
     }
 
     public function details($native)

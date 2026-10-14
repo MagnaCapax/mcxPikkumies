@@ -23,7 +23,10 @@ function delugeFixture(array $over = [])
     $t = function ($id, $name, $state, $progress, $files, $over = []) use ($home) {
         return $over + ['hash' => $id, 'name' => $name, 'state' => $state, 'progress' => $progress, 'total_wanted' => 4000, 'total_done' => 4000,
             'ratio' => 1.5, 'download_payload_rate' => 10, 'upload_payload_rate' => 20, 'time_added' => 1700000000.5, 'download_location' => "$home/data",
-            'message' => 'OK', 'tracker_status' => 'Announce OK', 'num_files' => count($files), 'tracker_host' => 'tracker.example', 'files' => $files];
+            'message' => 'OK', 'tracker_status' => 'Announce OK', 'num_files' => count($files), 'tracker_host' => 'tracker.example',
+                'files' => $files,
+            'completed_time' => 0, 'seeding_time' => 0, 'private' => false, 'total_uploaded' => 0,
+            'trackers' => [['url' => 'https://tracker.example/a1b2c3d4e5f6a7b8c9d0/announce?passkey=SECRETDELUGEKEY99', 'tier' => 0]]];
     };
     $f = function ($path, $size) {
         return ['index' => 0, 'path' => $path, 'size' => $size, 'offset' => 0];
@@ -33,7 +36,8 @@ function delugeFixture(array $over = [])
         'daemon_port' => $port, // what a connected daemon says about itself (core.get_config_value): never what the tool checks
         'connected_host' => null, // the host deluge-web is connected to (web.get_host_status answers 'Connected' for it)
         'torrents' => [
-            str_repeat('a', 40) => $t(str_repeat('a', 40), 'Show', 'Seeding', 100.0, [$f('Show/e1.mkv', 3000), $f('Show/sub/e2.srt', 1000)]),
+            str_repeat('a', 40) => $t(str_repeat('a', 40), 'Show', 'Seeding', 100.0, [$f('Show/e1.mkv', 3000), $f('Show/sub/e2.srt', 1000)],
+                ['completed_time' => 1700000500, 'seeding_time' => 86400, 'private' => true, 'total_uploaded' => 6000]),
             str_repeat('b', 40) => $t(str_repeat('b', 40), 'Other', 'Paused', 50.0, [$f('other/o.iso', 2000)], ['tracker_status' => 'Error: unregistered torrent']),
             str_repeat('c', 40) => $t(str_repeat('c', 40), 'Grabbing', 'Downloading', 12.5, []),
             str_repeat('d', 40) => $t(str_repeat('d', 40), 'Moving one', 'Moving', 0.0, [], ['message' => 'Moving storage']),

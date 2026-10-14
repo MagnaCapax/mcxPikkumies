@@ -11,18 +11,20 @@ require_once "$lib/Host.php";
 require_once "$lib/Http.php";
 require_once dirname(__DIR__) . '/lib/Torrents.php';
 require_once dirname(__DIR__) . '/lib/Bencode.php';
-foreach (['QbitSecret', 'QbitEndpoint', 'QbitApi', 'QbitProc', 'QbitRestart', 'QbitStats', 'QbitAdd', 'QbitChange', 'QbitDetails', 'QbittorrentClient'] as $qbitClass) {
+foreach (['QbitSecret', 'QbitEndpoint', 'QbitApi', 'QbitProc', 'QbitRestart', 'QbitStats', 'QbitAdd', 'QbitChange', 'QbitDetails',
+    'QbitExtras', 'QbittorrentClient'] as $qbitClass) {
     require_once __DIR__ . "/$qbitClass.php";
 }
 
 $usage = <<<'TXT'
 usage: php qbittorrent.php <verb> [arguments] [--human]
-  list [--state <state>] [--search <text>] [--limit N]
-  show <id>... [--files]
+  list [--state <state>] [--search <text>] [--sort <field> [--reverse]] [--limit N]
+  show <id>... [--files] [--trackers]
   add <magnet|url|file.torrent>... [--paused] [--dir <path>]
   remove <id>... [--with-data --expect <size>]
   pause <id>...     resume <id>...
   stats             traffic             restart
+  recheck <id>...   reannounce <id>...  limit [--down <rate>] [--up <rate>]
   login             (the user types the WebUI password at a terminal; stored for this tool)
 Ids are the 40-hex ids `list` prints. Output: JSON Lines; --human for people. See USAGE.md.
 TXT;
@@ -38,7 +40,7 @@ $qbitMake = function () use ($qbitSecretDir, $qbitFamily) {
     return [new QbitApi($ep, $secret), $secret];
 };
 
-$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'login'];
+$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'recheck', 'reannounce', 'limit', 'login'];
 list($qbitVerb, , $qbitOpt) = Cli::parse($argv, $qbitVerbs);
 if ($qbitVerb === null && !empty($qbitOpt['verbs'])) {
     echo implode("\n", $qbitVerbs), "\n"; // Torrents::run lists only the shared verbs

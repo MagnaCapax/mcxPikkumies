@@ -9,7 +9,9 @@
  * - an unknown method is a <fault> struct with faultCode and faultString (XML-RPC spec; xmlrpc-c's
  *   "method not defined" is -506);
  * - d.hash is upper-case hex (command_download.cc:676); d.ratio is in thousandths (:229-237);
- * - load.* return 0 and add asynchronously (command_events.cc:198-213, 383-392).
+ * - load.* return 0 and add asynchronously (command_events.cc:198-213, 383-392);
+ * - throttle.global_{down,up}.max_rate.set take the target "" and bytes/s (command_throttle.cc:211, 216), anything else
+ *   is a fault; d.check_hash starts a hash check (command_download.cc:732); t.multicall answers the torrent's "trackers".
  * In "hang" mode it listens and never accepts, like a busy rtorrent whose accept queue is full.
  */
 require __DIR__ . '/codec.php';
@@ -66,6 +68,16 @@ function fakeAnswer(array &$state, $method, array $p)
     $sys = ['system.client_version' => '0.9.8', 'system.library_version' => '0.13.8', 'system.pid' => 4242, 'system.time' => 1760000000,
         'network.listen.port' => 51413, 'throttle.global_down.rate' => 1000, 'throttle.global_up.rate' => 2000, 'throttle.global_down.total' => 10000,
         'throttle.global_up.total' => 20000, 'throttle.global_down.max_rate' => 0, 'throttle.global_up.max_rate' => 512000];
+    if (preg_match('/^throttle\.global_(down|up)\.max_rate\.set$/', $method)) {
+        if (count($p) !== 2 || $p[0] !== '') { // the target "" first, then the bytes/s value (command_throttle.cc:211, 216)
+            throw new Exception('Wrong number of arguments or target.');
+        }
+        $state['limits'][substr($method, 0, -4)] = ((int) $p[1] >> 10) * 1024; // whole KiB/s (root.h:88-89, root.cc:181, 211)
+        return 0;
+    }
+    if (isset($state['limits'][$method])) {
+        return $state['limits'][$method];
+    }
     if (isset($sys[$method])) {
         return $sys[$method];
     }
@@ -114,6 +126,13 @@ function fakeAnswer(array &$state, $method, array $p)
         }));
         return 0;
     }
+    if ($method === 'd.check_hash') {
+        $t['hashing'] = 1;
+        return 0;
+    }
+    if ($method === 'd.tracker_announce') {
+        return 0;
+    }
     if ($method === 'd.stop' || $method === 'd.start') {
         $t['state'] = $t['open'] = $t['active'] = $method === 'd.start' ? 1 : 0;
         return 0;
@@ -125,8 +144,19 @@ function fakeAnswer(array &$state, $method, array $p)
             }, array_slice($p, 2));
         }, $t['files']);
     }
-    if ($method === 't.multicall') {
-        return [['https://tracker.example/announce?passkey=SECRETPASSKEY123', 1, 7, 3]];
+    if ($method === 't.multicall') { // the torrent's "trackers" (command_tracker.cc:115-155 names); an unset value is 0
+        $keys = ['t.url=' => 'url', 't.group=' => 'group', 't.is_enabled=' => 'enabled', 't.success_counter=' => 'ok',
+            't.failed_counter=' => 'bad',
+            't.success_time_last=' => 'ok_at', 't.failed_time_last=' => 'bad_at', 't.scrape_complete=' => 'seeds',
+                't.scrape_incomplete=' => 'leechers'];
+        return array_map(function ($tr) use ($p, $keys) {
+            return array_map(function ($col) use ($tr, $keys) {
+                if (!isset($keys[$col])) {
+                    throw new Exception("Command \"$col\" does not exist.");
+                }
+                return isset($tr[$keys[$col]]) ? $tr[$keys[$col]] : 0;
+            }, array_slice($p, 2));
+        }, isset($t['trackers']) ? $t['trackers'] : []);
     }
     return fakeGet($t, $method);
 }

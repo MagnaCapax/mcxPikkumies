@@ -40,8 +40,20 @@ class Fake implements TorrentClient {
     function pause(array $ns) { $this->save(["pause", $ns]); return []; }
     function resume(array $ns) { $this->save(["resume", $ns]); return []; }
     function stats() { return ["version" => "fake"]; }
-    function traffic() { return ["down_rate" => 0]; }
+    function traffic() { $none = ["down_limit" => 0, "up_limit" => 0];
+        return ["down_rate" => 0] + (isset($this->s["limits"]) ? $this->s["limits"] : $none); }
     function restart() { return ["answered" => true]; }
+    function recheck(array $ns) { $this->save(["recheck", $ns]); }
+    function reannounce(array $ns) { $this->save(["reannounce", $ns]); }
+    function setLimits($d, $u) { $l = $this->traffic(); // whole KiB/s as qBittorrent keeps them (sessionimpl-5.0.0.cpp:3366-3371)
+        foreach (["down_limit" => $d, "up_limit" => $u] as $k => $v) {
+            if ($v !== null) { $l[$k] = $v <= 0 ? 0 : ($v <= 1024 ? 1024 : intdiv($v, 1024) * 1024); } }
+        $this->s["limits"] = ["down_limit" => $l["down_limit"], "up_limit" => $l["up_limit"]];
+        $this->save(["limit", $d, $u]); return ["persists" => false]; }
+    function trackers($n) { return [
+        ["url" => "https://t.example:8443/a1b2c3d4e5f6a7b8c9d0/announce?passkey=f00dfeedf00dfeedf00d", "tier" => 0, "status" => "working",
+            "message" => "invalid passkey 0123abcd4567ef89aa, contact staff", "seeds" => 3, "leechers" => -1],
+        ["url" => "udp://T2.example:6969/announce/abcdefghijklmnopqrstuvwxyz", "status" => "bogus"]]; }
 }
 Torrents::run($argv, function () { return new Fake(' . var_export("$dir/state.json", true) . '); }, "usage: fake.php <verb>");
 ');

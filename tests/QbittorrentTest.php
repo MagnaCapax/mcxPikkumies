@@ -32,8 +32,9 @@ return [
         qbitWith([], function ($fx) use ($B) {
             list($code, $out) = qbitRun($fx, ['show', 'aaaaaaaa']);
             $r = cliLines($out)[0];
-            check($code === 0 && $r['seeds'] === 4 && $r['comment'] === 'hi' && count($r['trackers']) === 1, 'show: ' . $out);
-            check(strpos($out, 'SECRETKEY123') === false && strpos($out, 'REDACTED') !== false, 'passkey printed: ' . $out);
+            check($code === 0 && $r['seeds'] === 4 && $r['comment'] === 'hi' && !isset($r['trackers']), 'show: ' . $out);
+            check(strpos($out, 'SECRETKEY123') === false && !in_array('GET torrents/trackers', qbitCalls($fx), true),
+                'show without --trackers read the trackers: ' . $out);
             list($code, $out) = qbitRun($fx, ['show', $B, 'aaaaaaaa', '--files']);
             $files = array_column(array_filter(cliLines($out), function ($l) {
                 return isset($l['file']);

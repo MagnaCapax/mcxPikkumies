@@ -9,8 +9,8 @@ require_once __DIR__ . '/RtorrentClient.php';
 
 $usage = <<<'TXT'
 usage: php rtorrent.php <verb> [arguments] [--human]
-  list [--state <state>] [--search <text>] [--limit N]
-  show <id>... [--files]
+  list [--state <state>] [--search <text>] [--sort <field> [--reverse]] [--limit N]
+  show <id>... [--files] [--trackers]
   add <magnet|url|file.torrent>... [--paused] [--dir <path>]
   remove <id>... [--with-data --expect <size>]
   pause <id>...
@@ -18,6 +18,9 @@ usage: php rtorrent.php <verb> [arguments] [--human]
   stats
   traffic
   restart
+  recheck <id>...
+  reannounce <id>...
+  limit [--down <rate>] [--up <rate>]
 Ids are the 40-character ids `list` prints. Full usage: USAGE.md next to this file.
 TXT;
 

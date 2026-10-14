@@ -12,7 +12,9 @@
  * - status keys and states (deluge/core/torrent.py:51-60, 632-655, 1035-1140), file paths relative to
  *   download_location (torrent.py:93-123);
  * - pause_torrents/resume_torrents with an empty list act on every torrent (deluge/core/core.py:674-677, 725-728);
- * - remove_torrent(id, remove_data) returns true (core.py:574-589; libtorrent deletes the files).
+ * - remove_torrent(id, remove_data) returns true (core.py:574-589; libtorrent deletes the files);
+ * - force_recheck / force_reannounce take a list of ids (core.py:659-662, 886-889); set_config writes the given keys (:822-828);
+ *   the `trackers` status key is a list of {url, tier} (torrent.py:562-590, 1104).
  */
 $file = getenv('DELUGE_FAKE_STATE');
 $s = json_decode((string) file_get_contents($file), true);
@@ -125,7 +127,21 @@ switch ($method) {
         $out(['payload_download_rate' => 1000, 'payload_upload_rate' => 2000, 'total_payload_download' => 30000, 'total_payload_upload' => 40000]);
         break;
     case 'core.get_config_values':
-        $out(['max_download_speed' => -1.0, 'max_upload_speed' => 512.0]);
+        $out(array_intersect_key((isset($s['config']) ? $s['config'] : []) + ['max_download_speed' => -1.0, 'max_upload_speed' => 512.0],
+            array_flip($p[0])));
+        break;
+    case 'core.set_config': // every key is written (core.py:822-828); the speeds are KiB/s floats, below 0 = no limit
+        $s['config'] = $p[0] + (isset($s['config']) ? $s['config'] : []);
+        $out(null);
+        break;
+    case 'core.force_recheck': // a list of ids; an empty list does nothing (core.py:886-889)
+    case 'core.force_reannounce': // core.py:659-662
+        foreach ($p[0] as $id) {
+            if ($method === 'core.force_recheck') {
+                $s['torrents'][$id]['state'] = 'Checking';
+            }
+        }
+        $out(null);
         break;
     case 'core.get_config_value': // core.py:812-815 (2.0.3)
         $out($p[0] === 'daemon_port' && isset($s['daemon_port']) ? $s['daemon_port'] : null);

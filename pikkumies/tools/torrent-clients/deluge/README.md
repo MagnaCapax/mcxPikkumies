@@ -1,6 +1,6 @@
 # deluge
 
-Controls the user's own Deluge 2.x torrent client: list, inspect, add, remove, pause and resume torrents, read stats and traffic, and restart it on PMSS. It talks to deluge-web's JSON-RPC on 127.0.0.1 with the user's own localclient secret, as the user, without root. It never runs Python programs such as deluge-console.
+Controls the user's own Deluge 2.x torrent client: list, inspect, add, remove, pause and resume torrents, recheck and reannounce them, read stats and traffic, read and set the global speed limits, and restart it on PMSS. It talks to deluge-web's JSON-RPC on 127.0.0.1 with the user's own localclient secret, as the user, without root. It never runs Python programs such as deluge-console.
 
 ## Where Deluge is found
 
@@ -20,8 +20,12 @@ Errors name the cause: Deluge not installed (no `deluged` in `/usr/bin`, `/usr/l
 |---|---|---|
 | all | `POST /json`, `Content-Type: application/json` exactly; `{"method","params","id"}` → `{"result","error","id"}` | `deluge/ui/web/json_api.py:133-253`; `/json` is served at `/` as well as at the base path, `server.py:687-689` |
 | login | `auth.login([secret])`; the `_session_id` cookie (path `<base>json`) is sent back by hand | `deluge/ui/web/auth.py:90-111, 243-256` |
-| list | `core.get_torrents_status([{}, keys])` | `deluge/core/core.py:772`; keys `deluge/core/torrent.py:1035-1140` |
-| show, files | `core.get_torrent_status([id, keys])`; file paths are relative to `download_location` | `core.py:758`; `torrent.py:93-123, 962-965` |
+| list | `core.get_torrents_status([{}, keys])`; the keys include `completed_time` (0 until finished → `completed_at` `null`), `seeding_time`, `private`, `total_uploaded` (→ `uploaded`) | `deluge/core/core.py:772`; keys `deluge/core/torrent.py:1035-1140` (`seeding_time` :1037, `total_uploaded` :1098, `private` :1122, `completed_time` :1134) |
+| show --trackers | `core.get_torrent_status([id, ["trackers"]])`: the tracker list, each with `url` and `tier`; Deluge has no status, message or counts per tracker, so those are `null` (its one `tracker_status` is in `show`) | `core.py:758`; `torrent.py:562-590, 1104` |
+| recheck | `core.force_recheck([[ids]])` | `core.py:885-889` |
+| reannounce | `core.force_reannounce([[ids]])` | `core.py:658-662` |
+| limit | read: `core.get_config_values` as `traffic`; set: `core.set_config([{max_download_speed, max_upload_speed}])` in KiB/s as floats, `-1.0` = no limit (bytes/s / 1024, rounded to 3 decimals). PMSS writes the same key and unit (`scripts/lib/user/deluge.php:215-232`) and ships the values as floats (`etc/seedbox/config/template.deluge.core.conf:39, 44`) | `core.py:816-828`; per-torrent speeds are KiB/s, `torrent.py:356-380` |
+| show, files | `core.get_torrent_status([id, keys])`; file paths are relative to `download_location`. `show` does not ask `completed_time`, `seeding_time` or `private` again: the list record has them (a 0 there would hide `completed_at: null`) | `core.py:758`; `torrent.py:93-123, 962-965` |
 | shared-file check | `core.get_torrents_status([{}, ['files', 'download_location']])`: every torrent's files in one call | `core.py:771-790`; `torrent.py:759-770, 1128` |
 | add | `core.add_torrent_magnet`, `core.add_torrent_url`, `core.add_torrent_file` (base64), options `add_paused`, `download_location` | `core.py:465-571`; `torrent.py:134-169` |
 | remove | `core.remove_torrent([id, remove_data])` per id | `core.py:574-589`; `torrentmanager.py` (2.1.1) `:708-775` |
@@ -51,6 +55,9 @@ States map as `Downloading` → downloading, `Seeding` → seeding, `Paused` →
 - [UNVERIFIED] Other providers: whether deluge-web listens on 127.0.0.1 and whether its password equals the localclient secret. Feral's page says the daemon login is not the web UI login, so login may fail there; the tool then says so and stops (one attempt per call).
 - [UNVERIFIED] Deluge 2.1.x: method names and keys were read in 2.0.3; 2.1.1 `json_api.py` was diffed against 2.0.3: it renames the session-status keys `web.update_ui` uses (this tool does not call it), accepts parameters after the content type and no longer escapes file paths; `core.py` 2.1.1 was not read in full.
 - `deluge/ui/hostlist.py` (`get_hosts_info`, `get_host_status`, `connect_host`) was read from the Deluge repository at tag `deluge-2.0.3` (github.com/deluge-torrent/deluge, fetched 2026-10-14); it is not among the research notes' source copies.
+- [UNVERIFIED] The global `max_download_speed` / `max_upload_speed` keys are KiB/s with below 0 = no limit, as `traffic` already reads them; `preferencesmanager.py`, which applies them to the session, is not among this session's local source copies (the per-torrent setters are KiB/s, `torrent.py:356-380`). `limit` reads back the config value, not the rate libtorrent applies.
+- On PMSS the watchdog may rewrite `max_upload_speed` in `core.conf` from the account's upload cap and restart Deluge (`scripts/cron/checkDelugeInstances.php:28`, `scripts/lib/user/deluge.php:215-232`); an upload limit set with `limit` can be replaced then.
+- [UNVERIFIED] The keys of a `trackers` entry beyond `url` and `tier` (libtorrent's announce entry); only those two are read.
 - [UNVERIFIED] `label` is always empty: the Label plugin's status key was not checked, so it is not requested.
 - [UNVERIFIED] deluge-web with `https` on is refused rather than tried, because lib/Http.php verifies certificates and deluge-web's is self-signed.
 - Connection timeout: lib/Http.php fixes the connect timeout at 10 s; the tool sets the whole request to 10 s (the brief asked for 5 s connect).

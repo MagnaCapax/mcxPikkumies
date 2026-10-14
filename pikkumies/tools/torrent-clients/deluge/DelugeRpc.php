@@ -103,7 +103,10 @@ class DelugeRpc
         if ($this->cookie !== '') {
             $headers[] = 'Cookie: _session_id=' . $this->cookie;
         }
-        $body = json_encode(['method' => $method, 'params' => $params, 'id' => ++$this->id], JSON_UNESCAPED_SLASHES);
+        // Floats stay floats (10240.0, not 10240): Deluge's speed settings are floats
+        // (PMSS etc/seedbox/config/template.deluge.core.conf:39).
+        $body = json_encode(['method' => $method, 'params' => $params, 'id' => ++$this->id],
+            JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
         $r = Http::request('POST', $this->url, ['headers' => $headers, 'body' => $body, 'timeout' => $this->timeout]);
         if ($r['code'] === 0) {
             throw self::transportError($r['error']);
