@@ -45,7 +45,7 @@ return [
             check(end($l)['expect_sync'] === null && end($l)['extra_on_dst'] === null, 'one-way must not offer a sync value');
             list($code, $l) = rcRun($fx, ['show', 'gdrive:tv', '--limit', '2', '--size']);
             check($code === 0 && count($l) === 3 && $l[0] === ['name' => 'Show', 'is_dir' => true, 'bytes' => null,
-                'modified' => '2026-10-01 10:00:00'] && $l[1]['name'] === 'a b.mkv'
+                'modified' => '2026-10-01T10:00:00Z'] && $l[1]['name'] === 'a b.mkv'
                 && end($l)['listed_all'] === false && end($l)['total_bytes'] === 1333 && end($l)['remote_free_bytes'] === 549755813888,
                 'show: ' . json_encode($l));
             foreach ([[':sftp,host=x,pass=y:/a', 'gdrive:tv'], ['/etc', 'gdrive:x'], ['relative/path', 'gdrive:x'], ['--config=/x',

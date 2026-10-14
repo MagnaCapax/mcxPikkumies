@@ -14,7 +14,7 @@ Works with the user's own rclone: lists remotes and folders, previews and runs c
 | verb | rclone command | source |
 |---|---|---|
 | list | `listremotes --long`: `name: type description` per line | `cmd/listremotes/listremotes.go:224` (1.69.1) |
-| show | `lsf --max-depth 1 --format tsp --separator <tab>`; `--size` adds `size --json` (`count`, `bytes`) and `about --json` (`total`, `used`, `free`; not every backend) | `docs/content/commands/rclone_lsf.md`, `cmd/size/size.go:56-58`, `rclone_about.md` |
+| show | `lsf --max-depth 1 --format tsp --separator <tab>` with `TZ=UTC0`: lsf prints times in rclone's local zone without saying which (rclone 1.75.0 printed 12:00 UTC as 15:00 under `TZ=Europe/Helsinki`, as 12:00 under `TZ=UTC0`; container run 2026-10-14), so `modified` is given as UTC; read up to offset + limit + 1 entries so `--offset` pages; `--size` adds `size --json` (`count`, `bytes`) and `about --json` (`total`, `used`, `free`; not every backend) | `docs/content/commands/rclone_lsf.md`, `cmd/size/size.go:56-58`, `rclone_about.md` |
 | stats | `version` (first line `rclone v1.69.1`), `config file` | `rclone_version.md`, `fs/config/ui.go:639-650` |
 | check | rclone 1.66+: `sync --dry-run --retries 1 --combined - <src> <dst>`, so the preview is decided by the same rule (size and modification time) and code path the real sync and move use (`fs/sync/sync.go:379` NeedTransfer; move runs the same `runSyncCopyMove`, `:1376-1377`). Older rclone: `check --combined - [--one-way]` (size and hash), shown without `expect` values. Lines: `=` identical, `-` only on the destination, `+` only in the source, `*` different, `!` error; directories are not listed | `rclone_sync.md` "Logger Flags" (in v1.66.0, absent at v1.65.2), `cmd/sync/sync.go:36-66`, `rclone_check.md` |
 | copy | `copy [--ignore-existing] <src> <dst>`, then the one-way plan to read back | `rclone_copy.md`; `docs.md` `--ignore-existing` |
@@ -45,7 +45,7 @@ All docs are rclone v1.69.1 (`github.com/rclone/rclone/tree/v1.69.1`). The argum
 
 ## Unverified
 
-- [UNVERIFIED] `listremotes --long` before 1.69 prints no description column; the parser accepts both, but older output was not seen.
+- `listremotes --long` on 1.60.1 and 1.53.3 prints no description column; the parser copes (smoke run 2026-10-14).
 - [UNVERIFIED] Whether `fusermount -u` waits for rclone's VFS cache to finish uploading. The verb reports what `fusermount` says; the skill tells the agent never to kill rclone or delete the cache.
-- [UNVERIFIED] No real rclone ran this session (none is installed on the build host); formats come from the 1.69.1 source and docs cited above. That a dry-run sync writes its `--combined` lines like the real one rests on the source (the logger is called while deciding, `fs/sync/sync.go:1034-1047, 1229`, `operations.go:244-261`; the copy and delete are skipped later), not on a run.
+- A smoke run against real rclone 1.75.0, 1.69.1, 1.60.1 and 1.53.3 (official images, 2026-10-14) ran list, show, stats, check and copy; sync and move were not run against real rclone. Other formats come from the 1.69.1 source and docs cited above. That a dry-run sync writes its `--combined` lines like the real one rests on the source (the logger is called while deciding, `fs/sync/sync.go:1034-1047, 1229`, `operations.go:244-261`; the copy and delete are skipped later), not on a run.
 - [UNVERIFIED] How fast rclone stops on the terminate signal while transfers run in parallel: a transfer that was already decided within the plan may finish; the one beyond it is aborted mid-upload.

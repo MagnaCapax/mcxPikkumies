@@ -98,13 +98,27 @@ class Quota
         return ['used' => $u, 'soft' => $s > 0 ? $s : $h, 'hard' => $h];
     }
 
+    /**
+     * `quota` and `timeout` come from PATH, like every program the storage tools run (tools/storage/lib/ToolProc.php),
+     * and the found path is the one run: the old check of fixed paths ran whatever `quota` the shell found in PATH.
+     * PATH costs no safety here: it runs as the user, so a `quota` of the user's own only misreports their own quota.
+     */
     private static function runQuota()
     {
-        if (!is_executable('/usr/bin/quota') && !is_executable('/bin/quota') && !is_executable('/usr/sbin/quota')) {
+        $bin = [];
+        foreach (['quota', 'timeout'] as $name) {
+            foreach (explode(':', (string) getenv('PATH')) as $dir) {
+                if (!isset($bin[$name]) && $dir !== '' && is_file("$dir/$name") && is_executable("$dir/$name")) {
+                    $bin[$name] = "$dir/$name";
+                }
+            }
+        }
+        if (count($bin) < 2) {
             return null;
         }
         $out = [];
-        exec('timeout 5 quota -s 2>/dev/null', $out); // the caller's own quota; can be slow on a busy disk
+        // timeout: quota can be slow on a busy disk
+        exec(escapeshellarg($bin['timeout']) . ' 5 ' . escapeshellarg($bin['quota']) . ' -s 2>/dev/null', $out);
         return $out ? implode("\n", $out) : null; // quota exits non-zero when over quota, so the code says nothing
     }
 }

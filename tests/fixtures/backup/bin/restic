@@ -8,7 +8,8 @@
  * content (global.go:301) against the scripted password, else "wrong password or no key found"
  * (internal/repository/key.go:21). Like restic it refuses RESTIC_REPOSITORY_FILE together with a
  * repository (cmd/restic/global.go:395, 0.11.0). Scripted: "version", "cat_err" (cat config fails, e.g.
- * the network), "check_code" and "check_err" (restic's check output, cmd_check.go:273/374).
+ * the network), "check_code" and "check_err" (restic's check output, cmd_check.go:273/374), "backup_id" (the summary's
+ * snapshot_id: the short id on 0.14.0, the full one on 0.19.1, both seen 2026-10-14).
  */
 require __DIR__ . '/fakelib.php'; // copied next to it by the test harness
 fakeLog($argv);
@@ -83,7 +84,8 @@ switch ($cmd) {
         echo json_encode(['message_type' => 'status', 'percent_done' => 0.5]), "\n";
         echo json_encode(['message_type' => 'summary', 'files_new' => 3, 'files_changed' => 1, 'files_unmodified' => 9,
             'data_added' => 4096,
-            'total_files_processed' => 13, 'total_bytes_processed' => 99999, 'total_duration' => 1.5, 'snapshot_id' => 'abcd1234']), "\n";
+            'total_files_processed' => 13, 'total_bytes_processed' => 99999, 'total_duration' => 1.5,
+            'snapshot_id' => isset($s['backup_id']) ? $s['backup_id'] : 'abcd1234']), "\n";
         exit(0);
     case 'restore':
         $t = $flags[array_search('--target', $flags, true) + 1];

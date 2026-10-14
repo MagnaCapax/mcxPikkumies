@@ -19,7 +19,7 @@ Works with the user's own restic repository: lists and inspects snapshots, check
 | show --prune-plan | `forget --dry-run --json <keep options>`: groups with `keep`, `remove`, `reasons` | `cmd/restic/cmd_forget.go:216-221` (0.11.0), `:258-263` (0.14.0); `--dry-run` at `:79` / `:100` |
 | prune | `forget -- <planned full ids>`, then `prune` | `cmd_forget.go:13` ("forget [flags] [snapshot ID] [...]") |
 | check | `nice -n 19 ionice -c3 restic check [--read-data \| --read-data-subset n/m]`; a percentage needs 0.12.0 (`cmd_check.go:57` there; 0.11.0 `:56` takes only `n/m`), so on older restic it is refused before restic runs. `errors_found` only for "Fatal: repository contains errors" (`cmd_check.go:273` 0.11.0, `:374` 0.14.0); any other exit 1 (`main.go:119-128`) is `finished: false` | `cmd/restic/cmd_check.go` |
-| backup | `nice -n 19 ionice -c3 restic backup --json -- <paths>`; the `summary` message has `snapshot_id`, `files_new`, `files_changed`, `data_added`; exit 3 = snapshot made but some files unreadable | `internal/ui/json/backup.go:443-456`, `cmd/restic/main.go:123-124` (0.11.0) |
+| backup | `nice -n 19 ionice -c3 restic backup --json -- <paths>`; the `summary` message has `snapshot_id`, `files_new`, `files_changed`, `data_added`; exit 3 = snapshot made but some files unreadable. `snapshot_id` is the short id on 0.14.0 and the full id on 0.19.1 (smoke run 2026-10-14), so the record's `id` is cut to the short id and `snapshot_id` is the full id or null | `internal/ui/json/backup.go:443-456`, `cmd/restic/main.go:123-124` (0.11.0) |
 | restore | `nice -n 19 ionice -c3 restic restore --target <new dir> [--include <path>] -- <id>`; files land under their original full path | `cmd/restic/cmd_restore.go:57-59` (0.11.0); PM wiki `restic-s3-backup-to-your-storage-box-on-pmss`:64 |
 
 Sources: `github.com/restic/restic/tree/v0.11.0` and `/tree/v0.14.0`, read 2026-10-14. Keep options map one to one; `--keep-within` is converted to restic's units (y, m, d, h; `internal/restic/duration.go`, 0.11.0), so `2w` becomes `14d` and `12H` becomes `12h`.
@@ -36,5 +36,5 @@ Sources: `github.com/restic/restic/tree/v0.11.0` and `/tree/v0.14.0`, read 2026-
 
 ## Unverified
 
-- [UNVERIFIED] No real restic ran this session (none is installed on the build host).
+- A smoke run against real restic 0.14.0 and 0.19.1 (official images, 2026-10-14) ran the read verbs, `login`, `check` and `backup`; prune and restore were not run against real restic.
 - The tool recognises a refused password by "wrong password" in stderr: restic's error is "wrong password or no key found" (`internal/repository/key.go:21`, 0.14.0) [UNVERIFIED for other versions].

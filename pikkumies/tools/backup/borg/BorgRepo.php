@@ -6,6 +6,8 @@
  * BORG_PASSCOMMAND, `cat <file>`, using its output with trailing newlines stripped
  * (environment.rst.inc:16-18). The tool drops BORG_PASSPHRASE from the environment, because borg
  * would read it before BORG_PASSCOMMAND, which it splits with shlex (src/borg/crypto/key.py:425-445, 1.2.4).
+ * borg prints times (start, end, mtime, the "Would prune" lines) in local time without a zone, so it runs with
+ * TZ=UTC0 and the tool reads them as UTC (a host zone shifted them by its offset in the 2026-10-14 smoke run).
  */
 class BorgRepo
 {
@@ -33,7 +35,7 @@ class BorgRepo
         $argv = array_merge(['borg'], $args);
         // borg splits the command shell-style; escapeshellarg quoting survives that.
         $env = ['BORG_REPO' => $repo, 'BORG_PASSCOMMAND' => escapeshellarg($cat) . ' ' . escapeshellarg($file),
-            'BORG_PASSPHRASE' => null, 'BORG_PASSPHRASE_FD' => null];
+            'BORG_PASSPHRASE' => null, 'BORG_PASSPHRASE_FD' => null, 'TZ' => 'UTC0'];
         return ToolProc::run($gentle ? ToolProc::gentle($argv) : $argv, $env, $onLine, $cwd);
     }
 
@@ -70,8 +72,8 @@ class BorgRepo
      */
     public static function record(array $a)
     {
-        $start = isset($a['start']) ? (int) strtotime((string) preg_replace('/\.\d+$/', '', (string) $a['start'])) : null;
-        return ['id' => (string) $a['name'], 'time' => $start, 'host' => isset($a['hostname']) ? $a['hostname'] : null,
+        return ['id' => (string) $a['name'], 'time' => isset($a['start']) ? self::utc($a['start']) : null,
+            'host' => isset($a['hostname']) ? $a['hostname'] : null,
             'paths' => [], 'tags' => [], 'snapshot_id' => isset($a['id']) ? (string) $a['id'] : null];
     }
 
@@ -100,11 +102,40 @@ class BorgRepo
             if (strpos($line, 'Keeping') === 0) {
                 $kept++;
             } elseif (preg_match('/^Would prune:\s+(.+?)\s+\w{3}, (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) \[([0-9a-f]{64})\]$/', $line, $m)) {
-                $out[] = ['id' => $m[1], 'time' => (int) strtotime($m[2]), 'host' => null, 'paths' => [], 'tags' => [],
+                $out[] = ['id' => $m[1], 'time' => self::utc($m[2]), 'host' => null, 'paths' => [], 'tags' => [],
                     'snapshot_id' => $m[3]];
             }
         }
         return ['remove' => $out, 'keep' => $kept];
+    }
+
+    /** A borg time (UTC, as borg runs with TZ=UTC0) as unix time; a time that carries its own zone keeps it. Else null. */
+    public static function utc($t)
+    {
+        if (!preg_match('/^\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d/', (string) $t)) {
+            return null;
+        }
+        try {
+            return (new DateTime((string) $t, new DateTimeZone('UTC')))->getTimestamp();
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * One `list --json-lines` item as the shared file record. type: restic's words (stat.filemode's first letter in
+     * borg). The second name of a hard link is "-" with mode "h...", size 0 and `source` = the first name (seen on borg
+     * 1.2.4 and 1.4.0): bytes null and link_to, so a size preview never counts the data twice nor calls it empty.
+     */
+    public static function item(array $f)
+    {
+        $types = ['-' => 'file', 'd' => 'dir', 'l' => 'symlink', 'b' => 'dev', 'c' => 'chardev', 'p' => 'fifo', 's' => 'socket'];
+        $t = isset($f['type']) ? (string) $f['type'] : '';
+        $link = $t === '-' && (!empty($f['source']) || (isset($f['mode']) && substr((string) $f['mode'], 0, 1) === 'h'));
+        $r = ['path' => '/' . $f['path'], 'type' => isset($types[$t]) ? $types[$t] : ($t === '' ? null : $t),
+            'bytes' => $link || $t === 'd' || !isset($f['size']) ? null : (int) $f['size'], // restic gives folders no size either
+            'modified_at' => isset($f['mtime']) ? self::utc($f['mtime']) : null];
+        return $link ? $r + ['hardlink' => true, 'link_to' => isset($f['source']) ? '/' . $f['source'] : null] : $r;
     }
 
     /** A path as borg stores it (no leading /) as an argv list; one starting with - would be read as an option. */

@@ -68,7 +68,7 @@ class BorgTool implements BackupTool
         }
         $a = $d['archives'][0];
         unset($a['command_line']); // the command line that made the archive can hold anything the user typed
-        return BorgRepo::record($a) + ['end' => isset($a['end']) ? $a['end'] : null,
+        return BorgRepo::record($a) + ['end' => isset($a['end']) ? BorgRepo::utc($a['end']) : null,
             'duration' => isset($a['duration']) ? $a['duration'] : null,
             'stats' => isset($a['stats']) ? $a['stats'] : null, 'username' => isset($a['username']) ? $a['username'] : null];
     }
@@ -80,16 +80,16 @@ class BorgTool implements BackupTool
         $r = $this->repo->run($args, function ($line) use (&$out, $max) {
             $f = json_decode($line, true); // one item per line: type, path, size, mtime (docs/internals/frontends.rst, 1.2.4)
             if (is_array($f) && isset($f['path'])) {
-                $out[] = ['path' => '/' . $f['path'], 'type' => isset($f['type']) ? $f['type'] : null,
-                    'bytes' => isset($f['size']) ? (int) $f['size'] : null,
-                    'modified_at' => isset($f['mtime']) ? (int) strtotime((string) preg_replace('/\.\d+$/', '', $f['mtime'])) : null];
+                $out[] = BorgRepo::item($f);
             }
-            return count($out) <= $max;
+            return count($out) < $max;
         });
         if (!$r['stopped'] && $r['code'] !== 0) {
             throw new CliError('borg list failed: ' . ToolProc::tail($r['err']), 'names come from `list`');
         }
-        return ['records' => array_slice($out, 0, $max), 'status' => ['listed_all' => count($out) <= $max]];
+        $links = array_filter(array_column($out, 'hardlink'));
+        return ['records' => $out, 'status' => ToolProc::listed(count($out), $max) + ($links ? ['hardlink_note' => 'bytes is null'
+            . ' for the second name of a hard link: its data is the file named in link_to, counted once there'] : [])];
     }
 
     public function prunePlan(array $keep)
@@ -130,9 +130,14 @@ class BorgTool implements BackupTool
                 . ' on a 500 MB storage box a big repository can run out of memory'];
     }
 
+    /** The archive is <host>-<UTC time to the millisecond>Z: borg's `{hostname}-{now}` is to the second, so a second run in
+     * the same second failed with "Archive ... already exists" (smoke run 2026-10-14); one job per account runs at a time. */
     public function backup(array $paths)
     {
-        $r = $this->repo->run(array_merge(['create', '--json', '::{hostname}-{now}', '--'], $paths), null, null, true);
+        $t = microtime(true);
+        $host = preg_replace('/[^A-Za-z0-9_-]/', '', explode('.', (string) gethostname())[0]) ?: 'backup';
+        $name = $host . '-' . gmdate('Y-m-d\TH:i:s', (int) $t) . sprintf('.%03dZ', (int) (($t - floor($t)) * 1000));
+        $r = $this->repo->run(array_merge(['create', '--json', '::' . $name, '--'], $paths), null, null, true);
         $d = json_decode($r['out'], true); // {"archive": {"name", "id", "stats": {...}}, ...} (docs/internals/frontends.rst, 1.2.4)
         if ($r['code'] !== 0 && !isset($d['archive'])) {
             throw new CliError('borg create failed: ' . ToolProc::tail($r['err']), 'see the error; `stats` checks the repository');

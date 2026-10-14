@@ -50,7 +50,7 @@ class Backup
                 }
                 $id = BackupRules::id($args);
                 $path = isset($args[1]) ? (string) $args[1] : null;
-                return !empty($opt['files']) ? $t()->files($id, $path, BackupRules::limit($opt)) : [$t()->details($id)];
+                return !empty($opt['files']) ? $t()->files($id, $path, ToolProc::want($opt)) : [$t()->details($id)];
             },
             'stats' => function ($args, $opt) use ($t) {
                 return [$t()->stats()];

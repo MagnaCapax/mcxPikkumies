@@ -8,7 +8,7 @@
 function fakeLog(array $argv, array $extra = [])
 {
     $env = [];
-    foreach (['RESTIC_REPOSITORY', 'RESTIC_PASSWORD_FILE', 'BORG_REPO', 'BORG_PASSCOMMAND'] as $k) {
+    foreach (['RESTIC_REPOSITORY', 'RESTIC_PASSWORD_FILE', 'BORG_REPO', 'BORG_PASSCOMMAND', 'TZ'] as $k) {
         if (getenv($k) !== false) {
             $env[$k] = getenv($k);
         }

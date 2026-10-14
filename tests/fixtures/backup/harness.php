@@ -31,7 +31,8 @@ function bkFixture($tool = 'restic', array $over = [], array $fakes = ST_FAKES)
             'mtime' => '2026-10-01T02:00:00+03:00']]];
     if ($tool === 'borg') {
         $state['plan'] = isset($over['plan']) ? $over['plan'] : ['box-1', 'box-2'];
-        $state['files'] = [['type' => '-', 'path' => 'home/u/data/a.txt', 'size' => 2, 'mtime' => '2026-10-01T02:00:00.000000']];
+        $state['files'] = isset($over['files']) ? $over['files']
+            : [['type' => '-', 'path' => 'home/u/data/a.txt', 'size' => 2, 'mtime' => '2026-10-01T02:00:00.000000']];
     }
     file_put_contents($fx['dir'] . '/state.json', json_encode($state, JSON_UNESCAPED_SLASHES));
     return $fx;

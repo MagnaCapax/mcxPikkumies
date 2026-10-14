@@ -75,12 +75,12 @@ class ResticTool implements BackupTool
                 $out[] = ['path' => $n['path'], 'type' => $n['type'], 'bytes' => isset($n['size']) ? (int) $n['size'] : null,
                     'modified_at' => isset($n['mtime']) ? ResticRepo::time($n['mtime']) : null];
             }
-            return count($out) <= $max;
+            return count($out) < $max;
         });
         if (!$r['stopped'] && $r['code'] !== 0) {
             throw new CliError('restic ls failed: ' . ToolProc::tail($r['err']), 'ids come from `list`');
         }
-        return ['records' => array_slice($out, 0, $max), 'status' => ['listed_all' => count($out) <= $max]];
+        return ['records' => $out, 'status' => ToolProc::listed(count($out), $max)];
     }
 
     /** `forget --dry-run --json <policy>`: groups with keep and remove lists (cmd/restic/cmd_forget.go:216-221, 0.11.0). */
@@ -139,8 +139,11 @@ class ResticTool implements BackupTool
             return isset($s[$k]) ? $s[$k] : null;
         };
         // Exit 3: the snapshot was made but some files could not be read (cmd/restic/main.go:123-124, 0.11.0).
-        return ['id' => $get('snapshot_id'), 'paths' => $paths, 'files_new' => $get('files_new'), 'files_changed' => $get('files_changed'),
-            'added_bytes' => $get('data_added'), 'incomplete' => $r['code'] === 3];
+        // snapshot_id is the short id on restic 0.14.0 and the full one on 0.19.1 (live runs 2026-10-14): `id` is always short.
+        $sid = (string) $get('snapshot_id');
+        return ['id' => $sid === '' ? null : substr($sid, 0, 8), 'snapshot_id' => strlen($sid) === 64 ? $sid : null, 'paths' => $paths,
+            'files_new' => $get('files_new'), 'files_changed' => $get('files_changed'), 'added_bytes' => $get('data_added'),
+            'incomplete' => $r['code'] === 3];
     }
 
     public function restore($id, $target, $include)

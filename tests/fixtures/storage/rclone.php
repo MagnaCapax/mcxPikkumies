@@ -28,9 +28,9 @@ function rcFixture(array $over = [], array $fakes = ST_FAKES)
     return $fx;
 }
 
-function rcRun(array $fx, array $args, $family = 'generic')
+function rcRun(array $fx, array $args, $family = 'generic', array $env = [])
 {
     list($code, $out) = stRun($fx, 'storage/rclone/rclone.php', $args, ['rcloneMountinfo' => $fx['mountinfo'],
-        'rcloneProcRoot' => $fx['proc'], 'rcloneFamily' => $family]);
+        'rcloneProcRoot' => $fx['proc'], 'rcloneFamily' => $family], $env);
     return [$code, stLines($out), $out];
 }

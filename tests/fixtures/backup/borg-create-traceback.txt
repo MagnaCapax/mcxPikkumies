@@ -1,0 +1,30 @@
+Local Exception
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/borg/archiver.py", line 5213, in main
+    exit_code = archiver.run(args)
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/borg/archiver.py", line 5144, in run
+    return set_ec(func(args))
+                  ^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/borg/archiver.py", line 183, in wrapper
+    return method(self, args, repository=repository, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/borg/archiver.py", line 675, in do_create
+    create_inner(archive, cache, fso)
+  File "/usr/lib/python3/dist-packages/borg/archiver.py", line 629, in create_inner
+    archive.save(comment=args.comment, timestamp=args.timestamp)
+  File "/usr/lib/python3/dist-packages/borg/archive.py", line 630, in save
+    'username': getuser(),
+                ^^^^^^^^^
+  File "/usr/lib/python3.11/getpass.py", line 169, in getuser
+    return pwd.getpwuid(os.getuid())[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'getpwuid(): uid not found: 1000'
+
+Platform: Linux pkst-host 6.12.63+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.63-1 (2025-12-30) x86_64
+Linux: Unknown Linux  
+Borg: 1.2.4  Python: CPython 3.11.2 msgpack: 1.0.3 fuse: None [pyfuse3,llfuse]
+PID: 1  CWD: /tmp/stsmk1/home
+sys.argv: ['/usr/bin/borg', 'create', '--json', '::{hostname}-{now}', '--', '/tmp/stsmk1/data']
+SSH_ORIGINAL_COMMAND: None
+

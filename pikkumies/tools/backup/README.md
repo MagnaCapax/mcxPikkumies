@@ -22,6 +22,13 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 - restic: `id` is the 8-character short id `list` prints (restic also accepts `latest`); `snapshot_id` is the full id.
 - borg: `id` is the archive name (borg addresses archives by name); `snapshot_id` is the archive id.
 - `show`, `restore`: one id. `prune` takes no ids: it removes exactly the snapshots of the plan it rebuilds.
+- `backup` returns the new snapshot's `id` in the same form (restic: the short id also when restic prints the full one).
+
+## Records
+
+- Times (`time`, `end`, `modified_at`) are unix seconds. borg prints its times in local time without a zone, so the borg unit runs it with `TZ=UTC0` and reads them as UTC; restic's times carry their zone.
+- `show <id> --files` records are `path`, `type`, `bytes`, `modified_at`. `type` uses restic's words in both units: `file`, `dir`, `symlink`, `dev`, `chardev`, `fifo`, `socket`. `bytes` is null for folders, and for the second name of a hard link in borg, which has `hardlink: true` and `link_to` (the name that holds the data, counted once there; borg lists the second name with size 0). restic gives each name of a hard link its full size.
+- `--files` pages like every list: `--limit 0` lists all (up to 10,000 entries per call), `--offset N` continues where `next_offset` says.
 
 ## Removing snapshots
 

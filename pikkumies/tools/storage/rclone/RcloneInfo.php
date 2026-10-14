@@ -19,7 +19,11 @@ class RcloneInfo
         return ['records' => $out, 'status' => ['config' => $c->configPath(), 'config_encrypted' => false]];
     }
 
-    /** One directory level (`lsf --max-depth 1`, read line by line, stopped after --limit). */
+    /**
+     * One directory level (`lsf --max-depth 1`, read line by line up to ToolProc::want, so --offset and --limit 0 page
+     * like every list). lsf prints times in rclone's local zone without saying which, so rclone runs with TZ=UTC0 (Go
+     * reads TZ; seen on rclone 1.75.0) and `modified` is ISO 8601 UTC.
+     */
     public static function show(RcloneCmd $c, array $args, array $opt)
     {
         if (count($args) !== 1) {
@@ -27,23 +31,22 @@ class RcloneInfo
         }
         $c->ready();
         $where = $c->place($args[0], true);
-        $limit = isset($opt['limit']) ? max(1, (int) $opt['limit']) : Cli::LIMIT;
+        $want = ToolProc::want($opt);
         $rows = [];
         $flags = ['--max-depth', '1', '--format', 'tsp', '--separator', "\t"];
-        $r = $c->run(['lsf'], $flags, [$where], function ($line) use (&$rows, $limit) {
+        $r = $c->run(['lsf'], $flags, [$where], function ($line) use (&$rows, $want) {
             $f = explode("\t", $line, 3); // time, size, path: the path last because separators in it are not escaped (lsf docs)
             if (count($f) === 3) {
                 $dir = substr($f[2], -1) === '/';
                 $rows[] = ['name' => $dir ? substr($f[2], 0, -1) : $f[2], 'is_dir' => $dir, 'bytes' => (int) $f[1] < 0 ? null : (int) $f[1],
-                    'modified' => $f[0]];
+                    'modified' => preg_match('/^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)$/', $f[0], $m) ? "{$m[1]}T{$m[2]}Z" : $f[0]];
             }
-            return count($rows) <= $limit;
-        });
+            return count($rows) < $want;
+        }, null, ['TZ' => 'UTC0']);
         if (!$r['stopped'] && $r['code'] !== 0) {
             throw new CliError("rclone lsf failed (exit {$r['code']}): " . ToolProc::tail($r['err']), 'remote names come from `list`');
         }
-        $status = ['place' => $where, 'listed_all' => count($rows) <= $limit];
-        $rows = array_slice($rows, 0, $limit);
+        $status = ['place' => $where] + ToolProc::listed(count($rows), $want);
         if (!empty($opt['size'])) {
             $size = json_decode($c->must(['size'], ['--json'], [$where])['out'], true); // a full listing: API calls and time on big remotes
             $status['files'] = isset($size['count']) ? (int) $size['count'] : null;

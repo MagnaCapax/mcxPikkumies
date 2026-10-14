@@ -1,7 +1,7 @@
 <?php
 /**
  * BackupRules: the checks every backup verb shares (tools/backup/README.md): the keep options, snapshot
- * ids, the record limit, and one backup job per account at a time.
+ * ids, the check record, and one backup job per account at a time (file listings page with ToolProc::want).
  */
 class BackupRules
 {
@@ -35,11 +35,6 @@ class BackupRules
             throw new CliError('name a snapshot: the id `list` prints', 'ids come from `list`');
         }
         return $id;
-    }
-
-    public static function limit(array $opt)
-    {
-        return isset($opt['limit']) ? max(1, (int) $opt['limit']) : Cli::LIMIT;
     }
 
     /** The shared check record: errors_found only for damage the program reported; a check that did not finish says nothing. */

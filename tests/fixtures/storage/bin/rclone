@@ -46,8 +46,10 @@ switch ($cmd) {
             printf("%-8s %-6s %s\n", $name . ':', $type, ''); // no %*s: width arguments need PHP 8
         }
         exit(0);
-    case 'lsf':
+    case 'lsf': // times in state are UTC; like rclone it prints local time, the zone "local_offset" unless TZ is UTC0 or UTC
+        $off = in_array(getenv('TZ'), ['UTC0', 'UTC'], true) ? 0 : (isset($s['local_offset']) ? (int) $s['local_offset'] : 0);
         foreach (isset($s['lsf'][$paths[0]]) ? $s['lsf'][$paths[0]] : [] as $row) {
+            $row[0] = gmdate('Y-m-d H:i:s', (new DateTime($row[0], new DateTimeZone('UTC')))->getTimestamp() + $off);
             echo implode("\t", $row), "\n";
         }
         exit(isset($s['lsf'][$paths[0]]) ? 0 : 3);

@@ -24,14 +24,15 @@ class RcloneCmd
             . ' missing); elsewhere the user installs it from rclone.org. This tool never installs anything.');
     }
 
-    /** rclone <words> <flags> --ask-password=false -- <paths>; $gentle: nice 19 and idle I/O, a time limit in seconds (0: none).
+    /** rclone <words> <flags> --ask-password=false -- <paths>; $gentle: nice 19 and idle I/O, a time limit in seconds (0: none);
+     * $env: variables added for this call (show sets TZ).
      * "unable to decrypt configuration" is the encrypted-config error for any verb: rclone 1.53.3 may load the config before
      * `config file` answers (fs/config/config.go:360-361 there; 1.69.1 fs/config/crypt.go:147-148). */
-    public function run(array $words, array $flags = [], array $paths = [], $onLine = null, $gentle = null)
+    public function run(array $words, array $flags = [], array $paths = [], $onLine = null, $gentle = null, array $env = [])
     {
         $this->bin();
         $argv = array_merge(['rclone'], $words, $flags, ['--ask-password=false'], $paths ? array_merge(['--'], $paths) : []);
-        $r = ToolProc::run($gentle === null ? $argv : ToolProc::gentle($argv, $gentle), [], $onLine);
+        $r = ToolProc::run($gentle === null ? $argv : ToolProc::gentle($argv, $gentle), $env, $onLine);
         if ($r['code'] !== 0 && stripos($r['err'], 'unable to decrypt configuration') !== false) {
             throw $this->encryptedError(is_string($this->config) ? $this->config : 'in use');
         }

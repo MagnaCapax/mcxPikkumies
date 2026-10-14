@@ -6,6 +6,10 @@
  * (archiver.py:1597-1616, helpers/parseformat.py:287-292, helpers/time.py:92-96). The passphrase
  * is read by running BORG_PASSCOMMAND, as borg does (crypto/key.py:425-445); a wrong one gets the
  * PassphraseWrong text (key.py:38-39) and rc 2. extract writes into the working directory.
+ * Times: state holds UTC; like borg the fake prints them in local time without a zone, the local zone being
+ * "local_offset" seconds unless TZ is UTC0 or UTC (borg read TZ in the 2026-10-14 smoke run). create takes the
+ * name from argv ({hostname} = box, {now} = state "now" or the second, like borg), refuses one that exists
+ * ("Archive ... already exists") and adds it; "create_err" prints a scripted error (a borg traceback) with rc 2.
  */
 require __DIR__ . '/fakelib.php'; // copied next to it by the test harness
 fakeLog($argv);
@@ -22,27 +26,35 @@ if ($pw !== $s['secret']) {
     fwrite(STDERR, "passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.\n");
     exit(2);
 }
-$fmt = function ($x) {
-    return sprintf('%-36s %s [%s]', $x['name'], date('D, Y-m-d H:i:s', strtotime($x['start'])), $x['id']);
+$off = in_array(getenv('TZ'), ['UTC0', 'UTC'], true) ? 0 : (isset($s['local_offset']) ? (int) $s['local_offset'] : 0);
+$local = function ($utc, $f = 'Y-m-d\TH:i:s.000000') use ($off) {
+    return gmdate($f, (new DateTime($utc, new DateTimeZone('UTC')))->getTimestamp() + $off);
+};
+$localArch = function ($x) use ($local) {
+    return ['start' => $local($x['start'])] + $x;
+};
+$fmt = function ($x) use ($local) {
+    return sprintf('%-36s %s [%s]', $x['name'], $local($x['start'], 'D, Y-m-d H:i:s'), $x['id']);
 };
 $repo = ['id' => str_repeat('0', 64), 'last_modified' => '2026-10-14T03:00:00.000000', 'location' => (string) getenv('BORG_REPO')];
 switch ($cmd) {
     case 'list':
         if (in_array('--json-lines', $a, true)) {
             foreach ($s['files'] as $f) {
-                echo json_encode($f), "\n";
+                echo json_encode(isset($f['mtime']) ? ['mtime' => $local($f['mtime'])] + $f : $f), "\n";
             }
             exit(0);
         }
-        echo json_encode(['archives' => $s['archives'], 'encryption' => ['mode' => 'repokey'], 'repository' => $repo]), "\n";
+        echo json_encode(['archives' => array_map($localArch, $s['archives']), 'encryption' => ['mode' => 'repokey'],
+            'repository' => $repo]), "\n";
         exit(0);
     case 'info':
         $name = isset($a[2]) ? substr($a[2], 2) : null;
         $arch = array_values(array_filter($s['archives'], function ($x) use ($name) {
             return $x['name'] === $name;
         }));
-        $arch = array_map(function ($x) {
-            return $x + ['hostname' => 'box', 'end' => $x['start'], 'duration' => 2.5, 'username' => 'u',
+        $arch = array_map(function ($x) use ($localArch) {
+            return $localArch($x) + ['hostname' => 'box', 'end' => $localArch($x)['start'], 'duration' => 2.5, 'username' => 'u',
                 'command_line' => ['/usr/bin/borg', 'create', '::x'], 'stats' => ['nfiles' => 3, 'original_size' => 100]];
         }, $arch);
         echo json_encode(['archives' => $name === null ? [] : $arch, 'repository' => $repo]), "\n";
@@ -66,7 +78,19 @@ switch ($cmd) {
         fwrite(STDERR, isset($s['check_err']) ? $s['check_err'] . "\n" : '');
         exit(isset($s['check_code']) ? (int) $s['check_code'] : 0);
     case 'create':
-        echo json_encode(['archive' => ['name' => 'box-2026-10-14T10:00:00', 'id' => str_repeat('e', 64), 'stats' => ['nfiles' => 3,
+        if (isset($s['create_err'])) {
+            fwrite(STDERR, $s['create_err']);
+            exit(2);
+        }
+        $now = isset($s['now']) ? $s['now'] : gmdate('Y-m-d\TH:i:s');
+        $name = str_replace(['{hostname}', '{now}'], ['box', $now], substr((string) current(preg_grep('/^::/', $a)), 2));
+        if (in_array($name, array_column($s['archives'], 'name'), true)) {
+            fwrite(STDERR, "Archive $name already exists\n");
+            exit(2);
+        }
+        $s['archives'][] = ['id' => hash('sha256', $name), 'name' => $name, 'start' => gmdate('Y-m-d\TH:i:s.000000')];
+        fakeSave($s);
+        echo json_encode(['archive' => ['name' => $name, 'id' => hash('sha256', $name), 'stats' => ['nfiles' => 3,
             'original_size' => 4096]], 'repository' => $repo]), "\n";
         exit(0);
     case 'extract':

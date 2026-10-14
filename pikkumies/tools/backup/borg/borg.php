@@ -16,7 +16,7 @@ usage: php borg.php <verb> [arguments] [--human]
   show --prune-plan --keep-daily N... what prune would remove, and the --expect value
   stats                               version, compact support, repository, archives, borgmatic configs
   check [--read-data]
-  backup <path>...                    a new archive {hostname}-{now} of paths inside the home
+  backup <path>...                    a new archive <host>-<UTC time>Z of paths inside the home
   restore <id> --target <new-dir> [--include /path]
   prune --keep-daily N... --expect <n>
 Keep options: --keep-last --keep-hourly --keep-daily --keep-weekly --keep-monthly --keep-yearly --keep-within 30d
