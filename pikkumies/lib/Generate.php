@@ -29,7 +29,7 @@ class Generate
         $outDir = $outDir ?: Units::generatedDir();
         $indexFile = $indexFile ?: $toolsDir . '/INDEX.md';
         $result = ['skills' => 0, 'written' => 0, 'removed' => 0, 'problems' => [], 'error' => ''];
-        if (!is_dir($outDir) && !@mkdir($outDir, 0700, true)) {
+        if (!@mkdir($outDir, 0700, true) && !is_dir($outDir)) {
             $result['error'] = "cannot create $outDir";
             return $result;
         }

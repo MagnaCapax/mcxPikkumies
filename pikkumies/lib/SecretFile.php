@@ -41,7 +41,7 @@ class SecretFile
     public static function write($file, array $fields, $what)
     {
         $dir = dirname($file);
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
             throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');
         }
         @chmod($dir, 0700);

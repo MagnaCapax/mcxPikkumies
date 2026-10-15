@@ -68,7 +68,7 @@ class Lessons
         }
         $text = "---\ndate: " . gmdate('Y-m-d') . "\ntopic: $topic\nsources: " . json_encode($sources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
             . "\n---\n# $title\n\n" . $body;
-        if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || @file_put_contents($path, $text) !== strlen($text)) {
+        if ((!@mkdir($dir, 0700, true) && !is_dir($dir)) || @file_put_contents($path, $text) !== strlen($text)) {
             throw new CliError("could not write $path", 'is the disk full?');
         }
         @chmod(self::root(), 0700); // git leaves the tracked memory/ directory 0755; lessons are private
