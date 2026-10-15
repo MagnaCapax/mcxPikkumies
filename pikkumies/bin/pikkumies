@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install | update | detect | doctor | generate | run [args...] | <free text prompt>
+ * pikkumies: install | update | detect | doctor | generate | cron-tick | run [args...] | <free text prompt>
  *
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
  * (ADR-0003) and Hermes' own session database and active-session registry are built for
@@ -85,6 +85,7 @@ switch ($cmd) {
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
+        out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));
         try {
             out('  path: ' . PathInstall::install($home, (string) getenv('PATH'), $link . '/bin/pikkumies'));
         } catch (Exception $x) {
@@ -105,8 +106,9 @@ switch ($cmd) {
         exit($postCode === 0 ? 0 : 1);
 
     case 'post-update': // internal: the second half of `update`, run by the updated code
+        $profile = profile();
         try {
-            $r = generate(profile());
+            $r = generate($profile);
         } catch (Exception $x) {
             out('generate failed: ' . $x->getMessage());
             exit(1);
@@ -114,6 +116,7 @@ switch ($cmd) {
         out('generated ' . $r['skills'] . ' skills and tools/INDEX.md');
         $config = Config::load();
         out('auto-update: ' . Update::schedule($config, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
+        out('cron-tick: ' . Update::scheduleCronTick($config, !empty($profile['root']['available'])));
         foreach (HermesInstall::cleanup($config) as $old) {
             out('removed old Hermes build ' . $old);
         }
@@ -152,6 +155,37 @@ switch ($cmd) {
         if (!empty($config['packs']['disabled'])) {
             out('note:     packs.disabled in local/config.php is no longer read; use tools.disabled with category names (ADR-0015)');
         }
+        // One line per Hermes feature pikkumies turns on at generate time (ADR-0024), read back
+        // from the actual generated config.yaml rather than assumed, so a write failure shows here too.
+        $yaml = (string) @file_get_contents(HermesConfig::home() . '/config.yaml');
+        if ($yaml === '') {
+            out('features: not generated yet (run `pikkumies generate`)');
+        } else {
+            $has = function ($needle) use ($yaml) {
+                return strpos($yaml, $needle) !== false;
+            };
+            out('features:');
+            out('  guard scan (agent-created skills): ' . ($has("  guard_agent_created: true\n") ? 'on' : 'off'));
+            out('  checkpoints (/rollback):           ' . ($has("checkpoints:\n  enabled: true\n") ? 'on' : 'off'));
+            out('  security-guidance plugin:          ' . ($has('"security-guidance"') ? 'on' : 'off'));
+            out('  background review (self-improve):  ' . ($has("background_review:\n    enabled: true\n") ? 'on' : 'off'));
+            out('  curator (skill housekeeping):      ' . ($has("curator:\n  enabled: true\n") ? 'on' : 'off'));
+            out('  external logins:                   ' . ($has("adopt_external_logins: false\n") ? 'own only' : 'borrowed (Hermes default)'));
+        }
+        // The ticker mode mirrors Update::scheduleCronTick's own decision (ADR-0025), without
+        // writing anything: doctor only reads the crontab to report whether the line is actually there.
+        $tickOff = !empty($config['cron']['disabled']);
+        $tickProfile = Detect::cached();
+        if ($tickOff) {
+            $tickMode = 'disabled (cron.disabled)';
+        } elseif (CronTick::refuses(!empty($tickProfile['root']['available']))) {
+            $tickMode = 'refused: no setpriv on a root host';
+        } else {
+            list(, $crontabOut) = Update::exec([Update::$crontab, '-l']);
+            $tickMode = strpos((string) $crontabOut, Update::CRON_TICK_TAG) !== false
+                ? 'installed (crontab, every minute)' : 'not installed yet (run `pikkumies install` or `update`)';
+        }
+        out('cron ticker: ' . $tickMode);
         break;
 
     case 'generate':
@@ -187,6 +221,28 @@ switch ($cmd) {
         $args = array_map('escapeshellarg', $passArgs);
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);
+
+    case 'cron-tick': // internal: the crontab line Update::scheduleCronTick installs, once a minute
+        $lockPath = Config::localDir() . '/cron.lock';
+        @mkdir(Config::localDir(), 0700, true);
+        $lock = @fopen($lockPath, 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+            exit(0); // a previous tick is still running; silent, there is another one in a minute
+        }
+        if (!is_file(hermesBin())) {
+            exit(0); // Hermes not installed yet; `run`/`doctor` already say so, no need to repeat every minute
+        }
+        $tickProfile = profile();
+        $tickArgv = CronTick::argv(hermesBin(), !empty($tickProfile['root']['available']));
+        if (!$tickArgv) {
+            CronTick::logRefusalOnce(Config::localDir() . '/update.log');
+            exit(0);
+        }
+        putenv('HERMES_HOME=' . HermesConfig::home());
+        $tickOut = [];
+        exec(implode(' ', array_map('escapeshellarg', $tickArgv)) . ' 2>&1', $tickOut, $tickCode);
+        CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', $tickCode, implode("\n", $tickOut));
+        exit($tickCode);
 
     case 'help':
     default:

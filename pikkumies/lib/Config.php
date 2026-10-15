@@ -18,6 +18,7 @@ class Config
             'tools' => ['disabled' => []],         // tool categories to leave out, e.g. ['seedbox'] (ADR-0015)
             'searchFirst' => ['disabled' => false], // first-turn search hint + search-first gate (ADR-0011)
             'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
+            'cron' => ['disabled' => false],        // per-minute `cron-tick` from the user's crontab, runs Hermes' own due jobs (ADR-0025)
             // The Hermes release the wiring was verified against, and its tarball checksum (ADR-0009).
             // lazyInstalls: let Hermes download optional packages and a browser at runtime (ADR-0021).
             'hermes' => ['version' => 'v2026.9.24', 'sha256' => '15b15ce4e6ec8ea424a081823709d1e17f0943e7b42b59597d24ebb94cbd1742', 'lazyInstalls' => false],

@@ -1,0 +1,56 @@
+# ADR-0025: Scheduled jobs: a per-minute tick under `setpriv --no-new-privs`
+
+## Metadata
+- Author: Aleksi Ursin / MCX (with Väinämöinen)
+- Date: 2026-10-15
+- Status: Accepted
+
+## Context
+Hermes' own `hermes cron create` lets the agent schedule a job (a recurring prompt, optionally a plain script), but nothing fires it: the pinned source has a built-in 60-second in-process ticker (`cron.scheduler_provider`, default `""` = builtin) that only runs while a long-lived Hermes gateway/desktop process is up. Pikkumies runs Hermes per-invocation (ADR-0022: any number of instances, none long-lived by design), so without something external calling `hermes cron tick`, a job the user or the agent scheduled never fires. `hermes cron tick` (`hermes_cli/cron.py`, `cron_tick()`) runs due jobs once and exits — exactly the shape a cron line needs.
+
+The risk this ADR is actually about: a cron-fired call runs **unattended, with nobody watching**. `approvals.*_mode` already denies by default in cron context (ADR-0020's research), but that is Hermes' own policy layer, editable by the same account the agent runs as. The OS-level backstop AGENTS.md asks for ("privilege comes from the OS, never from the agent's own config") is a kernel flag no config file can turn back off mid-run: `PR_SET_NO_NEW_PRIVS`, set by `setpriv --no-new-privs`.
+
+Verified this session, on the real host (passwordless sudo already present on this account, so no container was needed to reproduce the condition):
+```
+$ sudo -n true; echo exit=$?
+exit=0
+$ setpriv --no-new-privs sudo -n true; echo exit=$?
+sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+exit=1
+$ setpriv --no-new-privs bash -c 'sudo -n true'; echo exit=$?
+sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+exit=1
+```
+Plain `sudo` succeeds for a sudo-group account; the identical call refuses once wrapped in `setpriv --no-new-privs`, including when sudo is invoked indirectly through `bash -c` (ruling out a direct-exec-only bypass). `setpriv` ships in Debian's `util-linux` package, present on every PMSS image already (`/usr/bin/setpriv` on this host); it is not an extra dependency to install.
+
+A round-18 adversarial review of the first draft (vjoukahainen) found two problems with a plain "add a regex cron-mode guard hook" approach: (1) unattended cron + passwordless sudo lets a job run root commands with no human in the loop even though `approval_detection.py`'s cron-mode deny only catches patterns it recognizes; (2) a hook built on that same regex is bypassable the same way the regex itself is (quoting, `bash -c`, an unlisted command). `setpriv --no-new-privs` is not a detection rule to evade; it is a kernel-enforced ceiling the process cannot raise on itself.
+
+## Options Considered
+- **No ticker at all.** `hermes cron create` would schedule jobs that silently never run outside an interactive gateway session — the feature would exist but not work for Pikkumies' per-invocation model.
+- **A regex cron-mode guard hook** (deny specific dangerous patterns in cron context). Rejected per the round-18 review above: bypassable, and still a config-editable policy layer, not an OS boundary.
+- **`setpriv --no-new-privs` around every tick, unconditionally.** Simple and uniform, but on a host with no root/sudo to begin with, wrapping a call that has nothing to drop adds a dependency (setpriv must exist) for zero additional safety.
+- **`setpriv --no-new-privs` when it exists; refuse to tick unattended on a root-available host when it does not; run bare when there is no root/sudo to drop in the first place.** Adopted: the wrapper's whole job is removing privilege the account could otherwise gain under sudo; where there is no such privilege, there is nothing to remove, and refusing would only block a harmless case. Where there IS such privilege and no way to remove it, ticking anyway would be the exact unattended-escalation risk this ADR exists to close.
+
+## Decision
+- `CronTick::argv($hermesBin, $rootAvailable)` returns the argv to exec: `setpriv --no-new-privs <hermesBin> cron tick` when a `setpriv` binary is found on PATH (existence check only, `is_executable()`, never executed to probe — same pattern as `Detect::suPresent()`); the bare `<hermesBin> cron tick` when setpriv is missing and `$rootAvailable` is false (nothing to drop); `[]` — refuse — when setpriv is missing and `$rootAvailable` is true. `CronTick::refuses()` is the shared predicate for that last case.
+- The `pikkumies cron-tick` subcommand (added to `Launch::SUBCOMMANDS`) is what the crontab line actually runs: it takes a non-blocking `flock` on `local/cron.lock` (two overlapping ticks, from a previous slow run plus the next minute's cron fire, must never both run — the second exits 0 silently), builds the argv above from the cached detection profile, sets `HERMES_HOME` the same way `run` does (`putenv`, not inlined into the shell string), and execs with every argument through `escapeshellarg`.
+- `Update::scheduleCronTick()` installs a second marked crontab line (`# pikkumies-cron-tick`, reusing the same tagged-line mechanism `schedule()` already uses for the daily update line, generalized to take the tag as a parameter) running `* * * * * <launcher> cron-tick`, output redirected to `/dev/null` (the subcommand does its own logging; an unredirected per-minute job would otherwise mail the account on every run that printed anything). It is skipped when `cron.disabled` is set in `local/config.php` (mirrors `autoUpdate.disabled`), and — matching `CronTick::refuses()` — **never installed** when root is available but setpriv is missing, because that line would tick every minute and refuse every minute. That case logs one line to `local/update.log` instead (`CronTick::logRefusalOnce`) and `pikkumies doctor` surfaces it as `refused: no setpriv on a root host`.
+- Pre-dispatch validation inside Hermes itself (`cron.preflight: true`, Hermes' own default) means a job whose provider key cannot resolve fails fast as `blocked_config` with one alert and no LLM call, rather than failing mid-run; the live check below confirms the tick path exercises this without a provider key configured.
+- Logging: `CronTick::logIfChanged()` writes one line to `local/update.log` only when this tick's outcome (exit code, or whether anything was printed at all) differs from the previous tick's recorded state, or when there was output — an idle tick with zero due jobs is otherwise silent (`cron/scheduler_tick.py`'s own "No jobs due" idle path only logs through Python's own logger, not stdout). State persists in `local/cron-tick.state` between the one-minute-apart, always-a-different-process tick runs.
+- `cron.allow_agent_scheduling` is deliberately left at Hermes' own `False` (ADR-0024): this ADR answers "how do already-scheduled jobs get ticked," not "can an unattended job schedule more jobs."
+
+## Consequences
+- A job created with `hermes cron create` actually fires, once a minute, without a long-lived Hermes process.
+- Even on an account with passwordless sudo, a cron-fired job cannot escalate through it: the kernel refuses the attempt outright, the same way it refused the verified reproduction above, regardless of what the job's prompt or a hook's regex does or does not recognize.
+- A host with real root (not sudo) but no `setpriv` binary never gets the tick line at all, rather than installing something that would fail silently (redirected to `/dev/null`) every single minute; the refusal is visible in `local/update.log` and `pikkumies doctor` instead.
+- One more crontab line to keep in sync with `cron.disabled`, following the exact mechanism ADR-0013 already established for the daily update line.
+
+## References
+- ADR-0004 (root detection, `suPresent` pattern reused here), ADR-0013 (the tagged-line crontab mechanism this generalizes), ADR-0020 (approvals, cron-mode deny as the policy layer this is a kernel-level backstop for), ADR-0022 (HERMES_HOME via `putenv`, concurrent-safe writes), ADR-0023 (`Detect::cached()`, the root hint this reads), ADR-0024 (the feature pins installed alongside this), ADR-0026 (adopt_external_logins)
+
+## Addendum 2026-10-15: live check in a scratch `HERMES_HOME` (never the real `~/.hermes`)
+Built the pinned Hermes release via `HermesInstall::ensure()` into this checkout's own `pikkumies/include/hermes` (the repo's own install path; gitignored, shared across accounts, not touched by this check), then copied a freshly generated `config.yaml`/`.env`/`SOUL.md` into a scratch `HERMES_HOME` under `/tmp/`.
+- **Zero jobs due**: `setpriv --no-new-privs <hermesBin> cron tick` (the exact argv `CronTick::argv()` builds) exits 0, no output, no network activity — confirmed both before any job existed and again after the one test job had already fired and its next run was still in the future.
+- **A due job, no provider configured at all** (a genuinely fresh install: `provider.endpoint`/`provider.model` both `""`): the tick dispatches the job, which fails FAST with `RuntimeError: Cron job '<name>' has no model configured (...)`, visible in `hermes cron list --all` as `Execution: failed`, with ZERO network activity — this is the actual state a brand-new Pikkumies install is in before the operator sets a provider, and it is what the automated test suite's "fail on old code" seam cannot reach (no Python runtime in `php tests/run.php`), so this manual run is this feature's only coverage of it.
+- **A due job, provider.endpoint + provider.model set, key deliberately left blank** (testing for the `blocked_config` branch `cron/scheduler_preflight.py` documents): this did NOT stop before a network attempt. Read the exact source afterward (`_preflight_check_provider_key`, `scheduler_preflight.py:86-119`): it treats a provider as "has a key" once `providers.<name>.key_env` names an environment variable that EXISTS, not whether that variable's VALUE is non-empty — so it called `resolve_runtime_provider()`, which proceeded to build a real HTTP client and attempt a connection. The test used a deliberately non-resolving `base_url` (`https://example.invalid/v1`, RFC 2606 reserved) specifically so no real provider could ever be reached; the attempt hung on DNS and was killed by a 30s `timeout` wrapper with no residual process or connection (`ps aux`, `ss -tnp` both clean afterward). **This is a real, verified Hermes behavior, not a Pikkumies bug** — Pikkumies' own `HermesConfig::renderYaml()` writes `providers.pikkumies.key_env: PIKKUMIES_API_KEY` unconditionally, and `.env` always sets that variable (possibly to an empty string via `Provider::resolve()`), so a half-configured account (endpoint+model set, key not yet dropped in) is NOT caught by this particular preflight check — only a fully-unconfigured account (this ADR's main tested case, and what a fresh install actually looks like) or a fully-configured one is. No code change follows from this: it is outside the scope of "tick the scheduler safely" and is recorded here as a verified fact for whoever next touches provider-key handling, rather than silently treated as proven.
+- RSS measurement and the delegation-concurrency determination are recorded in ADR-0024's own addendum (same live-check session).

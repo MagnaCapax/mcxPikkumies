@@ -12,7 +12,7 @@ return [
         }
     },
     'launch: a known subcommand wins, and its own words pass through unchanged' => function () {
-        foreach (['install', 'update', 'post-update', 'detect', 'doctor', 'generate'] as $w) {
+        foreach (['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'cron-tick'] as $w) {
             list($cmd, $args) = Launch::route(['pikkumies', $w]);
             check($cmd === $w && $args === [], "$w misrouted: " . json_encode([$cmd, $args]));
         }
@@ -28,7 +28,7 @@ return [
     'launch: a prompt that starts with a Pikkumies subcommand word stays a prompt' => function () {
         // Natural requests ("update my plex", "install radarr please", "detect what is slow") must
         // never start a self-update or re-run the installer.
-        foreach ([['update', 'my', 'plex'], ['install', 'radarr', 'please'], ['detect', 'what', 'is', 'slow'], ['doctor', 'my', 'jellyfin']] as $words) {
+        foreach ([['update', 'my', 'plex'], ['install', 'radarr', 'please'], ['detect', 'what', 'is', 'slow'], ['doctor', 'my', 'jellyfin'], ['cron-tick', 'the', 'rename']] as $words) {
             list($cmd, $args) = Launch::route(array_merge(['pikkumies'], $words));
             check($cmd === 'run' && $args === ['chat', '--query=' . implode(' ', $words)], 'subcommand word swallowed a prompt: ' . json_encode([$cmd, $args]));
         }

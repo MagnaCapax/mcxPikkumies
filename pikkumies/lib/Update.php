@@ -7,6 +7,7 @@
 class Update
 {
     const CRON_TAG = '# pikkumies-update';
+    const CRON_TICK_TAG = '# pikkumies-cron-tick';
 
     /** @var string|null test seam: a checkout other than this one */
     public static $root = null;
@@ -42,12 +43,12 @@ class Update
         return strpbrk($line, "%\n\r") === false ? $line : '';
     }
 
-    /** Crontab text without our line, plus $line when it is not ''. Every other line is kept as it was. */
-    public static function cronMerge($current, $line)
+    /** Crontab text without any line tagged $tag, plus $line when it is not ''. Every other line is kept as it was. */
+    public static function cronMerge($current, $line, $tag)
     {
         $kept = '';
         foreach (preg_split('/(?<=\n)/', (string) $current, -1, PREG_SPLIT_NO_EMPTY) as $l) {
-            if (strpos($l, self::CRON_TAG) === false) {
+            if (strpos($l, $tag) === false) {
                 $kept .= $l;
             }
         }
@@ -58,10 +59,11 @@ class Update
     }
 
     /**
-     * Put the daily update line in the user's crontab, or take it out when autoUpdate.disabled.
-     * Nothing is written unless `crontab -l` worked or said there is no crontab yet. Returns a status line.
+     * One crontab read/merge/write cycle for one tagged line, shared by the daily auto-update line
+     * and the per-minute cron-tick line (ADR-0025). Nothing is written unless `crontab -l` worked
+     * or said there is no crontab yet. Returns a status line.
      */
-    public static function schedule(array $config, $uid)
+    private static function installTaggedLine($tag, $line, $onMsg, $offMsg)
     {
         list($code, $current, $err) = self::exec([self::$crontab, '-l']);
         if ($code !== 0) {
@@ -70,8 +72,7 @@ class Update
             }
             $current = '';
         }
-        $off = !empty($config['autoUpdate']['disabled']);
-        $new = self::cronMerge($current, $off ? '' : self::cronLine($uid));
+        $new = self::cronMerge($current, $line, $tag);
         if ($new !== $current) {
             $tmp = Config::localDir() . '/crontab.new';
             @mkdir(Config::localDir(), 0700, true);
@@ -84,7 +85,47 @@ class Update
                 return 'not changed (crontab failed: ' . trim($err) . ')';
             }
         }
-        return $off ? 'off (autoUpdate.disabled)' : 'daily, from your crontab (log: local/update.log)';
+        return $line === '' ? $offMsg : $onMsg;
+    }
+
+    /**
+     * Put the daily update line in the user's crontab, or take it out when autoUpdate.disabled.
+     * Nothing is written unless `crontab -l` worked or said there is no crontab yet. Returns a status line.
+     */
+    public static function schedule(array $config, $uid)
+    {
+        $off = !empty($config['autoUpdate']['disabled']);
+        return self::installTaggedLine(self::CRON_TAG, $off ? '' : self::cronLine($uid),
+            'daily, from your crontab (log: local/update.log)', 'off (autoUpdate.disabled)');
+    }
+
+    /**
+     * The per-minute tick line. Output is discarded by the line itself: `cron-tick` logs its own
+     * state changes to local/update.log (CronTick::logIfChanged), and without a redirect cron would
+     * otherwise mail the account on every run that printed anything. '' when the path has a % or a
+     * line break (see cronLine()).
+     */
+    public static function cronTickLine()
+    {
+        $line = sprintf('* * * * * %s cron-tick >/dev/null 2>&1 %s', escapeshellarg(Config::root() . '/bin/pikkumies'), self::CRON_TICK_TAG);
+        return strpbrk($line, "%\n\r") === false ? $line : ''; // same guard as cronLine(): a % or line break would break the line
+    }
+
+    /**
+     * Put the per-minute cron-tick line in the user's crontab, or take it out when
+     * cron.disabled — and never install it when it would only ever refuse: root available but no
+     * `setpriv` to run it under (CronTick::refuses, ADR-0025). That refusal is logged once instead,
+     * so it stays visible without a per-minute line that can never succeed. Returns a status line.
+     */
+    public static function scheduleCronTick(array $config, $rootAvailable, $logFile = null)
+    {
+        $off = !empty($config['cron']['disabled']);
+        if (!$off && CronTick::refuses($rootAvailable)) {
+            CronTick::logRefusalOnce($logFile !== null ? $logFile : Config::localDir() . '/update.log');
+            return 'not installed (root available, no setpriv; see local/update.log)';
+        }
+        return self::installTaggedLine(self::CRON_TICK_TAG, $off ? '' : self::cronTickLine(),
+            'every minute, from your crontab (log: local/update.log)', 'off (cron.disabled)');
     }
 
     /** Run a command without a shell; returns [exit code, stdout, stderr]. */

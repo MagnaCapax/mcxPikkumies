@@ -186,6 +186,40 @@ return [
         Update::$crontab = 'crontab';
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'cron-tick crontab: one tagged line, idempotent, removed by cron.disabled, never installed on root+no-setpriv' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-tick-cron-' . getmypid();
+        @mkdir($tmp, 0700, true);
+        file_put_contents("$tmp/crontab", "#!/bin/sh\nf=\"$tmp/tab\"\nif [ \"\$1\" = -l ]; then\n  [ -f \"\$f\" ] && exec cat \"\$f\"\n  echo 'no crontab for u' >&2; exit 1\nfi\ncp \"\$1\" \"\$f\"\n");
+        chmod("$tmp/crontab", 0700);
+        Update::$crontab = "$tmp/crontab";
+        $on = Config::defaults();
+        CronTick::$setprivPresentOverride = true;
+        $msg = Update::scheduleCronTick($on, false);
+        check(strpos($msg, 'every minute') === 0, 'first schedule: ' . $msg);
+        $tab = file_get_contents("$tmp/tab");
+        check(substr_count($tab, Update::CRON_TICK_TAG) === 1 && strpos($tab, '* * * * * ') === 0 && strpos($tab, 'cron-tick') !== false, 'line: ' . $tab);
+        // Idempotent: scheduling again must not duplicate the line.
+        Update::scheduleCronTick($on, false);
+        check(substr_count(file_get_contents("$tmp/tab"), Update::CRON_TICK_TAG) === 1, 'second schedule duplicated the line');
+        // cron.disabled removes it.
+        $off = Config::merge($on, ['cron' => ['disabled' => true]]);
+        $offMsg = Update::scheduleCronTick($off, false);
+        check(strpos($offMsg, 'off') === 0, 'off message: ' . $offMsg);
+        check(strpos(file_get_contents("$tmp/tab"), Update::CRON_TICK_TAG) === false, 'cron.disabled did not remove the line');
+        // Root available + no setpriv: the line is never installed at all (it would only ever refuse); logged once instead.
+        CronTick::$setprivPresentOverride = false;
+        $log = "$tmp/update.log";
+        $refuseMsg = Update::scheduleCronTick($on, true, $log);
+        check(strpos($refuseMsg, 'not installed') === 0, 'root+no-setpriv must refuse to install: ' . $refuseMsg);
+        check(strpos(file_get_contents("$tmp/tab"), Update::CRON_TICK_TAG) === false, 'refused case must not install the line');
+        check(strpos(file_get_contents($log), 'refused') !== false, 'refusal must be logged: ' . file_get_contents($log));
+        $before = file_get_contents($log);
+        Update::scheduleCronTick($on, true, $log);
+        check(file_get_contents($log) === $before, 'a second refusal must not log a second line');
+        CronTick::$setprivPresentOverride = null;
+        Update::$crontab = 'crontab';
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
     'update: fast-forwards a depth-1 clone, refuses local edits' => function () {
         $tmp = sys_get_temp_dir() . '/pk-upd-' . getmypid();
         $g = function ($dir, $args) {

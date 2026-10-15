@@ -79,6 +79,21 @@ return [
         check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'update banners must be off: Hermes is pinned');
         check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');
     },
+    'hermes yaml: feature pins at install (ADR-0024, ADR-0026)' => function () {
+        $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], []);
+        check(strpos($y, "  guard_agent_created: true\n") !== false, 'skills.guard_agent_created must be pinned on');
+        check(strpos($y, "checkpoints:\n  enabled: true\n") !== false, 'checkpoints.enabled must be pinned on');
+        check(strpos($y, "plugins:\n  enabled:\n    - \"security-guidance\"\n") !== false, 'plugins.enabled must list security-guidance');
+        check(strpos($y, "auxiliary:\n  background_review:\n    enabled: true\n") !== false, 'auxiliary.background_review.enabled must be pinned on');
+        check(strpos($y, "curator:\n  enabled: true\n") !== false, 'curator.enabled must be pinned on');
+        check(strpos($y, "auth:\n  adopt_external_logins: false\n") !== false, 'auth.adopt_external_logins must be pinned off');
+        // No invented limits, no model selection, no cron-spawned scheduling, no browser keys (ADR-0024).
+        check(strpos($y, 'max_input_tokens') === false, 'max_input_tokens must not be set: no measured basis');
+        check(strpos($y, 'consolidate') === false, 'curator.consolidate must stay at the Hermes default');
+        check(strpos($y, 'allow_agent_scheduling') === false, 'cron.allow_agent_scheduling must stay at the Hermes default (false)');
+        check(strpos($y, "\nmodels:") === false, 'no extra model-selection key beyond the existing provider block');
+        check(strpos($y, 'browser') === false, 'no browser key: ADR-0021 already covers it');
+    },
     'hermes build: pinned tag and checksum, verified before unpacking, atomic switch' => function () {
         $sha = str_repeat('a', 64);
         check(HermesInstall::buildCommand('v1;rm -rf ~', $sha) === '', 'unsafe tag accepted');

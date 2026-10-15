@@ -76,6 +76,9 @@ class HermesConfig
                 $y .= "    - " . self::q($name) . "\n";
             }
         }
+        // Agent-written skills get the same static scan as a hub install before they can run
+        // again; Hermes' own default leaves them unscanned (ADR-0024).
+        $y .= "  guard_agent_created: true\n";
         // Hermes is pinned and updated by Pikkumies (ADR-0009): no update banners.
         $y .= "updates:\n  check: false\n";
         // Hermes web_search/web_extract fall back to outside free search services when no backend is
@@ -91,6 +94,20 @@ class HermesConfig
         // (tools/approval_smart.py). Deletes need the user's approval (ADR-0020), so the user decides.
         // config.yaml is deep-merged over the defaults, so timeout and cron_mode: deny stay.
         $y .= "approvals:\n  mode: manual\n";
+        // Per-turn working-directory snapshots (/rollback): Hermes defaults this off; the size caps
+        // (max_snapshots, max_total_size_mb, max_file_size_mb) stay at Hermes' own values (ADR-0024).
+        $y .= "checkpoints:\n  enabled: true\n";
+        // Opt-in allow-list (ADR-0024): a static scan of file writes, no model call, no cost.
+        $y .= "plugins:\n  enabled:\n    - \"security-guidance\"\n";
+        // Pinned on so a future Hermes default change cannot silently turn off the post-turn
+        // self-improvement fork; consolidate (its aux-model cost) is left at Hermes' own off (ADR-0024).
+        $y .= "auxiliary:\n  background_review:\n    enabled: true\n";
+        // Pinned on (already Hermes' default): background pruning/archiving of agent-created skills;
+        // consolidate stays off, left at Hermes' own default (ADR-0024).
+        $y .= "curator:\n  enabled: true\n";
+        // Hermes would otherwise borrow a codex/other CLI login from this account; two programs
+        // sharing one login rotate its refresh token and log each other out (ADR-0026).
+        $y .= "auth:\n  adopt_external_logins: false\n";
         if ($hooks) {
             // Hermes registers a shell hook only after first-use consent; a non-interactive run
             // silently skips unapproved hooks. These hooks ship with pikkumies, so the
