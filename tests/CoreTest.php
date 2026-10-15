@@ -53,6 +53,17 @@ return [
         $solo = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => false], 'tenancy' => ['shared' => false]], Config::defaults());
         check(strpos($solo, 'Shared server') === false, 'shared-server line on a single-tenant host');
     },
+    'soul tells the model scheduled jobs run only where the tick line is installed (ADR-0025)' => function () {
+        $p = ['pmss' => false, 'root' => ['available' => false]];
+        CronTick::$setprivPresentOverride = true;
+        check(strpos(HermesConfig::capabilities($p, Config::defaults()), '- Cron jobs run from crontab; ignore') !== false,
+            'tick installed: the model must be told jobs run, or it repeats Hermes\' "will NOT fire" warning to the user');
+        check(strpos(HermesConfig::capabilities($p, ['cron' => ['disabled' => true]]), 'Cron jobs run') === false, 'cron.disabled: no tick line, no claim that jobs run');
+        CronTick::$setprivPresentOverride = false;
+        check(strpos(HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults()), 'Cron jobs run') === false,
+            'tick refused (root, no setpriv): no claim that jobs run');
+        CronTick::$setprivPresentOverride = null;
+    },
     'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);
         // Hermes reads key_env under providers:<name>; a bare `provider: custom` ignored

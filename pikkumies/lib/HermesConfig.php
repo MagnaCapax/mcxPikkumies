@@ -160,8 +160,14 @@ class HermesConfig
             . (!empty($profile['tenancy']['shared'])
                 ? "\n- Shared server: yes; other accounts live on this machine, so read and change only this user's own files and processes"
                 : '')
-            . "\n\nThis was detected when the agent started. Skills for other kinds of machine are listed too; use one only when this machine matches it."
-            . " Every tool has a skill; to compare tools or find one by what it does, read " . Units::toolsDir() . "/INDEX.md.";
+            // Hermes' cronjob tool says a job "will NOT fire until the gateway is started" whenever no
+            // gateway runs (tools/cronjob_job_args.py, pinned v2026.9.24); here the crontab tick fires
+            // it (ADR-0025), and installing the gateway is a sudo path the tick exists to avoid.
+            . (empty($config['cron']['disabled']) && !CronTick::refuses(!empty($profile['root']['available']))
+                ? "\n- Cron jobs run from crontab; ignore \"gateway is not running\", never start the gateway"
+                : '')
+            . "\n\nDetected at start. Skills for other machines are listed too; use one only if it matches."
+            . " To compare or find tools, read " . Units::toolsDir() . "/INDEX.md.";
     }
 
     /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */
