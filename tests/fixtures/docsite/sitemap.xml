@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://docs.example.org/wiki/Disk_quota</loc></url>
+  <url><loc>http://docs.example.org/wiki/Rtorrent_setup</loc></url>
+  <url><loc>https://docs.example.org/wiki/Rtorrent_setup#top</loc></url>
+  <url><loc>https://docs.example.org/wiki/Private?session=1</loc></url>
+  <url><loc>https://docs.example.org/blog/news-item</loc></url>
+  <url><loc>https://other.example.net/wiki/Elsewhere</loc></url>
+  <url><loc>https://docs.example.org/clients/clientarea.php</loc></url>
+  <url><loc>https://docs.example.org/wiki/revisions/1</loc></url>
+  <url><loc>https://docs.example.org/wiki/A&amp;B</loc></url>
+  <url><loc>https://docs.example.org/wiki/login</loc></url>
+  <url><loc>https://docs.example.org/wiki/Register/</loc></url>
+</urlset>

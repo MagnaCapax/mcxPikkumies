@@ -12,7 +12,7 @@ return [
         }
     },
     'launch: a known subcommand wins, and its own words pass through unchanged' => function () {
-        foreach (['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'cron-tick'] as $w) {
+        foreach (['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'cron-tick', 'docs-fill'] as $w) {
             list($cmd, $args) = Launch::route(['pikkumies', $w]);
             check($cmd === $w && $args === [], "$w misrouted: " . json_encode([$cmd, $args]));
         }
@@ -47,6 +47,13 @@ return [
     'launch: quoting is never re-split: a word with spaces/quotes/$( ) stays one argv entry, one prompt word' => function () {
         list(, $args) = Launch::route(['pikkumies', 'rm -rf /; echo "hi" $(whoami)']);
         check($args === ['chat', '--query=rm -rf /; echo "hi" $(whoami)'], 'a single argv word was split or evaluated: ' . json_encode($args));
+    },
+    'launch: install and post-update both start the background documentation fill' => function () {
+        $bin = file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        foreach (['install', 'post-update'] as $case) {
+            check(preg_match("/\n    case '" . preg_quote($case, '/') . "':(.*?)\n        break;/s", $bin, $m) && strpos($m[1], 'startDocsFill()') !== false, "$case does not start the docs fill");
+        }
+        check(substr_count($bin, "' docs-fill > '") === 1, 'the docs-fill command line is not in one place');
     },
     'launch: a prompt that starts like a flag stays one --query token' => function () {
         list($cmd, $args) = Launch::route(['pikkumies', '--', '-v', 'means', 'what']);

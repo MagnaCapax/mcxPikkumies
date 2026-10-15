@@ -13,7 +13,7 @@
 class Launch
 {
     /** Subcommands bin/pikkumies dispatches on its own. */
-    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick'];
+    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill'];
     const HELP = ['help', '--help', '-h'];
 
     /**

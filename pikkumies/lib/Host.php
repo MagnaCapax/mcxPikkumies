@@ -57,8 +57,8 @@ class Host
             'markers'      => [],
             'logGlobs'     => [],
             'limitsSource' => null,
-            'source'       => 'https://whatbox.ca/wiki/FAQ',
-            'verified'     => null, // research only; not re-checked at source this session
+            'source'       => 'https://whatbox.ca/wiki/SSH', // "Enter ssh user@server.whatbox.ca"
+            'verified'     => '2026-10-15',
         ],
         'ultra' => [
             'type'         => 'provider',
@@ -73,12 +73,12 @@ class Host
         ],
         'bytesized' => [
             'type'         => 'provider',
-            'suffixes'     => ['bysh.me', 'bytesized-hosting.com'],
+            'suffixes'     => ['bytesized-hosting.com', 'bysh.me'], // the first is verified; bysh.me is research only
             'markers'      => [],
             'logGlobs'     => [],
             'limitsSource' => null,
-            'source'       => 'https://bytesized-hosting.com/pages/faq',
-            'verified'     => null, // research only; not re-checked at source this session
+            'source'       => 'https://bytesized-hosting.com/pages/ssh', // "servername.bytesized-hosting.com"; bysh.me is research only
+            'verified'     => '2026-10-15',
         ],
         'seedhost' => [
             'type'         => 'provider',
@@ -91,6 +91,15 @@ class Host
             // only reliably identifies a Shared App Hosting slot, not a Dedicated/renamed box.
             'source'       => 'https://www.seedhost.eu/whmcs/knowledgebase/67/How-to-change-the-server-name.html',
             'verified'     => null, // research only; not re-checked at source this session
+        ],
+        'hostingbydesign' => [
+            'type'         => 'provider', // Seedbox.io's successor
+            'suffixes'     => ['hostingby.design'],
+            'markers'      => [],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://docs.hostingby.design/application-hosting/getting-started/how-do-i-connect', // "ssh dan@app02.hostingby.design"
+            'verified'     => '2026-10-15',
         ],
         // NO rapidseedbox row: seedbox.vip is confirmed only for app-proxy endpoints
         // (rt-*.a.seedbox.vip), not as the SSH-reachable shell hostname (providers.md).

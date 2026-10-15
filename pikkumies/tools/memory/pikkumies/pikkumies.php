@@ -10,7 +10,7 @@ require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
 require_once __DIR__ . '/Lessons.php';
 
-const NEXT_STEP = 'not found on this machine: delegate a wider search to a subagent, or search the web through a backend the user configured (if none, ask the user); then save what you learn with `save`';
+const NEXT_STEP = 'not found on this machine: use the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing else, ask the user; then save what you learn with `save`';
 
 Cli::run($argv, [
     'search' => function ($args, $opt) {
@@ -25,6 +25,9 @@ Cli::run($argv, [
         if (!$hits) {
             list($hits) = DocSources::search($query, $limit, true, 0.34); // step 2: a share of the words is enough
             $mode = 'any words';
+            if ($hits) {
+                $notes = array_values(array_diff($notes, [DocSources::linkNote()])); // the support pages only when nothing is found
+            }
         }
         $records = [];
         $fetched = false;
@@ -79,13 +82,18 @@ Cli::run($argv, [
     },
     'sources' => function ($args, $opt) {
         $out = [];
+        $host = DocSources::hostProfile();
         foreach (DocSources::load() as $name => $src) {
             $m = DocSources::meta($name);
             $out[] = ['name' => $name, 'trust' => isset($src['trust']) ? $src['trust'] : '', 'type' => isset($src['type']) ? $src['type'] : '',
                 'url' => isset($src['url']) ? $src['url'] : '', 'origin' => $src['origin'], 'status' => isset($src['status']) ? $src['status'] : 'on',
+                'scope' => isset($src['scope']) ? $src['scope'] : 'all', 'in_scope' => DocSources::inScope($src, $host),
                 'covers' => isset($src['covers']) ? $src['covers'] : '', 'problems' => DocSources::problems($src),
-                'fetched_at' => isset($m['fetched']) ? (int) $m['fetched'] : null, 'pages' => isset($m['count']) ? (int) $m['count'] : 0];
+                'fetched_at' => isset($m['fetched']) ? (int) $m['fetched'] : null,
+                'age_s' => isset($m['fetched']) ? time() - (int) $m['fetched'] : null,
+                'pages' => isset($m['count']) ? (int) $m['count'] : 0,
+                'last_error' => isset($m['error']) ? (string) $m['error'] : ''];
         }
-        return $out;
+        return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },
 ], "usage: pikkumies.php search|save|append|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path']);

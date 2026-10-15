@@ -6,8 +6,13 @@
  * Each source is downloaded into local/docs-cache/<name>/ as one markdown file per page or
  * article, and searched there together with the lessons (TextSearch). Only the documentation
  * is downloaded; search words never leave the machine. Fetched text is data, not instructions.
+ *
+ * A source's `scope` names the hosts it is for (Host::TABLE names, `generic`, or `all`); only sources
+ * whose scope matches this host's family or stack are downloaded and searched (ADR-0027). `link`
+ * sources are never downloaded: when a search finds nothing, their addresses are offered instead.
  */
 require_once __DIR__ . '/Config.php';
+require_once __DIR__ . '/Detect.php';
 require_once __DIR__ . '/TextSearch.php';
 require_once __DIR__ . '/Http.php';
 
@@ -15,15 +20,20 @@ class DocSources
 {
     /** Highest first. The same names are listed in config/documentationSources.md and doctrine/doctrine.md. */
     const TRUST = ['live', 'official', 'lessons', 'upstream', 'community', 'recall'];
-    const TYPES = ['mediawiki', 'kb-json'];
+    const TYPES = ['mediawiki', 'kb-json', 'site', 'link'];
     const MAX_RESPONSE = 5242880;   // bytes per HTTP response
     const MAX_PAGE = 65536;         // bytes kept per page or article
     const MAX_REQUESTS = 40;        // per refresh of one source
+    const FILL_REQUESTS = 300;      // per provider source in the daily background fill (site sources)
+    const FILL_REQUESTS_SHARED = 100; // per scope-all source: every server of every provider fetches these
+    const FILL_JITTER = 3600;       // seconds: the background fill starts at a random point in this window
 
     /** @var string|null test seam: a pikkumies root other than this one */
     public static $root = null;
     /** @var callable|null test seam: fn(url) => body, used after the URL checks instead of the network */
     public static $fetcher = null;
+    /** @var array|null test seam: the host profile (family, stack) instead of Detect */
+    public static $host = null;
 
     public static function root()
     {
@@ -103,19 +113,108 @@ class DocSources
         if (self::refreshSeconds(isset($src['refresh']) ? $src['refresh'] : '1d') === 0) {
             $p[] = 'refresh must look like 12h or 7d';
         }
+        if (isset($src['scope']) && !preg_match('/^[a-z0-9-]+( *, *[a-z0-9-]+)*$/', $src['scope'])) {
+            $p[] = 'scope must be a comma list of host names (Host::TABLE), generic or all';
+        } elseif (isset($src['scope'])) {
+            // A typo would silently scope the source to no host at all.
+            $unknown = array_diff(array_map('trim', explode(',', $src['scope'])), array_merge(array_keys(Host::TABLE), ['generic', 'all']));
+            if ($unknown) {
+                $p[] = 'scope names no known host: ' . implode(', ', $unknown) . ' (use names from Host::TABLE, generic or all)';
+            }
+        }
+        if (isset($src['verified']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $src['verified'])) {
+            $p[] = 'verified must be a date like 2026-10-15';
+        }
+        if (isset($src['depth']) && !in_array($src['depth'], ['1', '2'], true)) {
+            $p[] = 'depth must be 1 or 2';
+        }
+        if (isset($src['prefix']) && !preg_match('#^/\S*$#', $src['prefix'])) {
+            $p[] = 'prefix must be a path starting with /';
+        }
         return $p;
     }
 
-    /** Sources that are on and valid. */
+    /** Sources that are on, valid, meant for this host, and downloadable (not `link`). */
     public static function active()
     {
         $out = [];
-        foreach (self::load() as $name => $src) {
-            if ((isset($src['status']) ? $src['status'] : 'on') === 'on' && !self::problems($src)) {
+        foreach (self::usable() as $name => $src) {
+            if ($src['type'] !== 'link') {
                 $out[$name] = $src;
             }
         }
         return $out;
+    }
+
+    /** `link` sources (support, help and status pages) meant for this host; never downloaded. */
+    public static function links()
+    {
+        $out = [];
+        foreach (self::usable() as $name => $src) {
+            if ($src['type'] === 'link') {
+                $out[$name] = $src;
+            }
+        }
+        return $out;
+    }
+
+    private static function usable()
+    {
+        $out = [];
+        $host = self::hostProfile();
+        foreach (self::load() as $name => $src) {
+            if ((isset($src['status']) ? $src['status'] : 'on') === 'on' && !self::problems($src) && self::inScope($src, $host)) {
+                $out[$name] = $src;
+            }
+        }
+        return $out;
+    }
+
+    /** This host's family and stack: the detection cache when there is one, else the cheap checks (no rDNS). */
+    public static function hostProfile()
+    {
+        if (self::$host !== null) {
+            return self::$host;
+        }
+        $file = self::root() . '/local/host.json';
+        try {
+            if (is_file($file)) {
+                return Detect::cached(false, $file, self::root() . '/local/update.log');
+            }
+            return Detect::applyOverride(['family' => Host::family(), 'stack' => Host::stack()], Config::load());
+        } catch (Throwable $e) {
+            return ['family' => 'generic', 'stack' => 'none'];
+        }
+    }
+
+    /** True when the source's scope (missing = all) names this host's family or stack, `all`, or `generic` on a generic host. */
+    public static function inScope(array $src, array $host)
+    {
+        $scope = array_map('trim', explode(',', isset($src['scope']) ? $src['scope'] : 'all'));
+        $family = isset($host['family']) ? (string) $host['family'] : 'generic';
+        $mine = ['all', $family, isset($host['stack']) ? (string) $host['stack'] : 'none'];
+        if ($family === 'generic') {
+            $mine[] = 'generic';
+        }
+        return (bool) array_intersect($scope, $mine);
+    }
+
+    /** A scope-all source (missing scope = all): upstream app documentation fetched by every server, so it is fetched gently. */
+    public static function isShared(array $src)
+    {
+        return in_array('all', array_map('trim', explode(',', isset($src['scope']) ? $src['scope'] : 'all')), true);
+    }
+
+    /** Pages one background fill may fetch for this source. */
+    public static function fillBudget(array $src)
+    {
+        return self::isShared($src) ? self::FILL_REQUESTS_SHARED : self::FILL_REQUESTS;
+    }
+
+    /** Seconds the background fill waits before starting, so many servers updated together do not fetch together; 0 when PIKKUMIES_DOCS_FILL_NOW=1 (tests). */
+    public static function fillJitter()
+    {
+        return getenv('PIKKUMIES_DOCS_FILL_NOW') === '1' ? 0 : mt_rand(0, self::FILL_JITTER);
     }
 
     public static function refreshSeconds($spec)
@@ -147,6 +246,31 @@ class DocSources
         if ($p = self::problems($src)) {
             return [false, implode('; ', $p)];
         }
+        if ($src['type'] === 'link') {
+            return [false, 'a link source is not downloaded'];
+        }
+        if ($src['type'] === 'site') {
+            require_once __DIR__ . '/DocSite.php';
+            return DocSite::refresh($src, self::MAX_REQUESTS, false); // incremental, never all-or-nothing
+        }
+        // The same per-source lock as DocSite: a search and the background fill never download one source twice at once.
+        $root = self::cacheRoot();
+        @mkdir($root, 0700, true);
+        $lock = @fopen($root . '/' . $src['name'] . '.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+            return [false, 'skipped: another download of this source is running'];
+        }
+        try {
+            return self::refreshAll($src);
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /** mediawiki and kb-json: the whole source into a new copy, swapped in only when complete. */
+    private static function refreshAll(array $src)
+    {
         try {
             $items = $src['type'] === 'mediawiki' ? self::fetchMediawiki($src['url']) : self::fetchKbJson($src['url']);
         } catch (Exception $e) {
@@ -193,6 +317,30 @@ class DocSources
         }
         self::removeDir($old);
         return [true, count($items) . ' pages'];
+    }
+
+    /**
+     * The daily background fill (`pikkumies install` and `update`): every active `site` source fetches
+     * up to $budgetPerSource more pages (default fillBudget(): fewer for scope-all sources), missing
+     * first, then the oldest past their refresh period, at least one second apart. This is the only
+     * place `site` sources are downloaded besides an explicit `pikkumies.php refresh`. Other sources
+     * are downloaded only when stale. Returns [[name, ok, message], ...].
+     */
+    public static function fill($budgetPerSource = null)
+    {
+        require_once __DIR__ . '/DocSite.php';
+        $out = [];
+        foreach (self::active() as $name => $src) {
+            if ($src['type'] === 'site') {
+                list($ok, $msg) = DocSite::refresh($src, $budgetPerSource !== null ? $budgetPerSource : self::fillBudget($src), true);
+            } elseif (self::isStale($src)) {
+                list($ok, $msg) = self::refresh($src);
+            } else {
+                continue;
+            }
+            $out[] = [$name, $ok, $msg];
+        }
+        return $out;
     }
 
     public static function renderPage(array $src, array $it)
@@ -281,8 +429,10 @@ class DocSources
     }
 
     /**
-     * Lessons and every active source's cache, ranked together. Unless $offline, stale sources
-     * are downloaded first. Returns [hits, notes]; a hit is [path, title, source, trust, url].
+     * Lessons and every active source's cache, ranked together. Unless $offline, stale mediawiki and
+     * kb-json sources are downloaded first; `site` sources never are here (a crawl of up to hundreds
+     * of pages with a Crawl-delay must not hold up a search): only the background fill fetches them.
+     * Returns [hits, notes]; a hit is [path, title, source, trust, url].
      */
     public static function search($query, $limit, $offline, $share = null)
     {
@@ -293,7 +443,7 @@ class DocSources
             $dirs[$d] = basename($d) === 'research' ? ['research', 'research'] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons'];
         }
         foreach (self::active() as $name => $src) {
-            if (!$offline && self::isStale($src)) {
+            if (!$offline && $src['type'] !== 'site' && self::isStale($src)) {
                 list($ok, $msg) = self::refresh($src);
                 $notes[] = $name . ': ' . ($ok ? 'downloaded ' . $msg : 'download failed, using the old copy (' . $msg . ')');
             }
@@ -306,7 +456,20 @@ class DocSources
             list($title, $url) = self::pageInfo($p);
             $hits[] = [$p, $title, $source, $trust, $url];
         }
+        if (!$hits && ($note = self::linkNote()) !== '') {
+            $notes[] = $note;
+        }
         return [$hits, $notes];
+    }
+
+    /** The support pages of this host's provider, for when nothing on the machine answers; '' when none. */
+    public static function linkNote()
+    {
+        $parts = [];
+        foreach (self::links() as $name => $src) {
+            $parts[] = $name . ': ' . $src['url'] . (isset($src['covers']) && $src['covers'] !== '' ? ' (' . $src['covers'] . ')' : '');
+        }
+        return $parts ? 'support pages for this host, to give the user when nothing here answers: ' . implode('; ', $parts) : '';
     }
 
     /** [title, url] of a cached page or lesson, from its first lines. */

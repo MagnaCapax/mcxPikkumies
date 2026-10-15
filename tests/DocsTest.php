@@ -31,9 +31,10 @@ $kbFixture = json_encode(['_meta' => ['built' => '2026-10-08T00:00:00+00:00'], '
 return [
     'docs: shipped config parses; header sections are not sources; shipped sources are valid' => function () {
         $all = DocSources::parse(file_get_contents(dirname(__DIR__) . '/pikkumies/config/documentationSources.md'));
-        check(array_keys($all) === ['pm-wiki', 'pm-kb'], 'sources: ' . implode(',', array_keys($all)));
+        check(isset($all['pm-wiki'], $all['pm-kb']), 'sources: ' . implode(',', array_keys($all)));
         foreach ($all as $src) {
             check(DocSources::problems($src) === [], $src['name'] . ': ' . implode('; ', DocSources::problems($src)));
+            check(isset($src['scope'], $src['verified']), $src['name'] . ' has no scope or verified date');
             check($src['description'] !== '', $src['name'] . ' has no description');
         }
     },
@@ -50,10 +51,15 @@ return [
     'docs: local overlay replaces, adds and switches off' => function () {
         $tree = docsTree();
         DocSources::$root = "$tree/pikkumies";
+        DocSources::$host = ['family' => 'pmss', 'stack' => 'pmss']; // the shipped pm-* sources are scoped to pmss
         file_put_contents("$tree/pikkumies/local/documentationSources.md", "## pm-wiki\n- type: mediawiki\n- url: https://wiki.example.org/api.php\n- trust: upstream\n- status: off\n\n## my-kb\n- type: kb-json\n- url: https://example.org/kb.json\n- trust: community\n- covers: x\n- refresh: 12h\n");
-        $all = DocSources::load();
-        $active = DocSources::active();
-        DocSources::$root = null;
+        try {
+            $all = DocSources::load();
+            $active = DocSources::active();
+        } finally {
+            DocSources::$root = null;
+            DocSources::$host = null;
+        }
         check($all['pm-wiki']['origin'] === 'local' && $all['pm-wiki']['trust'] === 'upstream', 'overlay did not replace');
         check(!isset($active['pm-wiki']) && isset($active['pm-kb']) && isset($active['my-kb']), 'active: ' . implode(',', array_keys($active)));
         exec('rm -rf ' . escapeshellarg($tree));
@@ -81,6 +87,62 @@ return [
         }
         DocSources::$fetcher = null;
         check($called === 0, 'refused URL reached the fetcher');
+    },
+    'docs: a scope name that is not a known host is a problem, also on an off source; the shipped RapidSeedbox sources are off and valid' => function () {
+        $base = ['name' => 'x', 'type' => 'site', 'url' => 'https://example.org/sitemap.xml', 'trust' => 'official'];
+        foreach (['pmss', 'feral, whatbox', 'generic', 'all', 'swizzin,all'] as $scope) {
+            check(DocSources::problems(['scope' => $scope] + $base) === [], "valid scope $scope refused");
+        }
+        foreach (['ferral', 'feral, whatbx', 'rapidseedbox'] as $scope) {
+            check(DocSources::problems(['scope' => $scope] + $base) !== [], "unknown scope $scope accepted");
+            check(DocSources::problems(['scope' => $scope, 'status' => 'off'] + $base) !== [], "unknown scope $scope accepted on an off source");
+        }
+        $all = DocSources::parse(file_get_contents(dirname(__DIR__) . '/pikkumies/config/documentationSources.md'));
+        foreach (['rapidseedbox-help', 'rapidseedbox-support'] as $n) {
+            check(isset($all[$n]) && $all[$n]['status'] === 'off' && DocSources::problems($all[$n]) === [] && strpos($all[$n]['description'], 'Host.php') !== false, "$n: " . json_encode(isset($all[$n]) ? $all[$n] : null));
+        }
+    },
+    'docs: scope-all sources are fetched gently: 30 days between refreshes, 100 pages per fill; provider sources 300; the fill start is jittered' => function () {
+        foreach (DocSources::parse(file_get_contents(dirname(__DIR__) . '/pikkumies/config/documentationSources.md')) as $src) {
+            if (DocSources::isShared($src) && (isset($src['status']) ? $src['status'] : 'on') === 'on' && $src['type'] !== 'link') {
+                check(DocSources::refreshSeconds($src['refresh']) >= 30 * 86400, $src['name'] . ' refreshes every ' . $src['refresh']);
+            }
+        }
+        check(DocSources::fillBudget(['scope' => 'all']) === 100 && DocSources::fillBudget([]) === 100 && DocSources::fillBudget(['scope' => 'feral']) === 300, 'fill budgets');
+        $old = getenv('PIKKUMIES_DOCS_FILL_NOW');
+        putenv('PIKKUMIES_DOCS_FILL_NOW=1');
+        $now = DocSources::fillJitter();
+        putenv('PIKKUMIES_DOCS_FILL_NOW');
+        $j = DocSources::fillJitter();
+        if ($old !== false) {
+            putenv("PIKKUMIES_DOCS_FILL_NOW=$old");
+        }
+        check($now === 0 && $j >= 0 && $j <= 3600, "jitter: $now / $j");
+    },
+    'docs: a mediawiki or kb-json refresh takes the per-source lock and skips while it is held' => function () use ($kbFixture) {
+        $tree = docsTree();
+        DocSources::$root = "$tree/pikkumies";
+        $called = 0;
+        DocSources::$fetcher = function () use ($kbFixture, &$called) {
+            $called++;
+            return $kbFixture;
+        };
+        @mkdir("$tree/pikkumies/local/docs-cache", 0700, true);
+        $h = fopen("$tree/pikkumies/local/docs-cache/kb.lock", 'c');
+        flock($h, LOCK_EX);
+        try {
+            $src = ['name' => 'kb', 'type' => 'kb-json', 'url' => 'https://example.org/kb.json', 'trust' => 'official'];
+            list($ok, $msg) = DocSources::refresh($src);
+            check(!$ok && strpos($msg, 'skipped') === 0 && $called === 0, "lock ignored: $msg, $called requests");
+            flock($h, LOCK_UN);
+            list($ok, $msg) = DocSources::refresh($src);
+            check($ok && $called === 1, "refresh after the lock: $msg");
+        } finally {
+            fclose($h);
+            DocSources::$fetcher = null;
+            DocSources::$root = null;
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
     },
     'docs: mediawiki follows continue and builds page addresses' => function () {
         $urls = [];

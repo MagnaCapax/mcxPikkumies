@@ -17,6 +17,9 @@ class Config
             'skills' => ['disabled' => []],        // shipped skill names to hide, e.g. after copying one (ADR-0007)
             'tools' => ['disabled' => []],         // tool categories to leave out, e.g. ['seedbox'] (ADR-0015)
             'searchFirst' => ['disabled' => false], // first-turn search hint + search-first gate (ADR-0011)
+            // reword: a question with no local hit is turned into search terms by the model once (hooks/pre_llm_call/search-first.php).
+            // llm.disabled: no hook ever calls the model. model: the hooks' model; '' = the light model decided at generate (local/llm.json).
+            'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => ''],
             'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
             'cron' => ['disabled' => false],        // per-minute `cron-tick` from the user's crontab, runs Hermes' own due jobs (ADR-0025)
             // The Hermes release the wiring was verified against, and its tarball checksum (ADR-0009).

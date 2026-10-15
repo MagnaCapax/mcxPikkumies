@@ -22,7 +22,9 @@ class HermesConfig
         $home = self::home();
         @mkdir($home . '/skills', 0700, true);
         $prov = Provider::resolve($config);
-        $prov['model'] = Provider::model($prov);
+        $prov['model'] = Provider::model($prov, $ids);
+        // The light model for hooks (local/llm.json), reusing the /models answer when there was one.
+        Provider::writeLight($prov, $config, $ids);
 
         self::put($home . '/config.yaml', self::renderYaml($prov, self::skillDirs(), self::hookEntries(), (array) $config['skills']['disabled'], !empty($config['hermes']['lazyInstalls'])));
         // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.

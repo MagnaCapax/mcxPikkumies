@@ -1,0 +1,9 @@
+# comment
+User-agent: SomeBot
+Disallow: /
+
+User-agent: *
+Disallow: /wiki/revisions
+Disallow: /wiki/apps/
+Allow: /wiki/apps/rtorrent$
+Crawl-delay: 2

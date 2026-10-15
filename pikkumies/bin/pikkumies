@@ -57,6 +57,18 @@ function generate(array $profile)
     return $result;
 }
 
+/**
+ * Provider and app documentation for this host, filled in the background (ADR-0027): a few hundred
+ * pages at one per second or slower must not hold up install or update. One fill at a time (flock).
+ */
+function startDocsFill()
+{
+    $docsLog = Config::localDir() . '/docs-fill.log';
+    exec('nohup flock -n ' . escapeshellarg(Config::localDir() . '/docs-fill.lock') . ' ' . escapeshellarg(PHP_BINARY) . ' '
+        . escapeshellarg(__FILE__) . ' docs-fill > ' . escapeshellarg($docsLog) . ' 2>&1 &');
+    return 'filling in the background (log: local/docs-fill.log)';
+}
+
 function hermesBin()
 {
     return Config::root() . '/include/hermes/bin/hermes';
@@ -86,6 +98,7 @@ switch ($cmd) {
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));
+        out('  docs: ' . startDocsFill());
         try {
             out('  path: ' . PathInstall::install($home, (string) getenv('PATH'), $link . '/bin/pikkumies'));
         } catch (Exception $x) {
@@ -121,6 +134,15 @@ switch ($cmd) {
             out('removed old Hermes build ' . $old);
         }
         out('hermes: ' . HermesInstall::ensure($config));
+        out('docs: ' . startDocsFill());
+        break;
+
+    case 'docs-fill': // internal: the daily background fill of documentation sources
+        // Servers updated together must not fetch the same sites together: start at a random point within the hour.
+        sleep(DocSources::fillJitter());
+        foreach (DocSources::fill() as $row) {
+            out(gmdate('c') . ' ' . $row[0] . ': ' . ($row[1] ? 'ok ' : 'failed ') . $row[2]);
+        }
         break;
 
     case 'detect':
@@ -172,6 +194,21 @@ switch ($cmd) {
             out('  curator (skill housekeeping):      ' . ($has("curator:\n  enabled: true\n") ? 'on' : 'off'));
             out('  external logins:                   ' . ($has("adopt_external_logins: false\n") ? 'own only' : 'borrowed (Hermes default)'));
         }
+        // Documentation sources that apply to this host (ADR-0027): downloaded pages, cache size and any last error.
+        $docNames = [];
+        $docPages = 0;
+        $docErrors = [];
+        foreach (DocSources::active() as $name => $src) { // active() never returns link sources
+            $m = DocSources::meta($name);
+            $docNames[] = $name;
+            $docPages += isset($m['count']) ? (int) $m['count'] : 0;
+            if (!empty($m['error'])) {
+                $docErrors[] = $name;
+            }
+        }
+        out('docs:     ' . count($docNames) . ' sources for this host, ' . $docPages . ' pages downloaded, '
+            . round(DocSite::dirBytes(DocSources::cacheRoot()) / 1048576, 1) . ' MB in local/docs-cache'
+            . ($docErrors ? '; last fetch failed: ' . implode(', ', $docErrors) . ' (see `pikkumies.php sources`)' : ''));
         // The ticker mode mirrors Update::scheduleCronTick's own decision (ADR-0025), without
         // writing anything: doctor only reads the crontab to report whether the line is actually there.
         $tickOff = !empty($config['cron']['disabled']);

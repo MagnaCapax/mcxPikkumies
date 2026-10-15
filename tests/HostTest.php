@@ -94,10 +94,11 @@ return [
             check(is_string($row['source']) && strncmp($row['source'], 'http', 4) === 0, "$key: source must be a URL");
             check($row['verified'] === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $row['verified']) === 1, "$key: verified must be null or YYYY-MM-DD");
         }
-        foreach (['feral', 'ultra'] as $key) {
+        // whatbox, bytesized and hostingbydesign: the hostname text was fetched from each one's own SSH page on 2026-10-15 (ADR-0027).
+        foreach (['feral', 'ultra', 'whatbox', 'bytesized', 'hostingbydesign'] as $key) {
             check(Host::TABLE[$key]['verified'] === '2026-10-15', "$key must be marked verified (orchestrator spot-checked it at source)");
         }
-        foreach (['whatbox', 'bytesized', 'seedhost'] as $key) {
+        foreach (['seedhost'] as $key) {
             check(Host::TABLE[$key]['verified'] === null, "$key rests on research only; verified must stay null until re-checked at source");
         }
     },
