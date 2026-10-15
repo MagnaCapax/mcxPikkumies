@@ -26,4 +26,43 @@ Cli::run($argv, [
         }, $load) : null;
         return [$profile];
     },
-], "usage: system-status.php show [--human]\n  show  one record: cached classification (host family, stack, tier, root access), own running apps, live limits (CPU, memory, disk), load");
+    // The account's own log files this host family/stack is known to keep (Host::TABLE logGlobs,
+    // ADR-0023), optionally searched. Only files under $HOME that this account owns, after
+    // resolving links, so a link can never point the search at another account's files.
+    'logs' => function ($args, $opt) {
+        $profile = Detect::cached();
+        $home = realpath((string) getenv('HOME'));
+        if ($home === false) {
+            throw new CliError('HOME is not set or does not exist', 'run this as the account whose logs you want');
+        }
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $needle = isset($opt['grep']) && $opt['grep'] !== true ? (string) $opt['grep'] : null;
+        $records = [];
+        $left = 50; // matching lines over all files
+        foreach (Host::logGlobs($profile['family'], $profile['stack']) as $glob) {
+            foreach ((array) glob($home . '/' . $glob) as $path) {
+                $real = realpath($path);
+                if ($real === false || strpos($real, $home . '/') !== 0 || !is_file($real) || @fileowner($real) !== $uid) {
+                    continue;
+                }
+                $rec = ['path' => substr($real, strlen($home) + 1), 'bytes' => filesize($real), 'modified' => gmdate('c', filemtime($real))];
+                if ($needle !== null) {
+                    $rec['matches'] = [];
+                    $fh = @fopen($real, 'r');
+                    if ($fh !== false) {
+                        fseek($fh, max(0, $rec['bytes'] - 1048576)); // only the last 1 MiB of each file
+                        while ($left > 0 && ($line = fgets($fh)) !== false) {
+                            if (stripos($line, $needle) !== false) {
+                                $rec['matches'][] = substr(rtrim($line), 0, 300);
+                                $left--;
+                            }
+                        }
+                        fclose($fh);
+                    }
+                }
+                $records[] = $rec;
+            }
+        }
+        return $records;
+    },
+], "usage: system-status.php show|logs [--grep TEXT] [--human]\n  show  one record: cached classification (host family, stack, tier, root access), own running apps, live limits (CPU, memory, disk), load\n  logs  this account's own log files known for this host (path relative to HOME, size, modified); --grep TEXT returns matching lines (last 1 MiB of each file, 50 lines in all)", [], ['grep']);

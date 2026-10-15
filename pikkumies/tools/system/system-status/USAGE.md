@@ -5,6 +5,7 @@ Read-only snapshot of this machine. Nothing is written and nothing goes over the
 | verb | arguments | changes | what it does |
 |---|---|---|---|
 | show | `[--human]` | no | One record: the cached classification (host family, stack, root access, tier), own running apps, this moment's own CPU/memory/disk limits (leading with whichever is closest to its cap), load average. |
+| logs | `[--grep TEXT] [--human]` | no | This account's own log files known for this host family/stack (path relative to HOME, size, modified). `--grep TEXT` adds matching lines: case-insensitive, the last 1 MiB of each file, at most 50 lines in all. Only files under HOME that this account owns. |
 
 ```sh
 php ~/pikkumies/tools/system/system-status/system-status.php show            # JSON Lines for the agent
