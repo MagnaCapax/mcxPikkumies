@@ -139,7 +139,10 @@ class HermesConfig
         // Only what decides which skills apply. SOUL.md goes to the model on every turn, so the
         // rest of the profile stays local; the system-status skill reads it when needed.
         return "# This machine\n\n- Root: " . $root . "\n- PMSS seedbox platform: " . (!empty($profile['pmss']) ? 'yes' : 'no')
-            . "\n- Host: " . (isset($profile['host']) ? $profile['host'] : 'generic')
+            . "\n- Host: " . (isset($profile['family']) ? $profile['family'] : 'generic')
+            . (!empty($profile['tenancy']['shared'])
+                ? "\n- Shared server: yes; other accounts live on this machine, so read and change only this user's own files and processes"
+                : '')
             . "\n\nThis was detected when the agent started. Skills for other kinds of machine are listed too; use one only when this machine matches it."
             . " Every tool has a skill; to compare tools or find one by what it does, read " . Units::toolsDir() . "/INDEX.md.";
     }

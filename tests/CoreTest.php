@@ -45,6 +45,13 @@ return [
         check(strpos($r, 'Root: available (via sudo)') !== false, 'root via sudo');
         $off = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => true, 'via' => 'sudo']], ['root' => ['disabled' => true]]);
         check(strpos($off, 'turned off in config') !== false && strpos($off, 'available (via') === false, 'root.disabled must win over detection');
+        // ADR-0023: only the shared yes/no reaches the model, never a hostname or an account count.
+        $sh = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => false], 'tenancy' => ['shared' => true],
+            'identity' => ['hostname' => 'box.example', 'rdns' => 'box.example']], Config::defaults());
+        check(strpos($sh, '- Shared server: yes') !== false, 'shared-server line missing');
+        check(strpos($sh, 'box.example') === false, 'hostname leaked into SOUL.md');
+        $solo = HermesConfig::capabilities(['pmss' => false, 'root' => ['available' => false], 'tenancy' => ['shared' => false]], Config::defaults());
+        check(strpos($solo, 'Shared server') === false, 'shared-server line on a single-tenant host');
     },
     'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);

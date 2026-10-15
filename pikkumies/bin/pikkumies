@@ -22,9 +22,9 @@ function out($line)
     fwrite(STDOUT, $line . "\n");
 }
 
-function profile()
+function profile($refresh = false)
 {
-    $profile = Detect::run();
+    $profile = Detect::cached($refresh);
     @mkdir(Config::localDir(), 0700, true);
     @chmod(Config::localDir(), 0700);
     // Nothing reads this file back (it is informational, for `detect`/a human looking at local/);
@@ -82,7 +82,7 @@ switch ($cmd) {
         out('pikkumies installed at ' . Config::root());
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
-        out('  host: ' . $profile['host'] . '; tools: ' . $generated['skills'] . ' skills');
+        out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         try {
@@ -121,7 +121,15 @@ switch ($cmd) {
         break;
 
     case 'detect':
-        out(json_encode(profile(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $refresh = in_array('--refresh', $passArgs, true);
+        $human = in_array('--human', $passArgs, true);
+        $p = profile($refresh);
+        if ($human) {
+            echo CliHuman::render([CliHuman::flatten($p)]);
+            echo CliHuman::statusLine(['ok' => true, 'count' => 1]), "\n";
+        } else {
+            out(json_encode($p, JSON_UNESCAPED_SLASHES)); // jsonl default: one compact record (ADR-0016)
+        }
         break;
 
     case 'doctor':

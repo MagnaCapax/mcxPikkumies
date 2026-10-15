@@ -1,24 +1,126 @@
 <?php
 /**
- * Host: which seedbox host this is, and whether a local endpoint belongs to this user (ADR-0019).
+ * Host: which seedbox host/software stack this is, and whether a local endpoint belongs to this
+ * user (ADR-0019, ADR-0023).
  *
- * family(): pmss first (/etc/seedbox/config is traversable by every PMSS user), then the
- * hostname, then generic. The host table only guides where to look; tools read the user's own
- * app config first.
+ * TABLE is the one place provider and stack facts live: hostname suffixes, filesystem/PATH
+ * markers, where that family's account-owned logs sit, and how it exposes resource limits. Each
+ * row also carries the source the row was built from and the date it was checked there (`verified`
+ * is null when the row rests on research rather than a direct read of the provider's own page this
+ * session — ADR-0023 addendum). The table only guides where to look; tools read the user's own app
+ * config first (ADR-0019).
+ *
+ * family() and stack() share one row matcher (rowMatches()): family() walks the provider rows by
+ * hostname suffix, with a marker as a fallback signal (ultra's app-stats, never a hostname a provider
+ * does not control); stack() walks the stack rows by filesystem marker only (no stack here has a
+ * fixed hostname). pmss is checked directly against $pmssDir in both, exactly as before this table
+ * existed, so every existing `Host::family()` caller keeps its signature and its 'pmss' result.
  *
  * ownsListener(): on shared servers every account can reach every 127.0.0.1 port, so before a
  * credential is sent the listening socket's owner is checked in /proc/net/tcp and tcp6.
  */
 class Host
 {
-    /** Hostname suffix => family. "What.CD" in the 2026-10-14 request is read as Whatbox. */
-    const SUFFIXES = [
-        'feralhosting.com' => 'feral',
-        'whatbox.ca'       => 'whatbox',
-        'usbx.me'          => 'ultra',
-        'bysh.me'          => 'bytesized',
-        'seedhost.eu'      => 'seedhost',
-        'seedbox.vip'      => 'rapidseedbox',
+    /**
+     * name => {type: provider|stack, suffixes: [hostname suffix, ...], markers: [filesystem path
+     * (starts with "/") or an executable name found on PATH/~/bin, ...], logGlobs: [account-owned
+     * log path relative to $HOME, ...], limitsSource: the unprivileged command/file that exposes
+     * resource limits, or null, source: the URL the row was built from, verified: the date that URL
+     * was read directly (this session), or null when the row rests on research of that URL rather
+     * than a direct read}.
+     *
+     * "What.CD" in the 2026-10-14 request is read as Whatbox (What.CD was a closed music tracker;
+     * no detectable platform of that name exists, ADR-0019).
+     */
+    const TABLE = [
+        'pmss' => [
+            'type'         => 'stack',
+            'suffixes'     => [],
+            'markers'      => ['/etc/seedbox/config'],
+            'logGlobs'     => ['.lighttpd/access.log', '.lighttpd/error.log', 'rTorrentLog'],
+            'limitsSource' => 'userShowLimits',
+            'source'       => 'https://github.com/MagnaCapax/PMSS/blob/main/etc/skel/bin/userShowLimits',
+            'verified'     => '2026-10-15',
+        ],
+        'feral' => [
+            'type'         => 'provider',
+            'suffixes'     => ['feralhosting.com'],
+            'markers'      => [],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://www.feralhosting.com/wiki/getting-started/newbie-info',
+            'verified'     => '2026-10-15', // orchestrator re-checked this page directly this session
+        ],
+        'whatbox' => [
+            'type'         => 'provider',
+            'suffixes'     => ['whatbox.ca'],
+            'markers'      => [],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://whatbox.ca/wiki/FAQ',
+            'verified'     => null, // research only; not re-checked at source this session
+        ],
+        'ultra' => [
+            'type'         => 'provider',
+            'suffixes'     => ['usbx.me'],
+            // app-stats is documented under Ultra's "unofficial SSH utilities", so it may be something a
+            // user installs rather than a default: a secondary signal only, the hostname suffix decides.
+            'markers'      => ['app-stats'],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://docs.ultra.cc/unofficial-ssh-utilities/disktraffic-usage-command',
+            'verified'     => '2026-10-15', // orchestrator re-checked this page directly this session
+        ],
+        'bytesized' => [
+            'type'         => 'provider',
+            'suffixes'     => ['bysh.me', 'bytesized-hosting.com'],
+            'markers'      => [],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://bytesized-hosting.com/pages/faq',
+            'verified'     => null, // research only; not re-checked at source this session
+        ],
+        'seedhost' => [
+            'type'         => 'provider',
+            'suffixes'     => ['seedhost.eu'],
+            'markers'      => [],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            // Seedhost's own KB documents changing the server name on a Dedicated server (standard
+            // Debian/CentOS hostname steps, not a Seedhost-specific marker), so a suffix match here
+            // only reliably identifies a Shared App Hosting slot, not a Dedicated/renamed box.
+            'source'       => 'https://www.seedhost.eu/whmcs/knowledgebase/67/How-to-change-the-server-name.html',
+            'verified'     => null, // research only; not re-checked at source this session
+        ],
+        // NO rapidseedbox row: seedbox.vip is confirmed only for app-proxy endpoints
+        // (rt-*.a.seedbox.vip), not as the SSH-reachable shell hostname (providers.md).
+        'swizzin' => [
+            'type'         => 'stack',
+            'suffixes'     => [],
+            'markers'      => ['/etc/swizzin'],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://swizzin.ltd/dev/structure',
+            'verified'     => null, // marker path not found on this page when re-checked 2026-10-15; research only
+        ],
+        'quickbox' => [
+            'type'         => 'stack',
+            'suffixes'     => [],
+            'markers'      => ['/srv/rutorrent'],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://github.com/Stonedestroyer/QuickBox',
+            'verified'     => '2026-10-15', // /srv/rutorrent appears on this page
+        ],
+        'saltbox' => [
+            'type'         => 'stack',
+            'suffixes'     => [],
+            'markers'      => ['/srv/git/saltbox'],
+            'logGlobs'     => [],
+            'limitsSource' => null,
+            'source'       => 'https://docs.saltbox.dev/saltbox/basics/paths/',
+            'verified'     => null, // marker path not found on this page when re-checked 2026-10-15; research only
+        ],
     ];
 
     /**
@@ -33,17 +135,91 @@ class Host
         if (is_dir($pmssDir)) {
             return 'pmss';
         }
-        $name = strtolower(trim($hostname !== null ? $hostname : (string) gethostname()));
-        if ($hostname === null && strpos($name, '.') === false) {
-            $full = strtolower(trim((string) @shell_exec('hostname -f 2>/dev/null'))); // can be slow; only when needed
-            $name = $full !== '' ? $full : $name;
-        }
-        foreach (self::SUFFIXES as $suffix => $family) {
-            if ($name === $suffix || substr($name, -strlen($suffix) - 1) === '.' . $suffix) {
-                return $family;
+        $name = self::resolveHostname($hostname);
+        foreach (self::TABLE as $key => $row) {
+            if ($row['type'] === 'provider' && self::rowMatches($row, $name, '')) {
+                return $key;
             }
         }
         return 'generic';
+    }
+
+    /**
+     * The software stack this account sits in: pmss, a known self-hosted installer, or 'none'.
+     * $root is a test seam prefixed to every absolute marker path (swizzin/quickbox/saltbox markers
+     * are real root-owned paths like /etc/swizzin that a test cannot create on the test machine);
+     * production callers never pass it, so every marker is checked at its real, absolute path.
+     */
+    public static function stack($pmssDir = '/etc/seedbox/config', $root = '')
+    {
+        if (is_dir($pmssDir)) {
+            return 'pmss';
+        }
+        foreach (self::TABLE as $key => $row) {
+            if ($row['type'] === 'stack' && $key !== 'pmss' && self::rowMatches($row, '', $root)) {
+                return $key;
+            }
+        }
+        return 'none';
+    }
+
+    /** The log globs TABLE documents for $family or $stack, relative to $HOME; derived on use, never cached (ADR-0023). */
+    public static function logGlobs($family, $stack)
+    {
+        foreach ([$stack, $family] as $key) {
+            if (isset(self::TABLE[$key])) {
+                return self::TABLE[$key]['logGlobs'];
+            }
+        }
+        return [];
+    }
+
+    /** Lowercased hostname -f, resolved only when $hostname is not given and the short name has no dot. */
+    private static function resolveHostname($hostname)
+    {
+        $name = strtolower(trim($hostname !== null ? $hostname : (string) gethostname()));
+        if ($hostname === null && strpos($name, '.') === false) {
+            $full = strtolower(trim((string) @shell_exec('timeout 3 hostname -f 2>/dev/null'))); // can be slow on broken DNS; bounded, and only when needed
+            $name = $full !== '' ? $full : $name;
+        }
+        return $name;
+    }
+
+    /** True when $hostname matches one of the row's suffixes, or any of its markers is present. */
+    private static function rowMatches(array $row, $hostname, $root)
+    {
+        foreach ($row['suffixes'] as $suffix) {
+            if ($hostname === $suffix || substr($hostname, -strlen($suffix) - 1) === '.' . $suffix) {
+                return true;
+            }
+        }
+        foreach ($row['markers'] as $marker) {
+            if (self::markerPresent($marker, $root)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A marker is a filesystem path (starts with "/", checked under $root) or an executable name on PATH or in ~/bin. */
+    private static function markerPresent($marker, $root = '')
+    {
+        if ($marker === '') {
+            return false;
+        }
+        if ($marker[0] === '/') {
+            return file_exists($root . $marker);
+        }
+        $home = (string) getenv('HOME');
+        if ($home !== '' && is_file("$home/bin/$marker") && is_executable("$home/bin/$marker")) {
+            return true;
+        }
+        foreach (explode(':', (string) getenv('PATH')) as $dir) {
+            if ($dir !== '' && is_file("$dir/$marker") && is_executable("$dir/$marker")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
