@@ -1,7 +1,13 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install | update | detect | doctor | generate | run [args...]
+ * pikkumies: install | update | detect | doctor | generate | run [args...] | <free text prompt>
+ *
+ * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
+ * (ADR-0003) and Hermes' own session database and active-session registry are built for
+ * concurrent writers; the files pikkumies itself regenerates on every run (skills, tools/INDEX.md,
+ * config.yaml, .env, SOUL.md) are written through a lock or an atomic rename, so two instances
+ * starting together never see a half-written file (ADR-0022).
  */
 // Everything we write (config, .env with the key, profile) is private to the user from
 // creation; chmod-after-write would leave a window where a secret is world-readable.
@@ -21,7 +27,15 @@ function profile()
     $profile = Detect::run();
     @mkdir(Config::localDir(), 0700, true);
     @chmod(Config::localDir(), 0700);
-    file_put_contents(Config::localDir() . '/profile.json', json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+    // Nothing reads this file back (it is informational, for `detect`/a human looking at local/);
+    // still written through a temp file + rename, best-effort, so a concurrent run never sees it
+    // half-written (a failed write here must never stop `run` from starting Hermes).
+    $path = Config::localDir() . '/profile.json';
+    $json = json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+    $tmp = $path . '.tmp-' . getmypid();
+    if (@file_put_contents($tmp, $json) !== strlen($json) || !@rename($tmp, $path)) {
+        @unlink($tmp);
+    }
     return $profile;
 }
 
@@ -48,11 +62,12 @@ function hermesBin()
     return Config::root() . '/include/hermes/bin/hermes';
 }
 
-$cmd = isset($argv[1]) ? $argv[1] : 'help';
+list($cmd, $passArgs) = Launch::route($argv);
 
 switch ($cmd) {
     case 'install':
-        $link = getenv('HOME') . '/pikkumies';
+        $home = getenv('HOME');
+        $link = $home . '/pikkumies';
         if (!file_exists($link)) {
             @symlink(Config::root(), $link);
         }
@@ -70,7 +85,13 @@ switch ($cmd) {
         out('  host: ' . $profile['host'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  hermes: ' . HermesInstall::ensure(Config::load()));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
+        try {
+            out('  path: ' . PathInstall::install($home, (string) getenv('PATH'), $link . '/bin/pikkumies'));
+        } catch (Exception $x) {
+            out('  path: not set up: ' . $x->getMessage());
+        }
         out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
+        out('Then open a new shell (or `hash -r`) and type `pikkumies`.');
         break;
 
     case 'update':
@@ -136,7 +157,7 @@ switch ($cmd) {
         break;
 
     case 'run':
-        if (isset($argv[2]) && $argv[2] === 'update') {
+        if (isset($passArgs[0]) && $passArgs[0] === 'update') {
             out('Hermes is pinned by Pikkumies (ADR-0009). Run `pikkumies update` instead.');
             exit(1);
         }
@@ -145,7 +166,9 @@ switch ($cmd) {
             exit(1);
         }
         // Regenerate first, so a key or config set after install reaches Hermes. Never start Hermes
-        // on a config that could not be written: it would run without the safety hooks.
+        // on a config that could not be written: it would run without the safety hooks. Safe to run
+        // from any number of instances at once: Generate::run takes a lock, every file it and
+        // HermesConfig::write touch is written through a temp file + rename (ADR-0022).
         try {
             generate(profile());
         } catch (Exception $x) {
@@ -153,10 +176,14 @@ switch ($cmd) {
             exit(1);
         }
         putenv('HERMES_HOME=' . HermesConfig::home());
-        $args = array_map('escapeshellarg', array_slice($argv, 2));
+        $args = array_map('escapeshellarg', $passArgs);
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);
 
+    case 'help':
     default:
-        out('usage: pikkumies install | update | detect | doctor | generate | run [hermes args]');
+        out('usage: pikkumies [install | update | detect | doctor | generate]');
+        out('       pikkumies [run [hermes args...]]           plain interactive session');
+        out('       pikkumies <free text>                      start a session with that as the first prompt');
+        out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
 }

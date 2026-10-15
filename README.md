@@ -15,7 +15,8 @@ The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, which seedbox host it is, root access, running apps, resources);
 - generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
-- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root and no changes to your PATH or shell files. It uses the system Python 3.11 to 3.13, or, on x86_64 where that is older, a pinned checksum-verified standalone Python in your own account (ADR-0014).
+- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root. It uses the system Python 3.11 to 3.13, or, on x86_64 where that is older, a pinned checksum-verified standalone Python in your own account (ADR-0014);
+- puts `pikkumies` on your `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is already on `PATH`, otherwise one marked block added to `~/.bashrc` and `~/.profile` (never duplicated on a re-run; ADR-0022). Open a new shell (or `hash -r`) afterwards.
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
 
@@ -24,7 +25,7 @@ endpoint=https://your-openai-compatible-endpoint/v1
 key=your-key
 ```
 
-Check everything with `~/pikkumies/bin/pikkumies doctor`, then start the agent with `~/pikkumies/bin/pikkumies run`.
+Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
 ## Update
 
@@ -38,12 +39,17 @@ Install also adds a daily `pikkumies update` to your own crontab (one tagged lin
 
 | Command | What it does |
 |---|---|
-| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, build the pinned Hermes release in the background, add the daily auto-update line to your crontab |
+| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, build the pinned Hermes release in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
 | `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); builds a newly pinned Hermes release |
 | `pikkumies detect` | Print the machine profile (JSON) |
 | `pikkumies doctor` | Show provider, masked key, Hermes and tool status |
 | `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
-| `pikkumies run [args]` | Start the agent |
+| `pikkumies` | Start a plain interactive session (same as `pikkumies run` with no further arguments) |
+| `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
+| `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
+| `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …) |
+
+Any number of `pikkumies` instances can run at once in one account: they share `HERMES_HOME` on purpose (so sessions, memory and auth live in one place) and Hermes itself is built for several writers at a time; everything *pikkumies* regenerates on every run is written under a lock or through an atomic rename, so two instances starting together never race each other (ADR-0022).
 
 ## What it is meant to be
 
