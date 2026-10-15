@@ -68,4 +68,17 @@ return [
         check(strpos($again, 'already present') !== false, "re-run should say the PATH line is already there: $again");
         exec('rm -rf ' . escapeshellarg($tmp) . ' ' . escapeshellarg($tmp2));
     },
+    'pathinstall: a symlinked rc file stays a symlink; its target gets the block; a dangling link is left alone' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-link-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/dotfiles", 0700, true);
+        file_put_contents("$tmp/dotfiles/bashrc", "export FOO=1\n");
+        symlink("$tmp/dotfiles/bashrc", "$tmp/.bashrc");
+        check(PathInstall::ensureFile("$tmp/.bashrc", '/opt/a/bin') === true, 'symlinked rc not written');
+        check(is_link("$tmp/.bashrc"), 'the symlink was replaced by a plain file');
+        check(strpos(file_get_contents("$tmp/dotfiles/bashrc"), '/opt/a/bin') !== false, 'link target missing the block');
+        symlink("$tmp/nowhere", "$tmp/.profile");
+        check(PathInstall::ensureFile("$tmp/.profile", '/opt/a/bin') === false, 'dangling link should be left alone');
+        check(is_link("$tmp/.profile") && !file_exists("$tmp/nowhere"), 'dangling link was followed or replaced');
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
 ];

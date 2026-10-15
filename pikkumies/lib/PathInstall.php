@@ -95,6 +95,15 @@ class PathInstall
      */
     public static function ensureFile($path, $dir)
     {
+        // A dotfile manager often makes ~/.bashrc a symlink; write the file it points to, so the
+        // rename below never replaces the link with a plain file. A dangling link is left alone.
+        if (is_link($path)) {
+            $real = realpath($path);
+            if ($real === false) {
+                return false;
+            }
+            $path = $real;
+        }
         @mkdir(dirname($path), 0700, true);
         $lock = @fopen($path . '.pikkumies-lock', 'c');
         if ($lock === false || !flock($lock, LOCK_EX)) {

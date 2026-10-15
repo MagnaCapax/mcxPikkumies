@@ -23,20 +23,20 @@ return [
     },
     'launch: free text becomes a seeded prompt, words rejoined with single spaces' => function () {
         list($cmd, $args) = Launch::route(['pikkumies', 'check', 'my', 'stats', 'and', 'can', 'we', 'increase', 'performance']);
-        check($cmd === 'run' && $args === ['chat', '-q', 'check my stats and can we increase performance'], 'free text misrouted: ' . json_encode([$cmd, $args]));
+        check($cmd === 'run' && $args === ['chat', '--query=check my stats and can we increase performance'], 'free text misrouted: ' . json_encode([$cmd, $args]));
     },
     'launch: a prompt that starts with a Pikkumies subcommand word stays a prompt' => function () {
         // Natural requests ("update my plex", "install radarr please", "detect what is slow") must
         // never start a self-update or re-run the installer.
         foreach ([['update', 'my', 'plex'], ['install', 'radarr', 'please'], ['detect', 'what', 'is', 'slow'], ['doctor', 'my', 'jellyfin']] as $words) {
             list($cmd, $args) = Launch::route(array_merge(['pikkumies'], $words));
-            check($cmd === 'run' && $args === ['chat', '-q', implode(' ', $words)], 'subcommand word swallowed a prompt: ' . json_encode([$cmd, $args]));
+            check($cmd === 'run' && $args === ['chat', '--query=' . implode(' ', $words)], 'subcommand word swallowed a prompt: ' . json_encode([$cmd, $args]));
         }
         // Flags after a subcommand keep it a subcommand.
         list($cmd, $args) = Launch::route(['pikkumies', 'detect', '--refresh']);
         check($cmd === 'detect' && $args === ['--refresh'], 'subcommand with flags misrouted: ' . json_encode([$cmd, $args]));
         list($cmd, $args) = Launch::route(['pikkumies', '--', 'update', 'the', 'kernel']);
-        check($cmd === 'run' && $args === ['chat', '-q', 'update the kernel'], '-- did not force a prompt: ' . json_encode([$cmd, $args]));
+        check($cmd === 'run' && $args === ['chat', '--query=update the kernel'], '-- did not force a prompt: ' . json_encode([$cmd, $args]));
     },
     'launch: -- with nothing after it, or only blank words, is a plain session' => function () {
         list($cmd, $args) = Launch::route(['pikkumies', '--']);
@@ -46,6 +46,10 @@ return [
     },
     'launch: quoting is never re-split: a word with spaces/quotes/$( ) stays one argv entry, one prompt word' => function () {
         list(, $args) = Launch::route(['pikkumies', 'rm -rf /; echo "hi" $(whoami)']);
-        check($args === ['chat', '-q', 'rm -rf /; echo "hi" $(whoami)'], 'a single argv word was split or evaluated: ' . json_encode($args));
+        check($args === ['chat', '--query=rm -rf /; echo "hi" $(whoami)'], 'a single argv word was split or evaluated: ' . json_encode($args));
+    },
+    'launch: a prompt that starts like a flag stays one --query token' => function () {
+        list($cmd, $args) = Launch::route(['pikkumies', '--', '-v', 'means', 'what']);
+        check($cmd === 'run' && $args === ['chat', '--query=-v means what'], 'flag-like prompt split: ' . json_encode($args));
     },
 ];

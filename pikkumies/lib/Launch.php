@@ -4,7 +4,7 @@
  *
  * The user-facing command is `pikkumies`. No arguments, or `run` with no further words, starts a
  * plain interactive session. Anything else that is not one of the known subcommands is free text:
- * it is sent to Hermes as `chat -q "<text>"`, which seeds an interactive session on a real TTY and
+ * it is sent to Hermes as `chat --query="<text>"`, which seeds an interactive session on a real TTY and
  * answers-and-exits otherwise (Hermes' own behaviour, not ours). `run [hermes args]` is the
  * documented Hermes passthrough and keeps all its words. Any other subcommand wins only when every
  * word after it is a flag (`pikkumies detect --refresh`): a prompt such as "update my plex" stays a
@@ -18,7 +18,7 @@ class Launch
 
     /**
      * [cmd, passArgs]: cmd is one of SUBCOMMANDS or 'help'. passArgs is only meaningful for 'run':
-     * [] for a plain interactive session, or ['chat', '-q', text] to seed one prompt. $argv is the
+     * [] for a plain interactive session, or ['chat', '--query=text'] to seed one prompt. $argv is the
      * script's own argv (index 0 is the script path, same shape PHP gives bin/pikkumies).
      */
     public static function route(array $argv)
@@ -51,10 +51,13 @@ class Launch
         return true;
     }
 
-    /** $words joined with a single space -> [] (nothing to say) or ['chat', '-q', text]. */
+    /**
+     * $words joined with a single space -> [] (nothing to say) or ['chat', '--query=text']. One token,
+     * so a prompt that starts with "-v" or "-m" is never read by Hermes' parser as one of its flags.
+     */
     public static function promptArgs(array $words)
     {
         $text = trim(implode(' ', $words));
-        return $text === '' ? [] : ['chat', '-q', $text];
+        return $text === '' ? [] : ['chat', '--query=' . $text];
     }
 }
