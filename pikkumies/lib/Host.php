@@ -89,8 +89,8 @@ class Host
             // Seedhost's own KB documents changing the server name on a Dedicated server (standard
             // Debian/CentOS hostname steps, not a Seedhost-specific marker), so a suffix match here
             // only reliably identifies a Shared App Hosting slot, not a Dedicated/renamed box.
-            'source'       => 'https://www.seedhost.eu/whmcs/knowledgebase/67/How-to-change-the-server-name.html',
-            'verified'     => null, // research only; not re-checked at source this session
+            'source'       => 'https://www.seedhost.eu/client-area/knowledgebase/247/File-transfer-between-servers.html', // "server.seedhost.eu with your destination server hostname"
+            'verified'     => '2026-10-15',
         ],
         'hostingbydesign' => [
             'type'         => 'provider', // Seedbox.io's successor
