@@ -68,6 +68,18 @@ Pulsed Media's wiki: guides for the apps on a seedbox (rTorrent, ruTorrent, auto
 
 Pulsed Media's customer knowledge base: billing, the affiliate program, seedboxes and storage boxes, services, transfer speeds, VPS and server hardware. Each article links to its page on the Pulsed Media client site; give that link to the user to open, but never fetch it.
 
+## pm-support
+
+- type: link
+- url: https://pulsedmedia.com/support-charter.php
+- trust: official
+- covers: Pulsed Media support: how tickets work, what to check first, the link to open a ticket
+- scope: pmss
+- verified: 2026-10-15
+- status: on
+
+Pulsed Media's support charter: how support tickets work, what to check before opening one, and the link to the ticket form.
+
 ## feral-wiki
 
 - type: site
