@@ -57,7 +57,7 @@ function arrFixture($app, array $over = [])
     file_put_contents("$dir/state.json", json_encode($state));
     $proc = null;
     if (!isset($over['start']) || $over['start']) {
-        $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg(__DIR__ . '/router.php'),
+        $proc = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg(__DIR__ . '/router.php'),
             [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, null, ['ARR_FAKE_STATE' => "$dir/state.json"]);
         for ($i = 0; $i < 50 && !($c = @fsockopen('127.0.0.1', $port, $e1, $e2, 0.1)); $i++) {
             usleep(100000);

@@ -44,7 +44,7 @@ function delugeFixture(array $over = [])
             str_repeat('e', 40) => $t(str_repeat('e', 40), 'Allocating one', 'Allocating', 0.0, [], ['ratio' => -1.0]),
         ]];
     file_put_contents("$dir/state.json", json_encode($state));
-    $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg(__DIR__ . '/router.php'),
+    $proc = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg(__DIR__ . '/router.php'),
         [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, null, ['DELUGE_FAKE_STATE' => "$dir/state.json"]);
     for ($i = 0; $i < 50; $i++) {
         $c = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);

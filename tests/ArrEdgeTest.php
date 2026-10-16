@@ -47,7 +47,7 @@ if (!function_exists('arrEdgeUid')) {
         file_put_contents($script, "<?php\n\$code = isset(\$_GET['__code']) ? (int) \$_GET['__code'] : 200;\n"
             . "http_response_code(\$code);\nheader('Content-Type: application/json');\necho json_encode(array('received' => \$code));\n");
         $port = testFreePort();
-        $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg($script),
+        $proc = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg($script),
             array(1 => array('file', '/dev/null', 'w'), 2 => array('file', '/dev/null', 'w')), $pipes);
         for ($i = 0; $i < 50 && !($c = @fsockopen('127.0.0.1', $port, $e1, $e2, 0.1)); $i++) {
             usleep(100000);

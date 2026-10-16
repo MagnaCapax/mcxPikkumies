@@ -31,7 +31,7 @@ if ($p === "/headers") { header("Set-Cookie: a=1", false); header("Set-Cookie: b
 http_response_code(404);
 ');
         $port = hhFreePort();
-        $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg("$dir/router.php"),
+        $proc = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg("$dir/router.php"),
             [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
         for ($i = 0; $i < 50; $i++) {
             $s = @fsockopen('127.0.0.1', $port, $e, $es, 0.1);

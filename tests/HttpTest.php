@@ -14,7 +14,7 @@ http_response_code(404);
     $srv = stream_socket_server('tcp://127.0.0.1:0'); // a free port: a fixed one could already answer (seen: 307)
     $port = (int) substr(strrchr(stream_socket_get_name($srv, false), ':'), 1);
     fclose($srv);
-    $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg("$dir/router.php"), [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+    $proc = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg("$dir/router.php"), [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
     for ($i = 0; $i < 50; $i++) {
         $s = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);
         if ($s) {
