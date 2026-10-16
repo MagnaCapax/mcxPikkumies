@@ -27,3 +27,7 @@ jobs:
           php -l pikkumies/bin/pikkumies > /dev/null
       - name: Tests
         run: php tests/run.php
+      - name: Tests left tracked files unchanged
+        run: |
+          git status --porcelain --untracked-files=no > /tmp/changed.txt
+          if [ -s /tmp/changed.txt ]; then cat /tmp/changed.txt; exit 1; fi

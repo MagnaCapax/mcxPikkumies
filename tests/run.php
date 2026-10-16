@@ -15,6 +15,18 @@ function check($cond, $msg)
     }
 }
 
+/** Thrown by skip(): the test could not run here; reported as "skip", never as "ok". */
+class TestSkipped extends Exception
+{
+}
+
+function skip($why)
+{
+    throw new TestSkipped($why);
+}
+
+require __DIR__ . '/support.php';
+
 /** Run a PHP script with arguments and stdin; returns [exit code, stdout]. */
 function runPhp($script, array $args, $stdin = '')
 {
@@ -35,17 +47,21 @@ function runPhp($script, array $args, $stdin = '')
 
 $pass = 0;
 $fail = 0;
+$skipped = 0;
 foreach (glob(__DIR__ . '/*Test.php') as $file) {
     foreach (require $file as $name => $fn) {
         try {
             $fn();
             $pass++;
             echo "ok   " . basename($file, '.php') . " :: $name\n";
+        } catch (TestSkipped $e) {
+            $skipped++;
+            echo "skip " . basename($file, '.php') . " :: $name: " . $e->getMessage() . "\n";
         } catch (Throwable $e) {
             $fail++;
             echo "FAIL " . basename($file, '.php') . " :: $name: " . $e->getMessage() . "\n";
         }
     }
 }
-echo "\n$pass passed, $fail failed\n";
+echo "\n$pass passed, $fail failed, $skipped skipped\n";
 exit($fail === 0 ? 0 : 1);

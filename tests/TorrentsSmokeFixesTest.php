@@ -74,7 +74,7 @@ return [
             delugeDone($fx);
         }
         if (RtorrentLocate::installed()) {
-            return; // a real rtorrent on this machine's PATH: the case cannot be built here
+            skip('a real rtorrent is on this machine\'s PATH: the case cannot be built here');
         }
         $h = rtorrentHome();
         try {

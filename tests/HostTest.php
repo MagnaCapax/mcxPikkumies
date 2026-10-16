@@ -104,7 +104,7 @@ return [
         @unlink($tmp);
         $s = @stream_socket_server("unix://$tmp");
         if ($s === false) {
-            return; // unix sockets unavailable here
+            skip('unix sockets unavailable here');
         }
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : fileowner($tmp);
         check(Host::ownsSocket($tmp, $uid), 'own socket not recognised');

@@ -29,7 +29,7 @@ http_response_code(404);
 return [
     'http: redirects are not followed, size cap and headers hold' => function () {
         if (!function_exists('curl_init')) {
-            return; // CI installs curl; a machine without it cannot run the tools either
+            skip('curl extension missing (CI installs it; a machine without it cannot run the tools either)');
         }
         list($proc, $base) = httpFixtureServer();
         try {
