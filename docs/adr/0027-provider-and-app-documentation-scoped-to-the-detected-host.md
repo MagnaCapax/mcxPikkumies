@@ -71,5 +71,10 @@ Research on 2026-10-15 (raw responses kept with the session notes) found:
 - **Coverage:** crawling index pages covers less than a full export on the deepest sites (GitHub wikis, Read the Docs, the Servarr wiki). This is accepted, and noted per source.
 - **Not shipped:** sites behind bot walls (the Deluge Trac wiki, qbittorrent.org). A Cloudflare challenge on a shipped source keeps the old copy and shows the error in `sources`.
 
+
+## Addendum 2026-10-16: a `link` may point at a `/clients/` page
+
+ADR-0011 forbids downloading any `/clients/` address, because unauthenticated requests there can look like failed logins. A `link` is never downloaded; it is only given to the user. So `DocSources::problems()` now refuses `/clients/` only for downloaded types, and the Pulsed Media `pm-support` link points at the ticket form, the same address the PMSS landing page gives. Fetching still refuses every `/clients/` address on its own: `DocSources::get()` and `DocSite` check the URL before any request. The agent is told to give links to the user and never fetch them.
+
 ## References
 - ADR-0011, ADR-0012, ADR-0018, ADR-0021, ADR-0023, ADR-0028.

@@ -30,7 +30,7 @@ When sources disagree, the higher level wins for the topics it covers. The same 
 Each source is a `## name` section (lowercase letters, digits and dashes) with these lines, then a description in plain words:
 
 - `type`: `mediawiki` (a MediaWiki site; `url` is its `api.php`), `kb-json` (a knowledge base exported as JSON in the Pulsed Media format), `site` (a documentation website; `url` is its sitemap.xml, a sitemap index, or an index page that links to every page), or `link` (a support, help or status page that is never downloaded; when a search finds nothing, its address is given to the user instead).
-- `url`: https only, the final address (downloads follow no redirect, except one on the same host that only adds or drops a trailing slash).
+- `url`: https only, the final address (downloads follow no redirect, except one on the same host that only adds or drops a trailing slash). Nothing downloaded may point at a Pulsed Media `/clients/` page; a `link` may, because it is only given to the user.
 - `trust`: one of the levels above.
 - `covers`: the topics this source is the authority for. Outside them it is only a lead.
 - `scope`: the hosts the source is for, as a comma list of host names from `pikkumies/lib/Host.php` (the provider or the software stack, such as `pmss`, `feral` or `swizzin`), `generic` (a host no row matches), or `all`. Missing means `all`. `pikkumies.php sources` shows which sources match this host.
@@ -71,14 +71,26 @@ Pulsed Media's customer knowledge base: billing, the affiliate program, seedboxe
 ## pm-support
 
 - type: link
+- url: https://pulsedmedia.com/clients/submitticket.php
+- trust: official
+- covers: open a Pulsed Media support ticket
+- scope: pmss
+- verified: 2026-10-16
+- status: on
+
+Where a Pulsed Media customer opens a support ticket; the same address the server's own landing page gives. Give it to the user to open; never fetch it.
+
+## pm-support-charter
+
+- type: link
 - url: https://pulsedmedia.com/support-charter.php
 - trust: official
-- covers: Pulsed Media support: how tickets work, what to check first, the link to open a ticket
+- covers: how Pulsed Media support works and what to check before opening a ticket
 - scope: pmss
 - verified: 2026-10-15
 - status: on
 
-Pulsed Media's support charter: how support tickets work, what to check before opening one, and the link to the ticket form.
+Pulsed Media's support charter: how support tickets work and what to check first.
 
 ## feral-wiki
 

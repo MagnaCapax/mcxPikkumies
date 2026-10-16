@@ -100,8 +100,11 @@ class DocSources
         if (!preg_match('#^https://[^/\s]+/\S*$#', $url)) {
             $p[] = 'url must be an https:// address';
         }
-        // Pulsed Media client-site pages: unauthenticated requests there can look like failed logins.
-        if (stripos($url, '/clients/') !== false) {
+        // Pulsed Media client-site pages: unauthenticated requests there can look like failed logins, so
+        // nothing that is downloaded may point there (ADR-0011). A `link` is never downloaded; it is only
+        // given to the user, so a ticket page under /clients/ is a valid link.
+        $type = isset($src['type']) ? $src['type'] : '';
+        if ($type !== 'link' && stripos($url, '/clients/') !== false) {
             $p[] = 'url must not point at a /clients/ page';
         }
         if (!in_array(isset($src['trust']) ? $src['trust'] : '', self::TRUST, true)) {
@@ -469,7 +472,7 @@ class DocSources
         foreach (self::links() as $name => $src) {
             $parts[] = $name . ': ' . $src['url'] . (isset($src['covers']) && $src['covers'] !== '' ? ' (' . $src['covers'] . ')' : '');
         }
-        return $parts ? 'support pages for this host, to give the user when nothing here answers: ' . implode('; ', $parts) : '';
+        return $parts ? 'support pages for this host, to give the user to open when nothing here answers (never fetch them yourself): ' . implode('; ', $parts) : '';
     }
 
     /** [title, url] of a cached page or lesson, from its first lines. */

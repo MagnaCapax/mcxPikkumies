@@ -69,6 +69,9 @@ return [
         check(DocSources::problems($base) === [], 'valid source refused');
         check(DocSources::problems(['url' => 'http://example.org/kb.json'] + $base) !== [], 'http accepted');
         check(DocSources::problems(['url' => 'https://example.org/clients/kb.json'] + $base) !== [], '/clients/ accepted');
+        check(DocSources::problems(['type' => 'site', 'url' => 'https://example.org/clients/sitemap.xml'] + $base) !== [], '/clients/ accepted for a downloaded site');
+        // A link is never downloaded, only given to the user, so a client-area ticket page is a valid link.
+        check(DocSources::problems(['type' => 'link', 'url' => 'https://example.org/clients/submitticket.php'] + $base) === [], '/clients/ refused for a link');
         check(DocSources::problems(['type' => 'web'] + $base) !== [], 'unknown type accepted');
         check(DocSources::problems(['trust' => 'high'] + $base) !== [], 'unknown trust accepted');
         check(DocSources::problems(['name' => '../x'] + $base) !== [], 'bad name accepted');
