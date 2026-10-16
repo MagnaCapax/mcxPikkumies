@@ -9,12 +9,16 @@
  */
 require dirname(__DIR__, 3) . '/lib/Detect.php';
 require_once dirname(__DIR__, 3) . '/lib/Cgroup.php'; // Detect.php already require_once's this; once here too, so a direct `php system-status.php` still finds the class
+require_once dirname(__DIR__, 3) . '/lib/Config.php'; // Detect.php already require_once's this; once here too, for the same reason
 require dirname(__DIR__, 3) . '/lib/Cli.php';
 require dirname(__DIR__, 3) . '/lib/CliHuman.php';
 
+// Test seam: a test may set this before including the file. Nothing is read from the environment.
+$systemStatusLocalDir = isset($systemStatusLocalDir) ? $systemStatusLocalDir : Config::localDir();
+
 Cli::run($argv, [
-    'show' => function () {
-        $profile = Detect::cached();
+    'show' => function () use ($systemStatusLocalDir) {
+        $profile = Detect::cached(false, $systemStatusLocalDir . '/host.json', $systemStatusLocalDir . '/update.log');
         // ADR-0023: hostnames and reverse DNS stay in local/host.json; this record goes to the model.
         unset($profile['identity'], $profile['fingerprint']);
         $home = (string) getenv('HOME');
@@ -29,8 +33,8 @@ Cli::run($argv, [
     // The account's own log files this host family/stack is known to keep (Host::TABLE logGlobs,
     // ADR-0023), optionally searched. Only files under $HOME that this account owns, after
     // resolving links, so a link can never point the search at another account's files.
-    'logs' => function ($args, $opt) {
-        $profile = Detect::cached();
+    'logs' => function ($args, $opt) use ($systemStatusLocalDir) {
+        $profile = Detect::cached(false, $systemStatusLocalDir . '/host.json', $systemStatusLocalDir . '/update.log');
         $home = realpath((string) getenv('HOME'));
         if ($home === false) {
             throw new CliError('HOME is not set or does not exist', 'run this as the account whose logs you want');

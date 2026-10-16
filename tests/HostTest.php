@@ -113,4 +113,66 @@ return [
         fclose($s);
         @unlink($tmp);
     },
+    'host: dockerSocket() only trusts a unix:// DOCKER_HOST owned by the asked-about uid; tcp:// and another uid\'s socket are refused' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-docksock-' . getmypid() . '.sock';
+        @unlink($tmp);
+        $s = @stream_socket_server("unix://$tmp");
+        if ($s === false) {
+            skip('unix sockets unavailable here');
+        }
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : fileowner($tmp);
+        testWithEnv(['DOCKER_HOST' => "unix://$tmp"], function () use ($tmp, $uid) {
+            check(Host::dockerSocket($uid) === $tmp, 'an owned unix:// DOCKER_HOST must be used');
+            check(Host::dockerSocket($uid + 1) === '', 'a socket owned by a DIFFERENT uid than the one asked about must be refused: '
+                . Host::dockerSocket($uid + 1));
+        });
+        testWithEnv(['DOCKER_HOST' => 'tcp://127.0.0.1:2375'], function () use ($uid) {
+            check(Host::dockerSocket($uid) === '', 'tcp:// DOCKER_HOST must never be used (ADR-0019: only this account\'s own unix socket)');
+        });
+        fclose($s);
+        @unlink($tmp);
+    },
+    'host: family() also matches a marker found via a PATH directory executable, not only ~/bin' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-pathmarker-' . getmypid();
+        @mkdir($tmp, 0700, true);
+        touch("$tmp/app-stats");
+        chmod("$tmp/app-stats", 0755);
+        testWithEnv(['HOME' => '/nonexistent-pk-home-for-marker-test', 'PATH' => $tmp], function () {
+            check(Host::family('/nonexistent-pmss-marker', 'myserver.example') === 'ultra', 'app-stats found via a PATH directory '
+                . '(not ~/bin) must still match');
+        });
+        @unlink("$tmp/app-stats");
+        @rmdir($tmp);
+    },
+    'host: ownsSocket() reports false for a nonexistent path and for an existing FIFO (not a socket)' => function () {
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        check(Host::ownsSocket('/pk-does-not-exist-anywhere-xyz', $uid) === false, 'a nonexistent path must not be an owned socket');
+        if (!function_exists('posix_mkfifo')) {
+            skip('posix_mkfifo unavailable here');
+        }
+        $fifo = sys_get_temp_dir() . '/pk-fifo-' . getmypid();
+        @unlink($fifo);
+        if (!posix_mkfifo($fifo, 0600)) {
+            skip('mkfifo failed on this filesystem');
+        }
+        check(Host::ownsSocket($fifo, $uid) === false, 'a FIFO must not be mistaken for a unix socket');
+        @unlink($fifo);
+    },
+    'host: procAddresses() returns [] for an unparseable IP, never a bogus always-matching hex string' => function () {
+        check(Host::procAddresses('not-an-ip') === [], 'an unparseable IP must yield no addresses, never a wrong/always-matching one');
+        check(Host::procAddresses('') === [], 'an empty string must yield no addresses');
+    },
+    '[contract] host: every TABLE marker is an absolute path or a bare safe executable name (no relative traversal, no shell metacharacters)' => function () {
+        foreach (Host::TABLE as $key => $row) {
+            foreach ($row['markers'] as $marker) {
+                check($marker === '' || $marker[0] === '/' || preg_match('/^[\w.-]+$/', $marker) === 1,
+                    "$key: marker '$marker' is neither an absolute path nor a bare safe executable name");
+            }
+        }
+    },
+    'host: ownsListener() skips a short line (e.g. /proc/net/tcp\'s own header row) instead of matching its stray tokens' => function () {
+        $header = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
+        check(Host::ownsListener(8080, 1001, [$header, '']) === 'none', 'a short header-shaped line must never be read as a listener: '
+            . Host::ownsListener(8080, 1001, [$header, '']));
+    },
 ];

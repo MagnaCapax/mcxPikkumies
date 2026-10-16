@@ -82,4 +82,27 @@ return [
         check(Cgroup::cpuQuota('/sys/fs/cgroup', '/nonexistent-self-cgroup') === null, 'unreadable self-cgroup must not fabricate a quota');
         check(Cgroup::memoryMax('/sys/fs/cgroup', '/nonexistent-self-cgroup') === null, 'unreadable self-cgroup must not fabricate a memory limit');
     },
+    'cgroup: a hybrid self-cgroup line listing 3 comma-joined controllers still matches a query for the LAST-listed one' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-cghybrid-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/cpuacct,cpu,cpuset", 0700, true);
+        file_put_contents("$tmp/cpuacct,cpu,cpuset/cpuset.cpus", "0-3\n"); // 4 cores
+        $self = "$tmp/self-cgroup";
+        file_put_contents($self, "7:cpuacct,cpu,cpuset:/\n"); // "cpuset" is the LAST name in the comma list
+        check(Cgroup::cpusetCount($tmp, $self) === 4, 'a query for the last-listed controller in a comma-joined hybrid line must still match: '
+            . var_export(Cgroup::cpusetCount($tmp, $self), true));
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
+    'cgroup: no line at all for the queried controller, and a completely empty (but existing) self-cgroup file, both return null without throwing' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-cgmissing-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/memory", 0700, true);
+        file_put_contents("$tmp/memory/memory.limit_in_bytes", "536870912\n");
+        $self = "$tmp/self-cgroup";
+        file_put_contents($self, "6:memory:/\n"); // no cpu/cpuset line at all
+        check(Cgroup::cpuQuota($tmp, $self) === null, 'a self-cgroup with no line for the queried controller must report null, not crash: '
+            . var_export(Cgroup::cpuQuota($tmp, $self), true));
+        file_put_contents($self, ''); // exists, but completely empty
+        check(Cgroup::memoryMax($tmp, $self) === null, 'a completely empty (but existing) self-cgroup file must report null, not crash: '
+            . var_export(Cgroup::memoryMax($tmp, $self), true));
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
 ];

@@ -38,4 +38,24 @@ return [
             @rmdir($home);
         }
     },
+    'quota bytes(): lowercase units, explicit KiB/MiB suffixes, decimals and the E tier all convert; a bad unit, a negative value and trailing garbage are rejected' => function () {
+        $g = 1073741824;
+        check(Quota::bytes('5g') === 5 * $g, 'lowercase g must convert like G: ' . Quota::bytes('5g'));
+        check(Quota::bytes('5GiB') === 5 * $g, 'explicit GiB suffix must convert: ' . Quota::bytes('5GiB'));
+        check(Quota::bytes('5MiB') === 5 * 1048576, 'explicit MiB suffix must convert: ' . Quota::bytes('5MiB'));
+        check(Quota::bytes('1.5G') === (int) round(1.5 * $g), 'a decimal value must convert: ' . Quota::bytes('1.5G'));
+        check(Quota::bytes('2E') === (int) round(2 * pow(1024, 6)), 'the E (exbibyte) tier must convert: ' . Quota::bytes('2E'));
+        check(Quota::bytes('5X') === null, 'an unrecognised unit letter must be rejected, not silently treated as KiB blocks');
+        check(Quota::bytes('-5G') === null, 'a negative value must be rejected');
+        check(Quota::bytes('5G extra') === null, 'trailing garbage after the unit must be rejected');
+        check(Quota::bytes('') === null, 'an empty string must be rejected');
+    },
+    'quota build (via parse()): soft=0 with a nonzero hard limit uses the hard limit as the baseline, NOT "no quota" (only both-zero means no quota)' => function () use ($head) {
+        $g = 1073741824;
+        $q = Quota::parse($head . "       /dev/md2    50G      0K   1280G               5       0       0\n");
+        check($q === ['used' => 50 * $g, 'soft' => 1280 * $g, 'hard' => 1280 * $g],
+            'soft=0/hard=1280G must use the hard limit as the baseline, not read as no quota: ' . json_encode($q));
+        check(Quota::parse($head . "       /dev/md2    50G      0K      0K               5       0       0\n") === null,
+            'soft=0 AND hard=0 together must still mean no quota');
+    },
 ];

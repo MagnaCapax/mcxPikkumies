@@ -1,4 +1,37 @@
 <?php
+/** A local php -S server for Provider tests, with a PK_DIR constant the router body can use for its own state. */
+if (!function_exists('coProviderStart')) {
+    function coProviderStart($routerBody)
+    {
+        $dir = sys_get_temp_dir() . '/pk-provider-' . getmypid() . '-' . mt_rand();
+        @mkdir($dir, 0700, true);
+        file_put_contents("$dir/router.php", "<?php\ndefine('PK_DIR', " . var_export($dir, true) . ");\n$routerBody");
+        $srv = stream_socket_server('tcp://127.0.0.1:0'); // a free port: a fixed one could already answer
+        $port = (int) substr(strrchr(stream_socket_get_name($srv, false), ':'), 1);
+        fclose($srv);
+        $proc = proc_open(escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port " . escapeshellarg("$dir/router.php"),
+            [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        for ($i = 0; $i < 50; $i++) {
+            $s = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);
+            if ($s) {
+                fclose($s);
+                break;
+            }
+            usleep(100000);
+        }
+        return [$proc, "http://127.0.0.1:$port", $dir];
+    }
+}
+
+if (!function_exists('coProviderServerDone')) {
+    function coProviderServerDone($proc, $dir)
+    {
+        proc_terminate($proc);
+        proc_close($proc);
+        exec('rm -rf ' . escapeshellarg($dir));
+    }
+}
+
 return [
     'uid map identity is real root' => function () {
         check(Detect::uidMapIsIdentity("         0          0 4294967295\n"), 'identity map not recognised');
@@ -157,5 +190,129 @@ return [
         @unlink("$dir/link");
         @unlink("$dir/key");
         @rmdir($dir);
+    },
+    'provider resolve(): PIKKUMIES_ENDPOINT/PIKKUMIES_KEY env wins over config, config wins over the key file when env is absent, and a trailing slash is stripped' => function () {
+        $dir = sys_get_temp_dir() . '/pk-presolve-' . getmypid() . '-' . mt_rand();
+        @mkdir($dir, 0700, true);
+        $keyFile = "$dir/key";
+        file_put_contents($keyFile, "endpoint=https://file-endpoint/v1/\nkey=file-key\n");
+        $config = ['provider' => ['endpoint' => '', 'model' => 'm1', 'keyFile' => $keyFile]];
+        try {
+            $r = Provider::resolve($config);
+            check($r === ['endpoint' => 'https://file-endpoint/v1', 'key' => 'file-key', 'model' => 'm1'],
+                'with no env/config endpoint, the key file must win, and a trailing slash must be stripped: ' . json_encode($r));
+            $config['provider']['endpoint'] = 'https://config-endpoint/v1';
+            check(Provider::resolve($config)['endpoint'] === 'https://config-endpoint/v1', 'config endpoint must win over the key file when set');
+            testWithEnv(['PIKKUMIES_ENDPOINT' => 'https://env-endpoint/v1', 'PIKKUMIES_KEY' => 'env-key'], function () use ($config) {
+                $r = Provider::resolve($config);
+                check($r['endpoint'] === 'https://env-endpoint/v1' && $r['key'] === 'env-key',
+                    'env must win over both config and the key file: ' . json_encode($r));
+            });
+        } finally {
+            exec('rm -rf ' . escapeshellarg($dir));
+        }
+    },
+    'provider check(): true only for a 2xx GET /models; 401 and a dead port both report false with the real HTTP code (0 for a dead port)' => function () {
+        list($proc, $base, $dir) = coProviderStart('
+$p = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+if (preg_match("#^/(\\d+)/models$#", $p, $m)) {
+    http_response_code((int) $m[1]);
+    echo json_encode(["data" => [["id" => "m-a"]]]);
+    exit;
+}
+http_response_code(404);
+');
+        try {
+            list($ok, $code) = Provider::check(['endpoint' => "$base/200", 'key' => 'k', 'model' => '']);
+            check($ok === true && $code === 200, '2xx must report ok=true: ' . json_encode([$ok, $code]));
+            list($ok, $code) = Provider::check(['endpoint' => "$base/401", 'key' => 'k', 'model' => '']);
+            check($ok === false && $code === 401, '401 must report ok=false with the real code: ' . json_encode([$ok, $code]));
+            list($ok, $code) = Provider::check(['endpoint' => "$base/500", 'key' => 'k', 'model' => '']);
+            check($ok === false && $code === 500, '500 must report ok=false with the real code: ' . json_encode([$ok, $code]));
+            list($ok, $code) = Provider::check(['endpoint' => 'http://127.0.0.1:1', 'key' => 'k', 'model' => '']);
+            check($ok === false && $code === 0, 'a dead port must report ok=false with code 0, never a 2xx false positive: ' . json_encode([$ok, $code]));
+        } finally {
+            coProviderServerDone($proc, $dir);
+        }
+    },
+    'provider model(): a configured model needs zero HTTP calls ($ids stays untouched); an unconfigured one is /models\' first id, and $ids is populated by reference' => function () {
+        list($proc, $base, $dir) = coProviderStart('
+$calls = (int) @file_get_contents(PK_DIR . "/calls");
+file_put_contents(PK_DIR . "/calls", (string) ($calls + 1));
+echo json_encode(["data" => [["id" => "first-model"], ["id" => "second-model"]]]);
+');
+        try {
+            $configured = ['endpoint' => $base, 'key' => 'k', 'model' => 'already-configured'];
+            $ids = null;
+            $m = Provider::model($configured, $ids);
+            check($m === 'already-configured' && $ids === null, '$ids must stay null: models() must never be called for a configured model');
+            check(!is_file("$dir/calls"), 'a configured model must make ZERO HTTP calls');
+            $unconfigured = ['endpoint' => $base, 'key' => 'k', 'model' => ''];
+            $ids2 = null;
+            $m2 = Provider::model($unconfigured, $ids2);
+            check($m2 === 'first-model', '/models\' first id must be used when no model is configured: ' . $m2);
+            check($ids2 === ['first-model', 'second-model'], '$ids must be populated by reference from models(): ' . json_encode($ids2));
+        } finally {
+            coProviderServerDone($proc, $dir);
+        }
+    },
+    'provider models(): zero HTTP requests are made when the endpoint or the key is blank' => function () {
+        list($proc, $base, $dir) = coProviderStart('
+$calls = (int) @file_get_contents(PK_DIR . "/calls");
+file_put_contents(PK_DIR . "/calls", (string) ($calls + 1));
+echo json_encode(["data" => []]);
+');
+        try {
+            list($code, $ids) = Provider::models(['endpoint' => '', 'key' => 'k', 'model' => '']);
+            check($code === 0 && $ids === [] && !is_file("$dir/calls"), 'a blank endpoint must make no request: ' . json_encode([$code, $ids]));
+            list($code, $ids) = Provider::models(['endpoint' => $base, 'key' => '', 'model' => '']);
+            check($code === 0 && $ids === [] && !is_file("$dir/calls"), 'a blank key must make no request: ' . json_encode([$code, $ids]));
+            list($code, $ids) = Provider::models(['endpoint' => $base, 'key' => 'k', 'model' => '']);
+            check($code === 200 && is_file("$dir/calls"), 'a real endpoint+key must actually call /models: ' . json_encode([$code, $ids]));
+        } finally {
+            coProviderServerDone($proc, $dir);
+        }
+    },
+    'provider models(): malformed /models JSON yields only valid string ids, never a crash' => function () {
+        list($proc, $base, $dir) = coProviderStart('
+$p = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+$bodies = [
+    "/a/models" => json_encode(["data" => "not-an-array"]),
+    "/b/models" => json_encode(["nope" => []]),
+    "/c/models" => json_encode(["data" => [["id" => "ok-1"], ["id" => 42], ["id" => ""], ["noId" => true], ["id" => "ok-2"]]]),
+];
+echo isset($bodies[$p]) ? $bodies[$p] : "not json at all {{{";
+');
+        try {
+            list($code, $ids) = Provider::models(['endpoint' => "$base/a", 'key' => 'k', 'model' => '']);
+            check($code === 200 && $ids === [], '"data" not a list must yield no ids, not a crash: ' . json_encode($ids));
+            list($code, $ids) = Provider::models(['endpoint' => "$base/b", 'key' => 'k', 'model' => '']);
+            check($code === 200 && $ids === [], 'a missing "data" key must yield no ids');
+            list($code, $ids) = Provider::models(['endpoint' => "$base/c", 'key' => 'k', 'model' => '']);
+            check($code === 200 && $ids === ['ok-1', 'ok-2'], 'a non-string id, a numeric id, an empty id and a missing id must all be '
+                . 'dropped, keeping only the valid string ids in order: ' . json_encode($ids));
+            list($code, $ids) = Provider::models(['endpoint' => "$base/d-not-json", 'key' => 'k', 'model' => '']);
+            check($code === 200 && $ids === [], 'non-JSON /models output must yield no ids, not a crash');
+        } finally {
+            coProviderServerDone($proc, $dir);
+        }
+    },
+    'provider llmFile() resolves under Config::localDir(); writeLight() still returns a value (never throws) when its directory is unwritable' => function () {
+        check(Provider::llmFile() === Config::localDir() . '/llm.json', 'llmFile() must resolve under Config::localDir()');
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            skip('running as root; permission bits do not block the write');
+        }
+        $dir = sys_get_temp_dir() . '/pk-unwritable-' . getmypid() . '-' . mt_rand();
+        mkdir($dir, 0500, true); // read+execute, no write
+        $file = "$dir/llm.json";
+        $prov = ['endpoint' => '', 'key' => '', 'model' => 'm-main'];
+        try {
+            $light = Provider::writeLight($prov, [], ['m-main'], $file);
+            check($light === 'm-main', 'writeLight() must still return the decided light model when the write fails: ' . $light);
+            check(!is_file($file), 'an unwritable directory must leave no llm.json behind (and no crash)');
+        } finally {
+            chmod($dir, 0700);
+            exec('rm -rf ' . escapeshellarg($dir));
+        }
     },
 ];
