@@ -176,7 +176,11 @@ class Config
         return $a === [] || array_keys($a) === range(0, count($a) - 1);
     }
 
-    /** Write local/config.php only if absent: local edits always win. */
+    /**
+     * Write local/config.php only if absent: local edits always win. Same atomic pattern as write()
+     * (lock, temporary file, checked rename): returns true only when the file was actually created,
+     * never true on a failed write (it used to: file_put_contents()'s return value went unchecked).
+     */
     public static function writeDefaultsIfMissing()
     {
         $file = self::localDir() . '/config.php';
@@ -184,9 +188,24 @@ class Config
             return false;
         }
         @mkdir(self::localDir(), 0700, true);
-        $body = "<?php\n// Local overrides. Updates never touch this file.\nreturn " . var_export(['provider' => ['endpoint' => '', 'model' => '']], true) . ";\n";
-        file_put_contents($file, $body);
-        chmod($file, 0600);
+        $lock = @fopen($file . '.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX)) {
+            return false;
+        }
+        try {
+            if (is_file($file)) {
+                return false; // another process won the race while we waited for the lock
+            }
+            $body = "<?php\n// Local overrides. Updates never touch this file.\nreturn " . var_export(['provider' => ['endpoint' => '', 'model' => '']], true) . ";\n";
+            $tmp = $file . '.tmp-' . getmypid();
+            if (@file_put_contents($tmp, $body) !== strlen($body) || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
+                @unlink($tmp);
+                return false;
+            }
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
         return true;
     }
 }
