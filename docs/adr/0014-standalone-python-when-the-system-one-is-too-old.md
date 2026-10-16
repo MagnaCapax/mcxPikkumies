@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-08
-- Status: Accepted
+- Status: Superseded by ADR-0033: Hermes' own package manager installs the Python it runs on, so no system or standalone Python is needed.
 
 ## Context
 Hermes needs Python 3.11 to 3.13 (ADR-0009). The first home of Pikkumies, the PMSS seedbox platform, runs mostly Debian 10 and 11, which ship Python 3.7 and 3.9; there `pikkumies install` set up Pikkumies but could not build the agent runtime. Pikkumies runs as the user, so it cannot install system packages.

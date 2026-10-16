@@ -1,6 +1,6 @@
 # Make a tool unit, a hook or a documentation source
 
-One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 (ADR-0005 to ADR-0009, ADR-0015 to ADR-0021). `php tests/run.php` enforces the unit rules.
+One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 (ADR-0005 to ADR-0009, ADR-0015 to ADR-0021); Hermes now follows upstream releases (ADR-0033), so re-check names against a new release. `php tests/run.php` enforces the unit rules.
 
 ## Where things go
 

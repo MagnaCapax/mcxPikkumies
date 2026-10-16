@@ -47,7 +47,7 @@ class Launch
         if ($argv[1] === 'tmux') {
             return $rest === [] || (count($rest) === 1 && ctype_digit($rest[0])) ? ['tmux', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
         }
-        // `run [hermes args]` is a documented passthrough (README, ADR-0009) and keeps every word.
+        // `run [hermes args]` is a documented passthrough (README, ADR-0033) and keeps every word.
         if ($argv[1] === 'run' || (in_array($argv[1], self::SUBCOMMANDS, true) && self::allFlags($rest))) {
             return [$argv[1], $rest];
         }

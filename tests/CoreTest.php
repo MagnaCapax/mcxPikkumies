@@ -130,7 +130,8 @@ return [
         $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], $entries);
         check(substr_count($guard, '    - command: ') === 2 && substr_count($guard, 'fail_closed') === 1
             && strpos($guard, "orchestrator.php pre_tool_call\"\n      timeout: 22\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
-        check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'update banners must be off: Hermes is pinned');
+        check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'no update check at session start: an unasked call to GitHub (AGENTS.md, ADR-0033)');
+        check(strpos($noHooks, "cli:\n  expose_on_path: false\n") !== false, 'Hermes updates must not write launchers into ~/.local/bin (ADR-0033)');
         check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');
     },
     'hermes yaml: feature pins at install (ADR-0024, ADR-0026)' => function () {
@@ -147,31 +148,6 @@ return [
         check(strpos($y, 'allow_agent_scheduling') === false, 'cron.allow_agent_scheduling must stay at the Hermes default (false)');
         check(strpos($y, "\nmodels:") === false, 'no extra model-selection key beyond the existing provider block');
         check(strpos($y, 'browser') === false, 'no browser key: ADR-0021 already covers it');
-    },
-    'hermes build: pinned tag and checksum, verified before unpacking, atomic switch' => function () {
-        $sha = str_repeat('a', 64);
-        check(HermesInstall::buildCommand('v1;rm -rf ~', $sha) === '', 'unsafe tag accepted');
-        check(HermesInstall::buildCommand('v2026.9.24', 'abc') === '', 'bad checksum accepted');
-        $c = HermesInstall::buildCommand('v2026.9.24', $sha);
-        check($c !== '' && strpos($c, 'set -e') === 0, 'build must stop at the first failure');
-        $check = strpos($c, 'sha256sum -c');
-        $tar = strpos($c, 'tar -xzf');
-        check($check !== false && $tar !== false && $check < $tar, 'checksum must be verified before unpacking');
-        check(strpos($c, '--anchored --no-wildcards-match-slash') !== false, 'excludes must only drop top-level directories');
-        check(strpos($c, 'archive/refs/tags/v2026.9.24.tar.gz') !== false, 'source must be the pinned tag');
-        $touch = strpos($c, '.complete');
-        $switch = strpos($c, 'mv -T');
-        check($touch !== false && $switch !== false && $touch < $switch, 'switch only after a complete build');
-        $py = HermesInstall::includeDir() . '/python-3.13.16';
-        $s = HermesInstall::buildCommand('v2026.9.24', $sha, $py . '/bin/python3');
-        $pyCheck = strpos($s, 'sha256sum -c ' . escapeshellarg($py . '.sha256'));
-        $pyTar = strpos($s, 'tar -xzf ' . escapeshellarg($py . '.tgz'));
-        check(strpos($s, HermesInstall::PY_STANDALONE_SHA256) !== false && $pyCheck !== false && $pyTar !== false && $pyCheck < $pyTar, 'standalone Python must be checksum-verified before unpacking');
-        check(strpos($s, escapeshellarg($py . '/bin/python3') . ' -m venv') !== false && strpos($c, "'python3' -m venv") !== false, 'venv must use the chosen python');
-        check(HermesInstall::python('aarch64')[0] === '' || HermesInstall::python('aarch64')[0] === 'python3', 'no standalone build outside x86_64');
-        check(preg_match('/^[0-9a-f]{64}$/', HermesInstall::PY_STANDALONE_SHA256) === 1, 'standalone Python pin must be a checksum');
-        $cfg = Config::defaults();
-        check(preg_match(HermesInstall::TAG_RE, $cfg['hermes']['version']) === 1 && preg_match('/^[0-9a-f]{64}$/', $cfg['hermes']['sha256']) === 1, 'default pin must be a tag plus checksum');
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');

@@ -1,7 +1,13 @@
 # User and agent state: never tracked, never touched by updates.
 pikkumies/local/
-pikkumies/include/hermes*
+# Hermes: the vanilla checkout, trees a failed build left (moved aside, never deleted), the ready
+# marker and the build lock (ADR-0033). The include/hermes* line covers builds from before ADR-0033
+# until they are removed.
+pikkumies/hermes/
+pikkumies/hermes.broken-*/
+pikkumies/include/.hermes-ready
 pikkumies/include/.hermes-build.lock
+pikkumies/include/hermes*
 pikkumies/memory/*
 !pikkumies/memory/README.md
 /vendor/

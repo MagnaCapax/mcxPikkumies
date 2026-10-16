@@ -1,7 +1,7 @@
 <?php
 /**
  * Authoring contract for shipped skills and packs, checked the way Hermes reads them (found in the
- * 0.19.0 source; re-check on a pin bump, ADR-0009).
+ * 0.19.0 source; the tests that read the installed Hermes run wherever pikkumies/hermes exists, ADR-0033).
  * A frontmatter Hermes cannot parse does not fail loudly: it logs a warning and lists the skill
  * with an empty description (agent/prompt_builder.py). Descriptions over 1024 characters are
  * cut silently (tools/skills_tool.py). A skill name that exists twice cannot be loaded
@@ -9,7 +9,8 @@
  */
 
 // Names Hermes v0.21.5 (tag v2026.9.24) already uses: registered tools, toolsets and built-in slash
-// commands. A skill with one of these names competes with the built-in. Re-check on a pin bump (ADR-0009).
+// commands. A skill with one of these names competes with the built-in. Hermes now updates on its own
+// (ADR-0033): a new built-in name shows up as a collision in the installed-source test below.
 const HERMES_RESERVED_NAMES = 'a2a agents annotate_preview apply_layout approvals approve battery bg blueprint branch browser browser_cdp browser_dialog browser_exec browser_vault_enter_code browser_vault_fill browser_vault_list browser_vault_save_login browser_vault_unlock btw bundles busy clarify clear close_terminal code_execution codex-runtime commands compress computer_use config connections context context_engine copy cron cronjob cronjob_manage curator debug delegate_task delegation deny desktop_preview desktop_project diff drive_preview egress execute_code export fast feishu_doc_read file focus focus_pane footer goal gui_tour handoff hatch heartbeat help history homeassistant image image_gen image_generate import indicator init insights journey kanban learn login loop manage_catalog manage_connections meet memory moa model new palette paste patch pause personality pet plan platform platforms plugins process_manage profile prompt queue quit react_to_message read_file read_terminal read_window_below reasoning redraw refine relay reload reload-mcp reload-skills restart resume retry review rollback save search_files sessions session_search sethome show_tip skill_manage skills skills_list skill_view skin snapshot spotify start status statusbar steer stop stt subgoal subscription suggestions terminal text_to_speech timestamps title todo todo_list tools toolsets topic topup tts undo update usage verbose version video video_analyze video_gen video_generate vision vision_analyze voice wake web web_extract web_search whoami worktree write_file x_search yolo yuanbao';
 
 /** Every shipped skill source: the skill.md of each tool unit. */
@@ -97,13 +98,13 @@ return [
         }
     },
     'units: names do not collide with a skill Hermes ships' => function () {
-        $src = glob(dirname(__DIR__) . '/pikkumies/include/hermes-*/src');
-        if (!$src) {
-            return; // Hermes not built here (CI); the reserved-name check above still runs
+        $src = HermesInstall::sourceDir();
+        if ($src === '') {
+            skip('Hermes is not installed in pikkumies/hermes here (CI); the reserved-name check above still runs');
         }
         $bundled = [];
         foreach (['skills', 'optional-skills'] as $d) {
-            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($src[0] . "/$d", FilesystemIterator::SKIP_DOTS)) as $f) {
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($src . "/$d", FilesystemIterator::SKIP_DOTS)) as $f) {
                 if ($f->getFilename() === 'SKILL.md' && preg_match('/^name:\s*"?([^"\n]+)/m', (string) file_get_contents((string) $f), $m)) {
                     $bundled[trim($m[1])] = true;
                 }
@@ -135,10 +136,10 @@ return [
             check(!preg_match('#\bpacks/|pikkumies packs\b|tools/system/status\.php#', $text), basename(dirname($f)) . '/' . basename($f) . ' still mentions packs or a moved tool path');
         }
     },
-    'hermes contract: the pinned source still behaves the way the design relies on' => function () {
-        $src = glob(dirname(__DIR__) . '/pikkumies/include/hermes-' . Config::defaults()['hermes']['version'] . '/src');
-        if (!$src) {
-            return; // Hermes not built here (CI); checked wherever the pinned release is installed
+    'hermes contract: the installed source still behaves the way the design relies on' => function () {
+        $src = HermesInstall::sourceDir();
+        if ($src === '') {
+            skip('Hermes is not installed in pikkumies/hermes here (CI); checked wherever it is installed');
         }
         $facts = [
             'agent/skill_utils.py' => ['"SKILL.md" in files', 'SKILL_PROMPT_DESC_LIMIT = 60'],            // ADR-0015: exact file name; 60-char index
@@ -150,7 +151,7 @@ return [
             'hermes_cli/config.py' => ['def _deep_merge('],                                                   // ADR-0020: approvals.mode alone keeps the other defaults
         ];
         foreach ($facts as $file => $needles) {
-            $text = (string) @file_get_contents($src[0] . '/' . $file);
+            $text = (string) @file_get_contents($src . '/' . $file);
             foreach ($needles as $n) {
                 check(strpos($text, $n) !== false, "Hermes $file no longer contains '$n': re-check the ADR that relies on it");
             }

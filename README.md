@@ -15,7 +15,7 @@ The installer needs no root and returns in seconds. It:
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, which seedbox host it is, root access, running apps, resources);
 - generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
-- builds the Hermes Agent environment in the background: a pinned, checksum-verified Hermes release in your own account, with no root. It uses the system Python 3.11 to 3.13, or, on x86_64 where that is older, a pinned checksum-verified standalone Python in your own account (ADR-0014);
+- installs Hermes Agent in the background: an unmodified checkout of its newest release in `pikkumies/hermes`, set up by Hermes' own package manager (its pinned, checksum-verified uv and Python) in your own account, with no root and without Hermes' installer scripts, which would edit your shell files (ADR-0033);
 - puts `pikkumies` on your `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is already on `PATH`, otherwise one marked block added to `~/.bashrc` and `~/.profile` (never duplicated on a re-run; ADR-0022). Open a new shell (or `hash -r`) afterwards.
 
 Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
@@ -41,14 +41,14 @@ On a terminal, the install and the first session ask what to call your agent, an
 ~/pikkumies/bin/pikkumies update
 ```
 
-Install also adds a daily `pikkumies update` to your own crontab (one tagged line; `autoUpdate.disabled` in `local/config.php` removes it; ADR-0013). Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
+Install also adds a daily `pikkumies update` to your own crontab (one tagged line; `autoUpdate.disabled` in `local/config.php` removes it; ADR-0013). Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. Hermes is updated separately, when you choose: `/update` in a session, or `pikkumies run update` from a shell with no other session open. Each start checks a changed Hermes against the settings Pikkumies relies on and refuses to run it if they no longer apply (ADR-0033). To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, build the pinned Hermes release in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
-| `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); builds a newly pinned Hermes release |
+| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, install Hermes in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
+| `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); never updates Hermes |
 | `pikkumies detect` | Print the machine profile (JSON) |
 | `pikkumies doctor` | Show provider, masked key, Hermes and tool status |
 | `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
@@ -56,6 +56,7 @@ Install also adds a daily `pikkumies update` to your own crontab (one tagged lin
 | `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
 | `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
 | `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …) |
+| `pikkumies run update` | Update Hermes with its own updater, separately from Pikkumies; refuses while another session runs |
 | `pikkumies tmux [1-9]` | Open window `pmN` (default `pm1`) of the tmux session `pikkumies`, running `pikkumies`; the session and the window are created when missing. Without tmux it says so |
 
 Any number of `pikkumies` instances can run at once in one account: they share `HERMES_HOME` on purpose (so sessions, memory and auth live in one place) and Hermes itself is built for several writers at a time; everything *pikkumies* regenerates on every run is written under a lock or through an atomic rename, so two instances starting together never race each other (ADR-0022).
@@ -91,7 +92,8 @@ pikkumies/            the runtime (~/pikkumies)
   config/             documentationSources.md: the wikis and knowledge bases it searches
   doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)
-  include/            third-party software, never tracked: hermes-<tag>/ builds, hermes -> current one
+  hermes/             Hermes Agent: an unmodified upstream git checkout (never tracked); its Python, tools and dependencies are in local/hermes/
+  include/            install state, never tracked: the Hermes ready marker and build lock
   local/              your config, machine profile and agent state (never tracked)
 docs/adr/             architecture decisions
 tests/                php tests/run.php

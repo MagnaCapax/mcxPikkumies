@@ -63,10 +63,19 @@ class CronTick
      */
     public static function argv($hermesBin, $rootAvailable)
     {
+        return self::wrap([$hermesBin, 'cron', 'tick'], $rootAvailable);
+    }
+
+    /**
+     * Any argv run under the same rule: prefixed with `setpriv --no-new-privs` when setpriv exists,
+     * bare when there is nothing to drop, [] when refuses($rootAvailable). Also used for
+     * `pikkumies run update`, whose upstream updater may otherwise call sudo apt-get (ADR-0033).
+     */
+    public static function wrap(array $cmd, $rootAvailable)
+    {
         if (self::refuses($rootAvailable)) {
             return [];
         }
-        $cmd = [$hermesBin, 'cron', 'tick'];
         return self::setprivPresent() ? array_merge(['setpriv', '--no-new-privs'], $cmd) : $cmd;
     }
 

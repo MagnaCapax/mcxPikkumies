@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. Supersedes the install method and the 0.19.0 pin of ADR-0008.
+- Status: Superseded by ADR-0033 (vanilla Hermes as a git checkout in pikkumies/hermes, updated separately). It had superseded the install method and the 0.19.0 pin of ADR-0008.
 
 ## Context
 ADR-0008 pinned Hermes 0.19.0 from PyPI. That channel is a dead end:

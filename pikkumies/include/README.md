@@ -1,5 +1,7 @@
 # include
 
-Third-party software Pikkumies runs, installed here at install time and never committed:
+Install state, never committed:
 
-- `hermes/`: Hermes Agent (MIT, NousResearch) in a Python virtualenv, built by `pikkumies install`.
+- `.hermes-ready`: written when the Hermes install finished; `.hermes-build.lock`: held while it runs.
+
+Hermes itself is not here: it is an unmodified upstream checkout in `pikkumies/hermes/`, and its Python, tools and dependencies live under `local/hermes/` (ADR-0033).

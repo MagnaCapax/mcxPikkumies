@@ -82,7 +82,7 @@ return [
         check(array_keys(Config::SETTABLE) === $allowed, 'the settable list changed: ' . json_encode(array_keys(Config::SETTABLE)));
         $file = settingsFile('tool');
         $refuse = array_merge(['terms.accepted', 'hooks.reword', 'hooks.llm.disabled', 'searchFirst.disabled', 'root.disabled', 'provider.endpoint', 'provider.keyFile',
-            'tools.disabled', 'skills.disabled', 'cron.disabled', 'autoUpdate.disabled', 'hermes.lazyInstalls', 'hermes.sha256', 'nonsense'], array_diff(configLeaves(Config::defaults()), $allowed));
+            'tools.disabled', 'skills.disabled', 'cron.disabled', 'autoUpdate.disabled', 'hermes.lazyInstalls', 'nonsense'], array_diff(configLeaves(Config::defaults()), $allowed));
         foreach (array_unique($refuse) as $key) {
             $threw = false;
             try {
@@ -135,11 +135,14 @@ return [
         check(strpos($forever, "telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n") !== false, 'Hermes telemetry must be pinned off');
         $src = (string) file_get_contents(Config::root() . '/lib/HermesConfig.php');
         check(strpos($src, '. self::sessionsYaml($config));') !== false, 'write() must append the sessions block to config.yaml');
-        $defaults = glob(Config::root() . '/include/hermes-' . Config::defaults()['hermes']['version'] . '/src/hermes_cli/config_defaults.py');
-        if ($defaults) { // Hermes not built here (CI): the key names were checked by hand (ADR-0032)
-            $py = (string) file_get_contents($defaults[0]);
-            check(preg_match('/"sessions": \{.*?"auto_prune": True,.*?"retention_days": \d+,/s', $py) === 1, 'Hermes sessions.auto_prune / retention_days moved');
-            check(preg_match('/"shared_metrics": \{\s*"enabled": False,.*?"send": False,/s', $py) === 1, 'Hermes telemetry defaults changed');
+    },
+    'hermes sessions: the installed Hermes still has the sessions and telemetry keys we set' => function () {
+        $src = HermesInstall::sourceDir();
+        if ($src === '') {
+            skip('Hermes is not installed in pikkumies/hermes here (CI); the key names were checked by hand (ADR-0032)');
         }
+        $py = (string) file_get_contents($src . '/hermes_cli/config_defaults.py');
+        check(preg_match('/"sessions": \{.*?"auto_prune": True,.*?"retention_days": \d+,/s', $py) === 1, 'Hermes sessions.auto_prune / retention_days moved');
+        check(preg_match('/"shared_metrics": \{\s*"enabled": False,.*?"send": False,/s', $py) === 1, 'Hermes telemetry defaults changed');
     },
 ];

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-15
-- Status: Accepted
+- Status: Accepted. The Hermes binary path and the per-tick lock are updated by ADR-0033 (`pikkumies/hermes`, shared `local/hermes.lock`, checks before a tick on a changed checkout).
 
 ## Context
 Hermes' own `hermes cron create` lets the agent schedule a job (a recurring prompt, optionally a plain script), but nothing fires it: the pinned source has a built-in 60-second in-process ticker (`cron.scheduler_provider`, default `""` = builtin) that only runs while a long-lived Hermes gateway/desktop process is up. Pikkumies runs Hermes per-invocation (ADR-0022: any number of instances, none long-lived by design), so without something external calling `hermes cron tick`, a job the user or the agent scheduled never fires. `hermes cron tick` (`hermes_cli/cron.py`, `cron_tick()`) runs due jobs once and exits — exactly the shape a cron line needs.

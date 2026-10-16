@@ -69,9 +69,10 @@ function startDocsFill()
     return 'filling in the background (log: local/docs-fill.log)';
 }
 
+/** The hermes command of a complete install in pikkumies/hermes, '' when there is none (ADR-0033). */
 function hermesBin()
 {
-    return Config::root() . '/include/hermes/bin/hermes';
+    return HermesInstall::bin();
 }
 
 function promptRead()
@@ -139,7 +140,7 @@ switch ($cmd) {
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
-        out('  hermes: ' . HermesInstall::ensure(Config::load()));
+        out('  hermes: ' . HermesInstall::ensure(false, !empty($profile['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));
         out('  docs: ' . startDocsFill());
@@ -174,10 +175,8 @@ switch ($cmd) {
         $config = Config::load();
         out('auto-update: ' . Update::schedule($config, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
         out('cron-tick: ' . Update::scheduleCronTick($config, !empty($profile['root']['available'])));
-        foreach (HermesInstall::cleanup($config) as $old) {
-            out('removed old Hermes build ' . $old);
-        }
-        out('hermes: ' . HermesInstall::ensure($config));
+        // Hermes updates on its own path (`pikkumies run update`, ADR-0033): this only builds it where none exists.
+        out('hermes: ' . HermesInstall::ensure(true, !empty($profile['root']['available']), !empty($config['hermes']['lazyInstalls'])));
         out('docs: ' . startDocsFill());
         break;
 
@@ -209,10 +208,20 @@ switch ($cmd) {
         out('key:      ' . Provider::mask($prov['key']));
         out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
         out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
-        $cur = HermesInstall::currentTag();
-        $pin = $config['hermes']['version'];
-        list(, $py) = HermesInstall::python();
-        out('hermes:   ' . ($cur === '' ? 'not installed' : 'installed ' . $cur) . '; pinned ' . $pin . (is_dir(HermesInstall::buildDir($pin)) && !HermesInstall::isComplete($pin) ? ' (building or failed, see local/install.log)' : '') . '; ' . $py);
+        if (HermesInstall::isComplete()) {
+            $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());
+            $py = 'python ' . ($pyPin !== '' ? $pyPin : '?') . ' managed by Hermes (pm/lock.json)';
+            // Read from the checkout itself, never fetched (ADR-0033).
+            $hs = HermesInstall::status();
+            out('hermes:   ' . $hs['rev'] . ' (' . $hs['sha'] . '), ' . ($hs['clean'] ? 'vanilla' : 'local changes in pikkumies/hermes')
+                . ', origin ' . ($hs['official'] ? 'official' : 'NOT the official repository: ' . $hs['origin'] . ' (`pikkumies run update` refuses it)') . '; ' . $py);
+            $missingKeys = HermesInstall::missingConfigKeys();
+            out('hermes config keys: ' . ($missingKeys ? 'missing: ' . implode(', ', $missingKeys) . ' (Pikkumies will not start this Hermes)' : 'ok'));
+            $leaks = HermesInstall::pathLaunchers((string) getenv('HOME'));
+            out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no launchers in ~/.local/bin (cli.expose_on_path: false)'));
+        } else {
+            out('hermes:   not installed' . (HermesInstall::building() ? ' (building, see local/install.log)' : (file_exists(HermesInstall::treeDir()) ? ' (incomplete build, see local/install.log; `pikkumies install` builds again)' : '')));
+        }
         $units = Units::all();
         $bad = array_filter($units, function ($u) {
             return $u['errors'];
@@ -280,12 +289,30 @@ switch ($cmd) {
         break;
 
     case 'run':
-        if (isset($passArgs[0]) && $passArgs[0] === 'update') {
-            out('Hermes is pinned by Pikkumies (ADR-0009). Run `pikkumies update` instead.');
+        if (hermesBin() === '') {
+            out('Hermes is not installed yet; see local/install.log');
             exit(1);
         }
-        if (!is_file(hermesBin())) {
-            out('Hermes is not installed yet; see local/install.log');
+        // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
+        $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';
+        if ($isUpdate) {
+            $origin = HermesInstall::origin();
+            if (!HermesInstall::originOfficial($origin)) {
+                out('Not updating: pikkumies/hermes fetches from ' . ($origin ?: '(no origin)') . ', not the official Hermes repository.');
+                exit(1);
+            }
+            $updateArgv = CronTick::wrap(array_merge([hermesBin()], $passArgs), !empty(profile()['root']['available']));
+            if (!$updateArgv) {
+                out('Not updating: root is available here and setpriv is missing; the Hermes updater may call sudo, so it runs only under setpriv --no-new-privs (ADR-0025, ADR-0033).');
+                exit(1);
+            }
+        }
+        // Held until Hermes exits: shared for a session, exclusive for an update, so an update never
+        // rewrites the code a running session or scheduled job is using.
+        $hermesLock = HermesInstall::lock($isUpdate);
+        if (!$hermesLock) {
+            out($isUpdate ? 'Not updating: other Hermes sessions or a scheduled job are running from pikkumies/hermes. Close the sessions (or wait a minute for the job) and run `pikkumies run update` again.'
+                : 'Hermes is being updated right now (`pikkumies run update`); start again when it has finished.');
             exit(1);
         }
         // First interactive session: the agent's name, then the terms until accepted (ADR-0032). Only on
@@ -318,6 +345,24 @@ switch ($cmd) {
             exit(1);
         }
         putenv('HERMES_HOME=' . HermesConfig::home());
+        putenv('HERMES_RUNTIME_DIR'); // pm's tool store follows HERMES_HOME, as at install (ADR-0033)
+        if ($isUpdate) {
+            passthru(implode(' ', array_map('escapeshellarg', $updateArgv)), $code);
+            // The same checks every start makes, right away, so a broken update is reported here.
+            $problems = HermesInstall::verify();
+            if ($problems) {
+                out('Hermes was updated, but Pikkumies will not start it: ' . implode('; ', $problems) . '. Run `pikkumies doctor`; report this to Pikkumies.');
+                exit(1);
+            }
+            HermesInstall::markVerified(HermesInstall::head());
+            exit($code);
+        }
+        // A checkout that moved since it was last checked (/update in a session, a hand edit) is checked first.
+        $problems = HermesInstall::checkBeforeStart();
+        if ($problems) {
+            out('not starting: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) . '. Run `pikkumies doctor`.');
+            exit(1);
+        }
         $args = array_map('escapeshellarg', $passArgs);
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);
@@ -329,8 +374,12 @@ switch ($cmd) {
         if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
             exit(0); // a previous tick is still running; silent, there is another one in a minute
         }
-        if (!is_file(hermesBin())) {
+        if (hermesBin() === '') {
             exit(0); // Hermes not installed yet; `run`/`doctor` already say so, no need to repeat every minute
+        }
+        $hermesLock = HermesInstall::lock(false);
+        if (!$hermesLock) {
+            exit(0); // Hermes is being updated; the next minute's tick runs the due jobs
         }
         $tickProfile = profile();
         $tickArgv = CronTick::argv(hermesBin(), !empty($tickProfile['root']['available']));
@@ -339,6 +388,12 @@ switch ($cmd) {
             exit(0);
         }
         putenv('HERMES_HOME=' . HermesConfig::home());
+        putenv('HERMES_RUNTIME_DIR');
+        $problems = HermesInstall::checkBeforeStart(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : []);
+        if ($problems) {
+            CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', 3, 'not run: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems));
+            exit(0);
+        }
         $tickOut = [];
         exec(implode(' ', array_map('escapeshellarg', $tickArgv)) . ' 2>&1', $tickOut, $tickCode);
         CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', $tickCode, implode("\n", $tickOut));
@@ -377,6 +432,7 @@ switch ($cmd) {
     default:
         out('usage: pikkumies [install | update | detect | doctor | generate]');
         out('       pikkumies [run [hermes args...]]           plain interactive session');
+        out('       pikkumies run update                       update Hermes with its own updater (separate from `pikkumies update`)');
         out('       pikkumies <free text>                      start a session with that as the first prompt');
         out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');

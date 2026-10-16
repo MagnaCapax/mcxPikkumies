@@ -1,172 +1,557 @@
 <?php
 /**
- * HermesInstall: Hermes Agent from a pinned release tarball, checked by sha256 (ADR-0009).
+ * HermesInstall: vanilla Hermes Agent, a git checkout of upstream at pikkumies/hermes (ADR-0033).
  *
- * Each release builds into include/hermes-<tag>/ (src/ + venv/) and include/hermes is a symlink
- * to the current venv, switched atomically when a build completes. There is no .git in the
- * source tree, so `hermes update` refuses to run and the pin holds. Builds run in the
- * background under a lock; the log is local/install.log.
+ * Install clones the newest stable release tag (depth 1) into pikkumies/hermes and bootstraps it the
+ * way upstream's own installers do (scripts/install.sh, setup-hermes.sh): the uv pinned in pm/lock.json
+ * (sha256-checked), a bootstrap Python from that uv, then upstream's package manager `pm.cli install`,
+ * which commits the dependency environment and the tools under HERMES_HOME (local/hermes) and writes
+ * the tree's own launcher .hermes/bin/hermes. No venv, no pip, no shell-file edits, no ~/.local/bin.
+ * It runs in the background under include/.hermes-build.lock (log: local/install.log).
+ * Pikkumies never edits, strips, rebuilds or updates the tree: Hermes updates itself with its own
+ * updater (`pikkumies run update`, or /update in a session), never from `pikkumies update`.
+ * The ready marker lives OUTSIDE the tree (include/.hermes-ready), because Hermes' updater stashes
+ * untracked files. Nothing here deletes a tree: an incomplete one is moved aside and reported.
+ * Because the code can change under us, every start checks a changed checkout first (verify()).
  */
 class HermesInstall
 {
-    const SOURCE = 'https://github.com/NousResearch/hermes-agent/archive/refs/tags/%s.tar.gz';
-    const TAG_RE = '/^v?[0-9][0-9A-Za-z._-]*$/';
-    const PY_MIN = '3.11';
-    const PY_MAX = '3.14'; // exclusive (pyproject requires-python >=3.11,<3.14)
-    // When the system python3 is older (Debian 10/11 ship 3.7/3.9): a pinned standalone CPython, checked
-    // by sha256 like the Hermes tarball (ADR-0014). Built for glibc 2.17+, x86_64 only.
-    const PY_STANDALONE = 'python-3.13.16';
-    const PY_STANDALONE_URL = 'https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.13.16%2B20261003-x86_64-unknown-linux-gnu-install_only.tar.gz';
-    const PY_STANDALONE_SHA256 = '0a0272910b10417c659a9312fb3f2d7a6d774da7bd510999be7a3ba83273dc1f';
+    const REPO = 'https://github.com/NousResearch/hermes-agent.git';
+    // A stable release tag as upstream selects one (hermes_cli/update_channel.py STABLE_TAG_RE): vX.Y.Z
+    // with a major of at most three digits, so the old date tags (v2026.9.24) and canaries never match.
+    const STABLE_TAG_RE = '/^v(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/';
+    // The official repository in the URL forms upstream accepts for origin (hermes_cli/source_releases.py).
+    const ORIGIN_RE = '#^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)NousResearch/hermes-agent(?:\.git)?/?$#i';
+    // What the delete guard answers for the rm -rf in verify() (hooks/guard/guard-destructive); any other block,
+    // such as "could not be read", means the payload did not reach the guard the way a real call does.
+    const GUARD_BLOCK = 'Pikkumies safety: recursive force delete';
+    // Optional tools upstream's installer can leave out (install.sh --skip-browser / --skip-computer-use);
+    // pm records the choice, so `hermes update` keeps them out too (pm/defaults.py). Left out unless
+    // hermes.lazyInstalls is on (ADR-0021).
+    const OPTIONAL_TOOLS = ['agent-browser', 'cua-driver'];
+    // curl exit codes for which upstream retries the identical bytes from its mirror (setup-hermes.sh fetch_pinned).
+    const MIRROR_RETRY_CODES = [5, 6, 7, 18, 22, 28, 52, 55, 56];
+
+    /**
+     * Each config key HermesConfig writes => [file in the Hermes tree, text that must be in it]. A key
+     * whose text is gone means our setting may no longer apply (approvals, logins, web fallback), so a
+     * changed checkout with a missing key is refused (verify()). tests/HermesInstallTest.php fails when
+     * HermesConfig writes a top-level key that is not listed here.
+     */
+    const CONFIG_FACTS = [
+        'model.provider' => ['hermes_cli/config_defaults.py', '"provider":'],
+        'model.default' => ['hermes_cli/config_defaults.py', '"default":'],
+        'providers.*.base_url' => ['hermes_cli/providers.py', 'entry.get("base_url"'],
+        'providers.*.key_env' => ['hermes_cli/providers.py', 'entry.get("key_env")'],
+        'providers.*.default_model' => ['hermes_cli/runtime_provider_custom.py', 'entry.get("default_model"'],
+        'skills.external_dirs' => ['hermes_cli/config_defaults.py', '"external_dirs":'],
+        'skills.disabled' => ['agent/skill_utils.py', 'skills_cfg.get("disabled")'],
+        'skills.guard_agent_created' => ['hermes_cli/config_defaults.py', '"guard_agent_created":'],
+        'updates.check' => ['hermes_cli/config_defaults.py', '"check":'],
+        'web.keyless_fallback' => ['hermes_cli/config_defaults.py', '"keyless_fallback":'],
+        'web.keyless_rescue' => ['hermes_cli/config_defaults.py', '"keyless_rescue":'],
+        'security.allow_lazy_installs' => ['hermes_cli/config_defaults.py', '"allow_lazy_installs":'],
+        'approvals.mode' => ['tools/approval_context.py', '_VALID_MODES = ("manual"'],
+        'checkpoints.enabled' => ['hermes_cli/config_defaults.py', '"checkpoints":'],
+        'plugins.enabled' => ['hermes_cli/config_defaults.py', '"plugins":'],
+        'auxiliary.background_review.enabled' => ['hermes_cli/config_defaults.py', '"background_review":'],
+        'curator.enabled' => ['hermes_cli/config_defaults.py', '"curator":'],
+        'auth.adopt_external_logins' => ['hermes_cli/config_defaults.py', '"adopt_external_logins":'],
+        'cli.expose_on_path' => ['hermes_cli/_launchers.py', '"expose_on_path"'],
+        'hooks_auto_accept' => ['hermes_cli/config_defaults.py', '"hooks_auto_accept":'],
+        'hooks.*.fail_closed' => ['agent/shell_hooks.py', 'raw.get("fail_closed"'],
+        'sessions.auto_prune' => ['hermes_cli/config_defaults.py', '"auto_prune":'],
+        'sessions.retention_days' => ['hermes_cli/config_defaults.py', '"retention_days":'],
+        'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
+    ];
+
+    /** Test seams: another pikkumies/ directory, and a local repository instead of GitHub. */
+    public static $root = null;
+    public static $repo = null;
+
+    public static function root()
+    {
+        return self::$root !== null ? self::$root : Config::root();
+    }
+
+    public static function repo()
+    {
+        return self::$repo !== null ? self::$repo : self::REPO;
+    }
 
     public static function includeDir()
     {
-        return Config::root() . '/include';
+        return self::root() . '/include';
     }
 
-    public static function buildDir($tag)
+    public static function localDir()
     {
-        return self::includeDir() . '/hermes-' . $tag;
+        return self::root() . '/local';
     }
 
-    public static function isComplete($tag)
+    /** The Hermes checkout: the unmodified upstream tree (its launchers in .hermes/bin, ignored by upstream's .gitignore). */
+    public static function treeDir()
     {
-        return is_file(self::buildDir($tag) . '/.complete');
+        return self::root() . '/hermes';
     }
 
-    /** Tag the include/hermes symlink points at, '' for none, 'legacy' for an old plain venv. */
-    public static function currentTag()
+    /** Written last by a build; outside the tree, which Hermes' updater would stash. */
+    public static function markerFile()
     {
-        $link = self::includeDir() . '/hermes';
-        if (is_link($link)) {
-            return preg_match('#^hermes-(.+)/venv$#', (string) readlink($link), $m) ? $m[1] : '';
-        }
-        return is_dir($link) ? 'legacy' : '';
+        return self::includeDir() . '/.hermes-ready';
     }
 
-    /**
-     * [python command, message]: the system python3 when it is 3.11 to 3.13, else the pinned standalone
-     * build on x86_64, else '' (Hermes cannot be installed here).
-     */
-    public static function python($machine = null)
+    /** Every Hermes start holds it shared; `pikkumies run update` holds it exclusive. */
+    public static function lockFile()
     {
-        $out = trim((string) @shell_exec('python3 --version 2>&1'));
-        $ver = preg_match('/^Python (\d+\.\d+)/', $out, $m) ? $m[1] : 'none';
-        if (version_compare($ver, self::PY_MIN, '>=') && version_compare($ver, self::PY_MAX, '<')) {
-            return ['python3', 'Python ' . $ver];
-        }
-        if (($machine === null ? php_uname('m') : $machine) === 'x86_64') {
-            return [self::includeDir() . '/' . self::PY_STANDALONE . '/bin/python3', 'standalone ' . self::PY_STANDALONE . ' (system python3: ' . $ver . ')'];
-        }
-        return ['', 'Hermes needs Python ' . self::PY_MIN . ' to 3.13; this machine has ' . $ver];
+        return self::localDir() . '/hermes.lock';
+    }
+
+    public static function isComplete()
+    {
+        return file_exists(self::treeDir() . '/.git') && is_file(self::markerFile());
+    }
+
+    /** HERMES_HOME: where pm keeps the dependency environment, the tools and its caches. */
+    public static function hermesHome()
+    {
+        return self::localDir() . '/hermes';
     }
 
     /**
-     * The background build: download, verify the checksum, unpack (without the top-level tests/,
-     * website/ and apps/ the runtime does not use; nested directories of those names are kept),
-     * venv + editable install, mark complete, switch the symlink.
+     * The hermes command of a complete install, '' otherwise: the launcher upstream's package manager
+     * writes into the tree (hermes_cli/venv_sync.py publish_launchers); it runs pm's committed environment.
      */
-    public static function buildCommand($tag, $sha256, $python = 'python3')
+    public static function bin()
     {
-        if (!preg_match(self::TAG_RE, $tag) || !preg_match('/^[0-9a-f]{64}$/', $sha256)) {
+        $path = self::treeDir() . '/.hermes/bin/hermes';
+        return self::isComplete() && is_file($path) && is_executable($path) ? $path : '';
+    }
+
+    /** The installed Hermes source, for the contract tests and the key check; '' when not installed. */
+    public static function sourceDir()
+    {
+        return self::isComplete() ? self::treeDir() : '';
+    }
+
+    /** The pm/lock.json artifact key for this machine (setup-hermes.sh `target`), '' when upstream has no build. */
+    public static function target($os = null, $machine = null)
+    {
+        $os = $os === null ? php_uname('s') : $os;
+        $machine = $machine === null ? php_uname('m') : $machine;
+        $o = ['Linux' => 'linux', 'Darwin' => 'darwin'];
+        $a = ['x86_64' => 'x64', 'amd64' => 'x64', 'aarch64' => 'arm64', 'arm64' => 'arm64'];
+        return isset($o[$os], $a[$machine]) ? $o[$os] . '-' . $a[$machine] : '';
+    }
+
+    /** [version, url, sha256] of the uv pinned in pm/lock.json for $target, null when there is none. */
+    public static function uvPin(array $lock, $target)
+    {
+        $uv = isset($lock['packages']['uv']) ? $lock['packages']['uv'] : null;
+        $art = isset($uv['artifacts'][$target]) ? $uv['artifacts'][$target] : null;
+        if (!is_array($art) || !isset($uv['version'], $art['url'], $art['sha256']) || !preg_match('/^[0-9A-Za-z._-]+$/', (string) $uv['version'])
+            || !preg_match('/^[0-9a-f]{64}$/i', (string) $art['sha256']) || strpos((string) $art['url'], 'https://') !== 0 && strpos((string) $art['url'], 'file://') !== 0) {
+            return null;
+        }
+        return ['version' => (string) $uv['version'], 'url' => (string) $art['url'], 'sha256' => strtolower((string) $art['sha256'])];
+    }
+
+    /** The bootstrap Python minor version pinned in pm/lock.json (3.14.7+20260901 -> 3.14), '' when there is none. */
+    public static function pythonPin(array $lock)
+    {
+        $v = isset($lock['packages']['python']['version']) ? (string) $lock['packages']['python']['version'] : '';
+        return preg_match('/^(\d+\.\d+)(\.|\+|$)/', $v, $m) ? $m[1] : '';
+    }
+
+    /** The installed tree's pm/lock.json, [] when it cannot be read. */
+    public static function lockData($tree = null)
+    {
+        $lock = json_decode((string) @file_get_contents(($tree !== null ? $tree : self::treeDir()) . '/pm/lock.json'), true);
+        return is_array($lock) ? $lock : [];
+    }
+
+    /** The newest stable release tag in `git ls-remote --tags` output, '' when there is none. */
+    public static function latestTag($lsRemote)
+    {
+        $best = '';
+        foreach (preg_split('/\r?\n/', (string) $lsRemote) as $line) {
+            // Peeled lines (v1.2.3^{}) never match: the tag name may not contain "^".
+            if (preg_match('#^[0-9a-f]{40,64}\s+refs/tags/(v[^\s^]+)$#', trim($line), $m) && preg_match(self::STABLE_TAG_RE, $m[1])
+                && ($best === '' || version_compare(substr($m[1], 1), substr($best, 1), '>'))) {
+                $best = $m[1];
+            }
+        }
+        return $best;
+    }
+
+    /**
+     * git with the options that keep a tree the agent can write from running code through git:
+     * no fsmonitor, no hooks, no optional locks. Returns [exit code, trimmed stdout].
+     */
+    public static function git(array $args, $dir = null)
+    {
+        $argv = array_merge(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null'], $dir !== null ? ['-C', $dir] : [], $args);
+        $out = [];
+        exec('GIT_TERMINAL_PROMPT=0 ' . implode(' ', array_map('escapeshellarg', $argv)) . ' 2>/dev/null', $out, $code);
+        return [$code, trim(implode("\n", $out))];
+    }
+
+    /**
+     * The environment of every bootstrap step: HERMES_HOME is ours, so pm's store resolves to
+     * local/hermes/tools (pm/environments.py store_root) for this build and for every later
+     * `hermes update`; HERMES_RUNTIME_DIR is removed so an inherited one cannot move it. UV_NO_CONFIG as
+     * upstream. uv's own Python downloads and cache stay under HERMES_HOME instead of ~/.local/share/uv
+     * and ~/.cache/uv (the cache is the one pm uses itself, pm/packages.py uv_cache_dir).
+     */
+    public static function bootstrapEnv()
+    {
+        $home = self::hermesHome();
+        return ['HERMES_HOME' => $home, 'UV_NO_CONFIG' => '1', 'UV_PYTHON_INSTALL_DIR' => $home . '/bootstrap-python', 'UV_CACHE_DIR' => $home . '/cache/uv'];
+    }
+
+    /** Run argv (with env and cwd), output to this process's stdout (the install log); returns the exit code. */
+    private static function run(array $argv, array $env = [], $cwd = null, &$out = null)
+    {
+        $cmd = 'env -u HERMES_RUNTIME_DIR';
+        foreach ($env as $k => $v) {
+            $cmd .= ' ' . escapeshellarg("$k=$v");
+        }
+        $cmd = ($cwd !== null ? 'cd ' . escapeshellarg($cwd) . ' && ' : '') . $cmd . ' ' . implode(' ', array_map('escapeshellarg', $argv));
+        if (func_num_args() >= 4) {
+            $lines = [];
+            exec($cmd . ' 2>/dev/null', $lines, $code);
+            $out = trim(implode("\n", $lines));
+            return $code;
+        }
+        passthru($cmd . ' 2>&1', $code);
+        return $code;
+    }
+
+    /**
+     * Stage the pinned uv into pm's store slot (<store>/uv-<version>-<target>/uv), as setup-hermes.sh
+     * does: download (the mirror only on a network failure), check the sha256 before unpacking, flatten a
+     * single wrapping directory, move into place. Returns '' or the problem.
+     */
+    private static function stageUv(array $uv, $entry, $tree)
+    {
+        $store = dirname($entry);
+        @mkdir($store, 0700, true);
+        $tmp = $store . '/.bootstrap-' . getmypid() . '-' . mt_rand();
+        if (!@mkdir($tmp, 0700)) {
+            return "cannot write $store";
+        }
+        try {
+            $archive = $tmp . '/' . basename((string) parse_url($uv['url'], PHP_URL_PATH));
+            $code = self::run(['curl', '-fsSL', '-o', $archive, $uv['url']]);
+            $mirror = json_decode((string) @file_get_contents($tree . '/pm/artifact-mirror.json'), true);
+            if ($code !== 0 && in_array($code, self::MIRROR_RETRY_CODES, true) && !empty($mirror['origin']) && !empty($mirror['prefix'])) {
+                $code = self::run(['curl', '-fsSL', '-o', $archive, $mirror['origin'] . '/' . $mirror['prefix'] . $uv['sha256']]);
+            }
+            if ($code !== 0) {
+                return 'failed to download the pinned uv from ' . $uv['url'];
+            }
+            $got = (string) hash_file('sha256', $archive);
+            if ($got !== $uv['sha256']) {
+                return "sha256 mismatch for uv (got $got, pinned {$uv['sha256']})";
+            }
+            mkdir($tmp . '/tree', 0700);
+            $unpack = substr($archive, -4) === '.zip' ? ['unzip', '-q', $archive, '-d', $tmp . '/tree'] : ['tar', '-xzf', $archive, '-C', $tmp . '/tree'];
+            if (self::run($unpack) !== 0) {
+                return 'cannot unpack the pinned uv';
+            }
+            $children = array_values(array_diff((array) scandir($tmp . '/tree'), ['.', '..']));
+            $src = count($children) === 1 && is_dir($tmp . '/tree/' . $children[0]) ? $tmp . '/tree/' . $children[0] : $tmp . '/tree';
+            if (file_exists($entry)) {
+                exec('rm -rf ' . escapeshellarg($entry)); // a store slot without a working uv, as upstream replaces it
+            }
+            if (!@rename($src, $entry) || !is_executable($entry . '/uv')) {
+                return 'the pinned uv archive has no uv';
+            }
             return '';
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tmp));
         }
-        $inc = self::includeDir();
-        $b = self::buildDir($tag);
-        $q = 'escapeshellarg';
-        $steps = [
-            'set -e',
-            'echo "hermes ' . $tag . ': build started $(date -u +%FT%TZ)"',
-        ];
-        if ($python !== 'python3') {
-            // Standalone Python: download, verify, unpack aside, then move into place (kept across Hermes builds).
-            $py = $inc . '/' . self::PY_STANDALONE;
-            $steps[] = 'if [ ! -x ' . $q($python) . ' ]; then rm -rf ' . $q($py . '.tmp') . ' && mkdir -p ' . $q($py . '.tmp')
-                . ' && curl -fsSL --retry 2 -o ' . $q($py . '.tgz') . ' ' . $q(self::PY_STANDALONE_URL)
-                . ' && printf ' . $q('%s  %s\n') . ' ' . $q(self::PY_STANDALONE_SHA256) . ' ' . $q($py . '.tgz') . ' > ' . $q($py . '.sha256')
-                . ' && sha256sum -c ' . $q($py . '.sha256')
-                . ' && tar -xzf ' . $q($py . '.tgz') . ' -C ' . $q($py . '.tmp') . ' --strip-components=1'
-                . ' && rm -f ' . $q($py . '.tgz') . ' ' . $q($py . '.sha256') . ' && rm -rf ' . $q($py) . ' && mv ' . $q($py . '.tmp') . ' ' . $q($py) . '; fi';
-        }
-        $steps = array_merge($steps, [
-            'rm -rf ' . $q($b),
-            'mkdir -p ' . $q($b . '/src'),
-            'curl -fsSL --retry 2 -o ' . $q($b . '/src.tgz') . ' ' . $q(sprintf(self::SOURCE, $tag)),
-            'printf ' . $q('%s  %s\n') . ' ' . $q($sha256) . ' ' . $q($b . '/src.tgz') . ' > ' . $q($b . '/src.sha256'),
-            'sha256sum -c ' . $q($b . '/src.sha256'),
-            'tar -xzf ' . $q($b . '/src.tgz') . ' -C ' . $q($b . '/src') . " --strip-components=1 --anchored --no-wildcards-match-slash --exclude='*/tests' --exclude='*/website' --exclude='*/apps'",
-            'rm -f ' . $q($b . '/src.tgz') . ' ' . $q($b . '/src.sha256'),
-            $q($python) . ' -m venv ' . $q($b . '/venv'),
-            $q($b . '/venv/bin/pip') . ' install --quiet -e ' . $q($b . '/src'),
-            'touch ' . $q($b . '/.complete'),
-            // An install made before ADR-0009 has a plain venv here: keep it aside, then switch.
-            'if [ -d ' . $q($inc . '/hermes') . ' ] && [ ! -L ' . $q($inc . '/hermes') . ' ]; then mv ' . $q($inc . '/hermes') . ' ' . $q($inc . '/hermes-legacy') . '; fi',
-            'ln -sfn ' . $q('hermes-' . $tag . '/venv') . ' ' . $q($inc . '/hermes.new'),
-            'mv -T ' . $q($inc . '/hermes.new') . ' ' . $q($inc . '/hermes'),
-            'echo "hermes ' . $tag . ': ready $(date -u +%FT%TZ)"',
-        ]);
-        return implode("\n", $steps);
     }
 
-    /** Start a build of the pinned release unless it is current; returns a status line. */
-    public static function ensure(array $config)
+    /**
+     * The background build: clone the release tag, then upstream's bootstrap (pinned uv, bootstrap
+     * Python, `pm.cli install`), then the ready marker. The marker goes first, so a half-built tree never
+     * looks complete. No step deletes the tree. Prints its progress (the install log); returns the exit code.
+     */
+    public static function build($tag, $optionalTools = false)
     {
-        $tag = (string) $config['hermes']['version'];
-        $sha = isset($config['hermes']['sha256']) ? (string) $config['hermes']['sha256'] : '';
-        if (self::currentTag() === $tag && self::isComplete($tag)) {
-            return 'installed ' . $tag;
+        $tree = self::treeDir();
+        echo "hermes $tag: build started " . gmdate('c') . "\n";
+        @unlink(self::markerFile());
+        $fail = function ($why) use ($tag) {
+            echo "hermes $tag: failed: $why\n";
+            return 1;
+        };
+        if (!preg_match(self::STABLE_TAG_RE, $tag)) {
+            return $fail('not a release tag');
+        }
+        if (self::run(['git', '-c', 'core.hooksPath=/dev/null', 'clone', '--quiet', '--depth', '1', '--branch', $tag, '--', self::repo(), $tree], ['GIT_TERMINAL_PROMPT' => '0']) !== 0) {
+            return $fail('git clone');
+        }
+        $target = self::target();
+        $lock = self::lockData($tree);
+        $uv = self::uvPin($lock, $target);
+        $py = self::pythonPin($lock);
+        if ($uv === null || $py === '') {
+            return $fail("pm/lock.json has no uv or python pin for $target");
+        }
+        $env = self::bootstrapEnv();
+        @mkdir($env['HERMES_HOME'], 0700, true);
+        $entry = $env['HERMES_HOME'] . "/tools/uv-{$uv['version']}-$target";
+        if (!is_executable($entry . '/uv')) {
+            $problem = self::stageUv($uv, $entry, $tree);
+            if ($problem !== '') {
+                return $fail($problem);
+            }
+        }
+        if (self::run([$entry . '/uv', 'python', 'install', '--no-bin', '--no-registry', $py], $env) !== 0) {
+            return $fail("uv could not install the bootstrap Python $py");
+        }
+        if (self::run([$entry . '/uv', 'python', 'find', '--managed-python', $py], $env, null, $boot) !== 0 || !is_executable($boot)) {
+            return $fail("uv found no bootstrap Python $py");
+        }
+        $pm = [$boot, '-m', 'pm.cli', 'install'];
+        foreach ($optionalTools ? [] : self::OPTIONAL_TOOLS as $name) {
+            array_push($pm, '--without', $name);
+        }
+        if (self::run($pm, $env, $tree) !== 0) {
+            return $fail('pm install');
+        }
+        if (!is_executable($tree . '/.hermes/bin/hermes')) {
+            return $fail('pm install wrote no .hermes/bin/hermes');
+        }
+        touch(self::markerFile());
+        echo "hermes $tag: ready " . gmdate('c') . "\n";
+        return 0;
+    }
+
+    /** The background command ensure() starts: build() in a fresh PHP process. */
+    public static function buildProcess($tag, $optionalTools)
+    {
+        $code = 'require ' . var_export(__FILE__, true) . '; HermesInstall::$root = ' . var_export(self::root(), true)
+            . '; HermesInstall::$repo = ' . var_export(self::repo(), true) . '; exit(HermesInstall::build(' . var_export($tag, true) . ', ' . ($optionalTools ? 'true' : 'false') . '));';
+        return [PHP_BINARY, '-r', $code];
+    }
+
+    /** True while a build holds include/.hermes-build.lock. */
+    public static function building()
+    {
+        $h = @fopen(self::includeDir() . '/.hermes-build.lock', 'r');
+        if (!$h) {
+            return false;
+        }
+        $free = flock($h, LOCK_EX | LOCK_NB);
+        fclose($h);
+        return !$free;
+    }
+
+    /**
+     * Start a build when there is no complete install; never touches a complete one (no git, no pm).
+     * $unattended (post-update, from the daily cron) builds only where no tree exists at all, and not on
+     * a root-capable host without setpriv (ADR-0025). $optionalTools: hermes.lazyInstalls (ADR-0021).
+     * Returns a status line.
+     */
+    public static function ensure($unattended = false, $rootAvailable = false, $optionalTools = false)
+    {
+        if (self::isComplete()) {
+            return 'installed (pikkumies/hermes; updates: `pikkumies run update`)';
         }
         if (getenv('PIKKUMIES_SKIP_HERMES') === '1') {
             return 'skipped (PIKKUMIES_SKIP_HERMES=1)';
         }
-        list($python, $pyMsg) = self::python();
-        if ($python === '') {
-            return 'not installed: ' . $pyMsg;
+        if (self::building()) {
+            return 'building in the background (log: local/install.log)';
         }
-        $cmd = self::buildCommand($tag, $sha, $python);
-        if ($cmd === '') {
-            return 'not installed: hermes.version must be a release tag and hermes.sha256 its tarball checksum';
+        $tree = self::treeDir();
+        $exists = file_exists($tree) || is_link($tree);
+        if ($exists && $unattended) {
+            return 'not complete: pikkumies/hermes is left from a build that failed or stopped (see local/install.log); run `pikkumies install` to move it aside and build again';
+        }
+        if (self::target() === '') {
+            return 'not installed: Hermes has no build for this machine (' . php_uname('s') . ' ' . php_uname('m') . ')';
+        }
+        if ($unattended && CronTick::refuses($rootAvailable)) {
+            return 'not installed: root is available and setpriv is missing, so no unattended build (ADR-0025); run `pikkumies install`';
+        }
+        list(, $tags) = self::git(['ls-remote', '--tags', '--', self::repo()]);
+        $tag = self::latestTag($tags);
+        if ($tag === '') {
+            return 'not installed: could not read the Hermes releases from ' . self::repo() . ' (network?)';
+        }
+        $note = '';
+        if ($exists) {
+            $lock = self::lock(true);
+            if (!$lock) {
+                return 'not complete, and a Hermes process still runs from pikkumies/hermes; close it and run `pikkumies install` again';
+            }
+            // Never deleted: the tree can hold the user's own stashed changes.
+            $aside = $tree . '.broken-' . gmdate('Ymd\THis\Z');
+            $moved = @rename($tree, $aside);
+            fclose($lock);
+            if (!$moved) {
+                return 'not complete, and could not move pikkumies/hermes aside; move or remove it, then run `pikkumies install`';
+            }
+            $note = 'moved the incomplete tree to ' . basename($aside) . ' (remove it when it is not needed); ';
         }
         @mkdir(self::includeDir(), 0700, true);
+        @mkdir(self::localDir(), 0700, true);
         $lock = self::includeDir() . '/.hermes-build.lock';
-        $log = Config::localDir() . '/install.log';
+        $log = self::localDir() . '/install.log';
+        // No build step may gain privileges (upstream's libatomic step would try sudo), so setpriv where it exists.
+        $argv = array_merge(['flock', '-n', $lock], CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], self::buildProcess($tag, $optionalTools));
         // flock -n: if a build already runs, this one exits at once and leaves it alone.
-        exec('nohup flock -n ' . escapeshellarg($lock) . ' sh -c ' . escapeshellarg($cmd) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
-        return 'building ' . $tag . ' in the background (log: local/install.log)';
+        exec('nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
+        return $note . 'building ' . $tag . ' in the background (log: local/install.log)';
     }
 
     /**
-     * True when one of this user's processes runs from $dir: a session started before a switch
-     * keeps using its build (the agent can run update from inside a session), so it must stay.
+     * The Hermes lock, held for as long as the returned handle stays open: shared for every start
+     * (sessions, cron-tick), exclusive for an update. null when it is not free right now.
      */
-    public static function inUse($dir)
+    public static function lock($exclusive)
     {
-        $dir = rtrim($dir, '/') . '/';
-        foreach ((array) glob('/proc/[0-9]*', GLOB_ONLYDIR) as $p) {
-            $exe = (string) @readlink($p . '/exe');
-            $cmd = str_replace("\0", ' ', (string) @file_get_contents($p . '/cmdline'));
-            if (strpos($exe, $dir) === 0 || strpos($cmd, $dir) !== false) {
-                return true;
-            }
+        @mkdir(self::localDir(), 0700, true);
+        $h = @fopen(self::lockFile(), 'c');
+        if (!$h) {
+            return null;
         }
-        return false;
+        if (!flock($h, ($exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB)) {
+            fclose($h);
+            return null;
+        }
+        return $h;
     }
 
-    /** Remove our own builds that are neither current nor the pinned one (run by update). */
-    public static function cleanup(array $config)
+    public static function origin()
     {
-        $keep = [self::currentTag(), (string) $config['hermes']['version']];
-        $removed = [];
-        foreach ((array) glob(self::includeDir() . '/hermes-*', GLOB_ONLYDIR) as $dir) {
-            $tag = substr(basename($dir), strlen('hermes-'));
-            if (in_array($tag, $keep, true) || is_link($dir) || self::inUse($dir)) {
-                continue;
-            }
-            exec('rm -rf ' . escapeshellarg($dir), $o, $code);
-            if ($code === 0) {
-                $removed[] = basename($dir);
+        return self::git(['config', '--get', 'remote.origin.url'], self::treeDir())[1];
+    }
+
+    /** True for the official repository (or the test seam's repository). */
+    public static function originOfficial($url)
+    {
+        return $url === self::repo() || preg_match(self::ORIGIN_RE, (string) $url) === 1;
+    }
+
+    /** The checked-out commit, '' when it cannot be read. */
+    public static function head()
+    {
+        list($code, $sha) = self::git(['rev-parse', 'HEAD'], self::treeDir());
+        return $code === 0 && preg_match('/^[0-9a-f]{40,64}$/', $sha) ? $sha : '';
+    }
+
+    /** For doctor: tag or branch, short commit, clean work tree, origin. No fetch. */
+    public static function status()
+    {
+        $dir = self::treeDir();
+        list($code, $rev) = self::git(['describe', '--tags', '--exact-match', 'HEAD'], $dir);
+        if ($code !== 0 || $rev === '') {
+            list($code, $rev) = self::git(['symbolic-ref', '--short', '-q', 'HEAD'], $dir);
+            $rev = $code === 0 && $rev !== '' ? $rev : 'detached';
+        }
+        list($code, $porcelain) = self::git(['status', '--porcelain'], $dir);
+        $origin = self::origin();
+        return ['rev' => $rev, 'sha' => substr(self::head(), 0, 10), 'clean' => $code === 0 && $porcelain === '', 'origin' => $origin, 'official' => self::originOfficial($origin)];
+    }
+
+    /** The config keys HermesConfig writes whose text is missing from the installed source (CONFIG_FACTS). */
+    public static function missingConfigKeys($src = null)
+    {
+        $src = $src !== null ? $src : self::sourceDir();
+        $missing = [];
+        foreach (self::CONFIG_FACTS as $key => $fact) {
+            if (strpos((string) @file_get_contents($src . '/' . $fact[0]), $fact[1]) === false) {
+                $missing[] = $key;
             }
         }
-        return $removed;
+        return $missing;
+    }
+
+    /**
+     * Hermes launchers in ~/.local/bin that run this tree. Hermes' updater writes them unless
+     * cli.expose_on_path is false; a bare `hermes` there would run without our config.
+     */
+    public static function pathLaunchers($home)
+    {
+        $found = [];
+        foreach ((array) glob($home . '/.local/bin/hermes*') as $f) {
+            $text = is_link($f) ? (string) @readlink($f) : (string) @file_get_contents($f, false, null, 0, 65536);
+            if (strpos($text, self::treeDir()) !== false) {
+                $found[] = $f;
+            }
+        }
+        return $found;
+    }
+
+    /**
+     * The checks a changed checkout must pass before Hermes starts on it: every config key we set still
+     * exists, and the delete guard still blocks `rm -rf` through Hermes' own hook runner. HERMES_HOME
+     * must already point at the generated config. $prefix: e.g. setpriv for an unattended caller.
+     * Returns the problems, [] when it passed.
+     */
+    public static function verify(array $prefix = [])
+    {
+        $problems = [];
+        foreach (self::missingConfigKeys() as $key) {
+            $problems[] = "Hermes no longer has the config key $key";
+        }
+        $bin = self::bin();
+        $payload = self::localDir() . '/hook-check-' . getmypid() . '.json';
+        $json = json_encode(['args' => ['command' => 'rm -rf /tmp/pikkumies-hook-check']], JSON_UNESCAPED_SLASHES);
+        if ($bin === '' || @file_put_contents($payload, $json) !== strlen($json)) {
+            $problems[] = 'could not run the delete guard check';
+            return $problems;
+        }
+        $argv = array_merge($prefix, [$bin, 'hooks', 'test', 'pre_tool_call', '--for-tool', 'terminal', '--payload-file', $payload]);
+        $out = [];
+        exec(implode(' ', array_map('escapeshellarg', $argv)) . ' 2>&1', $out, $code);
+        @unlink($payload);
+        $text = implode("\n", $out);
+        if (strpos($text, '"action": "block"') === false || strpos($text, self::GUARD_BLOCK) === false) {
+            $problems[] = 'the delete guard did not block rm -rf in `hermes hooks test` (exit ' . $code . ')';
+        }
+        return $problems;
+    }
+
+    /** The commit that last passed verify(), '' for none. */
+    public static function verifiedCommit()
+    {
+        $data = json_decode((string) @file_get_contents(self::localDir() . '/hermes-verified.json'), true);
+        return is_array($data) && isset($data['commit']) && is_string($data['commit']) ? $data['commit'] : '';
+    }
+
+    public static function markVerified($commit)
+    {
+        $file = self::localDir() . '/hermes-verified.json';
+        $json = json_encode(['commit' => $commit, 'at' => gmdate('c')]) . "\n";
+        $tmp = $file . '.tmp-' . getmypid();
+        if (@file_put_contents($tmp, $json) !== strlen($json) || !@rename($tmp, $file)) {
+            @unlink($tmp);
+        }
+    }
+
+    /**
+     * Before every start: when the checkout moved since it was last verified (an update, /update in a
+     * session, a hand edit), verify() it; a pass is recorded, a fail is returned and nothing starts.
+     */
+    public static function checkBeforeStart(array $prefix = [])
+    {
+        $head = self::head();
+        if ($head === '') {
+            return ['cannot read the Hermes commit in pikkumies/hermes'];
+        }
+        if ($head === self::verifiedCommit()) {
+            return [];
+        }
+        $problems = self::verify($prefix);
+        if (!$problems) {
+            self::markVerified($head);
+        }
+        return $problems;
     }
 }

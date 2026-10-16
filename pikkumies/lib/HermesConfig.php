@@ -94,15 +94,21 @@ class HermesConfig
         // Agent-written skills get the same static scan as a hub install before they can run
         // again; Hermes' own default leaves them unscanned (ADR-0024).
         $y .= "  guard_agent_created: true\n";
-        // Hermes is pinned and updated by Pikkumies (ADR-0009): no update banners.
+        // No update check at session start: it is a call to GitHub the user did not ask for (AGENTS.md);
+        // Hermes updates when the user asks, with `pikkumies run update` or /update (ADR-0033).
         $y .= "updates:\n  check: false\n";
+        // Hermes' updater would otherwise write hermes, hermes-acp and hermes-agent launchers into
+        // ~/.local/bin (hermes_cli/_launchers.py): a bare `hermes` there runs without this config, and
+        // they are files outside pikkumies/ nobody cleans up (ADR-0033).
+        $y .= "cli:\n  expose_on_path: false\n";
         // Hermes web_search/web_extract fall back to outside free search services when no backend is
         // configured (keyless_fallback, hermes_cli/config_defaults.py). AGENTS.md: nothing leaves the
         // machine unasked, so both are off; a user who wants web search configures a backend (ADR-0021).
         $y .= "web:\n  keyless_fallback: false\n  keyless_rescue: false\n";
         // Hermes would otherwise pip-install optional packages (unpinned, from PyPI) and download a browser
-        // at runtime (tools/lazy_deps.py): that undoes the pinned build of ADR-0009 and costs every
-        // account on a shared server the download. Off unless the user sets hermes.lazyInstalls (ADR-0021).
+        // at runtime (tools/lazy_deps.py), which costs every account on a shared server the download.
+        // Off unless the user sets hermes.lazyInstalls (ADR-0021), which also decides whether the install
+        // declines the optional tools; the required ones (node, ffmpeg, ...) always come (ADR-0033).
         $y .= "security:\n  allow_lazy_installs: " . ($lazyInstalls ? 'true' : 'false') . "\n";
         // Hermes' default approvals.mode is "smart": a second model decides whether a command on Hermes'
         // dangerous list (rm -r, find -delete, ...) runs, and it approves "safe file operations"
@@ -114,10 +120,10 @@ class HermesConfig
         $y .= "checkpoints:\n  enabled: true\n";
         // Opt-in allow-list (ADR-0024): a static scan of file writes, no model call, no cost.
         $y .= "plugins:\n  enabled:\n    - \"security-guidance\"\n";
-        // Pinned on so a future Hermes default change cannot silently turn off the post-turn
+        // Set on explicitly so a future Hermes default change cannot silently turn off the post-turn
         // self-improvement fork; consolidate (its aux-model cost) is left at Hermes' own off (ADR-0024).
         $y .= "auxiliary:\n  background_review:\n    enabled: true\n";
-        // Pinned on (already Hermes' default): background pruning/archiving of agent-created skills;
+        // Set on explicitly (already Hermes' default): background pruning/archiving of agent-created skills;
         // consolidate stays off, left at Hermes' own default (ADR-0024).
         $y .= "curator:\n  enabled: true\n";
         // Hermes would otherwise borrow a codex/other CLI login from this account; two programs
@@ -144,7 +150,7 @@ class HermesConfig
      * Appended to config.yaml (ADR-0032). sessions: Hermes prunes ended sessions older than
      * retention_days at start (auto_prune, hermes_cli/config_defaults.py "sessions"); our
      * sessions.retentionDays 0 means keep them forever, so pruning is off. telemetry: Hermes'
-     * own shared metrics stay off (already its default), pinned so a new release cannot turn them on.
+     * own shared metrics stay off (already its default), set explicitly so a new release cannot turn them on.
      */
     public static function sessionsYaml(array $config)
     {
@@ -217,7 +223,7 @@ class HermesConfig
                 ? "\n- Shared server: yes; other accounts live here" . (!empty($profile['root']['available']) && empty($config['root']['disabled']) ? ", so touch only this user's files and processes" : '')
                 : '')
             // Hermes' cronjob tool says a job "will NOT fire until the gateway is started" whenever no
-            // gateway runs (tools/cronjob_job_args.py, pinned v2026.9.24); here the crontab tick fires
+            // gateway runs (tools/cronjob_job_args.py, read in v2026.9.24); here the crontab tick fires
             // it (ADR-0025), and installing the gateway is a sudo path the tick exists to avoid.
             . (empty($config['cron']['disabled']) && !CronTick::refuses(!empty($profile['root']['available']))
                 ? "\n- Cron jobs run from crontab; ignore \"gateway is not running\", never start the gateway"
