@@ -122,6 +122,7 @@ return [
             $mine = fileowner("$dir/tok");
             $content = SecretFile::read("$dir/tok", 'run login', $mine);
             check(is_string($content) && strpos($content, 'secret-value') !== false, 'content lost on auto-heal: ' . var_export($content, true));
+            clearstatcache(); // fileowner() above cached the 0644 mode; read() changed it since
             check((fileperms("$dir/tok") & 0777) === 0600, 'mode 0644 was not healed back to 0600');
             try {
                 SecretFile::read("$dir/tok", 'run login', $mine + 99999);

@@ -36,6 +36,11 @@ class MediaHttp
     public static function local($url)
     {
         $u = parse_url((string) $url);
+        // PHP 7.3's parse_url leaves out an empty query or fragment ("http://127.0.0.1:1/?"), PHP 8 sets
+        // it to ''; refuse any '?' or '#' in the address itself so both versions refuse the same URLs.
+        if (strpbrk((string) $url, '?#') !== false) {
+            $u = false;
+        }
         $host = is_array($u) && isset($u['host']) ? strtolower(trim($u['host'], '[]')) : '';
         if (!is_array($u) || !isset($u['scheme']) || strtolower($u['scheme']) !== 'http'
             || !in_array($host, ['127.0.0.1', 'localhost', '::1'], true)

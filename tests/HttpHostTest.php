@@ -60,7 +60,7 @@ return [
         $script = tempnam(sys_get_temp_dir(), 'pk-hh-nocurl');
         file_put_contents($script, '<?php
 require ' . var_export(dirname(__DIR__) . '/pikkumies/lib/Http.php', true) . ';
-echo json_encode(Http::request("GET", "http://127.0.0.1:1/"));
+echo extension_loaded("curl") ? "curl-still-loaded" : serialize(Http::request("GET", "http://127.0.0.1:1/"));
 ');
         $cmd = escapeshellarg(PHP_BINARY) . ' -n ' . escapeshellarg($script);
         $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
@@ -69,7 +69,11 @@ echo json_encode(Http::request("GET", "http://127.0.0.1:1/"));
         fclose($pipes[2]);
         proc_close($p);
         unlink($script);
-        check(json_decode($out, true) === ['code' => 0, 'body' => '', 'headers' => [], 'error' => 'the PHP curl extension is missing'],
+        if ($out === 'curl-still-loaded') {
+            skip('curl is built into this PHP, so php -n cannot remove it');
+        }
+        // serialize(), not json_encode(): php -n also drops a shared json extension (PHP 7.3 in CI).
+        check(@unserialize($out) === ['code' => 0, 'body' => '', 'headers' => [], 'error' => 'the PHP curl extension is missing'],
             "curl-missing shape wrong (or php -n did not disable curl here): $out");
     },
     'http: foreignLocalListener refuses a non-http(s) scheme, and an address with no host name, with the exact message' => function () {
