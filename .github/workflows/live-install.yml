@@ -1,0 +1,44 @@
+name: Live install
+
+# A real install against upstream Hermes (network: GitHub and the package mirrors Hermes uses).
+# Not on every push: weekly and on demand. No secrets, no provider key (ADR-0033: the live check).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, posix, json
+          coverage: none
+      - name: Install without prompts
+        run: php pikkumies/bin/pikkumies install --name=CI --accept-terms --telemetry=off < /dev/null
+      - name: Wait for the Hermes build
+        run: |
+          for i in $(seq 1 180); do
+            grep -qE ': ready|failed' pikkumies/local/install.log 2>/dev/null && break
+            sleep 10
+          done
+          tail -20 pikkumies/local/install.log
+          grep -q ': ready' pikkumies/local/install.log
+      - name: Doctor
+        run: php pikkumies/bin/pikkumies doctor
+      - name: Hermes starts through Pikkumies (start check included)
+        run: php pikkumies/bin/pikkumies run skills list < /dev/null
+      - name: Contract tests run against the installed Hermes (no skips allowed)
+        run: |
+          php tests/run.php Contract ConfigTest | tee /tmp/contract.txt
+          ! grep -q '^skip' /tmp/contract.txt
+      - name: Update through Pikkumies, then check again
+        run: |
+          php pikkumies/bin/pikkumies run update --yes < /dev/null
+          php pikkumies/bin/pikkumies doctor
+          test -z "$(git -C pikkumies/hermes status --porcelain)"
+          test ! -e "$HOME/.local/bin/hermes"
