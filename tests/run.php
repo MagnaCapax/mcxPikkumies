@@ -1,6 +1,6 @@
 <?php
 /**
- * Minimal test runner (no dependencies): php tests/run.php
+ * Minimal test runner (no dependencies): php tests/run.php [Name ...] (only files whose name contains a word)
  * Each tests/*Test.php returns an array of name => callable; a callable throws on failure.
  */
 $root = dirname(__DIR__);
@@ -48,7 +48,14 @@ function runPhp($script, array $args, $stdin = '')
 $pass = 0;
 $fail = 0;
 $skipped = 0;
+// php tests/run.php [Name ...]: run only the test files whose base name contains one of the words.
+$only = array_slice($argv, 1);
 foreach (glob(__DIR__ . '/*Test.php') as $file) {
+    if ($only && !array_filter($only, function ($w) use ($file) {
+        return stripos(basename($file, '.php'), $w) !== false;
+    })) {
+        continue;
+    }
     foreach (require $file as $name => $fn) {
         try {
             $fn();
