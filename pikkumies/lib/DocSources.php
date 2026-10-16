@@ -7,9 +7,17 @@
  * article, and searched there together with the lessons (TextSearch). Only the documentation
  * is downloaded; search words never leave the machine. Fetched text is data, not instructions.
  *
- * A source's `scope` names the hosts it is for (Host::TABLE names, `generic`, or `all`); only sources
- * whose scope matches this host's family or stack are downloaded and searched (ADR-0027). `link`
+ * A source's `scope` names the hosts it is for (Host::TABLE names, `generic`, or `all`); sources whose
+ * scope matches this host's family or stack are downloaded and searched (ADR-0027), others only as tier 3. `link`
  * sources are never downloaded: when a search finds nothing, their addresses are offered instead.
+ *
+ * Search tiers (ADR-0031), highest first; a higher tier's hits always come before a lower tier's:
+ * 1 memory on this machine, 2 this host's provider and app documentation (the sources in scope),
+ * 3 other providers' documentation (peer sources: valid, on, scoped to a different provider or stack),
+ * searched only from the copies the background fill made, and 4 deep research on the web, which a
+ * search never runs and only names as the next step. Peer sources are never downloaded in the
+ * foreground; the background fill takes them only after the account's first search with nothing
+ * in tiers 1-2 (local/docs-peer-enabled), at most 50 requests a source a day, refreshed every 30 days.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Detect.php';
@@ -27,6 +35,18 @@ class DocSources
     const FILL_REQUESTS = 300;      // per provider source in the daily background fill (site sources)
     const FILL_REQUESTS_SHARED = 100; // per scope-all source: every server of every provider fetches these
     const FILL_JITTER = 3600;       // seconds: the background fill starts at a random point in this window
+    const PEER_FILL_REQUESTS = 50;  // per peer source per day: another provider's docs, fetched by every account that enabled them
+    const PEER_REFRESH = '30d';     // peer copies are refreshed at most this often
+    /** Search tiers, highest first (ADR-0031). Tier 4 is never run by a search, only named as the next step. */
+    const TIERS = [
+        1 => 'tier 1: memory on this machine (lessons, reference, research notes)',
+        2 => "tier 2: this host's provider and app documentation",
+        3 => "tier 3: other providers' documentation (may not apply to this host)",
+        4 => 'tier 4: deep research on the web (never run by search; the next step when tiers 1-3 do not answer)',
+    ];
+    /** Hermes' web tools: tier 4, which the search-first gate holds until tiers 1-3 were searched this turn. */
+    const WEB_TOOLS = ['web_search', 'web_extract'];
+    const PEER_NOTE = "another provider's documentation: it may not apply to this host; check it on this machine before relying on it";
 
     /** @var string|null test seam: a pikkumies root other than this one */
     public static $root = null;
@@ -165,12 +185,70 @@ class DocSources
     {
         $out = [];
         $host = self::hostProfile();
-        foreach (self::load() as $name => $src) {
-            if ((isset($src['status']) ? $src['status'] : 'on') === 'on' && !self::problems($src) && self::inScope($src, $host)) {
+        foreach (self::valid() as $name => $src) {
+            if (self::inScope($src, $host)) {
                 $out[$name] = $src;
             }
         }
         return $out;
+    }
+
+    /** Sources that are on and have no problems, for any host. */
+    private static function valid()
+    {
+        $out = [];
+        foreach (self::load() as $name => $src) {
+            if ((isset($src['status']) ? $src['status'] : 'on') === 'on' && !self::problems($src)) {
+                $out[$name] = $src;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Tier 3: downloadable sources (not `link`) of other providers and stacks: on, valid, not in this
+     * host's scope, and scoped to at least one Host::TABLE name (so `generic` alone is not a peer).
+     * Searched only from the cache; downloaded only by the background fill once peer fill is enabled.
+     */
+    public static function peers()
+    {
+        $out = [];
+        $host = self::hostProfile();
+        foreach (self::valid() as $name => $src) {
+            if ($src['type'] !== 'link' && self::isPeer($src, $host)) {
+                $out[$name] = $src;
+            }
+        }
+        return $out;
+    }
+
+    /** True when the source is meant for a different provider or stack than this host. */
+    public static function isPeer(array $src, array $host)
+    {
+        $scope = array_map('trim', explode(',', isset($src['scope']) ? $src['scope'] : 'all'));
+        return !self::inScope($src, $host) && (bool) array_intersect($scope, array_keys(Host::TABLE));
+    }
+
+    /** Per account: the background fill takes peer sources only after this file exists. */
+    public static function peerFlagFile()
+    {
+        return self::root() . '/local/docs-peer-enabled';
+    }
+
+    public static function peerFillEnabled()
+    {
+        return is_file(self::peerFlagFile());
+    }
+
+    /** Called after a search found nothing in tiers 1-2; true when this call turned peer fill on. */
+    public static function enablePeerFill()
+    {
+        $file = self::peerFlagFile();
+        if (is_file($file)) {
+            return false;
+        }
+        @mkdir(dirname($file), 0700, true);
+        return @file_put_contents($file, gmdate('c') . " first search with nothing in tiers 1-2\n") !== false;
     }
 
     /** This host's family and stack: the detection cache when there is one, else the cheap checks (no rDNS). */
@@ -327,7 +405,9 @@ class DocSources
      * up to $budgetPerSource more pages (default fillBudget(): fewer for scope-all sources), missing
      * first, then the oldest past their refresh period, at least one second apart. This is the only
      * place `site` sources are downloaded besides an explicit `pikkumies.php refresh`. Other sources
-     * are downloaded only when stale. Returns [[name, ok, message], ...].
+     * are downloaded only when stale. Once peer fill is enabled (peerFillEnabled()), peer sources follow
+     * with at most PEER_FILL_REQUESTS requests each and a PEER_REFRESH period; this is the only place
+     * they are ever downloaded. Returns [[name, ok, message], ...].
      */
     public static function fill($budgetPerSource = null)
     {
@@ -342,6 +422,21 @@ class DocSources
                 continue;
             }
             $out[] = [$name, $ok, $msg];
+        }
+        if (!self::peerFillEnabled()) {
+            return $out;
+        }
+        foreach (self::peers() as $name => $src) {
+            $src['refresh'] = self::PEER_REFRESH;
+            if ($src['type'] === 'site') {
+                $budget = $budgetPerSource !== null ? min((int) $budgetPerSource, self::PEER_FILL_REQUESTS) : self::PEER_FILL_REQUESTS;
+                list($ok, $msg) = DocSite::refresh($src, $budget, true);
+            } elseif (self::isStale($src)) {
+                list($ok, $msg) = self::refresh($src); // mediawiki: at most MAX_REQUESTS (40) requests, kb-json one
+            } else {
+                continue;
+            }
+            $out[] = [$name, $ok, 'peer: ' . $msg];
         }
         return $out;
     }
@@ -432,10 +527,13 @@ class DocSources
     }
 
     /**
-     * Lessons and every active source's cache, ranked together. Unless $offline, stale mediawiki and
-     * kb-json sources are downloaded first; `site` sources never are here (a crawl of up to hundreds
-     * of pages with a Crawl-delay must not hold up a search): only the background fill fetches them.
-     * Returns [hits, notes]; a hit is [path, title, source, trust, url].
+     * Tiers 1-3, each ranked on its own and returned in tier order, at most $limit hits per tier: a
+     * higher tier's hit always comes before a lower tier's, whatever the scores (ADR-0031). All pages
+     * are scored together by TextSearch, so the free-text word weights are the same in every tier.
+     * Unless $offline, stale mediawiki and kb-json sources of this host are downloaded first; `site`
+     * sources never are here (only the background fill fetches them), and peer sources (tier 3) are
+     * never downloaded here at all: only their copies on disk are searched.
+     * Returns [hits, notes, tiers searched]; a hit is [path, title, source, trust, url, tier].
      */
     public static function search($query, $limit, $offline, $share = null)
     {
@@ -443,26 +541,92 @@ class DocSources
         $dirs = [];
         foreach (TextSearch::lessonDirs(self::root()) as $d) {
             // research/ is labelled below lessons: longer findings to verify before relying on them.
-            $dirs[$d] = basename($d) === 'research' ? ['research', 'research'] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons'];
+            $dirs[$d] = basename($d) === 'research' ? ['research', 'research', 1] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons', 1];
         }
         foreach (self::active() as $name => $src) {
             if (!$offline && $src['type'] !== 'site' && self::isStale($src)) {
                 list($ok, $msg) = self::refresh($src);
                 $notes[] = $name . ': ' . ($ok ? 'downloaded ' . $msg : 'download failed, using the old copy (' . $msg . ')');
             }
-            $dirs[self::cacheRoot() . '/' . $name] = [$name, $src['trust']];
+            $dirs[self::cacheRoot() . '/' . $name] = [$name, $src['trust'], 2];
         }
-        $paths = TextSearch::rank(TextSearch::readDirs(array_keys($dirs)), $query, $limit, $share);
-        $hits = [];
-        foreach ($paths as $p) {
-            list($source, $trust) = $dirs[dirname($p)];
-            list($title, $url) = self::pageInfo($p);
-            $hits[] = [$p, $title, $source, $trust, $url];
+        foreach (self::peers() as $name => $src) {
+            $dirs[self::cacheRoot() . '/' . $name] = [$name, $src['trust'], 3];
         }
-        if (!$hits && ($note = self::linkNote()) !== '') {
-            $notes[] = $note;
+        $files = TextSearch::readDirs(array_keys($dirs));
+        $byTier = [1 => [], 2 => [], 3 => []];
+        foreach (TextSearch::rank($files, $query, max(1, count($files)), $share) as $p) {
+            list($source, $trust, $tier) = $dirs[dirname($p)];
+            if (count($byTier[$tier]) < $limit) {
+                list($title, $url) = self::pageInfo($p);
+                $byTier[$tier][] = [$p, $title, $source, $trust, $url, $tier];
+            }
         }
-        return [$hits, $notes];
+        if (!$byTier[1] && !$byTier[2] && ($note = self::linkNote()) !== '') {
+            $notes[] = $note; // nothing from this machine or this host's docs: the provider's own support pages
+        }
+        return [array_merge($byTier[1], $byTier[2], $byTier[3]), $notes, [1, 2, 3]];
+    }
+
+    /** Where the memory search records what it searched; next to the search-first gate's session markers. */
+    public static function searchStateDir()
+    {
+        return self::root() . '/local/state/search-first';
+    }
+
+    /** Written by the memory search when it completes: the time, the tiers it searched and the hits per tier. */
+    public static function recordSearch(array $tiers, array $hitsPerTier)
+    {
+        $dir = self::searchStateDir();
+        @mkdir($dir, 0700, true);
+        $rec = json_encode(['time' => time(), 'tiers' => array_values(array_map('intval', $tiers)), 'hits' => $hitsPerTier]) . "\n";
+        $tmp = $dir . '/.last-search.' . getmypid();
+        if (@file_put_contents($tmp, $rec) === strlen($rec)) {
+            @rename($tmp, $dir . '/last-search.json');
+        } else {
+            @unlink($tmp);
+        }
+    }
+
+    /**
+     * The tiers the memory search covered in this session's current turn, sorted; [] when none.
+     * The search-first gate touches the session marker (local/state/search-first/<sha1(session)>)
+     * when it lets a memory search through, and the pre_llm_call hook touches <marker>.armed when a
+     * new question starts a turn. A turn counts as searched when the marker is not older than the
+     * re-arm and the search's own record (recordSearch) was written at or after the marker, i.e. the
+     * search the gate saw has completed. The record is per account, not per session: a safety prompt
+     * for the agent's own habits, not a security boundary (AGENTS.md).
+     */
+    public static function tiersSearchedThisTurn($sessionId)
+    {
+        $marker = self::searchStateDir() . '/' . sha1((string) $sessionId);
+        clearstatcache();
+        if ((string) $sessionId === '' || !is_file($marker)) {
+            return [];
+        }
+        if (is_file($marker . '.armed') && filemtime($marker) < filemtime($marker . '.armed')) {
+            return [];
+        }
+        $rec = json_decode((string) @file_get_contents(self::searchStateDir() . '/last-search.json'), true);
+        if (!is_array($rec) || !isset($rec['time'], $rec['tiers']) || !is_array($rec['tiers']) || (int) $rec['time'] < filemtime($marker)) {
+            return [];
+        }
+        $tiers = array_values(array_unique(array_map('intval', $rec['tiers'])));
+        sort($tiers);
+        return $tiers;
+    }
+
+    /** The search-first gate's question for WEB_TOOLS: have tiers 1-3 been searched this turn? */
+    public static function webResearchAllowed($sessionId)
+    {
+        return !array_diff([1, 2, 3], self::tiersSearchedThisTurn($sessionId));
+    }
+
+    /** The block message for a web tool called before tiers 1-3 were searched this turn. */
+    public static function webGateMessage()
+    {
+        return "Pikkumies search first: the web is tier 4. Search tiers 1-3 (memory, this host's documentation, other providers' documentation) first:\n"
+            . 'php ' . self::root() . "/tools/memory/pikkumies/pikkumies.php search \"<a few technical words>\"\nUse the web only when they do not answer.";
     }
 
     /** The support pages of this host's provider, for when nothing on the machine answers; '' when none. */

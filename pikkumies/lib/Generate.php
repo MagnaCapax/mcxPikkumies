@@ -1,6 +1,7 @@
 <?php
 /**
- * Generate: write the Hermes skills and tools/INDEX.md from the tool units (ADR-0015).
+ * Generate: write the Hermes skills and tools/INDEX.md from the tool units (ADR-0015), and
+ * hooks/INDEX.md from the hook units (ADR-0030).
  *
  * Runs on install, update and every `pikkumies run`. Under a lock, each file is written only when
  * its content changed, through a temporary file and a rename, so a Hermes session that is running
@@ -9,6 +10,7 @@
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Units.php';
+require_once __DIR__ . '/HookUnits.php';
 
 class Generate
 {
@@ -69,6 +71,21 @@ class Generate
         }
         if ($result['error'] === '' && self::writeIfChanged($indexFile, Units::renderIndex($listed)) === null) {
             $result['error'] = "cannot write $indexFile";
+        }
+        // hooks/ beside tools/; a tools dir without one (a test tree) gets no hook index.
+        $hooksDir = dirname($toolsDir) . '/hooks';
+        if ($result['error'] === '' && is_dir($hooksDir)) {
+            $hooks = [];
+            foreach (HookUnits::all($hooksDir) as $h) {
+                if ($h['errors']) {
+                    $result['problems']["hooks/{$h['category']}/{$h['name']}"] = $h['errors'];
+                } else {
+                    $hooks[] = $h;
+                }
+            }
+            if (self::writeIfChanged("$hooksDir/INDEX.md", HookUnits::renderIndex($hooks)) === null) {
+                $result['error'] = "cannot write $hooksDir/INDEX.md";
+            }
         }
         flock($lock, LOCK_UN);
         fclose($lock);

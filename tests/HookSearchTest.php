@@ -6,7 +6,7 @@ if (!function_exists('hookSearchTree')) {
     {
         $tmp = sys_get_temp_dir() . '/pk-hook-' . getmypid() . '-' . mt_rand();
         $src = dirname(__DIR__) . '/pikkumies';
-        foreach (['lib', 'hooks/pre_llm_call', 'hooks/pre_tool_call', 'tools/memory/pikkumies', 'config'] as $d) {
+        foreach (['lib', 'hooks/search/search-first', 'hooks/search/search-first-gate', 'tools/memory/pikkumies', 'config'] as $d) {
             @mkdir("$tmp/pikkumies/$d", 0700, true);
             foreach ((array) glob("$src/$d/*.*") as $f) {
                 copy($f, "$tmp/pikkumies/$d/" . basename($f));
@@ -24,7 +24,7 @@ if (!function_exists('hookSearchTree')) {
 
     function hookSearchRun($tree, array $payload)
     {
-        list(, $out) = runPhp("$tree/pikkumies/hooks/pre_llm_call/search-first.php", [], json_encode($payload));
+        list(, $out) = runPhp("$tree/pikkumies/hooks/search/search-first/search-first.php", [], json_encode($payload));
         $d = json_decode($out, true);
         return is_array($d) && isset($d['context']) ? $d['context'] : (trim($out) === '' ? '' : 'UNPARSED: ' . $out);
     }
@@ -37,7 +37,7 @@ if (!function_exists('hookSearchTree')) {
     function hookSearchGateBlocks($tree, $session, $tool, $cmd = null)
     {
         $p = ['hook_event_name' => 'pre_tool_call', 'session_id' => $session, 'tool_name' => $tool, 'tool_input' => $cmd === null ? ['path' => 'x'] : ['command' => $cmd]];
-        list(, $out) = runPhp("$tree/pikkumies/hooks/pre_tool_call/search-first-gate.php", [], json_encode($p));
+        list(, $out) = runPhp("$tree/pikkumies/hooks/search/search-first-gate/search-first-gate.php", [], json_encode($p));
         $d = json_decode($out, true);
         return is_array($d) && isset($d['action']) && $d['action'] === 'block';
     }
@@ -207,11 +207,29 @@ return [
             $cfg();
             file_put_contents("$fake/mode", 'sleep');
             $t0 = microtime(true);
-            list($code, $out) = runPhp("$tree/pikkumies/hooks/pre_llm_call/search-first.php", [], json_encode(hookSearchTurn('s6', $question, false)));
+            list($code, $out) = runPhp("$tree/pikkumies/hooks/search/search-first/search-first.php", [], json_encode(hookSearchTurn('s6', $question, false)));
             check($code === 0 && trim($out) === '' && microtime(true) - $t0 < 8.5, 'timeout must be silent and bounded: ' . $out);
         } finally {
             proc_terminate($proc, 9);
             proc_close($proc);
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'search gate: web tools stay blocked until this turn\'s search covered tiers 1-3, even when the session marker opens other tools' => function () {
+        $tree = hookSearchTree([]);
+        try {
+            $dir = "$tree/pikkumies/local/state/search-first";
+            @mkdir($dir, 0700, true);
+            check(hookSearchGateBlocks($tree, 'w1', 'web_search'), 'web_search ran before any search');
+            touch("$dir/" . sha1('w1'), time() - 20); // the gate let a search through, its record is not written yet
+            check(!hookSearchGateBlocks($tree, 'w1', 'terminal', 'ls'), 'the session marker did not open an ordinary tool');
+            check(hookSearchGateBlocks($tree, 'w1', 'web_extract'), 'web_extract ran on the session marker alone');
+            file_put_contents("$dir/last-search.json", json_encode(['time' => time(), 'tiers' => [1, 2], 'hits' => []]) . "\n");
+            check(hookSearchGateBlocks($tree, 'w1', 'web_search'), 'web_search ran after tiers 1-2 only');
+            file_put_contents("$dir/last-search.json", json_encode(['time' => time(), 'tiers' => [1, 2, 3], 'hits' => []]) . "\n");
+            check(!hookSearchGateBlocks($tree, 'w1', 'web_search'), 'web_search still blocked after a search of tiers 1-3');
+            check(hookSearchGateBlocks($tree, 'w2', 'web_search'), 'another session inherited the search');
+        } finally {
             exec('rm -rf ' . escapeshellarg($tree));
         }
     },

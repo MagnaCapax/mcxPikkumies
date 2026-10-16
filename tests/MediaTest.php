@@ -114,7 +114,7 @@ return [
         }
     },
     'media units: the USAGE examples get no answer from the guard hook (nothing in them deletes)' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+        $hook = dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php';
         $n = 0;
         foreach (['jellyfin', 'emby', 'plex'] as $unit) {
             $usage = (string) file_get_contents(dirname(__DIR__) . "/pikkumies/tools/media-servers/$unit/USAGE.md");

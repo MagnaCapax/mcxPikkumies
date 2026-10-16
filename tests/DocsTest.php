@@ -4,7 +4,7 @@ function docsTree()
 {
     $tmp = sys_get_temp_dir() . '/pk-docs-' . getmypid() . '-' . mt_rand();
     $src = dirname(__DIR__) . '/pikkumies';
-    foreach (['lib', 'hooks/pre_llm_call', 'hooks/pre_tool_call', 'tools/memory/pikkumies', 'config'] as $d) {
+    foreach (['lib', 'hooks/search/search-first', 'hooks/search/search-first-gate', 'tools/memory/pikkumies', 'config'] as $d) {
         @mkdir("$tmp/pikkumies/$d", 0700, true);
         foreach ((array) glob("$src/$d/*.*") as $f) {
             copy($f, "$tmp/pikkumies/$d/" . basename($f));
@@ -19,6 +19,28 @@ function docsHook($tree, $hook, array $payload)
 {
     list(, $out) = runPhp("$tree/pikkumies/hooks/$hook", [], json_encode($payload));
     return $out;
+}
+
+/** Search tiers (ADR-0031): own kb + an app manual (tier 2), a peer site and a peer kb (tier 3), a peer link. */
+function docsTierTree()
+{
+    $tree = docsTree();
+    file_put_contents("$tree/pikkumies/config/documentationSources.md", "# tiers\n\n"
+        . "## own-kb\n- type: kb-json\n- url: https://own.example.org/kb.json\n- trust: official\n- scope: pmss\n- refresh: 1d\n\n"
+        . "## app-handbook\n- type: site\n- url: https://handbook.example.org/sitemap.xml\n- trust: community\n- scope: all\n- refresh: 30d\n\n"
+        . "## peer-wiki\n- type: site\n- url: https://peer.example.org/sitemap.xml\n- trust: official\n- scope: feral\n- refresh: 7d\n\n"
+        . "## peer-kb\n- type: kb-json\n- url: https://peerkb.example.org/kb.json\n- trust: official\n- scope: whatbox\n- refresh: 1d\n\n"
+        . "## peer-link\n- type: link\n- url: https://peer.example.org/support\n- trust: official\n- scope: feral\n");
+    return $tree;
+}
+
+/** A cached documentation page as the downloads write it. */
+function docsTierPage($tree, $source, $trust, $slug, $title, $text)
+{
+    @mkdir("$tree/pikkumies/local/docs-cache/$source", 0700, true);
+    $page = DocSources::renderPage(['name' => $source, 'trust' => $trust], ['title' => $title, 'url' => "https://$source.example.org/$slug", 'text' => $text, 'updated' => '']);
+    file_put_contents("$tree/pikkumies/local/docs-cache/$source/$slug.md", $page);
+    return "$tree/pikkumies/local/docs-cache/$source/$slug.md";
 }
 
 $kbFixture = json_encode(['_meta' => ['built' => '2026-10-08T00:00:00+00:00'], 'categories' => [
@@ -229,19 +251,19 @@ return [
         @mkdir("$tree/pikkumies/local/docs-cache/kb", 0700, true);
         file_put_contents("$tree/pikkumies/local/documentationSources.md", "## kb\n- type: kb-json\n- url: https://example.org/kb.json\n- trust: official\n");
         file_put_contents("$tree/pikkumies/local/docs-cache/kb/disk-full.md", "---\ntitle: \"Disk full\"\nurl: \"https://example.org/x\"\n---\n# Disk full\n\nSECRET-BODY-TEXT rtorrent stops when the disk is full.\n");
-        $out = docsHook($tree, 'pre_llm_call/search-first.php', ['hook_event_name' => 'pre_llm_call', 'session_id' => 's', 'extra' => ['is_first_turn' => true, 'user_message' => 'rtorrent stopped, disk full?']]);
+        $out = docsHook($tree, 'search/search-first/search-first.php', ['hook_event_name' => 'pre_llm_call', 'session_id' => 's', 'extra' => ['is_first_turn' => true, 'user_message' => 'rtorrent stopped, disk full?']]);
         $d = json_decode($out, true);
         check(is_array($d) && strpos($d['context'], 'tools/memory/pikkumies/pikkumies.php search') !== false, 'no instruction: ' . $out);
         check(strpos($d['context'], '[official] kb: Disk full') !== false && strpos($d['context'], 'SECRET-BODY-TEXT') === false, 'hits wrong or page text leaked: ' . $d['context']);
         check(strlen($d['context']) <= 1500, 'context too long');
-        $multi = json_decode(docsHook($tree, 'pre_llm_call/search-first.php', ['extra' => ['is_first_turn' => true, 'user_message' => [['type' => 'text', 'text' => 'disk full']]]]), true);
+        $multi = json_decode(docsHook($tree, 'search/search-first/search-first.php', ['extra' => ['is_first_turn' => true, 'user_message' => [['type' => 'text', 'text' => 'disk full']]]]), true);
         check(strpos($multi['context'], 'Disk full') !== false, 'multimodal message not searched');
-        check(trim(docsHook($tree, 'pre_llm_call/search-first.php', ['extra' => ['is_first_turn' => false, 'user_message' => 'x']])) === '', 'fired after the first turn');
+        check(trim(docsHook($tree, 'search/search-first/search-first.php', ['extra' => ['is_first_turn' => false, 'user_message' => 'x']])) === '', 'fired after the first turn');
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'search-first gate: blocks acting tools until the memory search runs, per session; switch turns it off' => function () {
         $tree = docsTree();
-        $gate = 'pre_tool_call/search-first-gate.php';
+        $gate = 'search/search-first-gate/search-first-gate.php';
         $call = function ($session, $tool, $cmd = null) use ($tree, $gate) {
             $p = ['hook_event_name' => 'pre_tool_call', 'session_id' => $session, 'tool_name' => $tool, 'tool_input' => $cmd === null ? ['path' => 'x'] : ['command' => $cmd]];
             $d = json_decode(docsHook($tree, $gate, $p), true);
@@ -259,5 +281,180 @@ return [
         file_put_contents("$tree/pikkumies/local/config.php", "<?php return ['searchFirst' => ['disabled' => true]];\n");
         check(!$call('s3', 'write_file'), 'searchFirst.disabled ignored');
         exec('rm -rf ' . escapeshellarg($tree));
+    },
+    'search tiers: peers are other providers\' downloadable sources; app manuals stay tier 2; links and generic-only scopes are not peers' => function () {
+        $tree = docsTree(); // the shipped sources
+        DocSources::$root = "$tree/pikkumies";
+        try {
+            DocSources::$host = ['family' => 'pmss', 'stack' => 'pmss'];
+            $peers = DocSources::peers();
+            check(isset($peers['feral-wiki'], $peers['whatbox-wiki']) && !isset($peers['feral-support']) && !isset($peers['rtorrent-wiki']) && !isset($peers['pm-wiki']), 'pmss peers: ' . implode(',', array_keys($peers)));
+            check(!isset($peers['rapidseedbox-help']), 'a source that is off became a peer');
+            DocSources::$host = ['family' => 'feral', 'stack' => 'none'];
+            $peers = DocSources::peers();
+            check(isset($peers['pm-wiki'], $peers['pm-kb']) && !isset($peers['feral-wiki']) && !isset($peers['pm-support']), 'feral peers: ' . implode(',', array_keys($peers)));
+            check(!DocSources::isPeer(['scope' => 'generic'], ['family' => 'pmss', 'stack' => 'pmss']), 'a generic-only source counted as another provider');
+        } finally {
+            DocSources::$root = null;
+            DocSources::$host = null;
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'search tiers: a lesson outranks a higher-scoring community page by tier; peer pages come after own-provider hits and carry their tier' => function () {
+        $tree = docsTierTree();
+        DocSources::$root = "$tree/pikkumies";
+        DocSources::$host = ['family' => 'pmss', 'stack' => 'pmss'];
+        try {
+            @mkdir("$tree/pikkumies/memory/lessons/rtorrent", 0700, true);
+            $lesson = "$tree/pikkumies/memory/lessons/rtorrent/20261016-long-notes.md";
+            file_put_contents($lesson, "# Notes from the week\n\n" . str_repeat('Assorted notes about the seedbox and its many services. ', 60) . "Once rtorrent stopped because the disk was full.\n");
+            $community = docsTierPage($tree, 'app-handbook', 'community', 'disk-full', 'rtorrent disk full', 'rtorrent stops when the disk is full.');
+            $own = docsTierPage($tree, 'own-kb', 'official', 'space', 'Storage space', 'When the disk is full rtorrent pauses. ' . str_repeat('Quota and storage details. ', 20));
+            $peer = docsTierPage($tree, 'peer-wiki', 'official', 'disk-full', 'rtorrent disk full', 'rtorrent disk full: free space first.');
+            // Without tiers the community and peer pages would win on score: the test is only meaningful if they do.
+            $plain = TextSearch::rank(TextSearch::readDirs([dirname($lesson), dirname($community), dirname($own), dirname($peer)]), 'rtorrent disk full', 10);
+            check(array_search($community, $plain, true) < array_search($lesson, $plain, true) && array_search($peer, $plain, true) < array_search($lesson, $plain, true), 'fixture: the lesson already scores highest: ' . implode(' ', array_map('basename', $plain)));
+            list($hits, $notes, $tiers) = DocSources::search('rtorrent disk full', 5, true);
+            $got = array_map(function ($h) {
+                return $h[5] . ':' . $h[2];
+            }, $hits);
+            check($got === ['1:lessons', '2:app-handbook', '2:own-kb', '3:peer-wiki'] || $got === ['1:lessons', '2:own-kb', '2:app-handbook', '3:peer-wiki'], 'tier order: ' . implode(' ', $got));
+            check($hits[0][0] === $lesson && $hits[3][3] === 'official' && $tiers === [1, 2, 3], 'lesson first, peer keeps its trust label, tiers recorded: ' . json_encode([$hits[0][0], $hits[3][3], $tiers]));
+            check(strpos(implode(' ', $notes), 'peer.example.org/support') === false, 'a peer provider\'s support link was offered');
+            list($one) = DocSources::search('rtorrent disk full', 1, true);
+            check(array_map(function ($h) {
+                return $h[5];
+            }, $one) === [1, 2, 3], 'the limit is per tier: ' . json_encode($one));
+        } finally {
+            DocSources::$root = null;
+            DocSources::$host = null;
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'search tiers: peer sources are never downloaded by a search; the fill takes them only once enabled, 50 requests a source at most' => function () use ($kbFixture) {
+        $tree = docsTierTree();
+        DocSources::$root = "$tree/pikkumies";
+        DocSources::$host = ['family' => 'pmss', 'stack' => 'pmss'];
+        DocSite::$sleep = function () {
+        };
+        $sitemap = '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+        for ($i = 1; $i <= 60; $i++) {
+            $sitemap .= "<url><loc>https://peer.example.org/p$i</loc></url>";
+        }
+        $sitemap .= '</urlset>';
+        $log = [];
+        DocSources::$fetcher = function ($url) use (&$log, $kbFixture, $sitemap) {
+            $log[] = $url;
+            $host = parse_url($url, PHP_URL_HOST);
+            if ($host === 'own.example.org' || $host === 'peerkb.example.org') {
+                return $kbFixture;
+            }
+            if ($url === 'https://peer.example.org/robots.txt') {
+                return "User-agent: *\nDisallow:\n";
+            }
+            if ($url === 'https://peer.example.org/sitemap.xml') {
+                return $sitemap;
+            }
+            if ($host === 'peer.example.org') {
+                return '<title>Peer page</title><main>peer text</main>';
+            }
+            return ['code' => 404];
+        };
+        $peerRequests = function () use (&$log) {
+            return count(array_filter($log, function ($u) {
+                return in_array(parse_url($u, PHP_URL_HOST), ['peer.example.org', 'peerkb.example.org'], true);
+            }));
+        };
+        try {
+            DocSources::enablePeerFill(); // even when enabled, a search never downloads a peer source
+            list(, $notes) = DocSources::search('refund policy', 5, false);
+            check(in_array('https://own.example.org/kb.json', $log, true), 'the stale own source was not refreshed: ' . implode(' ', $log) . ' ' . implode(' | ', $notes));
+            check($peerRequests() === 0, 'a search downloaded a peer source: ' . implode(' ', $log));
+            unlink(DocSources::peerFlagFile());
+            $log = [];
+            $rows = DocSources::fill();
+            check($peerRequests() === 0 && !array_filter($rows, function ($r) {
+                return strpos($r[0], 'peer-') === 0;
+            }), 'the fill took peer sources before peer fill was enabled: ' . implode(' ', $log));
+            check(DocSources::enablePeerFill() && !DocSources::enablePeerFill(), 'enable must report only the first time');
+            $log = [];
+            $rows = DocSources::fill();
+            $peerSite = count(array_filter($log, function ($u) {
+                return parse_url($u, PHP_URL_HOST) === 'peer.example.org';
+            }));
+            check($peerSite === DocSources::PEER_FILL_REQUESTS && in_array('https://peerkb.example.org/kb.json', $log, true), "peer fill: $peerSite site requests; " . json_encode($rows));
+            check(count(glob("$tree/pikkumies/local/docs-cache/peer-wiki/*.md")) === DocSources::PEER_FILL_REQUESTS - 2, 'peer pages on disk: ' . count(glob("$tree/pikkumies/local/docs-cache/peer-wiki/*.md")));
+            list($hits) = DocSources::search('refund policy', 5, true);
+            check($hits && end($hits)[2] === 'peer-kb' && end($hits)[5] === 3 && $hits[0][5] === 2, 'peer copies not searched as tier 3: ' . json_encode($hits));
+            $log = [];
+            DocSources::fill();
+            check(!in_array('https://peerkb.example.org/kb.json', $log, true), 'a fresh peer copy was fetched again within 30 days: ' . implode(' ', $log));
+        } finally {
+            DocSources::$fetcher = null;
+            DocSources::$root = null;
+            DocSources::$host = null;
+            DocSite::$sleep = null;
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'search tiers: the memory search groups by tier, enables peer fill only after a tier-1/2 miss, and records the tiers for the gate' => function () {
+        $tree = docsTierTree();
+        file_put_contents("$tree/pikkumies/local/config.php", "<?php return ['host' => ['family' => 'pmss', 'stack' => 'pmss']];\n");
+        @mkdir("$tree/pikkumies/memory/lessons/rtorrent", 0700, true);
+        file_put_contents("$tree/pikkumies/memory/lessons/rtorrent/20261016-disk-full.md", "# rtorrent stops on a full disk\n\nFree space, then start rtorrent.\n");
+        DocSources::$root = "$tree/pikkumies";
+        docsTierPage($tree, 'own-kb', 'official', 'disk', 'Disk full', 'rtorrent and a full disk.');
+        docsTierPage($tree, 'peer-wiki', 'official', 'zebra', 'Zebra quantum tuning', 'zebra quantum settings for another provider.');
+        DocSources::$root = null;
+        $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+        $flag = "$tree/pikkumies/local/docs-peer-enabled";
+        $record = "$tree/pikkumies/local/state/search-first/last-search.json";
+        try {
+            list($code, $out) = runPhp($tool, ['search', 'rtorrent', 'disk', 'full', '--offline']);
+            $l = cliLines($out);
+            $status = $l[count($l) - 1];
+            check($code === 0 && $l[0]['tier'] === 1 && strpos($l[0]['heading'], 'tier 1') === 0 && $l[1]['tier'] === 2 && strpos($l[1]['heading'], 'tier 2') === 0, 'groups: ' . $out);
+            check($status['tiers_searched'] === [1, 2, 3] && !isset($status['next']), 'status: ' . $out);
+            check(!is_file($flag), 'peer fill enabled although tiers 1-2 answered');
+            $rec = json_decode((string) @file_get_contents($record), true);
+            check(is_array($rec) && $rec['tiers'] === [1, 2, 3] && $rec['time'] >= time() - 60, 'record: ' . json_encode($rec));
+            list($code, $out) = runPhp($tool, ['search', 'zebra', 'quantum', '--offline']);
+            $l = cliLines($out);
+            $status = $l[count($l) - 1];
+            check($code === 0 && $l[0]['tier'] === 3 && $l[0]['source'] === 'peer-wiki' && $l[0]['trust'] === 'official' && strpos($l[0]['note'], 'may not apply to this host') !== false && strpos($l[0]['heading'], 'tier 3') === 0, 'peer hit: ' . $out);
+            check(is_file($flag) && strpos(implode(' ', $status['notes']), 'background fill') !== false && strpos($status['next'], 'tier 4') !== false, 'peer fill not enabled after a tier-1/2 miss, or no next step: ' . $out);
+            list(, $out) = runPhp($tool, ['search', 'nginx', 'certificate', '--offline']);
+            $l = cliLines($out);
+            check(count($l) === 1 && strpos($l[0]['next'], 'deep research') !== false, 'no hit must name tier 4: ' . $out);
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'search tiers: the gate function opens web tools only after a completed search of tiers 1-3 in this turn' => function () {
+        $tree = docsTree();
+        DocSources::$root = "$tree/pikkumies";
+        try {
+            $dir = DocSources::searchStateDir();
+            @mkdir($dir, 0700, true);
+            $marker = $dir . '/' . sha1('s1');
+            check(DocSources::tiersSearchedThisTurn('s1') === [] && !DocSources::webResearchAllowed('s1'), 'open without any search');
+            touch($marker, time() - 20); // the gate let a search through ...
+            check(DocSources::tiersSearchedThisTurn('s1') === [], 'open before the search completed');
+            DocSources::recordSearch([3, 1, 2], [1 => 0, 2 => 1, 3 => 0]); // ... and it completed
+            check(DocSources::tiersSearchedThisTurn('s1') === [1, 2, 3] && DocSources::webResearchAllowed('s1'), 'closed after a search of tiers 1-3');
+            check(DocSources::tiersSearchedThisTurn('s2') === [] && DocSources::tiersSearchedThisTurn('') === [], 'another session or no session inherited the search');
+            touch($marker . '.armed', time() - 10); // a new question re-armed the turn
+            check(!DocSources::webResearchAllowed('s1'), 'a re-armed turn kept the old search');
+            touch($marker, time() + 30); // the gate let the next search through; its record is not written yet
+            check(!DocSources::webResearchAllowed('s1'), 'the previous search\'s record counted for a search that has not completed');
+            touch($marker, time() - 5);
+            DocSources::recordSearch([1, 2], []);
+            check(DocSources::tiersSearchedThisTurn('s1') === [1, 2] && !DocSources::webResearchAllowed('s1'), 'tiers 1-2 alone opened the web');
+            DocSources::recordSearch([1, 2, 3], []);
+            check(DocSources::webResearchAllowed('s1') && strpos(DocSources::webGateMessage(), 'pikkumies.php search') !== false, 'gate message or reopen');
+        } finally {
+            DocSources::$root = null;
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
     },
 ];

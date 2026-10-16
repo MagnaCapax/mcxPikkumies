@@ -1,6 +1,6 @@
 <?php
 /**
- * Hermes shell hook (pre_tool_call): blocks obviously destructive terminal commands and tells
+ * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): blocks obviously destructive terminal commands and tells
  * the agent to ask the user first; data deletes the user may want (backup prunes, torrent data)
  * go to Hermes' human-approval gate instead (ADR-0020). Reads the hook JSON on stdin, prints a
  * JSON decision on stdout (agent/shell_hooks.py _parse_pre_tool_call).

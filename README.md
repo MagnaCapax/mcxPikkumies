@@ -27,6 +27,14 @@ key=your-key
 
 Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
+On a terminal, the install and the first session ask what to call your agent, and the first interactive session shows the [terms of service](https://pulsedmedia.com/terms.php) and [privacy policy](https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy) and starts only once you accept them. Flags answer every question, so a scripted install (PMSS) asks nothing:
+
+```sh
+~/.mcxPikkumies/pikkumies/bin/pikkumies install --name=Helper --accept-terms --telemetry=on --perf-logging=on --retention-days=0
+```
+
+`--retention-days=0` keeps session history forever (the default); a number of days lets Hermes prune older ended sessions. Telemetry and performance logging are settings only for now: nothing is sent or logged. Runs without a terminal (cron, scripts, piped one-shot prompts) never ask and are never blocked. The settings can be reviewed and changed later with the `pikkumies-configure` skill (ADR-0032).
+
 ## Update
 
 ```sh
@@ -48,8 +56,18 @@ Install also adds a daily `pikkumies update` to your own crontab (one tagged lin
 | `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
 | `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
 | `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …) |
+| `pikkumies tmux [1-9]` | Open window `pmN` (default `pm1`) of the tmux session `pikkumies`, running `pikkumies`; the session and the window are created when missing. Without tmux it says so |
 
 Any number of `pikkumies` instances can run at once in one account: they share `HERMES_HOME` on purpose (so sessions, memory and auth live in one place) and Hermes itself is built for several writers at a time; everything *pikkumies* regenerates on every run is written under a lock or through an atomic rename, so two instances starting together never race each other (ADR-0022).
+
+To keep several sessions one keystroke away, add aliases to your `~/.bashrc` (the installer does not add them):
+
+```sh
+alias pm1='pikkumies tmux 1'
+alias pm2='pikkumies tmux 2'   # ... up to pm9
+```
+
+`pm2` attaches to the `pikkumies` tmux session at window `pm2`, starting a new agent session there if that window is not open yet; detach with `Ctrl-b d` and the sessions keep running.
 
 ## What it is meant to be
 
@@ -69,7 +87,7 @@ pikkumies/            the runtime (~/pikkumies)
   lib/                core PHP
   tools/<category>/<tool>/  tool units: skill.md, USAGE.md, README.md, <tool>.php; INDEX.md is generated
   skills/             core skills not yet moved into units (Hermes SKILL.md format)
-  hooks/<event>/      safety hooks run by the agent (PHP, JSON in and out)
+  hooks/<category>/<hook>/  hook units: hook.md, README.md, <hook>.php; orchestrator.php runs them per event; INDEX.md is generated
   config/             documentationSources.md: the wikis and knowledge bases it searches
   doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)

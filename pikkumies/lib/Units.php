@@ -46,6 +46,25 @@ class Units
         return $units;
     }
 
+    /**
+     * Category rules for the agent: tools/<category>/DOCTRINE.md of every category not in $disabled,
+     * as [category => text], sorted by category. They go into SOUL.md (ADR-0029); a disabled
+     * category's rules disappear with its skills.
+     */
+    public static function doctrines(array $disabled = [], $toolsDir = null)
+    {
+        $out = [];
+        foreach ((array) glob(($toolsDir ?: self::toolsDir()) . '/*/DOCTRINE.md') as $file) {
+            $category = basename(dirname($file));
+            $text = trim((string) @file_get_contents($file));
+            if ($text !== '' && !in_array($category, $disabled, true)) {
+                $out[$category] = $text;
+            }
+        }
+        ksort($out);
+        return $out;
+    }
+
     /** "---\nkey: value\n---\nbody" -> [[key => value], body]. Values may be "quoted". */
     public static function frontmatter($text)
     {

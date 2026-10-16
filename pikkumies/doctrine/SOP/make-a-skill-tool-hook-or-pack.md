@@ -8,7 +8,7 @@ One page for contributors and for the agent itself. Checked against Hermes Agent
 |---|---|---|
 | A command the agent runs, with the procedure for using it | a tool unit | `pikkumies/tools/<category>/<tool>/` |
 | A procedure without its own command | a tool unit without a script | `pikkumies/tools/<category>/<name>/` |
-| A check on every tool call | a hook | `pikkumies/hooks/<event>/<name>.php` |
+| A check on every tool call | a hook unit | `pikkumies/hooks/<category>/<hook>/` |
 | How a problem got solved | a lesson, not any of the above | the memory skill (`pikkumies save`) |
 | A wiki or knowledge base the agent should search | a documentation source | a section in `pikkumies/config/documentationSources.md` (shipped) or `~/pikkumies/local/documentationSources.md` (one machine) |
 
@@ -55,13 +55,39 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 
 ## Hook
 
-`hooks/<event>/<name>.php` runs on every matching event. Two events are used: `pre_tool_call` (before each tool call; can block it or ask the user) and `pre_llm_call` (before each turn; can add text to the user's message).
+Every hook is one directory, laid out like a tool unit (ADR-0030). Hermes runs one entry per event, `hooks/orchestrator.php <event>`; it runs the units of that event in name order, each with its own timeout, and merges their answers the way Hermes merges hooks. Install, update and every run list the units in `hooks/INDEX.md` (generated, never tracked).
+
+```text
+pikkumies/hooks/guard/guard-destructive/
+  hook.md                for the orchestrator: event, failure mode, timeout
+  README.md              for people: what it checks and what it answers
+  guard-destructive.php  the hook: JSON on stdin, one JSON answer on stdout
+```
+
+**hook.md**: frontmatter with exactly `name` (equal to the directory), `event`, `description`, `failClosed` and `timeout`, then a short note.
+
+```markdown
+---
+name: guard-destructive
+event: pre_tool_call
+description: Blocks obviously destructive terminal commands and asks the user about data deletes.
+failClosed: true
+timeout: 10
+---
+```
+
+- `event` is `pre_tool_call` (before each tool call; can block it or ask the user) or `pre_llm_call` (before each turn; can add text to the user's message).
+- `failClosed: true` (only for `pre_tool_call`): if the hook crashes, times out, exits non-zero without an answer or prints something that is not a JSON object, the call is blocked. Use it only for a hook whose silence would let real damage through, like the delete guard; `false` lets the call run when the hook fails.
+- `timeout` is whole seconds, 1 to 60. The Hermes entry of an event gets the sum of its units' timeouts plus 2 seconds (at most 300), so keep hooks fast.
+
+**The hook**:
 
 - Input on stdin is JSON: `hook_event_name`, `tool_name`, `tool_input` (the tool's arguments), `session_id`, `cwd`, and `extra` with the event's own fields (for `pre_llm_call`: `user_message`, `is_first_turn`).
 - To add text to the turn from `pre_llm_call`, print `{"context":"..."}`; keep it short, it goes to the model every time.
 - To stop a tool call, print `{"action":"block","message":"..."}`. To make Hermes ask the user, print `{"action":"approve","message":"...","rule_key":"..."}`: put the exact command in the message (the prompt shows only the message) and make `rule_key` specific to that command, or one "always" answer approves every later call of the tool.
-- Anything else means no opinion and the call runs. If a hook errors or times out (10 seconds), the call runs, except for the delete guard, which is registered `fail_closed`. Hooks are safety prompts for the agent's own mistakes, not security; limits that must hold come from the OS.
-- Filter on `tool_name` inside the script and exit quietly otherwise (see `hooks/pre_tool_call/guard-destructive.php`).
+- Anything else means no opinion and the call runs. With several hooks on one event, a block wins over any approve, the first approve (in name order) wins over later ones, and `pre_llm_call` texts are joined (at most 9000 characters in total). Hooks are safety prompts for the agent's own mistakes, not security; limits that must hold come from the OS.
+- Filter on `tool_name` inside the script and exit quietly otherwise (see `hooks/guard/guard-destructive/guard-destructive.php`).
+- Each run is logged to `local/logs/hooks/YYYYMMDD.jsonl` (unit, milliseconds, outcome; never the payload; 7 days kept): look there when a hook is slow or failing.
 - Shipped hooks are registered without a consent prompt (`hooks_auto_accept`), which is why only reviewed repository code may add one.
 
 ## Before you commit

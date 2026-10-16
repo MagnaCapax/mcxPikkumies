@@ -1,0 +1,5 @@
+- The repository password is typed by the user at a terminal (`login`), never in chat or on a command line. Never read `local/secrets/`.
+- Removing snapshots: `show --prune-plan --keep-...` first, then `prune --keep-... --expect <n>`; the user approves once for the whole batch.
+- Restore only into a new or empty directory inside the home, never into a FUSE mount, never over existing files. To put a file back, the user moves it with `mv -n`.
+- `check` never repairs; `--read-data` only when asked. `finished: false` says nothing about damage.
+- The tools never delete the restic/borg cache. "disk quota exceeded" during a backup is often that cache; its cleanup (`restic cache --cleanup`, `borg delete --cache-only`) is the user's command.

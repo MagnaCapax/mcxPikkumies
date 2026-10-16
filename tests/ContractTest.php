@@ -129,7 +129,7 @@ return [
     },
     'units: removed commands are not mentioned in units, doctrine or docs' => function () {
         $root = dirname(__DIR__);
-        $files = array_merge((array) glob("$root/pikkumies/tools/*/*/*.md"), (array) glob("$root/pikkumies/doctrine/*.md"), (array) glob("$root/pikkumies/doctrine/SOP/*.md"), (array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/skills/*/SKILL.md"), (array) glob("$root/pikkumies/hooks/*/*.php"), ["$root/README.md", "$root/AGENTS.md"]);
+        $files = array_merge((array) glob("$root/pikkumies/tools/*/*/*.md"), (array) glob("$root/pikkumies/doctrine/*.md"), (array) glob("$root/pikkumies/doctrine/SOP/*.md"), (array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/skills/*/SKILL.md"), (array) glob("$root/pikkumies/hooks/*/*/*.php"), ["$root/README.md", "$root/AGENTS.md"]);
         foreach ($files as $f) {
             $text = (string) @file_get_contents($f);
             check(!preg_match('#\bpacks/|pikkumies packs\b|tools/system/status\.php#', $text), basename(dirname($f)) . '/' . basename($f) . ' still mentions packs or a moved tool path');

@@ -1,0 +1,6 @@
+- Ids are the client's own ids as `list` prints them; names are never ids (find one with `list --search <text>`). `remove` takes full ids only.
+- No "all": every verb names its torrents.
+- Deleting data: `show <id>... --files` first, show the user the files and the `--expect` value, then `remove <id>... --with-data --expect <that value>`: one call, one approval.
+- The shared-file check sees only the client being called: when two clients seed the same files, check the other one before deleting with data.
+- `limit` makes one change and reads it back; give the user `was` to undo it. On PMSS the watchdog may set the upload cap again.
+- A client on another account's port is never contacted. "busy" means no answer in time: unknown, not down.

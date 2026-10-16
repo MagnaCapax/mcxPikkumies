@@ -1,0 +1,5 @@
+- No storage verb deletes. Free space through the tool that owns the data (a torrent client's `remove <id> --with-data`); never `rm` a listed file to free space.
+- Quota truth comes from `quota` / `~/.quota` (the `storage` tool), never from the filesystem's free space. "Cannot open quotafile ... Permission denied" means quota is off on the host: tell support.
+- A verb that deletes or replaces needs `--expect` from its preview (`rclone check`) or `--replace`; the user approves once.
+- Never read or print config values or password files. Passwords only through a terminal prompt (`login`). An encrypted rclone config stops the tool.
+- No `serve` or `mount` verb, no starting cloudplow.

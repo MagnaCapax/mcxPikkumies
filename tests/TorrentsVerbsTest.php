@@ -94,7 +94,7 @@ return [
         exec('rm -rf ' . escapeshellarg($dir));
     },
     'torrent units: the guard hook gives no answer to the non-deleting USAGE examples; remove --with-data still asks' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+        $hook = dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php';
         $ask = function ($cmd) use ($hook) {
             list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
             return trim($out);

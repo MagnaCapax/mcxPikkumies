@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Supersedes ADR-0002 and ADR-0006 (packs) and the skill-directory parts of ADR-0003 and ADR-0005.
+- Status: Accepted. Supersedes ADR-0002 and ADR-0006 (packs) and the skill-directory parts of ADR-0003 and ADR-0005. Its hook parts are superseded by ADR-0030.
 
 ## Context
 The request of 2026-10-14 asks for tools for torrent clients, the *arr apps, media servers, storage and backup, with "all tools into pikkumies/tools/ and categorized well, then all have that USAGE.md and README.md", "single skill per tool, like /rtorrent", "placed on tools/{tool category}/{tool}/skill.md", "On launch the skills are dynamically copied and generated for in hermes use from those tools", a tools/INDEX.md "so agent can read it efficiently", and then: "everything should be like this! including memory tools/memory/pikkumies/ {save,search,append}".

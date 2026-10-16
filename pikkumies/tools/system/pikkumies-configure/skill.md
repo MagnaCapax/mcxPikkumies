@@ -1,0 +1,14 @@
+---
+name: pikkumies-configure
+description: Show, review and change Pikkumies' own settings (the agent's name, performance logging, telemetry, session history retention).
+---
+
+# Configure Pikkumies
+
+Use it when the user asks about Pikkumies' own settings: what the agent is called, whether it may log or send performance data, how long session history is kept.
+
+- `review` first when the user wants to know what is set: it explains every setting and warns about the ones that need a look (for example session history kept forever).
+- `set` changes only `agent.name`, `privacy.perfLogging`, `privacy.telemetry` and `sessions.retentionDays`, and only when the user asked for that change. Say what you set; it takes effect when the next session starts.
+- Never accept the terms of service or privacy policy for the user: `terms.accepted` is refused here. The person accepts them when the first interactive session asks, or installs with `pikkumies install --accept-terms`.
+- Every other setting (provider, tools, hooks, root, cron, auto-update, Hermes) is the person's: the tool refuses it. Tell them it lives in `~/pikkumies/local/config.php`; do not edit that file yourself.
+- Performance logging and telemetry are settings only: nothing is logged or sent yet. Say so if asked.

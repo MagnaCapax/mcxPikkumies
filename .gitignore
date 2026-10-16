@@ -6,5 +6,6 @@ pikkumies/memory/*
 !pikkumies/memory/README.md
 /vendor/
 *.log
-# Generated at install, update and run (ADR-0015); never tracked.
+# Generated at install, update and run (ADR-0015, ADR-0030); never tracked.
 pikkumies/tools/INDEX.md
+pikkumies/hooks/INDEX.md

@@ -30,8 +30,11 @@ return [
         check(in_array('server-admin', Generate::disabledCategories(['root' => ['disabled' => true]]), true), 'root.disabled must hide the server-admin category');
     },
     'soul stays within its size budget (sent to the model on every turn)' => function () {
+        // Core (without tool doctrine) <= 8000, total <= 16000; every profile is checked in DoctrineTest (ADR-0029).
+        $core = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults(), false);
+        check(strlen($core) <= 8000, 'core SOUL.md is ' . strlen($core) . ' bytes; keep it at or under 8000');
         $s = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
-        check(strlen($s) <= 8000, 'SOUL.md is ' . strlen($s) . ' bytes; keep it at or under 8000');
+        check(strlen($s) <= 16000, 'SOUL.md with tool doctrine is ' . strlen($s) . ' bytes; keep it at or under 16000');
         // ADR-0007: a live run saved a lesson into the built-in memory; the doctrine must steer away from it.
         check(strpos($s, 'never the built-in memory tool') !== false, 'the built-in memory steer is missing from SOUL.md');
     },
@@ -65,7 +68,7 @@ return [
         CronTick::$setprivPresentOverride = null;
     },
     'hermes yaml: named provider with key_env, model, external dirs, consented hooks' => function () {
-        $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['/h/g.php']]);
+        $y = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], ['pre_tool_call' => ['command' => '/usr/bin/php /h/orchestrator.php pre_tool_call', 'failClosed' => false, 'timeout' => 12]]);
         // Hermes reads key_env under providers:<name>; a bare `provider: custom` ignored
         // model.key_env when first verified and the request went out without the key (ADR-0005).
         check(strpos($y, "model:\n  provider: \"custom:pikkumies\"\n  default: \"m\"\n") !== false, 'model must name the custom:pikkumies provider and the model');
@@ -78,15 +81,22 @@ return [
         $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], [], true);
         check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
         // Unapproved shell hooks are silently skipped in a non-interactive run.
-        check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n") !== false && strpos($y, '/h/g.php') !== false, 'hook with consent');
+        check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n    - command: \"/usr/bin/php /h/orchestrator.php pre_tool_call\"\n      timeout: 12\n") !== false, 'hook with consent');
         $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);
         check(strpos($noHooks, 'hooks_auto_accept') === false, 'no consent line without hooks');
         check(strpos($noHooks, 'disabled:') === false, 'no disabled list when none set');
         $off = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], ['seedbox-apps']);
         check(strpos($off, "skills:\n  external_dirs:\n    - \"/a/skills\"\n  disabled:\n    - \"seedbox-apps\"\n") !== false, 'skills.disabled must render under skills:');
         check(strpos($y, 'fail_closed') === false, 'fail_closed stays at the Hermes default for prompt hooks');
-        $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], ['pre_tool_call' => ['/h/guard-destructive.php', '/h/g.php']]);
-        check(strpos($guard, "guard-destructive.php\"\n      timeout: 10\n      fail_closed: true\n") !== false && substr_count($guard, 'fail_closed') === 1, 'the delete guard must fail closed, and only it');
+        // The shipped units: one orchestrator entry per event; pre_tool_call fails closed because the delete guard does (ADR-0030).
+        $entries = HermesConfig::hookEntries();
+        check(array_keys($entries) === ['pre_llm_call', 'pre_tool_call'], 'one entry per event: ' . json_encode(array_keys($entries)));
+        check($entries['pre_tool_call']['failClosed'] === true && $entries['pre_llm_call']['failClosed'] === false, 'only the event with the delete guard fails closed');
+        check($entries['pre_tool_call']['timeout'] === 22 && $entries['pre_llm_call']['timeout'] === 12, 'timeout = sum of unit timeouts + 2: ' . json_encode($entries));
+        check(preg_match('#/hooks/orchestrator\.php pre_tool_call$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
+        $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], $entries);
+        check(substr_count($guard, '    - command: ') === 2 && substr_count($guard, 'fail_closed') === 1
+            && strpos($guard, "orchestrator.php pre_tool_call\"\n      timeout: 22\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
         check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'update banners must be off: Hermes is pinned');
         check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');
     },

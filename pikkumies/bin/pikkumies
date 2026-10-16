@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install | update | detect | doctor | generate | cron-tick | run [args...] | <free text prompt>
+ * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | run [args...] | <free text prompt>
  *
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
  * (ADR-0003) and Hermes' own session database and active-session registry are built for
@@ -51,7 +51,7 @@ function generate(array $profile)
         throw new Exception($result['error']);
     }
     foreach ($result['problems'] as $unit => $problems) {
-        fwrite(STDERR, "tool unit $unit skipped: " . implode('; ', $problems) . "\n");
+        fwrite(STDERR, "unit $unit skipped: " . implode('; ', $problems) . "\n");
     }
     HermesConfig::write($config, $profile);
     return $result;
@@ -74,16 +74,60 @@ function hermesBin()
     return Config::root() . '/include/hermes/bin/hermes';
 }
 
+function promptRead()
+{
+    return fgets(STDIN);
+}
+
+function promptWrite($text)
+{
+    fwrite(STDOUT, $text);
+}
+
+/** On a terminal with no name set yet: ask for one and save it (ADR-0032). Never called without a TTY. */
+function askNameIfMissing()
+{
+    $config = Config::load();
+    if (trim((string) $config['agent']['name']) !== '') {
+        return;
+    }
+    $name = Launch::askName('promptRead', 'promptWrite');
+    if ($name !== null) {
+        Config::set('agent.name', $name);
+        out('Your agent is called ' . $name . '. Change it any time with the pikkumies-configure skill.');
+    }
+}
+
 list($cmd, $passArgs) = Launch::route($argv);
 
 switch ($cmd) {
     case 'install':
+        // Flags answer the first-start questions, so an install from a script asks nothing (ADR-0032).
+        list($installSettings, $installTerms, $flagErrors) = Launch::installFlags($passArgs);
+        if ($flagErrors) {
+            out('install stopped, nothing changed: ' . implode('; ', $flagErrors));
+            exit(2);
+        }
         $home = getenv('HOME');
         $link = $home . '/pikkumies';
         if (!file_exists($link)) {
             @symlink(Config::root(), $link);
         }
         Config::writeDefaultsIfMissing();
+        try {
+            foreach ($installSettings as $key => $value) {
+                Config::set($key, $value);
+            }
+            if ($installTerms) {
+                Config::acceptTerms();
+            }
+            if (!isset($installSettings['agent.name']) && Launch::isTty()) {
+                askNameIfMissing();
+            }
+        } catch (Exception $x) {
+            out('install stopped: ' . $x->getMessage());
+            exit(1);
+        }
         $profile = profile();
         try {
             $generated = generate($profile);
@@ -244,6 +288,25 @@ switch ($cmd) {
             out('Hermes is not installed yet; see local/install.log');
             exit(1);
         }
+        // First interactive session: the agent's name, then the terms until accepted (ADR-0032). Only on
+        // a terminal: cron-tick, docs-fill and piped one-shot runs are never asked and never blocked.
+        if (Launch::isTty() && Launch::isSession($passArgs)) {
+            try {
+                askNameIfMissing();
+                $firstConfig = Config::load();
+                if (empty($firstConfig['terms']['accepted'])) {
+                    promptWrite(Launch::settingsNote($firstConfig));
+                    if (!Launch::askTerms('promptRead', 'promptWrite')) {
+                        out('Not starting: the terms of service and privacy policy have to be accepted first. Run `pikkumies` again when you are ready.');
+                        exit(1);
+                    }
+                    Config::acceptTerms();
+                }
+            } catch (Exception $x) {
+                out('not starting: ' . $x->getMessage());
+                exit(1);
+            }
+        }
         // Regenerate first, so a key or config set after install reaches Hermes. Never start Hermes
         // on a config that could not be written: it would run without the safety hooks. Safe to run
         // from any number of instances at once: Generate::run takes a lock, every file it and
@@ -281,10 +344,41 @@ switch ($cmd) {
         CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', $tickCode, implode("\n", $tickOut));
         exit($tickCode);
 
+    case 'tmux': // window pmN of the tmux session "pikkumies", running pikkumies (ADR-0032)
+        $n = isset($passArgs[0]) ? $passArgs[0] : '1';
+        if (!preg_match('/^[1-9]$/', $n)) {
+            out('usage: pikkumies tmux [1-9]');
+            exit(2);
+        }
+        exec('command -v tmux 2>/dev/null', $tmuxPath, $tmuxCode);
+        if ($tmuxCode !== 0) {
+            out('tmux is not installed on this machine. Plain `pikkumies` starts a session without it; install tmux (or ask your provider) to use `pikkumies tmux`.');
+            exit(1);
+        }
+        $windows = null;
+        exec('tmux list-windows -t ' . escapeshellarg('=' . Launch::TMUX_SESSION) . ' -F ' . escapeshellarg('#W') . ' 2>/dev/null', $windowList, $listCode);
+        if ($listCode === 0) {
+            $windows = $windowList;
+        }
+        $insideTmux = (string) getenv('TMUX') !== '';
+        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__));
+        $attach = array_pop($plan);
+        foreach ($plan as $step) {
+            exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);
+            if ($stepCode !== 0) {
+                out('tmux failed: ' . implode(' ', $stepOut));
+                exit(1);
+            }
+        }
+        passthru(implode(' ', array_map('escapeshellarg', $attach)), $code);
+        exit($code);
+
     case 'help':
     default:
         out('usage: pikkumies [install | update | detect | doctor | generate]');
         out('       pikkumies [run [hermes args...]]           plain interactive session');
         out('       pikkumies <free text>                      start a session with that as the first prompt');
         out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
+        out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
+        out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N]');
 }

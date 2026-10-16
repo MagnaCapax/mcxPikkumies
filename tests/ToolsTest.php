@@ -1,23 +1,32 @@
 <?php
+// The guard tests run through hooks/orchestrator.php (ADR-0030), in a throwaway tree so its log stays out of this checkout.
+if (!function_exists('orchestratorTree')) {
+    require __DIR__ . '/OrchestratorTest.php';
+}
+$guardTree = orchestratorTree();
+$guardOrchestrator = "$guardTree/pikkumies/hooks/orchestrator.php";
+register_shutdown_function(function () use ($guardTree) {
+    exec('rm -rf ' . escapeshellarg($guardTree));
+});
 return [
-    'guard hook blocks rm -rf' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
-        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /home/x']]));
+    'guard hook blocks rm -rf' => function () use ($guardOrchestrator) {
+        $hook = $guardOrchestrator;
+        list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /home/x']]));
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'block' && $d['message'] !== '', 'rm -rf not blocked: ' . $out);
     },
-    'guard hook blocks when the check itself fails (regex engine limit)' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+    'guard hook blocks when the check itself fails (regex engine limit)' => function () use ($guardOrchestrator) {
+        $hook = $guardOrchestrator;
         // The dd check runs out of backtracking in the first segment before it reaches the real dd.
         $cmd = str_repeat('dd ', 700000) . '| dd if=/dev/zero of=/dev/sdz';
-        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+        list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'block', 'regex error let the call through');
     },
-    'guard hook asks the user (approve) for data deletes, one decision per command' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+    'guard hook asks the user (approve) for data deletes, one decision per command' => function () use ($guardOrchestrator) {
+        $hook = $guardOrchestrator;
         $ask = function ($cmd) use ($hook) {
-            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+            list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
             return json_decode($out, true);
         };
         foreach ([
@@ -65,12 +74,12 @@ return [
         $a = $ask('restic -r /a forget --keep-last 1');
         $b = $ask('restic -r /b forget --keep-last 1');
         check($a['message'] !== $b['message'] && strpos($a['rule_key'], 'pikkumies-delete:') === 0 && $a['rule_key'] !== $b['rule_key'], 'two different deletes must not share one approval (rule_key)');
-        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => "import os; os.system('restic -r /a forget --prune')"]]));
+        list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => "import os; os.system('restic -r /a forget --prune')"]]));
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'approve', 'execute_code bypassed the guard');
         foreach (['import subprocess; subprocess.run(["rclone", "purge", "remote:old"])', 'import requests; requests.delete("http://127.0.0.1:8989/api/v3/series/1")', 'rpc("torrent-remove", {"ids": [1], "delete-local-data": True})',
             'subprocess.run(["php", "/h/pikkumies/tools/arr/radarr/radarr.php", "remove", "12", "--with-data"])', 'requests.delete(f"http://127.0.0.1:{p}/api/v3/movie/1")', 'requests.request("DELETE", "http://127.0.0.1:8989/x")'] as $code) {
-            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
+            list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
             $d = json_decode($out, true);
             check(is_array($d) && $d['action'] === 'approve', "execute_code delete not asked: $code");
         }
@@ -80,7 +89,7 @@ return [
         $d = $ask(str_repeat('echo ok; ', 500) . 'rclone purge remote:');
         check($d['action'] === 'block', 'a delete too long to show in full must be refused, not half-shown');
         foreach (['import os; os.remove("/home/u/x")', 'import shutil; shutil.rmtree(p)', 'pathlib.Path(p).unlink()'] as $code) {
-            list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
+            list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'execute_code', 'tool_input' => ['code' => $code]]));
             $d = json_decode($out, true);
             check(is_array($d) && $d['action'] === 'approve', "execute_code file delete not asked: $code");
         }
@@ -97,11 +106,11 @@ return [
             check($out === null, "read-only command flagged: $cmd");
         }
     },
-    'guard hook ignores harmless and non-terminal calls' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
-        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]));
+    'guard hook ignores harmless and non-terminal calls' => function () use ($guardOrchestrator) {
+        $hook = $guardOrchestrator;
+        list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]));
         check(trim($out) === '', 'harmless command flagged');
-        list(, $out) = runPhp($hook, [], json_encode(['tool_name' => 'read_file', 'tool_input' => ['path' => 'x']]));
+        list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'read_file', 'tool_input' => ['path' => 'x']]));
         check(trim($out) === '', 'non-terminal flagged');
     },
     'memory unit: save needs links or a reason, never overwrites; append adds; search finds it in two steps' => function () {

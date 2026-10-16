@@ -1,6 +1,6 @@
 # Documentation sources
 
-The documentation Pikkumies searches before it acts: wikis, knowledge bases, provider manuals and app documentation. The memory skill (`php ~/pikkumies/tools/memory/pikkumies/pikkumies.php`) downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded. Only the sources meant for this host (its `scope`) are downloaded and searched.
+The documentation Pikkumies searches before it acts: wikis, knowledge bases, provider manuals and app documentation. The memory skill (`php ~/pikkumies/tools/memory/pikkumies/pikkumies.php`) downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded. The sources meant for this host (its `scope`) are downloaded and searched first; other providers' sources only as a lower tier (see Search tiers).
 
 ## How to change this list
 
@@ -41,6 +41,17 @@ Each source is a `## name` section (lowercase letters, digits and dashes) with t
 - `status`: `on` or `off`.
 
 Only pages on the same host as `url` are fetched, at most 500 per source and 200 MB for all sources together.
+
+## Search tiers
+
+A search returns its hits grouped by tier, highest first. A higher tier's hit always comes before a lower tier's, whatever the scores; within a tier the best match comes first.
+
+1. **Memory on this machine**: the lessons, reference sheets and research notes saved here.
+2. **This host's provider and app documentation**: every source below whose `scope` matches this host, including the app manuals (`scope: all`).
+3. **Other providers' documentation**: the sources below that are on and valid but scoped to a different provider or stack than this host. Similar services often document the same app or problem. Each hit keeps its source's trust level and carries a note that another provider's documentation may not apply to this host; check it on this machine before relying on it.
+4. **Deep research on the web**: never run by a search. The search names it as the next step when tiers 1-3 have nothing.
+
+Tier 3 is never downloaded while you wait. It is searched only from copies already on disk, and nothing downloads it until a search on this account first finds nothing in tiers 1-2 (that search creates `~/pikkumies/local/docs-peer-enabled`). From then on the daily background fill also takes the other providers' sources, at most 50 requests per source per day, each page refreshed at most every 30 days. To keep one of them out, switch it off in your overlay with `- status: off`.
 
 ## pm-wiki
 

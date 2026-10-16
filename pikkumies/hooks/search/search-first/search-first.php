@@ -1,9 +1,9 @@
 <?php
 /**
- * Hermes shell hook (pre_llm_call, the Hermes counterpart of UserPromptSubmit; runs once per turn).
+ * Hook unit (pre_llm_call, run by hooks/orchestrator.php, ADR-0030; the Hermes counterpart of UserPromptSubmit; runs once per turn).
  * First turn: tells the agent to search lessons and documentation before acting, and lists the
  * local matches for the user's message. Later turns: only when the message asks something new
- * (4+ content words or a question mark, not a slash command) it re-arms search-first-gate.php for
+ * (4+ content words or a question mark, not a slash command) it re-arms hooks/search/search-first-gate/ for
  * this session and lists the local matches; silent when there are none.
  * Matches are titles, trust and paths only (titles cleaned of control characters, 120 characters),
  * at most 1500 bytes, never page text.
@@ -17,8 +17,8 @@
  * {"context": "..."}, which Hermes appends to that turn's message (hooks.md, Hermes v2026.9.24).
  * The searches use only the copies already on disk. A safety prompt, not a security boundary (AGENTS.md).
  */
-require_once dirname(__DIR__, 2) . '/lib/DocSources.php';
-require_once dirname(__DIR__, 2) . '/lib/HookLlm.php';
+require_once dirname(__DIR__, 3) . '/lib/DocSources.php';
+require_once dirname(__DIR__, 3) . '/lib/HookLlm.php';
 
 const SEARCH_FIRST_MAX = 1500;
 // Words that do not make a follow-up a new question ("ok thanks", "yes do it").

@@ -110,7 +110,7 @@ return [
         }
     },
     'storage and backup USAGE examples: every one that deletes or replaces asks the user (approve), every read example gets no answer' => function () {
-        $hook = dirname(__DIR__) . '/pikkumies/hooks/pre_tool_call/guard-destructive.php';
+        $hook = dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php';
         $root = dirname(__DIR__) . '/pikkumies/tools';
         $seen = ['approve' => 0, 'read' => 0];
         foreach (array_merge((array) glob("$root/storage/*/USAGE.md"), (array) glob("$root/backup/*/USAGE.md")) as $usage) {

@@ -26,7 +26,7 @@ class HermesConfig
         // The light model for hooks (local/llm.json), reusing the /models answer when there was one.
         Provider::writeLight($prov, $config, $ids);
 
-        self::put($home . '/config.yaml', self::renderYaml($prov, self::skillDirs(), self::hookEntries(), (array) $config['skills']['disabled'], !empty($config['hermes']['lazyInstalls'])));
+        self::put($home . '/config.yaml', self::renderYaml($prov, self::skillDirs(), self::hookEntries(), (array) $config['skills']['disabled'], !empty($config['hermes']['lazyInstalls'])) . self::sessionsYaml($config));
         // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($home . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         self::put($home . '/SOUL.md', self::renderSoul($profile, $config));
@@ -50,14 +50,25 @@ class HermesConfig
         return [Units::generatedDir()];
     }
 
-    /** Shell hooks: hooks/<event>/<name>.php, run with php. */
-    public static function hookEntries()
+    /**
+     * Shell hooks (ADR-0030): one entry per event that has hook units, running hooks/orchestrator.php,
+     * which runs the units. The entry fails closed when any unit of the event does; its timeout covers
+     * every unit's own timeout run one after another, plus 2 seconds, within Hermes' maximum of 300.
+     * Returns [event => ['command' => ..., 'failClosed' => bool, 'timeout' => seconds]].
+     */
+    public static function hookEntries($hooksDir = null)
     {
+        $hooksDir = $hooksDir ?: HookUnits::hooksDir();
         $entries = [];
-        foreach ((array) glob(Config::root() . '/hooks/*/*.php') as $script) {
-            $entries[basename(dirname($script))][] = $script;
+        foreach (HookUnits::byEvent($hooksDir) as $event => $units) {
+            $closed = false;
+            $timeout = 0;
+            foreach ($units as $u) {
+                $closed = $closed || ($u['failClosed'] && $event === 'pre_tool_call');
+                $timeout += $u['timeout'];
+            }
+            $entries[$event] = ['command' => PHP_BINARY . ' ' . $hooksDir . '/orchestrator.php ' . $event, 'failClosed' => $closed, 'timeout' => min(300, $timeout + 2)];
         }
-        ksort($entries);
         return $entries;
     }
 
@@ -116,30 +127,68 @@ class HermesConfig
             // installer gives the consent (hooks_auto_accept, agent/shell_hooks.py).
             $y .= "hooks_auto_accept: true\n";
             $y .= "hooks:\n";
-            foreach ($hooks as $event => $scripts) {
-                $y .= "  " . $event . ":\n";
-                foreach ($scripts as $s) {
-                    // Hooks are safety prompts, not security (AGENTS.md), so most stay at the Hermes
-                    // default (a hook that errors or times out lets the call run). The delete guard
-                    // is the exception: if it cannot answer, the call is blocked (ADR-0020).
-                    $closed = basename($s) === 'guard-destructive.php' ? "      fail_closed: true\n" : '';
-                    $y .= "    - command: " . self::q(PHP_BINARY . ' ' . $s) . "\n      timeout: 10\n" . $closed;
-                }
+            foreach ($hooks as $event => $h) {
+                // One orchestrator entry per event (ADR-0030). Hooks are safety prompts, not security
+                // (AGENTS.md), so an event stays at the Hermes default (a hook that errors or times out
+                // lets the call run) unless one of its units fails closed, like the delete guard (ADR-0020).
+                $y .= "  " . $event . ":\n    - command: " . self::q($h['command']) . "\n      timeout: " . (int) $h['timeout'] . "\n"
+                    . (!empty($h['failClosed']) ? "      fail_closed: true\n" : '');
             }
         }
         return $y;
     }
 
-    public static function renderSoul(array $profile, array $config)
+    /**
+     * Appended to config.yaml (ADR-0032). sessions: Hermes prunes ended sessions older than
+     * retention_days at start (auto_prune, hermes_cli/config_defaults.py "sessions"); our
+     * sessions.retentionDays 0 means keep them forever, so pruning is off. telemetry: Hermes'
+     * own shared metrics stay off (already its default), pinned so a new release cannot turn them on.
+     */
+    public static function sessionsYaml(array $config)
+    {
+        $days = isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0;
+        $y = $days > 0 ? "sessions:\n  auto_prune: true\n  retention_days: $days\n" : "sessions:\n  auto_prune: false\n";
+        return $y . "telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n";
+    }
+
+    /**
+     * SOUL.md: what this machine allows, the static doctrine (soul, then the name line when the user
+     * named the agent, ADR-0032; voice, doctrine, safety), then "## Tool doctrine" with the DOCTRINE.md
+     * of every enabled tool category (ADR-0029). $toolDoctrine false gives the core alone, whose
+     * budget is 8000 bytes.
+     */
+    public static function renderSoul(array $profile, array $config, $toolDoctrine = true)
     {
         $parts = [self::capabilities($profile, $config)];
         foreach (['soul', 'voice', 'doctrine', 'safety'] as $f) {
             $p = Config::root() . '/doctrine/' . $f . '.md';
             if (is_file($p)) {
-                $parts[] = trim((string) file_get_contents($p));
+                $parts[] = trim((string) file_get_contents($p)) . ($f === 'soul' ? self::nameLine($config) : '');
             }
         }
+        $rules = $toolDoctrine ? Units::doctrines(Generate::disabledCategories($config)) : [];
+        if ($rules) {
+            $section = "## Tool doctrine\n\nRules for each tool category; follow them whenever you use its tools.";
+            foreach ($rules as $category => $text) {
+                $section .= "\n\n### $category\n\n" . $text;
+            }
+            $parts[] = $section;
+        }
         return implode("\n\n---\n\n", $parts) . "\n";
+    }
+
+    /** "\n\nYour name is ..." when the user named the agent something other than Pikkumies, else ''. */
+    public static function nameLine(array $config)
+    {
+        $name = self::agentName($config);
+        return $name === 'Pikkumies' ? '' : "\n\nYour name is $name; the user chose it. Pikkumies is the software you run as.";
+    }
+
+    /** The agent's name: agent.name from the config when it is a valid name (Config::validName), else "Pikkumies". */
+    public static function agentName(array $config)
+    {
+        $name = isset($config['agent']['name']) && is_string($config['agent']['name']) ? trim($config['agent']['name']) : '';
+        return $name !== '' && Config::validName($name) ? $name : 'Pikkumies';
     }
 
     /**
@@ -153,14 +202,17 @@ class HermesConfig
         } elseif (!empty($profile['root']['available'])) {
             $root = 'available (via ' . $profile['root']['via'] . ')';
         } else {
-            $root = 'not available (no root and no passwordless sudo); manage only this user\'s own files and processes';
+            $root = 'not available; manage only this user\'s files and processes';
         }
         // Only what decides which skills apply. SOUL.md goes to the model on every turn, so the
         // rest of the profile stays local; the system-status skill reads it when needed.
-        return "# This machine\n\n- Root: " . $root . "\n- PMSS seedbox platform: " . (!empty($profile['pmss']) ? 'yes' : 'no')
-            . "\n- Host: " . (isset($profile['family']) ? $profile['family'] : 'generic')
+        // On PMSS the host family is PMSS too; elsewhere the family says which host it is.
+        return "# This machine\n\n- Root: " . $root
+            . (!empty($profile['pmss']) ? "\n- PMSS seedbox platform: yes" : '')
+            . (!empty($profile['pmss']) && isset($profile['family']) && $profile['family'] === 'pmss' ? '' : "\n- Host: " . (isset($profile['family']) ? $profile['family'] : 'generic'))
+            // Without root the Root line already limits the agent to this user's own files.
             . (!empty($profile['tenancy']['shared'])
-                ? "\n- Shared server: yes; other accounts live on this machine, so read and change only this user's own files and processes"
+                ? "\n- Shared server: yes; other accounts live here" . (!empty($profile['root']['available']) && empty($config['root']['disabled']) ? ", so touch only this user's files and processes" : '')
                 : '')
             // Hermes' cronjob tool says a job "will NOT fire until the gateway is started" whenever no
             // gateway runs (tools/cronjob_job_args.py, pinned v2026.9.24); here the crontab tick fires
@@ -168,8 +220,7 @@ class HermesConfig
             . (empty($config['cron']['disabled']) && !CronTick::refuses(!empty($profile['root']['available']))
                 ? "\n- Cron jobs run from crontab; ignore \"gateway is not running\", never start the gateway"
                 : '')
-            . "\n\nDetected at start. Skills for other machines are listed too; use one only if it matches."
-            . " To compare or find tools, read " . Units::toolsDir() . "/INDEX.md.";
+            . "\n\nSkills for other machines are listed too; use one only if it matches. Tool index: " . Units::toolsDir() . "/INDEX.md.";
     }
 
     /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */
