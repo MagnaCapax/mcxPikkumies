@@ -52,8 +52,11 @@ class HermesConfig
 
     /**
      * Shell hooks (ADR-0030): one entry per event that has hook units, running hooks/orchestrator.php,
-     * which runs the units. The entry fails closed when any unit of the event does; its timeout covers
-     * every unit's own timeout run one after another, plus 2 seconds, within Hermes' maximum of 300.
+     * which runs the units. The pre_tool_call entry always fails closed: whether the guard does is read
+     * from its hook.md, and a broken hook.md must not turn that off. Its timeout covers every unit's own
+     * timeout run one after another, plus 2 seconds, within Hermes' maximum of 300. display_errors=stdout
+     * (fatal errors only, 4437 = E_ERROR|E_PARSE|E_CORE_ERROR|E_COMPILE_ERROR|E_USER_ERROR|E_RECOVERABLE_ERROR)
+     * makes an orchestrator that cannot even compile print text, which a fail-closed entry blocks on.
      * Returns [event => ['command' => ..., 'failClosed' => bool, 'timeout' => seconds]].
      */
     public static function hookEntries($hooksDir = null)
@@ -61,13 +64,12 @@ class HermesConfig
         $hooksDir = $hooksDir ?: HookUnits::hooksDir();
         $entries = [];
         foreach (HookUnits::byEvent($hooksDir) as $event => $units) {
-            $closed = false;
             $timeout = 0;
             foreach ($units as $u) {
-                $closed = $closed || ($u['failClosed'] && $event === 'pre_tool_call');
                 $timeout += $u['timeout'];
             }
-            $entries[$event] = ['command' => PHP_BINARY . ' ' . $hooksDir . '/orchestrator.php ' . $event, 'failClosed' => $closed, 'timeout' => min(300, $timeout + 2)];
+            $entries[$event] = ['command' => PHP_BINARY . ' -d display_errors=stdout -d error_reporting=4437 ' . $hooksDir . '/orchestrator.php ' . $event,
+                'failClosed' => $event === 'pre_tool_call', 'timeout' => min(300, $timeout + 2)];
         }
         return $entries;
     }

@@ -28,13 +28,13 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
   - `<hook>.php`, the hook.
   `lib/HookUnits.php` finds and validates the units, like `lib/Units.php` does for tools.
 - **The shipped hooks move unchanged.** They are now `guard/guard-destructive` (fail closed), `search/search-first-gate` and `search/search-first` (fail open). Every timeout stays at 10 seconds. Only their `lib/` paths change.
-- **One Hermes entry per event.** The command is `php <root>/hooks/orchestrator.php <event>`, for each event that has units. `fail_closed` is set when any unit of the event fails closed, and the timeout is the sum of the units' timeouts plus 2 seconds, at most 300. `hooks_auto_accept` stays. The file-name special case for the delete guard is gone.
+- **One Hermes entry per event.** The command is `php -d display_errors=stdout -d error_reporting=4437 <root>/hooks/orchestrator.php <event>`, for each event that has units, so an orchestrator that cannot even compile prints text instead of nothing. The `pre_tool_call` entry always has `fail_closed` (amended 2026-10-16: it used to follow the units' `hook.md`, so a broken `hook.md` could turn it off), and the timeout is the sum of the units' timeouts plus 2 seconds, at most 300. `hooks_auto_accept` stays. The file-name special case for the delete guard is gone.
 - **The orchestrator** reads stdin once and runs the units of the event in name order, each as its own `php` process with the same stdin and its own timeout:
   - Each unit's output is read as `_evaluate_result` reads a shell hook.
   - One addition: a fail-closed unit that exits non-zero with no answer also blocks. With PHP's `display_errors` off, a fatal error leaves stdout empty and exits 255, which Hermes would let through.
-  - A unit whose `hook.md` is broken is skipped, unless it declares `failClosed: true`, in which case the call is blocked.
+  - Every `hooks/<category>/<hook>/` directory is a unit, even with a missing or unreadable `hook.md` (amended 2026-10-16). For `pre_tool_call` any broken unit blocks the call, whatever event or `failClosed` it claims; for `pre_llm_call` a broken unit is skipped.
   - All units run even after a block, as Hermes runs all hooks, so their side effects (the search-first markers) stay as before.
-  - The orchestrator itself blocks on a fatal error of its own for `pre_tool_call`.
+  - The orchestrator itself blocks on a fatal error of its own for `pre_tool_call`: its crash handler is registered before it loads `lib/`, and the requires are wrapped so a broken library file blocks too.
 - **Merging** follows Hermes:
   - `pre_tool_call` uses the plugins.py rules above.
   - Because one shell hook gives one directive, an approve together with a modify is answered as the approve. Asking the user is the safety part. No shipped hook answers modify.

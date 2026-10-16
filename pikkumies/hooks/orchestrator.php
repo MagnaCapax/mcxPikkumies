@@ -12,12 +12,31 @@
  * - pre_llm_call (agent/turn_context.py _collect_pre_llm_call_context): contexts joined by a blank
  *   line, capped at 9000 characters (Hermes spills a hook's context to disk above 10000).
  * A failClosed unit that crashes, times out, exits non-zero without an answer or prints something that
- * is not a JSON object makes the answer a block. A fail-open unit's failure is ignored.
+ * is not a JSON object makes the answer a block. A fail-open unit's failure is ignored. On pre_tool_call
+ * a broken unit (bad or missing hook.md) blocks whatever it declares, and so does a fatal error of the
+ * orchestrator itself, also while loading lib/ (Hermes runs it with display_errors=stdout, HermesConfig).
  * One JSONL line per unit run goes to local/logs/hooks/YYYYMMDD.jsonl (UTC; 7 daily files kept):
  * time, event, unit, milliseconds and outcome, never the payload.
  */
-require_once dirname(__DIR__) . '/lib/Config.php';
-require_once dirname(__DIR__) . '/lib/HookUnits.php';
+$hookEvent = isset($argv[1]) ? (string) $argv[1] : '';
+$hookDone = false;
+$hookError = '';
+// The orchestrator itself must not fail open on pre_tool_call: a fatal error prints a block. Registered
+// before anything is loaded, so a broken or missing lib file blocks too.
+register_shutdown_function(function () use (&$hookDone, &$hookError, $hookEvent) {
+    if (!$hookDone && $hookEvent === 'pre_tool_call') {
+        $e = error_get_last();
+        $why = $hookError !== '' ? $hookError : ($e ? $e['message'] : '');
+        echo "\n" . json_encode(['action' => 'block', 'message' => 'Pikkumies hook orchestrator failed' . ($why !== '' ? ': ' . substr($why, 0, 200) : '') . '. Not run; tell the user this safety check is failing.']) . "\n";
+    }
+});
+try {
+    require_once dirname(__DIR__) . '/lib/Config.php';
+    require_once dirname(__DIR__) . '/lib/HookUnits.php';
+} catch (\Throwable $e) {
+    $hookError = $e->getMessage();
+    exit(1);
+}
 
 const HOOK_BLOCK_EXIT = 2;                 // agent/shell_hooks.py BLOCK_EXIT_CODE
 const HOOK_DEFAULT_BLOCK = 'Blocked by shell hook.';
@@ -285,32 +304,18 @@ function hookLog($event, $unit, $ms, $outcome)
     }
 }
 
-$hookEvent = isset($argv[1]) ? (string) $argv[1] : '';
-$hookDone = false;
-$hookFailClosed = $hookEvent === 'pre_tool_call'; // until the units are known, a crash here blocks
-// The orchestrator itself must not fail open for a failClosed event: a fatal error prints a block.
-register_shutdown_function(function () use (&$hookDone, &$hookFailClosed) {
-    if (!$hookDone && $hookFailClosed) {
-        $e = error_get_last();
-        echo "\n" . json_encode(['action' => 'block', 'message' => 'Pikkumies hook orchestrator failed' . ($e ? ': ' . substr($e['message'], 0, 200) : '') . '. Not run; tell the user this safety check is failing.']) . "\n";
-    }
-});
-
 $stdin = (string) stream_get_contents(STDIN);
 $units = HookUnits::forEvent($hookEvent);
-$hookFailClosed = false;
-foreach ($units as $u) {
-    $hookFailClosed = $hookFailClosed || ($u['failClosed'] && $hookEvent === 'pre_tool_call');
-}
 $results = [];
 foreach ($units as $u) {
     $start = microtime(true);
     if ($u['errors']) {
-        // A broken unit is skipped, unless it is meant to fail closed.
-        $results[] = $u['failClosed'] && $hookEvent === 'pre_tool_call'
+        // A broken unit blocks a tool call (its hook.md cannot be trusted to say whether it fails closed); elsewhere it is skipped.
+        $closed = $hookEvent === 'pre_tool_call';
+        $results[] = $closed
             ? ['action' => 'block', 'message' => "Pikkumies hook {$u['category']}/{$u['name']} failed closed: " . implode('; ', $u['errors']) . '. Not run; tell the user this safety check is failing.']
             : null;
-        hookLog($hookEvent, "{$u['category']}/{$u['name']}", 0, $u['failClosed'] ? 'failed-closed' : 'invalid');
+        hookLog($hookEvent, "{$u['category']}/{$u['name']}", 0, $closed ? 'failed-closed' : 'invalid');
         continue;
     }
     list($directive, $outcome) = hookEvaluate($hookEvent, $u, hookSpawn($u['script'], $stdin, $u['timeout']));

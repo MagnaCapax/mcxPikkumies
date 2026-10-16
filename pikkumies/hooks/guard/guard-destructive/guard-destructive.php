@@ -8,7 +8,13 @@
  * This is a safety prompt for the agent's own mistakes, NOT a security boundary: the user
  * owns this file and Hermes' config. Real limits come from the OS (permissions, no sudo).
  */
-$payload = json_decode((string) stream_get_contents(STDIN), true);
+$stdin = (string) stream_get_contents(STDIN);
+$payload = json_decode($stdin, true, 100000);
+if (!is_array($payload) && trim($stdin) !== '') {
+    // A payload that cannot be read cannot be checked: this unit fails closed, so it must not stay silent.
+    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: the tool call could not be read to check it. Not run; tell the user this safety check is failing.']) . "\n";
+    exit(0);
+}
 // The terminal command, or the code of execute_code (which can run the same programs).
 $tool = is_array($payload) && isset($payload['tool_name']) ? $payload['tool_name'] : '';
 $field = $tool === 'terminal' ? 'command' : ($tool === 'execute_code' ? 'code' : '');
@@ -16,20 +22,37 @@ if ($field === '') {
     exit(0); // no opinion
 }
 $command = isset($payload['tool_input'][$field]) ? (string) $payload['tool_input'][$field] : '';
+// The shell joins r"m", 'r'm and r\m into rm: every pattern also reads the command without quotes and backslashes.
+$texts = array_unique([$command, str_replace(['"', "'", '\\'], '', $command)]);
+
+/** preg_match over every form of the command: 1 on a hit, false on a regex engine error, else 0. */
+function guardMatch($re, array $texts)
+{
+    foreach ($texts as $text) {
+        $hit = preg_match($re, $text);
+        if ($hit !== 0) {
+            return $hit;
+        }
+    }
+    return 0;
+}
 
 $patterns = [
     '/\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i' => 'recursive force delete',
     '/\bmkfs(\.|\s)/'                              => 'filesystem format',
     '/\bdd\s+[^|]*\bof=\/dev\//'                    => 'raw write to a device',
     '/\b(fdisk|parted|sgdisk|wipefs)\b/'            => 'partition or signature change',
-    '/\bchmod\s+(-R\s+)?777\b/'                     => 'world-writable permissions',
+    '/\bchmod\s+(-[a-zA-Z]+\s+|--[a-z-]+\s+)*0*777\b/' => 'world-writable permissions',
     '/:\(\)\s*\{\s*:\|:&\s*\};:/'                   => 'fork bomb',
-    '/\bgit\s+push\s+.*--force\b/'                  => 'force push',
+    '/\bgit\s+push\b.*(--force|\s-f)\b/'           => 'force push',
+    // A verb behind a name the shell expands (alias x=rm; X=rm; $X -rf) is out of sight of the patterns here.
+    '/\b[A-Za-z_][A-Za-z0-9_]*=["\']?(rm|unlink|shred|truncate|dd)([\s"\';]|$)/' => 'a destructive command renamed through an alias or a variable',
+    '/^(?=.*\bbase64\s+(-\S+\s+)*(-d|--decode|-D)\b)(?=.*(\|\s*(sudo\s+)?(ba|z|da|k)?sh\b|\beval\b|\b(ba|z|da|k)?sh\s+(-c|<)|<\())/s' => 'decoded text run as a shell command, which cannot be checked',
     '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
     '/\brclone\b.*\bconfig\s+(show|dump)\b/s' => 'rclone config show/dump prints cloud credentials, and what the agent reads goes to the model',
 ];
 foreach ($patterns as $re => $why) {
-    $hit = preg_match($re, $command);
+    $hit = guardMatch($re, $texts);
     if ($hit === false) {
         $why = 'a command too long or complex to check'; // a regex engine error must not let the call through
     }
@@ -78,6 +101,8 @@ $approve = [
     // Plain file deletes: Hermes' own list catches only rm -r and rm /, and its default "smart" mode lets a
     // second model approve them; the user decides about their files (ADR-0020). rm -rf stays blocked above.
     '/(^|[\s;&|(`"\'])(rm|unlink|shred|truncate)\s/'                                           => 'deletes or empties files',
+    // Emptying or deleting without a delete verb: `: > f`, `cp /dev/null f`, `mv f /dev/null`, `... | xargs rm`.
+    '#(^|[\s;&|(]):\s*>(?!>)|\b(cp|mv)\b[^;&|\n]*(?<![>&\s])\s+/dev/null\b|\bxargs\b.*\b(rm|unlink|shred)\b#s' => 'deletes or empties files',
     '/\bfind\b.*\s-(delete|exec(dir)?\s+(\S*\/)?(rm|unlink|shred)\b)/s'                        => 'deletes the files find matches',
     '/\bos\.(remove|unlink|rmdir|removedirs)\(|\bshutil\.rmtree\(|\.unlink\(|\.rmdir\(/'          => 'deletes files from code',
     // rclone's remote-control API (the WebUI's rcd runs for every rclone-enabled PMSS account) and its HTTP form.
@@ -95,7 +120,7 @@ $approve = [
     '/install-media-stack\.sh(?![^;&|\n]*--(stop-app|start-app|help)\b)/' => 'runs the media installer, which can delete app settings and data',
 ];
 foreach ($approve as $re => $why) {
-    $hit = preg_match($re, $command);
+    $hit = guardMatch($re, $texts);
     if ($hit === false) {
         $why = 'a command too long or complex to check'; // fail toward asking the user, never allow
     }

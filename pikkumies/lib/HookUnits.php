@@ -19,14 +19,18 @@ class HookUnits
         return Config::root() . '/hooks';
     }
 
-    /** Every unit with its parsed hook.md and problems (an empty 'errors' list means usable), by category then name. */
+    /**
+     * Every unit with its parsed hook.md and problems (an empty 'errors' list means usable), by category then name.
+     * Every hooks/<category>/<hook>/ directory is a unit, also one whose hook.md is missing or unreadable:
+     * a broken hook.md must show up as a broken unit, never make the unit disappear.
+     */
     public static function all($hooksDir = null)
     {
         $units = [];
-        foreach ((array) glob(($hooksDir ?: self::hooksDir()) . '/*/*/hook.md') as $file) {
-            $dir = dirname($file);
+        foreach ((array) glob(($hooksDir ?: self::hooksDir()) . '/*/*', GLOB_ONLYDIR) as $dir) {
             $name = basename($dir);
-            list($meta, $body) = self::frontmatter((string) file_get_contents($file));
+            $file = "$dir/hook.md";
+            list($meta, $body) = self::frontmatter(is_file($file) ? (string) file_get_contents($file) : '');
             $u = ['category' => basename(dirname($dir)), 'name' => $name, 'dir' => $dir, 'meta' => $meta, 'body' => $body,
                 'script' => "$dir/$name.php", 'event' => isset($meta['event']) ? $meta['event'] : '',
                 'failClosed' => isset($meta['failClosed']) && $meta['failClosed'] === 'true',
@@ -53,8 +57,8 @@ class HookUnits
             if ($u['timeout'] < 1 || $u['timeout'] > self::MAX_TIMEOUT) {
                 $u['errors'][] = 'timeout must be whole seconds from 1 to ' . self::MAX_TIMEOUT;
             }
-            if (!is_file("$dir/README.md") || !is_file($u['script'])) {
-                $u['errors'][] = "README.md and $name.php are required";
+            if (!is_file($file) || !is_file("$dir/README.md") || !is_file($u['script'])) {
+                $u['errors'][] = "hook.md, README.md and $name.php are required";
             }
             $units[] = $u;
         }
@@ -63,14 +67,15 @@ class HookUnits
 
     /**
      * The units that declare this event, in name order (the order the orchestrator runs them).
-     * Units with problems are included: the orchestrator refuses a broken failClosed unit instead of
-     * silently skipping it.
+     * Units with problems are included: the orchestrator refuses a broken unit on pre_tool_call instead of
+     * silently skipping it. For pre_tool_call that is every broken unit, whatever event it declares: a
+     * broken hook.md cannot be trusted to say which event or failClosed it meant.
      */
     public static function forEvent($event, $hooksDir = null)
     {
         $out = [];
         foreach (self::all($hooksDir) as $u) {
-            if ($u['event'] === $event) {
+            if ($u['event'] === $event || ($u['errors'] && $event === 'pre_tool_call')) {
                 $out[] = $u;
             }
         }

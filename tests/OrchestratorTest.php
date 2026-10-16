@@ -173,7 +173,7 @@ return [
         ]);
         $e = HermesConfig::hookEntries("$tree/pikkumies/hooks");
         check(array_keys($e) === ['pre_llm_call', 'pre_tool_call'], 'entries: ' . json_encode($e));
-        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " $tree/pikkumies/hooks/orchestrator.php pre_tool_call", 'failClosed' => true, 'timeout' => 19], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call']));
+        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call", 'failClosed' => true, 'timeout' => 19], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call']));
         check($e['pre_llm_call']['failClosed'] === false && $e['pre_llm_call']['timeout'] === 5, 'pre_llm_call entry: ' . json_encode($e['pre_llm_call']));
         $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], $e);
         check(substr_count($y, '    - command: ') === 2 && substr_count($y, 'fail_closed: true') === 1 && strpos($y, "hooks_auto_accept: true\n") !== false, 'yaml: ' . $y);
