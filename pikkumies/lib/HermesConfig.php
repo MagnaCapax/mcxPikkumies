@@ -137,8 +137,9 @@ class HermesConfig
             $y .= "hooks:\n";
             foreach ($hooks as $event => $h) {
                 // One orchestrator entry per event (ADR-0030). Hooks are safety prompts, not security
-                // (AGENTS.md), so an event stays at the Hermes default (a hook that errors or times out
-                // lets the call run) unless one of its units fails closed, like the delete guard (ADR-0020).
+                // (AGENTS.md): only pre_tool_call fails closed, because that is where the delete guard
+                // runs (ADR-0020); every other event stays at the Hermes default (a hook that errors or
+                // times out lets the call run), whatever any of its own units declare.
                 $y .= "  " . $event . ":\n    - command: " . self::q($h['command']) . "\n      timeout: " . (int) $h['timeout'] . "\n"
                     . (!empty($h['failClosed']) ? "      fail_closed: true\n" : '');
             }

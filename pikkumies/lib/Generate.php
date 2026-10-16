@@ -35,7 +35,7 @@ class Generate
             $result['error'] = "cannot create $outDir";
             return $result;
         }
-        $lock = fopen(dirname($outDir) . '/.generate.lock', 'c');
+        $lock = @fopen(dirname($outDir) . '/.generate.lock', 'c');
         if ($lock === false || !flock($lock, LOCK_EX)) {
             $result['error'] = 'cannot take the generate lock';
             return $result;
