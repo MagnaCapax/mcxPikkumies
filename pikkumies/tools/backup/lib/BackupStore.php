@@ -118,6 +118,10 @@ class BackupStore
 
     private function write($file, $content)
     {
+        if (!is_string($content)) {
+            throw new CliError("cannot store the {$this->tool} settings: the data could not be encoded as JSON (not valid UTF-8?)",
+                're-check the value just entered and try again');
+        }
         $dir = dirname($file);
         if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
             throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');

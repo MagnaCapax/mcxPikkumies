@@ -81,7 +81,11 @@ class Http
             return 'not an http or https address with a host name; not connecting';
         }
         $host = strtolower(rtrim(trim($u['host'], '[]'), '.'));
-        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (array) @gethostbynamel($host);
+        // gethostbynamel() returns false, not [], when it cannot resolve: (array) false is [false],
+        // a one-element truthy array, not an empty one, so the "cannot resolve" check below never
+        // fired for this failure. is_array() keeps that check live for a real DNS failure.
+        $v4 = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : @gethostbynamel($host);
+        $ips = is_array($v4) ? $v4 : [];
         if (!filter_var($host, FILTER_VALIDATE_IP) && function_exists('dns_get_record')) {
             foreach ((array) @dns_get_record($host, DNS_AAAA) as $r) {
                 if (isset($r['ipv6'])) {

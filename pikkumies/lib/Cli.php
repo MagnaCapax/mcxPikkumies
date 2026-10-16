@@ -137,8 +137,10 @@ class Cli
                 $r = array_intersect_key($r, $fields);
             }
             $line = self::json($r);
-            if (strlen($line) > self::BUDGET) {
-                $r = ['record' => $offset + $n, 'error' => 'record larger than ' . self::BUDGET . ' bytes; ask for fewer fields with --fields'];
+            if ($line === '' || strlen($line) > self::BUDGET) {
+                $r = ['record' => $offset + $n, 'error' => $line === ''
+                    ? 'record could not be encoded as JSON (a NaN or Infinite number?)'
+                    : 'record larger than ' . self::BUDGET . ' bytes; ask for fewer fields with --fields'];
                 $line = self::json($r);
             }
             if (($limit > 0 && count($shown) >= $limit) || $bytes + strlen($line) > self::BUDGET) {

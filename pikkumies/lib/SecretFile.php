@@ -45,9 +45,13 @@ class SecretFile
             throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');
         }
         @chmod($dir, 0700);
+        $json = json_encode($fields + ['saved_at' => time()]);
+        if ($json === false) {
+            throw new CliError("cannot store the $what: the data could not be encoded as JSON (not valid UTF-8?)", 're-check the value just entered and try again');
+        }
         $tmp = $file . '.tmp' . getmypid();
         $old = umask(0077);
-        $ok = @file_put_contents($tmp, json_encode($fields + ['saved_at' => time()])) !== false;
+        $ok = @file_put_contents($tmp, $json) !== false;
         umask($old);
         if (!$ok || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
             @unlink($tmp);
