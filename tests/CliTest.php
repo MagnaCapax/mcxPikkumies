@@ -48,13 +48,6 @@ Cli::run($argv, [
     return $tool;
 }
 
-function cliLines($out)
-{
-    return array_map(function ($l) {
-        return json_decode($l, true);
-    }, array_values(array_filter(explode("\n", $out), 'strlen')));
-}
-
 return [
     'cli: JSON Lines records then one status line, exit 0' => function () {
         list($code, $out) = runPhp(cliFixtureTool(), ['list']);

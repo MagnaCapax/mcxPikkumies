@@ -57,13 +57,18 @@ header("Content-Type: application/json");
 echo json_encode(["choices" => [["message" => ["role" => "assistant", "content" => (string) @file_get_contents("$d/reply")]]]]);
 ');
         for ($try = 0; $try < 5; $try++) {
-            $port = mt_rand(20000, 60000);
+            // A port the OS just handed out, not a random one: with a random port another run's
+            // listener could answer while our server had already exited on "address in use".
+            $port = testFreePort();
             $p = proc_open('exec ' . escapeshellarg(PHP_BINARY) . " -S 127.0.0.1:$port router.php", [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $dir);
             for ($i = 0; $i < 50; $i++) {
                 $s = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
                 if ($s) {
                     fclose($s);
-                    return [$p, $port];
+                    if (proc_get_status($p)['running']) {
+                        return [$p, $port];
+                    }
+                    break; // something else answers on this port; ours exited: try another
                 }
                 usleep(100000);
             }

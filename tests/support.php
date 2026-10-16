@@ -49,3 +49,11 @@ function testWithEnv(array $vars, callable $fn)
         }
     }
 }
+
+/** The JSON Lines a tool printed, decoded; blank lines dropped. */
+function cliLines($out)
+{
+    return array_map(function ($l) {
+        return json_decode($l, true);
+    }, array_values(array_filter(explode("\n", $out), 'strlen')));
+}
