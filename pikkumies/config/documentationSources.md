@@ -71,26 +71,26 @@ Pulsed Media's customer knowledge base: billing, the affiliate program, seedboxe
 ## pm-support
 
 - type: link
-- url: https://pulsedmedia.com/clients/submitticket.php
+- url: https://pulsedmedia.com/support.php
 - trust: official
-- covers: open a Pulsed Media support ticket
+- covers: open a Pulsed Media support ticket, which department to pick, what Väinämöinen sets up for customers
 - scope: pmss
 - verified: 2026-10-16
 - status: on
 
-Where a Pulsed Media customer opens a support ticket; the same address the server's own landing page gives. Give it to the user to open; never fetch it.
+Pulsed Media's support page: the ticket links per department, what to include in a ticket, and the setup work Pulsed Media's own support agent does on request. Give it to the user to open; never fetch it.
 
 ## pm-support-charter
 
 - type: link
 - url: https://pulsedmedia.com/support-charter.php
 - trust: official
-- covers: how Pulsed Media support works and what to check before opening a ticket
+- covers: human support at Pulsed Media: ticket rules and the human response times
 - scope: pmss
-- verified: 2026-10-15
+- verified: 2026-10-16
 - status: on
 
-Pulsed Media's support charter: how support tickets work and what to check first.
+Pulsed Media's human support charter: ticket rules and time frames for the humans behind support, who step in only when the support agent cannot.
 
 ## feral-wiki
 
