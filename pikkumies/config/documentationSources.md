@@ -30,6 +30,7 @@ When sources disagree, the higher level wins for the topics it covers. The same 
 Each source is a `## name` section (lowercase letters, digits and dashes) with these lines, then a description in plain words:
 
 - `type`: `mediawiki` (a MediaWiki site; `url` is its `api.php`), `kb-json` (a knowledge base exported as JSON in the Pulsed Media format), `site` (a documentation website; `url` is its sitemap.xml, a sitemap index, or an index page that links to every page), or `link` (a support, help or status page that is never downloaded; when a search finds nothing, its address is given to the user instead).
+- `kind`: optional, which tool searches the source besides the memory search (ADR-0037): `wiki` (the provider's wiki or documentation: `tools/documentation/wiki`), `kb` (the provider's knowledge base or help center: `tools/documentation/kb`), `manual` (an app's own documentation: the memory search only) or `link` (type `link` only). Without it, `mediawiki` is a wiki, `kb-json` a kb, `site` a manual and `link` a link.
 - `url`: https only, the final address (downloads follow no redirect, except one on the same host that only adds or drops a trailing slash). Nothing downloaded may point at a Pulsed Media `/clients/` page; a `link` may, because it is only given to the user.
 - `trust`: one of the levels above.
 - `covers`: the topics this source is the authority for. Outside them it is only a lead.
@@ -106,6 +107,7 @@ Pulsed Media's human support charter: ticket rules and time frames for the human
 ## feral-wiki
 
 - type: site
+- kind: wiki
 - url: https://www.feralhosting.com/wiki/index
 - trust: official
 - covers: Feral Hosting: slots, SSH, the web manager, installing and using apps, payments, tickets
@@ -131,6 +133,7 @@ How to open a support ticket with Feral Hosting.
 ## whatbox-wiki
 
 - type: site
+- kind: wiki
 - url: https://whatbox.ca/sitemap.xml
 - trust: official
 - covers: Whatbox: the wiki (apps, SSH, connecting), plans, policies and the FAQ
@@ -156,6 +159,7 @@ Whatbox's page on getting help.
 ## ultra-docs
 
 - type: site
+- kind: wiki
 - url: https://docs.ultra.cc/sitemap.xml
 - trust: official
 - covers: Ultra.cc: connection details, applications, torrent clients, rclone, the client area, SSH utilities
@@ -193,6 +197,7 @@ Ultra.cc's status page.
 ## bytesized-wiki
 
 - type: site
+- kind: kb
 - url: https://bytesized-hosting.com/system/sitemap.xml
 - trust: official
 - covers: Bytesized Hosting: the knowledge base (apps, SSH, accounts)
@@ -207,6 +212,7 @@ Bytesized Hosting's knowledge base (wiki), the /pages/ part of its sitemap.
 ## bytesized-guides
 
 - type: site
+- kind: wiki
 - url: https://bytesized-hosting.com/system/sitemap.xml
 - trust: official
 - covers: Bytesized Hosting: how-to guides for apps on its seedboxes
@@ -233,6 +239,7 @@ How to contact Bytesized Hosting.
 ## seedhost-kb
 
 - type: site
+- kind: kb
 - url: https://www.seedhost.eu/sitemap_new.xml
 - trust: official
 - covers: Seedhost: the knowledge base (how-to, FAQ, apps)
@@ -259,6 +266,7 @@ How to contact Seedhost.
 ## rapidseedbox-help
 
 - type: site
+- kind: kb
 - url: https://help.rapidseedbox.com/sitemap.xml
 - trust: official
 - covers: RapidSeedbox: the help center (apps, SSH, accounts)
@@ -285,6 +293,7 @@ RapidSeedbox's help and support page. Off for the same reason as rapidseedbox-he
 ## hostingbydesign-docs
 
 - type: site
+- kind: wiki
 - url: https://docs.hostingby.design/sitemap.xml
 - trust: official
 - covers: HostingByDesign (formerly Seedbox.io): application hosting, getting started, connecting
@@ -298,6 +307,7 @@ HostingByDesign's documentation.
 ## seedboxio-docs
 
 - type: site
+- kind: wiki
 - url: https://docs.seedbox.io/sitemap.xml
 - trust: official
 - covers: Seedbox.io legacy services (now HostingByDesign)
@@ -335,6 +345,7 @@ HostingByDesign's client-area knowledge base, where tickets are opened too.
 ## swizzin-docs
 
 - type: site
+- kind: wiki
 - url: https://swizzin.ltd/sitemap.xml
 - trust: official
 - covers: swizzin: installing and managing apps with box, getting started, guides
@@ -360,6 +371,7 @@ swizzin's discussion forum.
 ## quickbox-docs
 
 - type: site
+- kind: wiki
 - url: https://quickbox.io/sitemap.xml
 - trust: official
 - covers: QuickBox: the dashboard, applications, the command line, settings
@@ -386,6 +398,7 @@ How to get support for QuickBox.
 ## saltbox-docs
 
 - type: site
+- kind: wiki
 - url: https://docs.saltbox.dev/sitemap.xml
 - trust: official
 - covers: Saltbox: installation, apps, the sandbox apps, reference, advanced setup

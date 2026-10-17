@@ -42,3 +42,6 @@ Today lessons are saved by `tools/memory/memory.php save` and searched, together
 
 ## References
 - ADR-0007, ADR-0011, ADR-0012, ADR-0015
+
+## Amendment 2026-10-17
+The wiki and the knowledge base are also tool units of their own (ADR-0037): `tools/documentation/wiki` and `tools/documentation/kb` search and list only those sources. This unit is unchanged: its search still covers the lessons and every source, and it keeps `refresh` and `sources`.

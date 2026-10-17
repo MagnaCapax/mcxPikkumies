@@ -73,21 +73,7 @@ Cli::run($argv, [
         return Lessons::append(isset($opt['path']) ? (string) $opt['path'] : '', Lessons::body($opt));
     },
     'list' => function ($args, $opt) {
-        $active = DocSources::active();
-        $out = [];
-        foreach ($args ?: array_keys($active) as $name) {
-            if (!isset($active[$name])) {
-                throw new CliError("$name is not an active source", 'see: pikkumies.php sources');
-            }
-            foreach ((array) glob(DocSources::cacheRoot() . "/$name/*.md") as $p) {
-                list($title, $url) = DocSources::pageInfo($p);
-                $out[] = ['source' => $name, 'title' => $title, 'url' => $url];
-            }
-        }
-        usort($out, function ($a, $b) {
-            return strnatcasecmp($a['source'] . $a['title'], $b['source'] . $b['title']);
-        });
-        return $out;
+        return DocSources::listPages($args, DocSources::active(), 'see: pikkumies.php sources');
     },
     'refresh' => function ($args, $opt) {
         $active = DocSources::active();
@@ -105,7 +91,7 @@ Cli::run($argv, [
         $host = DocSources::hostProfile();
         foreach (DocSources::load() as $name => $src) {
             $m = DocSources::meta($name);
-            $out[] = ['name' => $name, 'trust' => isset($src['trust']) ? $src['trust'] : '', 'type' => isset($src['type']) ? $src['type'] : '',
+            $out[] = ['name' => $name, 'trust' => isset($src['trust']) ? $src['trust'] : '', 'type' => isset($src['type']) ? $src['type'] : '', 'kind' => DocSources::kind($src),
                 'url' => isset($src['url']) ? $src['url'] : '', 'origin' => $src['origin'], 'status' => isset($src['status']) ? $src['status'] : 'on',
                 'scope' => isset($src['scope']) ? $src['scope'] : 'all', 'in_scope' => DocSources::inScope($src, $host),
                 'covers' => isset($src['covers']) ? $src['covers'] : '', 'problems' => DocSources::problems($src),

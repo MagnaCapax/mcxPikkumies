@@ -3,7 +3,7 @@
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): search first. Until the agent has run the memory search
  * (`tools/memory/pikkumies/pikkumies.php search`, lessons and documentation together), tool calls
  * that act are blocked with the command to run. Reading, asking the user and the search tools
- * themselves are allowed. Partner of hooks/search/search-first/.
+ * themselves (the memory unit, and the wiki and kb units' search and list) are allowed. Partner of hooks/search/search-first/.
  *
  * State: one marker file per session under local/state/search-first/, touched by the search; the
  * pre_llm_call hook touches <marker>.armed when a later turn asks something new, and the gate stays
@@ -52,7 +52,9 @@ if (preg_match(SEARCH_FIRST_TOOL . 'search\b#', $command)) {
     }
     exit(0);
 }
-if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match(SEARCH_FIRST_TOOL . '(list|sources)\b#', $command)) {
+// The wiki and kb units only read the downloaded copies (ADR-0037): allowed, but they do not open the gate (no lessons searched).
+const SEARCH_FIRST_DOCS_TOOL = '#tools/documentation/(wiki|kb)/\\1\.php["\']?(\s+--?[a-z][a-z-]*)*\s+(search|list)\b#';
+if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match(SEARCH_FIRST_TOOL . '(list|sources)\b#', $command) || preg_match(SEARCH_FIRST_DOCS_TOOL, $command)) {
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';

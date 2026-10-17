@@ -119,4 +119,28 @@ class TextSearch
         arsort($scores);
         return array_slice(array_keys($scores), 0, $limit);
     }
+
+    /**
+     * The paragraph of $path with the most distinct search words, at most $max bytes plus an ellipsis; YAML
+     * frontmatter and heading-only paragraphs are skipped. Shared by the memory search and the wiki and kb units.
+     */
+    public static function excerpt($path, $query, $max)
+    {
+        $text = preg_replace('/\A---\n.*?\n---\n/s', '', (string) @file_get_contents($path));
+        $want = array_flip(self::terms($query));
+        $best = '';
+        $bestScore = -1;
+        foreach (preg_split('/\n\s*\n/', (string) $text) as $para) {
+            if (preg_match('/\A\s*#{1,6} [^\n]*\s*\z/', $para)) {
+                continue; // a heading alone repeats the title; the excerpt is the text under it
+            }
+            $score = count(array_intersect_key(array_flip(self::terms($para)), $want));
+            if ($score > $bestScore) {
+                $best = $para;
+                $bestScore = $score;
+            }
+        }
+        $best = trim($best);
+        return strlen($best) > $max ? substr($best, 0, $max) . '…' : $best;
+    }
 }

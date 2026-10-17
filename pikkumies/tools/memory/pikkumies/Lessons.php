@@ -117,24 +117,9 @@ class Lessons
         return array_values(array_unique($out));
     }
 
-    /** The paragraph of $path that contains the most search words, at most EXCERPT bytes. */
+    /** The paragraph of $path that contains the most search words, at most EXCERPT bytes (TextSearch::excerpt). */
     public static function excerpt($path, $query)
     {
-        $text = preg_replace('/\A---\n.*?\n---\n/s', '', (string) @file_get_contents($path));
-        $want = array_flip(TextSearch::terms($query));
-        $best = '';
-        $bestScore = -1;
-        foreach (preg_split('/\n\s*\n/', (string) $text) as $para) {
-            if (preg_match('/\A\s*#{1,6} [^\n]*\s*\z/', $para)) {
-                continue; // a heading alone repeats the title; the excerpt is the text under it
-            }
-            $score = count(array_intersect_key(array_flip(TextSearch::terms($para)), $want));
-            if ($score > $bestScore) {
-                $best = $para;
-                $bestScore = $score;
-            }
-        }
-        $best = trim($best);
-        return strlen($best) > self::EXCERPT ? substr($best, 0, self::EXCERPT) . '…' : $best;
+        return TextSearch::excerpt($path, $query, self::EXCERPT);
     }
 }

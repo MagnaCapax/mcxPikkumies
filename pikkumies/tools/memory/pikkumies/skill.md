@@ -1,6 +1,6 @@
 ---
 name: pikkumies
-description: "Memory, not the built-in memory tool: search first, save and append lessons; also searches this host's provider docs and app manuals, downloaded. Search first on every task."
+description: "Memory, not the built-in memory tool: search first, save and append lessons; also searches this host's wiki, knowledge base and app manuals, downloaded. Search first on every task; the wiki and kb skills search those alone."
 ---
 
 # Memory

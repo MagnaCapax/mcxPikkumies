@@ -34,7 +34,8 @@ The first install builds the agent runtime in the background, so `doctor` may sa
 - Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)
 - Know-how for the apps on a PMSS seedbox, with the wiki pages to read: [seedbox apps](pikkumies/tools/seedbox/seedbox-apps/README.md)
 - Server administration when it has root: [server admin](pikkumies/tools/server-admin/server-admin/README.md)
-- Lessons it saves and the documentation it searches: [memory](pikkumies/tools/memory/pikkumies/README.md)
+- The provider's wiki and knowledge base, searched on your machine: [wiki](pikkumies/tools/documentation/wiki/README.md), [knowledge base](pikkumies/tools/documentation/kb/README.md)
+- Lessons it saves, searched together with all the documentation: [memory](pikkumies/tools/memory/pikkumies/README.md)
 - Longer research questions: [deep research](pikkumies/tools/research/deep-research/README.md)
 
 It is not only for server work: it answers general questions and investigates too.

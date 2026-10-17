@@ -23,12 +23,16 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Detect.php';
 require_once __DIR__ . '/TextSearch.php';
 require_once __DIR__ . '/Http.php';
+require_once __DIR__ . '/Cli.php'; // CliError from listPages
 
 class DocSources
 {
     /** Highest first. The same names are listed in config/documentationSources.md and doctrine/doctrine.md. */
     const TRUST = ['live', 'official', 'lessons', 'upstream', 'community', 'recall'];
     const TYPES = ['mediawiki', 'kb-json', 'site', 'link'];
+    /** What a source is, for the wiki and kb units (ADR-0037); the default comes from the type (KIND_BY_TYPE). */
+    const KINDS = ['wiki', 'kb', 'manual', 'link'];
+    const KIND_BY_TYPE = ['mediawiki' => 'wiki', 'kb-json' => 'kb', 'site' => 'manual', 'link' => 'link'];
     const MAX_RESPONSE = 5242880;   // bytes per HTTP response
     const MAX_PAGE = 65536;         // bytes kept per page or article
     const MAX_REQUESTS = 40;        // per refresh of one source
@@ -127,6 +131,11 @@ class DocSources
         if ($type !== 'link' && stripos($url, '/clients/') !== false) {
             $p[] = 'url must not point at a /clients/ page';
         }
+        if (isset($src['kind']) && !in_array($src['kind'], self::KINDS, true)) {
+            $p[] = 'kind must be one of: ' . implode(', ', self::KINDS);
+        } elseif (isset($src['kind']) && ($src['kind'] === 'link') !== ($type === 'link')) {
+            $p[] = 'kind link goes with type link, and only there';
+        }
         if (!in_array(isset($src['trust']) ? $src['trust'] : '', self::TRUST, true)) {
             $p[] = 'trust must be one of: ' . implode(', ', self::TRUST);
         }
@@ -155,6 +164,76 @@ class DocSources
             $p[] = 'prefix must be a path starting with /';
         }
         return $p;
+    }
+
+    /** The source's kind: its `kind` line, or the default for its type (ADR-0037). */
+    public static function kind(array $src)
+    {
+        if (isset($src['kind']) && $src['kind'] !== '') {
+            return $src['kind'];
+        }
+        $type = isset($src['type']) ? $src['type'] : '';
+        return isset(self::KIND_BY_TYPE[$type]) ? self::KIND_BY_TYPE[$type] : '';
+    }
+
+    /** Active sources of one kind (wiki, kb, manual), by name. */
+    public static function activeOfKind($kind)
+    {
+        return array_filter(self::active(), function ($src) use ($kind) {
+            return self::kind($src) === $kind;
+        });
+    }
+
+    /**
+     * Every downloaded page of the named sources (all of $active when $names is empty), by title and address,
+     * sorted by source then title. A name not in $active fails the call (CliError) and names the sources verb.
+     */
+    public static function listPages(array $names, array $active, $hint)
+    {
+        $out = [];
+        foreach ($names ?: array_keys($active) as $name) {
+            if (!isset($active[$name])) {
+                throw new CliError("$name is not an active source here", $hint);
+            }
+            foreach ((array) glob(self::cacheRoot() . "/$name/*.md") as $p) {
+                list($title, $url) = self::pageInfo($p);
+                $out[] = ['source' => $name, 'title' => $title, 'url' => $url];
+            }
+        }
+        usort($out, function ($a, $b) {
+            return strnatcasecmp($a['source'] . $a['title'], $b['source'] . $b['title']);
+        });
+        return $out;
+    }
+
+    /** A stale downloadable copy is downloaded again first (never `site`: the background fill owns those); the note says how it went. */
+    private static function refreshIfStale($name, array $src, $offline, array &$notes)
+    {
+        if (!$offline && $src['type'] !== 'site' && self::isStale($src)) {
+            list($ok, $msg) = self::refresh($src);
+            $notes[] = $name . ': ' . ($ok ? 'downloaded ' . $msg : 'download failed, using the old copy (' . $msg . ')');
+        }
+    }
+
+    /**
+     * Search only the given documentation sources (the wiki and kb units, ADR-0037): [hits, notes], each hit
+     * [path, title, source, trust, url]. Lessons and other sources are not searched; the memory search does that.
+     */
+    public static function searchSources(array $sources, $query, $limit, $offline, $share = null)
+    {
+        $notes = [];
+        $dirs = [];
+        foreach ($sources as $name => $src) {
+            self::refreshIfStale($name, $src, $offline, $notes);
+            $dirs[self::cacheRoot() . '/' . $name] = [$name, $src['trust']];
+        }
+        $hits = [];
+        foreach (TextSearch::rank(TextSearch::readDirs(array_keys($dirs)), $query, $limit, $share) as $p) {
+            list($source, $trust) = $dirs[dirname($p)];
+            list($title, $url) = self::pageInfo($p);
+            $hits[] = [$p, $title, $source, $trust, $url];
+        }
+        return [$hits, $notes];
     }
 
     /** Sources that are on, valid, meant for this host, and downloadable (not `link`). */
@@ -544,10 +623,7 @@ class DocSources
             $dirs[$d] = basename($d) === 'research' ? ['research', 'research', 1] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons', 1];
         }
         foreach (self::active() as $name => $src) {
-            if (!$offline && $src['type'] !== 'site' && self::isStale($src)) {
-                list($ok, $msg) = self::refresh($src);
-                $notes[] = $name . ': ' . ($ok ? 'downloaded ' . $msg : 'download failed, using the old copy (' . $msg . ')');
-            }
+            self::refreshIfStale($name, $src, $offline, $notes);
             $dirs[self::cacheRoot() . '/' . $name] = [$name, $src['trust'], 2];
         }
         foreach (self::peers() as $name => $src) {

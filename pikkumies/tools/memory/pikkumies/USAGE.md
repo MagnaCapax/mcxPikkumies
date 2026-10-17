@@ -16,7 +16,7 @@ P=~/pikkumies/tools/memory/pikkumies/pikkumies.php
 php $P search "rtorrent stopped disk full"
 php $P save --topic rtorrent --title "rtorrent stops on a full disk" --sources "df -h output; rtorrent log" --body-file /tmp/x/lesson.md
 php $P append --path ~/pikkumies/memory/lessons/rtorrent/20261014-rtorrent-stops-on-a-full-disk.md --body-file /tmp/x/more.md
-php $P list pm-wiki --human | grep -i docker
+php $P list pm-wiki --offset 20   # the next page of titles (next_offset); to find a page by name: wiki.php list --search <word>
 ```
 
 - The lesson text goes in a file (`--body-file`) or on stdin. Link related lessons inside the text: `[what it is about](<path printed by search>)`.
