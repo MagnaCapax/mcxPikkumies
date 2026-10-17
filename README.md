@@ -18,7 +18,7 @@ The installer needs no root and returns in seconds. It:
 - installs Hermes Agent in the background: an unmodified checkout of its newest release in `pikkumies/hermes`, set up by Hermes' own package manager (its pinned, checksum-verified uv and Python) in your own account, with no root and without Hermes' installer scripts, which would edit your shell files (ADR-0033);
 - puts `pikkumies` on your `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is already on `PATH`, otherwise one marked block added to `~/.bashrc` and `~/.profile` (never duplicated on a re-run; ADR-0022). Open a new shell (or `hash -r`) afterwards.
 
-Then set your provider, either in `~/pikkumies/local/config.php` or in a key file `~/.pikkumiesKey`:
+Then give it a model key. A platform key in `~/.virsilipasKey` (Pulsed Media puts one there for each account) is used as it is. For your own provider, write a key file `~/.pikkumiesKey`; it wins over the platform key. `~/pikkumies/local/config.php` can set the endpoint and the model, never the key.
 
 ```ini
 endpoint=https://your-openai-compatible-endpoint/v1

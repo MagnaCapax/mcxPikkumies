@@ -149,7 +149,7 @@ switch ($cmd) {
         } catch (Exception $x) {
             out('  path: not set up: ' . $x->getMessage());
         }
-        out('Next: set your provider in local/config.php or ~/.pikkumiesKey (a platform key in ~/.virsilipasKey is used too), then `pikkumies doctor`.');
+        out('Next: a platform key in ~/.virsilipasKey is used as it is; for your own provider put endpoint= and key= in ~/.pikkumiesKey (local/config.php can set the endpoint and model, never the key). Then `pikkumies doctor`.');
         out('Then open a new shell (or `hash -r`) and type `pikkumies`.');
         break;
 
@@ -303,6 +303,11 @@ switch ($cmd) {
             foreach (Update::ensureScheduled(Config::load(), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(), !empty(profile()['root']['available'])) as $msg) {
                 out('restored in your crontab: ' . $msg);
             }
+        }
+        // A session without a model key would only fail on its first request: say where the key comes from instead.
+        if (Launch::isSession($passArgs) && ($noKey = Launch::missingKeyMessage(Provider::resolve(Config::load()))) !== '') {
+            out($noKey);
+            exit(1);
         }
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
         $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';

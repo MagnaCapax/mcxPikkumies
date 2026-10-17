@@ -96,8 +96,13 @@ return [
         check(Launch::isTty($mem) === false, 'a pipe or file is not a terminal');
         fclose($mem);
         check(Launch::isSession([]) && Launch::isSession(['chat', '--query=hi']) && !Launch::isSession(['sessions', 'list']), 'isSession');
+        check(Launch::missingKeyMessage(['endpoint' => 'https://e/v1', 'key' => 'k', 'model' => '']) === '', 'a key present: no message');
+        $noKey = Launch::missingKeyMessage(['endpoint' => 'https://e/v1', 'key' => '', 'model' => '']);
+        check(strpos($noKey, 'Not starting') === 0 && strpos($noKey, '~/.virsilipasKey') !== false && strpos($noKey, '~/.pikkumiesKey') !== false, 'no key: says where it comes from: ' . $noKey);
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
         check(preg_match("/\n    case 'run':(.*?)\n    case /s", $bin, $m) === 1 && strpos($m[1], 'if (Launch::isTty() && Launch::isSession($passArgs))') !== false, 'run must ask only on a TTY');
+        check(strpos($m[1], 'Launch::isSession($passArgs) && ($noKey = Launch::missingKeyMessage(Provider::resolve(Config::load()))) !== \'\'') !== false
+            && strpos($m[1], 'missingKeyMessage') < strpos($m[1], 'HermesInstall::lock('), 'run must stop a session without a key before Hermes starts');
         check(preg_match("/\n    case 'install':(.*?)\n        break;/s", $bin, $m) === 1 && strpos($m[1], "!isset(\$installSettings['agent.name']) && Launch::isTty()") !== false, 'install must ask the name only on a TTY and without --name');
         foreach (['cron-tick', 'docs-fill'] as $case) {
             check(preg_match("/\n    case '$case':(.*?)\n    case /s", $bin, $m) === 1 && strpos($m[1], 'askName') === false && strpos($m[1], 'askTerms') === false, "$case must never ask");

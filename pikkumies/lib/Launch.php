@@ -116,6 +116,19 @@ class Launch
     }
 
     /**
+     * Why a session cannot start for lack of a model key, or '' when it can: without one Hermes would start and fail
+     * on its first request with the provider's own error. Names where a key comes from (ADR-0004).
+     */
+    public static function missingKeyMessage(array $prov)
+    {
+        if ($prov['key'] !== '') {
+            return '';
+        }
+        return 'Not starting: no model key yet. A platform key arrives in ~/.virsilipasKey (on Pulsed Media it is also shown in the client area);'
+            . ' for your own provider put endpoint= and key= lines in ~/.pikkumiesKey. Then run `pikkumies doctor`.';
+    }
+
+    /**
      * install flags -> [settings [key => typed value], acceptTerms, errors]. Only --name=, --telemetry=,
      * --perf-logging=, --retention-days= and --accept-terms; anything else is an error, so a mistyped
      * flag never installs without the setting the person meant.
