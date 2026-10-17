@@ -175,4 +175,40 @@ return [
         check(Host::ownsListener(8080, 1001, [$header, '']) === 'none', 'a short header-shaped line must never be read as a listener: '
             . Host::ownsListener(8080, 1001, [$header, '']));
     },
+    'host: every TABLE row carries a docker key: null, or PMSS\'s facts with ports, dropped ports, a recovery link, source and verified (ADR-0034)' => function () {
+        foreach (Host::TABLE as $key => $row) {
+            check(array_key_exists('docker', $row), "$key: no docker key");
+            check($row['docker'] === null || is_array($row['docker']), "$key: docker must be null or a facts array");
+        }
+        $d = Host::TABLE['pmss']['docker'];
+        check($d['daemon'] === 'platform' && $d['ports'] === [38001, 49999] && $d['inbound_dropped'] === [8080, 8112], 'pmss docker facts: ' . json_encode($d));
+        check(strncmp($d['source'], 'https://', 8) === 0 && strncmp($d['recovery'], 'https://', 8) === 0 && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d['verified']) === 1, 'source, recovery and verified');
+        check(!preg_match('/\bpkill\b|\bkill\b/', json_encode($d)), 'the recovery is a link, never a kill command');
+        check(Host::dockerFacts('generic', 'pmss') === $d && Host::dockerFacts('feral', 'none') === null && Host::dockerFacts('generic', 'none') === null, 'dockerFacts() follows logGlobs(): stack, then family');
+    },
+    'host: dockerSocket() falls back to /var/run/docker.sock only for uid 0, and tries candidates in order, through a symlinked directory too' => function () {
+        check(Host::dockerSocketCandidates(0) === ['/run/user/0/docker.sock', '/var/run/docker.sock'], 'uid 0: its runtime dir, then root\'s own daemon');
+        check(Host::dockerSocketCandidates(1000) === ['/run/user/1000/docker.sock'], 'any other uid never gets root\'s socket');
+        $dir = testTempDir('pk-docksock-cand');
+        try {
+            mkdir("$dir/real");
+            $s = @stream_socket_server("unix://$dir/real/docker.sock");
+            if ($s === false) {
+                skip('unix sockets unavailable here');
+            }
+            symlink("$dir/real", "$dir/run"); // /var/run -> /run on most systems
+            $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+            testWithEnv(['DOCKER_HOST' => null], function () use ($dir, $uid) {
+                check(Host::dockerSocket($uid, ["$dir/missing.sock", "$dir/run/docker.sock"]) === "$dir/run/docker.sock", 'the first owned candidate, reached through a symlinked directory');
+                check(Host::dockerSocket($uid + 1, ["$dir/run/docker.sock"]) === '', 'a candidate owned by another uid is refused');
+                check(Host::dockerSocket($uid, []) === '', 'no candidates, no socket');
+            });
+            testWithEnv(['DOCKER_HOST' => 'tcp://127.0.0.1:2375'], function () use ($dir, $uid) {
+                check(Host::dockerSocket($uid, ["$dir/run/docker.sock"]) === '', 'a tcp:// DOCKER_HOST wins over candidates and is refused');
+            });
+            fclose($s);
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];

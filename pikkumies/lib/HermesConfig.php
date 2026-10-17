@@ -5,7 +5,8 @@
  * - config.yaml: model provider, skills.external_dirs (the skills generated from the tool units,
  *   ADR-0015), shell hooks.
  *   A local skill must not reuse a shipped name: Hermes refuses an ambiguous name (ADR-0007).
- * - .env: provider key (0600). SOUL.md: what this machine allows (from detection) + doctrine.
+ * - .env: provider key (0600). SOUL.md: what this machine allows (from detection), tools' notices + doctrine.
+ * - scripts/pikkumies-docker-check.sh: what the scheduled Docker check runs (ADR-0034).
  * Regenerated on install, update and run; hand edits belong in local/config.php, not here.
  * Every file is written to a temporary name and renamed: a full disk leaves the old file, never an
  * empty config without the safety hooks.
@@ -30,6 +31,9 @@ class HermesConfig
         // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($home . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         self::put($home . '/SOUL.md', self::renderSoul($profile, $config));
+        list($script, $line) = self::dockerCheckScript($home);
+        @mkdir(dirname($script), 0700, true);
+        self::put($script, $line, 0700);
         return $home;
     }
 
@@ -229,7 +233,60 @@ class HermesConfig
             . (empty($config['cron']['disabled']) && !CronTick::refuses(!empty($profile['root']['available']))
                 ? "\n- Cron jobs run from crontab; ignore \"gateway is not running\", never start the gateway"
                 : '')
+            . implode('', array_map(function ($n) {
+                return "\n- Notice from " . $n['from'] . ': ' . $n['text'];
+            }, self::notices()))
             . "\n\nSkills for other machines are listed too; use one only if it matches. Tool index: " . Units::toolsDir() . "/INDEX.md.";
+    }
+
+    const NOTICES_MAX = 2;      // notice lines in SOUL.md
+    const NOTICE_BYTES = 120;   // bytes of text per line
+
+    /** Test seam: a notices directory other than local/notices. */
+    public static $noticesDir = null;
+
+    /**
+     * Short notices tools leave for the next session (ADR-0034: the scheduled Docker check), from
+     * local/notices/<name>.txt, at most NOTICES_MAX in name order: [['from' => name, 'text' => ...]]. SOUL.md is
+     * the system-prompt tier, so a notice is counts and fixed words only: a file not owned by this account, a link
+     * or a name outside [a-z0-9-] is skipped, the text is cut to NOTICE_BYTES and keeps only letters, digits, spaces
+     * and plain punctuation (no markdown, no backticks, no line breaks). The tool that wrote a notice removes it.
+     * Like tool doctrine, notices count against SOUL.md's 16000-byte total, not the 8000-byte static core.
+     */
+    public static function notices($dir = null)
+    {
+        $dir = $dir !== null ? $dir : (self::$noticesDir !== null ? self::$noticesDir : Config::localDir() . '/notices');
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $out = [];
+        foreach ((array) glob($dir . '/*.txt') as $f) {
+            $name = basename($f, '.txt');
+            if (count($out) >= self::NOTICES_MAX) {
+                break;
+            }
+            if (!preg_match('/^[a-z0-9-]{1,32}$/', $name) || is_link($f) || !is_file($f) || @fileowner($f) !== $uid) {
+                continue;
+            }
+            $text = preg_replace('/\s+/', ' ', (string) @file_get_contents($f, false, null, 0, 4096));
+            $text = preg_replace('/[^A-Za-z0-9 .,:;!?()\/_+=%@\'"-]+/', '', (string) $text);
+            $text = trim(substr(trim((string) preg_replace('/ {2,}/', ' ', (string) $text)), 0, self::NOTICE_BYTES));
+            if ($text !== '') {
+                $out[] = ['from' => $name, 'text' => $text];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The script the scheduled Docker check runs (ADR-0034): HERMES_HOME/scripts/pikkumies-docker-check.sh. Hermes
+     * runs a cron script by its extension (.sh and .bash with bash, anything else with Python; the shebang is not
+     * read, cron/scheduler_script.py in v2026.9.24) and only from its scripts directory, by a relative name. One
+     * line: the containers unit's scheduled form. Returns [path, content].
+     */
+    public static function dockerCheckScript($home = null)
+    {
+        $home = $home !== null ? $home : self::home();
+        $line = 'exec ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(Units::toolsDir() . '/containers/docker/docker.php') . " diagnose --changes\n";
+        return [$home . '/scripts/pikkumies-docker-check.sh', $line];
     }
 
     /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */

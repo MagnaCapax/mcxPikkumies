@@ -45,7 +45,9 @@ return [
     },
     'doctrine: SOUL.md is capabilities, the static doctrine, then the tool doctrine of enabled categories' => function () {
         $p = soulProfiles()['pmss+root'];
+        Generate::$dockerPresentOverride = true; // every category on, containers included (its gate: GenerateTest)
         $s = HermesConfig::renderSoul($p, Config::defaults());
+        Generate::$dockerPresentOverride = null;
         $cap = strpos($s, '# This machine');
         $safety = strpos($s, '# Safety');
         $tools = strpos($s, '## Tool doctrine');
@@ -69,14 +71,24 @@ return [
     },
     'doctrine: core SOUL <= 8000 bytes and total <= 16000 for every profile (Hermes cuts context files at 20000)' => function () {
         CronTick::$setprivPresentOverride = true; // the cron line present: the longest capability block
+        Generate::$dockerPresentOverride = true; // the containers doctrine on (it is off only without a docker CLI)
+        $notices = testTempDir('pk-soul-notices'); // two notices at their longest
+        file_put_contents("$notices/aa-longest-name-for-a-notice-32b.txt", str_repeat('n', 500));
+        file_put_contents("$notices/bb-longest-name-for-a-notice-32b.txt", str_repeat('n', 500));
         $named = Config::merge(Config::defaults(), ['agent' => ['name' => str_repeat('N', Config::NAME_MAX)]]); // the name line at its longest
         foreach (soulProfiles() as $name => $p) {
+            // Notices come and go like tool doctrine, so they count against the total, not the static core (ADR-0034).
+            HermesConfig::$noticesDir = "$notices/none";
             $core = strlen(HermesConfig::renderSoul($p, $named, false));
+            HermesConfig::$noticesDir = $notices;
             $total = strlen(HermesConfig::renderSoul($p, $named));
             check($core <= 8000, "$name: core SOUL.md is $core bytes with a " . Config::NAME_MAX . "-character name; tighten the text, keep it at or under 8000");
             check($total <= 16000, "$name: SOUL.md with tool doctrine is $total bytes; keep it at or under 16000");
         }
         CronTick::$setprivPresentOverride = null;
+        Generate::$dockerPresentOverride = null;
+        HermesConfig::$noticesDir = null;
+        testRmTree($notices);
     },
     'doctrine: a named agent gets one name line after the soul; unnamed or invalid names leave SOUL.md unchanged (ADR-0032)' => function () {
         check(HermesConfig::agentName(Config::defaults()) === 'Pikkumies', 'default name');
@@ -93,5 +105,22 @@ return [
         check(substr_count($named, $line) === 1, 'name line missing');
         check(strpos($named, $line) < strpos($named, '# Voice') && strpos($named, $line) > strpos($named, '## How you work'), 'name line must follow the soul text');
         check(strlen($named) - strlen($plain) === strlen(HermesConfig::nameLine(['agent' => ['name' => 'Helper']])), 'only the name line is added');
+    },
+    'doctrine: the containers rules reach SOUL.md only where a docker CLI exists, and its README quotes every rule word for word' => function () {
+        $p = soulProfiles()['pmss shared, no root'];
+        $rules = trim((string) file_get_contents(Units::toolsDir() . '/containers/DOCTRINE.md'));
+        try {
+            Generate::$dockerPresentOverride = true;
+            check(strpos(HermesConfig::renderSoul($p, Config::defaults()), "### containers\n\n" . $rules) !== false, 'docker present: the containers doctrine must be in SOUL.md');
+            Generate::$dockerPresentOverride = false;
+            check(strpos(HermesConfig::renderSoul($p, Config::defaults()), '### containers') === false, 'no docker CLI: no containers doctrine (no bytes paid)');
+        } finally {
+            Generate::$dockerPresentOverride = null;
+        }
+        $readme = (string) file_get_contents(Units::toolsDir() . '/containers/README.md');
+        foreach (explode("\n", $rules) as $line) {
+            check(strpos($readme, $line) !== false, "containers/README.md does not quote this DOCTRINE line: $line");
+        }
+        check(!preg_match('/\bpkill\b|\bkillall\b/', $rules), 'the containers doctrine must name the recovery outcome, never a kill command');
     },
 ];

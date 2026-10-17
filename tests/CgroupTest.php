@@ -105,4 +105,32 @@ return [
             . var_export(Cgroup::memoryMax($tmp, $self), true));
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'cgroup: usageAtLimit() reads memory and pids use where the limit is set (the user slice), not the leaf, v2 and v1; memoryCurrent() keeps the leaf' => function () {
+        list($base, $self) = cgroupV2Fixture();
+        $slice = "$base/user.slice/user-1000.slice";
+        file_put_contents("$slice/memory.current", "419430400\n"); // 400 MiB for the whole account
+        file_put_contents("$slice/pids.max", "500\n");
+        file_put_contents("$slice/pids.current", "123\n");
+        file_put_contents("$slice/session.scope/pids.max", "max\n");
+        $u = Cgroup::usageAtLimit($base, $self);
+        check($u['memory_max'] === 536870912.0 && $u['memory_current'] === 419430400.0 && $u['memory_path'] === $slice, 'v2 memory at the slice: ' . json_encode($u));
+        check($u['pids_max'] === 500 && $u['pids_current'] === 123 && $u['pids_path'] === $slice, 'v2 pids at the slice: ' . json_encode($u));
+        check(Cgroup::memoryCurrent($base, $self) === 209715200.0, 'memoryCurrent() must still read the leaf (system-status relies on it)');
+        file_put_contents("$base/user.slice/memory.max", "536870912\n"); // the same limit one level up: the topmost holder wins the tie
+        file_put_contents("$base/user.slice/memory.current", "629145600\n");
+        check(Cgroup::usageAtLimit($base, $self)['memory_path'] === "$base/user.slice", 'on a tie the topmost level (the larger usage) is the conservative one');
+        exec('rm -rf ' . escapeshellarg($base));
+        list($base, $self) = cgroupV1Fixture();
+        file_put_contents("$base/memory/user.slice/user-1000.slice/memory.usage_in_bytes", "314572800\n");
+        @mkdir("$base/pids/user.slice/user-1000.slice/session.scope", 0700, true);
+        file_put_contents("$base/pids/user.slice/user-1000.slice/pids.max", "300\n");
+        file_put_contents("$base/pids/user.slice/user-1000.slice/pids.current", "42\n");
+        file_put_contents($self, (string) file_get_contents($self) . "4:pids:/user.slice/user-1000.slice/session.scope\n");
+        $u = Cgroup::usageAtLimit($base, $self);
+        check($u['memory_current'] === 314572800.0 && $u['memory_path'] === "$base/memory/user.slice/user-1000.slice", 'v1 memory at the slice: ' . json_encode($u));
+        check($u['pids_max'] === 300 && $u['pids_current'] === 42 && $u['pids_path'] === "$base/pids/user.slice/user-1000.slice", 'v1 pids in its own hierarchy: ' . json_encode($u));
+        exec('rm -rf ' . escapeshellarg($base));
+        $none = Cgroup::usageAtLimit('/nonexistent-cg', '/nonexistent-self-cgroup');
+        check($none === ['memory_max' => null, 'memory_current' => null, 'memory_path' => null, 'pids_max' => null, 'pids_current' => null, 'pids_path' => null], 'unreadable: all null, never a guess');
+    },
 ];

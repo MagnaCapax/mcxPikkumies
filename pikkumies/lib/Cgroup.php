@@ -49,21 +49,82 @@ class Cgroup
     /** Effective memory ceiling in bytes, or null when no ancestor sets one (unlimited). */
     public static function memoryMax($base = '/sys/fs/cgroup', $selfCgroup = '/proc/self/cgroup')
     {
+        return self::minOverAncestors($base, $selfCgroup, 'memory', [self::class, 'memoryLimitAt'])[0];
+    }
+
+    /**
+     * What is used against the binding limits (ADR-0034: launch preflight), read where each limit is set, not at the
+     * leaf: memoryCurrent() is this process's own scope, which on a per-user slice says nothing about the account's
+     * other processes (the torrent client, containers). Returns memory_max, memory_current, memory_path (the ancestor
+     * with the lowest memory limit, the topmost on a tie), pids_max, pids_current, pids_path (the same for pids, its
+     * own hierarchy on cgroup v1). A value is null when unlimited or unreadable; a path is null when no level sets
+     * a limit.
+     */
+    public static function usageAtLimit($base = '/sys/fs/cgroup', $selfCgroup = '/proc/self/cgroup')
+    {
+        list($memMax, $memPath) = self::minOverAncestors($base, $selfCgroup, 'memory', [self::class, 'memoryLimitAt']);
+        list($pidsMax, $pidsPath) = self::minOverAncestors($base, $selfCgroup, 'pids', [self::class, 'pidsLimitAt']);
+        return [
+            'memory_max' => $memMax,
+            'memory_current' => $memPath === null ? null : self::numberIn($memPath, ['memory.current', 'memory.usage_in_bytes']),
+            'memory_path' => $memPath,
+            'pids_max' => $pidsMax === null ? null : (int) $pidsMax,
+            'pids_current' => $pidsPath === null ? null : self::intOrNull(self::numberIn($pidsPath, ['pids.current'])),
+            'pids_path' => $pidsPath,
+        ];
+    }
+
+    /** [lowest limit over the ancestors of $controller, the directory holding it], [null, null] when none sets one. */
+    private static function minOverAncestors($base, $selfCgroup, $controller, callable $limitAt)
+    {
         $min = null;
-        foreach (self::ancestorPaths($base, $selfCgroup, 'memory') as $p) {
-            if (is_file("$p/memory.max")) {
-                $raw = trim((string) @file_get_contents("$p/memory.max"));
-                if ($raw !== '' && $raw !== 'max' && is_numeric($raw)) {
-                    $min = $min === null ? (float) $raw : min($min, (float) $raw);
-                }
-            } elseif (is_file("$p/memory.limit_in_bytes")) {
-                $raw = trim((string) @file_get_contents("$p/memory.limit_in_bytes"));
-                if ($raw !== '' && is_numeric($raw) && (float) $raw < self::V1_UNLIMITED_FLOOR) {
-                    $min = $min === null ? (float) $raw : min($min, (float) $raw);
-                }
+        $at = null;
+        foreach (self::ancestorPaths($base, $selfCgroup, $controller) as $p) {
+            $v = call_user_func($limitAt, $p);
+            if ($v !== null && ($min === null || $v < $min)) {
+                $min = $v;
+                $at = $p;
             }
         }
-        return $min;
+        return [$min, $at];
+    }
+
+    /** The memory limit set at directory $p (v2 memory.max, v1 memory.limit_in_bytes), or null for none/unset. */
+    private static function memoryLimitAt($p)
+    {
+        if (is_file("$p/memory.max")) {
+            $raw = trim((string) @file_get_contents("$p/memory.max"));
+            return $raw !== '' && $raw !== 'max' && is_numeric($raw) ? (float) $raw : null;
+        }
+        if (is_file("$p/memory.limit_in_bytes")) {
+            $raw = trim((string) @file_get_contents("$p/memory.limit_in_bytes"));
+            return $raw !== '' && is_numeric($raw) && (float) $raw < self::V1_UNLIMITED_FLOOR ? (float) $raw : null;
+        }
+        return null;
+    }
+
+    /** The pids limit set at directory $p (pids.max, the same file on v1 and v2), or null for "max"/unset. */
+    private static function pidsLimitAt($p)
+    {
+        $raw = is_file("$p/pids.max") ? trim((string) @file_get_contents("$p/pids.max")) : '';
+        return $raw !== '' && ctype_digit($raw) ? (float) $raw : null;
+    }
+
+    /** The number in the first of $files that exists in $dir, or null. */
+    private static function numberIn($dir, array $files)
+    {
+        foreach ($files as $file) {
+            if (is_file("$dir/$file")) {
+                $raw = trim((string) @file_get_contents("$dir/$file"));
+                return is_numeric($raw) ? (float) $raw : null;
+            }
+        }
+        return null;
+    }
+
+    private static function intOrNull($v)
+    {
+        return $v === null ? null : (int) $v;
     }
 
     /** This process's own current memory usage in bytes (leaf cgroup only; a usage counter, not a limit), or null. */

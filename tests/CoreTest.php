@@ -58,9 +58,14 @@ return [
         check($m['l'] === ['y', 'z'], 'list not replaced');
     },
     'tools: tools.disabled leaves categories out; root.disabled hides server-admin' => function () {
-        check(Generate::disabledCategories(Config::defaults()) === [], 'defaults must load every category');
-        check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']], 'root' => ['disabled' => false]]) === ['seedbox'], 'tools.disabled ignored');
-        check(in_array('server-admin', Generate::disabledCategories(['root' => ['disabled' => true]]), true), 'root.disabled must hide the server-admin category');
+        Generate::$dockerPresentOverride = true; // the docker CLI gate has its own test (GenerateTest)
+        try {
+            check(Generate::disabledCategories(Config::defaults()) === [], 'defaults must load every category');
+            check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']], 'root' => ['disabled' => false]]) === ['seedbox'], 'tools.disabled ignored');
+            check(in_array('server-admin', Generate::disabledCategories(['root' => ['disabled' => true]]), true), 'root.disabled must hide the server-admin category');
+        } finally {
+            Generate::$dockerPresentOverride = null;
+        }
     },
     'soul stays within its size budget (sent to the model on every turn)' => function () {
         // Core (without tool doctrine) <= 8000, total <= 16000; every profile is checked in DoctrineTest (ADR-0029).

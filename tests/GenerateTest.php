@@ -55,4 +55,30 @@ return [
         $v = Units::verbs("text\n| verb | arguments | changes | what it does |\n|---|---|---|---|\n| show | `<id>` | no | One \\| two. |\n\nafter\n| x | y | z | w |\n");
         check(count($v) === 1 && $v[0]['verb'] === 'show' && $v[0]['does'] === 'One | two.', 'verbs parse: ' . json_encode($v));
     },
+    'generate: containers is left out when no docker CLI is on PATH or in ~/bin, recomputed each call, whatever the daemon does (ADR-0034)' => function () {
+        $dir = testTempDir('pk-gen-docker');
+        try {
+            mkdir("$dir/bin");
+            mkdir("$dir/home/bin", 0700, true);
+            testWithEnv(['PATH' => "$dir/bin", 'HOME' => "$dir/home"], function () use ($dir) {
+                check(Generate::disabledCategories([]) === ['containers'], 'no docker anywhere: containers off');
+                check(Generate::disabledCategories(['tools' => ['disabled' => ['containers']]]) === ['containers'], 'switched off and missing: listed once');
+                touch("$dir/home/bin/docker");
+                chmod("$dir/home/bin/docker", 0755);
+                check(Generate::disabledCategories([]) === [], '~/bin/docker counts (PMSS puts helpers there); a down daemon does not remove the category');
+                unlink("$dir/home/bin/docker");
+                touch("$dir/bin/docker");
+                check(Generate::disabledCategories([]) === ['containers'], 'a docker file that is not executable is not a CLI');
+                chmod("$dir/bin/docker", 0755);
+                check(Generate::disabledCategories([]) === [], 'docker on PATH: containers on');
+            });
+            Generate::$dockerPresentOverride = false;
+            check(in_array('containers', Generate::disabledCategories(Config::defaults()), true), 'the test seam turns the gate off');
+            Generate::$dockerPresentOverride = true;
+            check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']]]) === ['seedbox'], 'with docker present only the user\'s list counts');
+        } finally {
+            Generate::$dockerPresentOverride = null;
+            testRmTree($dir);
+        }
+    },
 ];

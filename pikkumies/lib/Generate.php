@@ -11,17 +11,36 @@
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Units.php';
 require_once __DIR__ . '/HookUnits.php';
+require_once __DIR__ . '/Host.php';
 
 class Generate
 {
-    /** Categories the user switched off: tools.disabled, plus server-admin when root.disabled. */
+    /** Test seam: a docker CLI presence other than this machine's real PATH and ~/bin. */
+    public static $dockerPresentOverride = null;
+
+    /**
+     * Categories left out: what the user switched off (tools.disabled, plus server-admin when root.disabled) and
+     * what this machine cannot use (unavailableCategories). The one list for skills, the tool index and the SOUL.md
+     * tool doctrine.
+     */
     public static function disabledCategories(array $config)
     {
         $off = isset($config['tools']['disabled']) ? (array) $config['tools']['disabled'] : [];
         if (!empty($config['root']['disabled'])) {
             $off[] = 'server-admin';
         }
-        return array_values(array_unique($off));
+        return array_values(array_unique(array_merge($off, self::unavailableCategories())));
+    }
+
+    /**
+     * Categories whose program is missing here, recomputed on every run, never written to the config:
+     * containers when no `docker` CLI is on PATH or in ~/bin (ADR-0034). Only the CLI decides, never the
+     * daemon's health: a daemon that is down is when the containers tools are needed.
+     */
+    public static function unavailableCategories()
+    {
+        $docker = self::$dockerPresentOverride !== null ? (bool) self::$dockerPresentOverride : Host::markerPresent('docker');
+        return $docker ? [] : ['containers'];
     }
 
     /** Returns ['skills' => n, 'written' => n, 'removed' => n, 'problems' => [unit => [..]], 'error' => '']. */

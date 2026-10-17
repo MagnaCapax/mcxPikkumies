@@ -27,7 +27,10 @@ class Host
      * log path relative to $HOME, ...], limitsSource: the unprivileged command/file that exposes
      * resource limits, or null, source: the URL the row was built from, verified: the date that URL
      * was read directly (this session), or null when the row rests on research of that URL rather
-     * than a direct read}.
+     * than a direct read, docker: the provider's facts for the user's own Docker daemon, or null when
+     * it documents none (ADR-0034): {daemon: 'platform' when the provider starts and watches it,
+     * ports: [low, high] preferred host-port window, inbound_dropped: ports the firewall drops from
+     * outside, recovery: the provider page for a wedged daemon, source, verified (as above)}}.
      *
      * "What.CD" in the 2026-10-14 request is read as Whatbox (What.CD was a closed music tracker;
      * no detectable platform of that name exists, ADR-0019).
@@ -41,6 +44,22 @@ class Host
             'limitsSource' => 'userShowLimits',
             'source'       => 'https://github.com/MagnaCapax/PMSS/blob/main/etc/skel/bin/userShowLimits',
             'verified'     => '2026-10-15',
+            // Read in the PMSS tree at c8ba1754 on 2026-10-17: the platform starts each enabled account's
+            // rootless daemon (docs/docker-help.md "Rootless Docker is started automatically ... by cron
+            // watchdogs"); the service-port allocator owns 2000-38000 (scripts/lib/portManager.php:15-16), so
+            // 38001-49999 is a preference window for container ports, not a clear one (outbound connections
+            // may hold any port above 38000: probe before use); the firewall drops inbound 8080 and 8112
+            // (scripts/util/setupNetwork.php:121-122). `recovery` is a link, not a command: the documented
+            // wedged-daemon step and the watchdog's own process match disagree (2026-10-17 review), so the
+            // tool shows the page and checks afterwards that no daemon process of the account is left.
+            'docker'       => [
+                'daemon'          => 'platform',
+                'ports'           => [38001, 49999],
+                'inbound_dropped' => [8080, 8112],
+                'recovery'        => 'https://github.com/MagnaCapax/PMSS/blob/main/docs/docker-help.md#troubleshooting',
+                'source'          => 'https://github.com/MagnaCapax/PMSS/blob/main/docs/docker-help.md',
+                'verified'        => '2026-10-17',
+            ],
         ],
         'feral' => [
             'type'         => 'provider',
@@ -50,6 +69,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://www.feralhosting.com/wiki/getting-started/newbie-info',
             'verified'     => '2026-10-15', // orchestrator re-checked this page directly this session
+            'docker'       => null,
         ],
         'whatbox' => [
             'type'         => 'provider',
@@ -59,6 +79,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://whatbox.ca/wiki/SSH', // "Enter ssh user@server.whatbox.ca"
             'verified'     => '2026-10-15',
+            'docker'       => null,
         ],
         'ultra' => [
             'type'         => 'provider',
@@ -70,6 +91,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://docs.ultra.cc/unofficial-ssh-utilities/disktraffic-usage-command',
             'verified'     => '2026-10-15', // orchestrator re-checked this page directly this session
+            'docker'       => null,
         ],
         'bytesized' => [
             'type'         => 'provider',
@@ -79,6 +101,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://bytesized-hosting.com/pages/ssh', // "servername.bytesized-hosting.com"; bysh.me is research only
             'verified'     => '2026-10-15',
+            'docker'       => null,
         ],
         'seedhost' => [
             'type'         => 'provider',
@@ -91,6 +114,7 @@ class Host
             // only reliably identifies a Shared App Hosting slot, not a Dedicated/renamed box.
             'source'       => 'https://www.seedhost.eu/client-area/knowledgebase/247/File-transfer-between-servers.html', // "server.seedhost.eu with your destination server hostname"
             'verified'     => '2026-10-15',
+            'docker'       => null,
         ],
         'hostingbydesign' => [
             'type'         => 'provider', // Seedbox.io's successor
@@ -100,6 +124,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://docs.hostingby.design/application-hosting/getting-started/how-do-i-connect', // "ssh dan@app02.hostingby.design"
             'verified'     => '2026-10-15',
+            'docker'       => null,
         ],
         // NO rapidseedbox row: seedbox.vip is confirmed only for app-proxy endpoints
         // (rt-*.a.seedbox.vip), not as the SSH-reachable shell hostname (providers.md).
@@ -111,6 +136,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://swizzin.ltd/dev/structure',
             'verified'     => null, // marker path not found on this page when re-checked 2026-10-15; research only
+            'docker'       => null,
         ],
         'quickbox' => [
             'type'         => 'stack',
@@ -120,6 +146,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://github.com/Stonedestroyer/QuickBox',
             'verified'     => '2026-10-15', // /srv/rutorrent appears on this page
+            'docker'       => null,
         ],
         'saltbox' => [
             'type'         => 'stack',
@@ -129,6 +156,7 @@ class Host
             'limitsSource' => null,
             'source'       => 'https://docs.saltbox.dev/saltbox/basics/paths/',
             'verified'     => null, // marker path not found on this page when re-checked 2026-10-15; research only
+            'docker'       => null,
         ],
     ];
 
@@ -210,8 +238,11 @@ class Host
         return false;
     }
 
-    /** A marker is a filesystem path (starts with "/", checked under $root) or an executable name on PATH or in ~/bin. */
-    private static function markerPresent($marker, $root = '')
+    /**
+     * A marker is a filesystem path (starts with "/", checked under $root) or an executable name on PATH or in
+     * ~/bin. Public for Generate's category gate (a `docker` CLI present, ADR-0034).
+     */
+    public static function markerPresent($marker, $root = '')
     {
         if ($marker === '') {
             return false;
@@ -289,14 +320,44 @@ class Host
 
     /**
      * The user's own Docker daemon socket: DOCKER_HOST when it is unix:// and the socket is this user's, else
-     * /run/user/<uid>/docker.sock (the address PMSS exports, etc/skel/.bashrc:284) when it is this user's. '' otherwise:
-     * tcp:// and a daemon run by root or another account are never used. The *ARR and media units share this rule.
+     * the first of dockerSocketCandidates() that is this user's. '' otherwise: tcp:// and a daemon run by root or
+     * another account are never used. The *ARR, media and containers units share this rule. $candidates (test
+     * seam): socket paths tried instead of the defaults; DOCKER_HOST still comes first.
      */
-    public static function dockerSocket($uid)
+    public static function dockerSocket($uid, ?array $candidates = null)
     {
         $env = getenv('DOCKER_HOST');
-        $path = $env !== false && $env !== '' ? (strncmp($env, 'unix://', 7) === 0 ? substr($env, 7) : '') : "/run/user/$uid/docker.sock";
-        return $path !== '' && self::ownsSocket($path, $uid) ? $path : '';
+        if ($env !== false && $env !== '') {
+            $path = strncmp($env, 'unix://', 7) === 0 ? substr($env, 7) : '';
+            return $path !== '' && self::ownsSocket($path, $uid) ? $path : '';
+        }
+        foreach ($candidates !== null ? $candidates : self::dockerSocketCandidates($uid) as $path) {
+            if (self::ownsSocket($path, $uid)) {
+                return $path;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Where an account's own daemon listens when DOCKER_HOST is unset: /run/user/<uid>/docker.sock (the
+     * rootless address PMSS exports, etc/skel/.bashrc:284), and for uid 0 also /var/run/docker.sock, which
+     * is then root's own daemon (ADR-0034). For any other uid that socket is root's, never used.
+     */
+    public static function dockerSocketCandidates($uid)
+    {
+        return (int) $uid === 0 ? ['/run/user/0/docker.sock', '/var/run/docker.sock'] : ["/run/user/$uid/docker.sock"];
+    }
+
+    /** The docker facts TABLE documents for $stack or $family (null when none), like logGlobs(). */
+    public static function dockerFacts($family, $stack)
+    {
+        foreach ([$stack, $family] as $key) {
+            if (isset(self::TABLE[$key])) {
+                return self::TABLE[$key]['docker'];
+            }
+        }
+        return null;
     }
 
     /** True when $path is a unix socket owned by $uid. */
