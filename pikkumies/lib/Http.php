@@ -13,9 +13,13 @@ class Http
 
     /**
      * Options: headers (list of "Name: value"), body (string), timeout (s, default 15),
-     * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener, or 'system').
+     * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener, or 'system'),
+     * discard (true: count the response bytes and keep none, for a throughput test; reaching max or the timeout
+     * after the first byte ends the transfer and is not an error).
      * Returns ['code' => int (0 when no response), 'body' => string, 'headers' => [lowercase name => [values]],
-     * 'error' => string].
+     * 'error' => string]; with discard also 'bytes' (received), 'total_time' and 'start_time' (s, curl's own
+     * clock: whole transfer, and until the first byte) and 'stopped' ('bytes', 'time' or null when it ended itself);
+     * a transfer that broke off after some bytes keeps its HTTP code next to the error.
      */
     public static function request($method, $url, array $o = [])
     {
@@ -27,6 +31,9 @@ class Http
             return ['code' => 0, 'body' => '', 'headers' => [], 'error' => $refusal];
         }
         $max = isset($o['max']) ? (int) $o['max'] : self::MAX;
+        $discard = !empty($o['discard']);
+        $bytes = 0;
+        $stopped = null;
         $body = '';
         $headers = [];
         $ch = curl_init($url);
@@ -39,7 +46,14 @@ class Http
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_USERAGENT => isset($o['agent']) ? $o['agent'] : 'pikkumies',
             CURLOPT_HTTPHEADER => isset($o['headers']) ? $o['headers'] : [],
-            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$body, $max) {
+            CURLOPT_WRITEFUNCTION => $discard ? function ($ch, $chunk) use (&$bytes, &$stopped, $max) {
+                $bytes += strlen($chunk); // counted, never kept: a 512 MiB test costs no memory
+                if ($bytes >= $max) {
+                    $stopped = 'bytes';
+                    return 0; // curl ends the transfer here
+                }
+                return strlen($chunk);
+            } : function ($ch, $chunk) use (&$body, $max) {
                 $body .= $chunk;
                 return strlen($body) > $max ? 0 : strlen($chunk);
             },
@@ -58,6 +72,17 @@ class Http
         $ok = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err = curl_error($ch);
+        if ($discard) {
+            if ($stopped === null && curl_errno($ch) === 28 && $bytes > 0) {
+                $stopped = 'time'; // CURLE_OPERATION_TIMEDOUT after data arrived: the time cap, not a failure
+            }
+            $failed = $ok === false && $stopped === null;
+            $r = ['code' => $failed && $bytes === 0 ? 0 : $code, 'body' => '', 'headers' => $headers, 'error' => $failed ? $err : '', 'bytes' => $bytes,
+                'total_time' => round((float) curl_getinfo($ch, CURLINFO_TOTAL_TIME), 3), 'start_time' => round((float) curl_getinfo($ch, CURLINFO_STARTTRANSFER_TIME), 3),
+                'stopped' => $stopped];
+            curl_close($ch);
+            return $r;
+        }
         curl_close($ch);
         if (strlen($body) > $max) {
             return ['code' => $code, 'body' => '', 'headers' => $headers, 'error' => "response larger than $max bytes"];

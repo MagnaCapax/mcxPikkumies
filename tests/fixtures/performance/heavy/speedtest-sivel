@@ -1,0 +1,4 @@
+<?php
+/** Fake speedtest-cli (the Python one, which also installs a `speedtest` command): `--version` names itself and Python. */
+require __DIR__ . '/fakelib.php';
+perfFake(basename($argv[0]), $argv, in_array('--version', $argv, true) ? "speedtest-cli 2.1.3\nPython 3.11.2 (main) [GCC 12.2.0]\n" : "{\"download\": 1.0}\n");

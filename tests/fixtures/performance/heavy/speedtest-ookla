@@ -1,0 +1,10 @@
+<?php
+/** Fake Ookla speedtest: `--version` names Ookla; any other run prints a --format=json result with the server, ISP and address fields the real one has. */
+require __DIR__ . '/fakelib.php';
+if (in_array('--version', $argv, true)) {
+    perfFake('speedtest', $argv, "Speedtest by Ookla 1.2.0.84 (ea6b6773cf) Linux/x86_64-linux-musl 6.1.0 x86_64\n");
+}
+perfFake('speedtest', $argv, json_encode(['type' => 'result', 'ping' => ['jitter' => 0.2, 'latency' => 1.9], 'packetLoss' => 0,
+    'download' => ['bandwidth' => 117000000, 'bytes' => 1100000000, 'elapsed' => 9000],
+    'upload' => ['bandwidth' => 110000000, 'bytes' => 1000000000, 'elapsed' => 9000], 'isp' => 'FAKE-ISP-NAME',
+    'interface' => ['externalIp' => '192.0.2.77'], 'server' => ['host' => 'fake-speed-server.example', 'ip' => '198.51.100.99']], JSON_UNESCAPED_SLASHES) . "\n");
