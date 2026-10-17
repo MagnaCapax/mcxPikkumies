@@ -42,4 +42,8 @@ return [
         check($skip !== false && $skip < strpos($tick, 'HermesInstall::lock(') && $skip < strpos($tick, 'exec('), 'hasJobs must come first');
         check(strpos($tick, 'CronTick::lowPriority($tickArgv)') !== false, 'the tick runs through lowPriority');
     },
+    'unattended build: the build nobody started runs through lowPriority, a user-started one does not' => function () {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php');
+        check(strpos($src, '$unattended ? CronTick::lowPriority($build) : $build') !== false, 'ensure() must lower the priority of an unattended build only');
+    },
 ];

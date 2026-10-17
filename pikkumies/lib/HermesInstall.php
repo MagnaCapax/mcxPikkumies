@@ -438,7 +438,10 @@ class HermesInstall
         $lock = self::includeDir() . '/.hermes-build.lock';
         $log = self::localDir() . '/install.log';
         // No build step may gain privileges (upstream's libatomic step would try sudo), so setpriv where it exists.
-        $argv = array_merge(['flock', '-n', $lock], CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], self::buildProcess($tag, $optionalTools));
+        // A build nobody started (the daily update's) runs at idle I/O and lowest CPU priority, so it never competes
+        // with the account's downloads or its neighbours; one the user starts keeps normal priority so it cannot stall.
+        $build = self::buildProcess($tag, $optionalTools);
+        $argv = array_merge(['flock', '-n', $lock], CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], $unattended ? CronTick::lowPriority($build) : $build);
         // flock -n: if a build already runs, this one exits at once and leaves it alone.
         exec('nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
         return $note . 'building ' . $tag . ' in the background (log: local/install.log)';
