@@ -319,7 +319,7 @@ class DockerCli
     private static function firstLine($text)
     {
         $lines = preg_split('/\r\n|\r|\n/', trim((string) $text));
-        return $lines && $lines[0] !== '' ? substr($lines[0], 0, 300) : null;
+        return $lines && $lines[0] !== '' ? substr($lines[0], 0, Cli::TEXT_MAX) : null;
     }
     /** Docker's own warnings that a per-container limit is unsupported (a swap warning alone is not one). */
     const LIMIT_WARNING_RE = '/\bNo (memory limit|cpu cfs quota|cpu cfs period|cpu shares|pids limit) support/i';

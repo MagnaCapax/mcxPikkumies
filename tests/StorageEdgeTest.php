@@ -171,6 +171,14 @@ return [
         check(strpos($out, 'Platform:') === false, 'the Platform: footer line must never be chosen as the cause, even though it matches /error/i: ' . $out);
         check(strpos($out, 'tail line 4') !== false, 'the real tail must still be kept: ' . $out);
     },
+    'ToolText::tail(): a long error is kept whole up to Cli::TEXT_MAX, so the agent reads the real message' => function () {
+        $msg = 'Error: repository check failed: ' . str_repeat('segment 0123456789 ', 60) . 'END-OF-ERROR';
+        check(strlen($msg) > 1000 && strlen($msg) < Cli::TEXT_MAX, 'fixture size');
+        $out = ToolText::tail($msg);
+        check(strpos($out, 'Error: repository check failed') === 0 && strpos($out, 'END-OF-ERROR') !== false, 'a ' . strlen($msg) . '-byte error must survive whole: ' . substr($out, 0, 80));
+        $huge = ToolText::tail(str_repeat('x', Cli::TEXT_MAX * 2));
+        check(strlen($huge) <= Cli::TEXT_MAX + 3, 'an oversized error is still bounded: ' . strlen($huge));
+    },
     'ToolText::redact(): a restic-style URL whose password itself contains @ is redacted up to the LAST @; credential-free text and null pass through unchanged' => function () {
         $r = ToolText::redact('rest:https://user:pa@ss@host:8000/repo');
         check($r === 'rest:https://user:REDACTED@host:8000/repo', 'password containing @ not redacted to the last @: ' . $r);

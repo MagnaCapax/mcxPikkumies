@@ -25,6 +25,7 @@ class Cli
 {
     const BUDGET = 16384;   // bytes of records per call: well under Hermes' 50,000-byte terminal cap, whole records only
     const LIMIT = 20;       // records per call unless --limit says otherwise
+    const TEXT_MAX = 4000;  // bytes of one free-text field (an error, a log line): a whole error fits, a record stays under BUDGET
     /** On/off options every tool takes. --yes is the confirmation a person types by hand (ADR-0020). */
     const GLOBAL_FLAGS = ['human', 'jsonl', 'help', 'yes', 'verbs'];
     /** Field names (lower-cased) that are never printed: rpc_password, webUiPassword, x-api-key, Authorization... */

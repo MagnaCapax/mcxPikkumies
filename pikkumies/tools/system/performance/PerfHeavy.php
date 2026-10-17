@@ -391,6 +391,6 @@ class PerfHeavy
     private static function firstLine($text)
     {
         $line = trim((string) strtok(trim((string) $text), "\n"));
-        return substr(Cli::cleanString($line), 0, 300);
+        return substr(Cli::cleanString($line), 0, Cli::TEXT_MAX);
     }
 }

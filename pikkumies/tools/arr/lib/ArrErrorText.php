@@ -6,7 +6,7 @@
  */
 class ArrErrorText
 {
-    /** At most 600 characters; a body that is not JSON gives its first 300 characters of text. */
+    /** At most Cli::TEXT_MAX bytes; a body that is not JSON gives its text, cut to the same. */
     public static function from($body)
     {
         $d = json_decode((string) $body, true);
@@ -20,9 +20,9 @@ class ArrErrorText
                 }
             }
         } else {
-            $parts[] = substr(trim(strip_tags((string) $body)), 0, 300);
+            $parts[] = substr(trim(strip_tags((string) $body)), 0, Cli::TEXT_MAX);
         }
-        return self::urls(substr(implode('; ', array_filter($parts, 'strlen')), 0, 600));
+        return self::urls(substr(implode('; ', array_filter($parts, 'strlen')), 0, Cli::TEXT_MAX));
     }
 
     /**

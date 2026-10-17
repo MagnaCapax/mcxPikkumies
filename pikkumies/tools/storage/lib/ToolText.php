@@ -9,7 +9,7 @@ class ToolText
      * The last lines of a program's error output, cleaned, for an error message. When the line naming the error comes
      * before them (a borg traceback ends in a Platform, PID and sys.argv footer), it is put first and the tail is cut.
      */
-    public static function tail($text, $chars = 400)
+    public static function tail($text, $chars = Cli::TEXT_MAX)
     {
         $lines = array_values(array_filter(array_map('trim', explode("\n", (string) $text)), 'strlen'));
         $cause = '';

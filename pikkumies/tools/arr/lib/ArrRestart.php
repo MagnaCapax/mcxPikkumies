@@ -32,7 +32,7 @@ class ArrRestart
         } elseif ($where['source'] === 'docker') {
             list($code, , $err) = ArrShell::run(['docker', 'restart', $app['id']], ['DOCKER_HOST' => 'unix://' . $where['docker']]);
             if ($code !== 0) {
-                throw new CliError("docker restart {$app['id']} failed (exit $code): " . substr(trim($err), 0, 300),
+                throw new CliError("docker restart {$app['id']} failed (exit $code): " . substr(trim($err), 0, Cli::TEXT_MAX),
                     'check the container with `docker ps -a`');
             }
             $how = 'Docker: docker restart (the user\'s own daemon)';
@@ -99,7 +99,7 @@ class ArrRestart
         if ($stop !== 0 || $start !== 0) {
             $msg = trim(preg_replace('/\x1b\[[0-9;]*m/', '', $start !== 0 ? $err . ' ' . $out : $stopErr));
             throw new CliError("the installer could not restart {$app['name']} (stop exit $stop, start exit $start)"
-                . ($msg !== '' ? ': ' . substr($msg, 0, 300) : ''), 'run `stats`; the user can also use the PMSS panel (Media stack)');
+                . ($msg !== '' ? ': ' . substr($msg, 0, Cli::TEXT_MAX) : ''), 'run `stats`; the user can also use the PMSS panel (Media stack)');
         }
         return 'PMSS: install-media-stack.sh --stop-app, then --start-app (as the panel does)';
     }

@@ -18,7 +18,7 @@ class DockerOps
     const STOP_WAIT = 30;        // stop/restart: seconds docker waits before it kills the container
     const LOG_LINES = 20; // the default Cli page, so a plain `logs` call is not cut
     const LOG_LINES_MAX = 500;
-    const LOG_TEXT_MAX = 4000;   // bytes of one log line kept (Cli's record budget is 16 KiB)
+    const LOG_TEXT_MAX = Cli::TEXT_MAX;   // bytes of one log line kept (Cli's record budget is 16 KiB)
     const ENV_FILE_LABEL = 'pikkumies.env_file'; // set by launch when it used --env-file; docker itself keeps no path
     const LABEL_RE = '#^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}(=[^\x00-\x1f,]{0,255})?\z#';
     const SINCE_RE = '/^[0-9][0-9A-Za-z:.+-]{0,39}\z/';
@@ -696,7 +696,7 @@ class DockerOps
     private static function firstLine($text)
     {
         $lines = preg_split('/\r\n|\r|\n/', trim((string) $text));
-        return $lines && $lines[0] !== '' ? substr($lines[0], 0, 300) : null;
+        return $lines && $lines[0] !== '' ? substr($lines[0], 0, Cli::TEXT_MAX) : null;
     }
 
     private static function str(array $row, $key)

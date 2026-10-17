@@ -88,7 +88,7 @@ class JackettIndexers
             $err = $ok ? ($n > 0 ? '' : 'answered with no results; Jackett\'s own test counts that as a failure')
                 : ($err !== false && $err !== '' ? $err : 'failed without a message');
             return array_merge($out, ['valid' => $ok && $n > 0, 'results' => $n,
-                'elapsed_ms' => isset($t['ElapsedTime']) ? (int) $t['ElapsedTime'] : 0, 'error' => $c->redact(ArrRecords::cut($err, 300))]);
+                'elapsed_ms' => isset($t['ElapsedTime']) ? (int) $t['ElapsedTime'] : 0, 'error' => $c->redact(ArrRecords::cut($err, Cli::TEXT_MAX))]);
         }, $want);
     }
 

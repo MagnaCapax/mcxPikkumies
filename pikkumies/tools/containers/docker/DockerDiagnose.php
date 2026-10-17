@@ -547,7 +547,7 @@ class DockerDiagnose
                 throw new CliError('docker compose is not installed here (the compose plugin); nothing was checked', 'the user installs the compose plugin, or runs the containers one by one with launch-plan');
             }
             $first = preg_split('/\r?\n/', trim($err));
-            throw new CliError('docker compose could not read the file: ' . self::redact(substr((string) $first[0], 0, 300), $secrets), 'fix the compose file; nothing was started');
+            throw new CliError('docker compose could not read the file: ' . self::redact(substr((string) $first[0], 0, Cli::TEXT_MAX), $secrets), 'fix the compose file; nothing was started');
         }
         $config = json_decode((string) $r['out'], true);
         if (!is_array($config) || !isset($config['services']) || !is_array($config['services'])) {

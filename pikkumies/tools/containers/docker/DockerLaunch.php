@@ -764,7 +764,7 @@ class DockerLaunch
     private static function firstLine($text)
     {
         $lines = preg_split('/\r\n|\r|\n/', trim((string) $text));
-        return $lines && $lines[0] !== '' ? substr($lines[0], 0, 300) : 'no error text';
+        return $lines && $lines[0] !== '' ? substr($lines[0], 0, Cli::TEXT_MAX) : 'no error text';
     }
 
     private static function size($bytes)

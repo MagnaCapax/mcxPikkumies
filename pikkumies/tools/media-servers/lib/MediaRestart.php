@@ -119,6 +119,6 @@ class MediaRestart
     private static function last($out)
     {
         $lines = array_values(array_filter(array_map('trim', explode("\n", (string) $out)), 'strlen'));
-        return $lines ? substr(end($lines), 0, 300) : '(no output)';
+        return $lines ? substr(end($lines), 0, Cli::TEXT_MAX) : '(no output)';
     }
 }
