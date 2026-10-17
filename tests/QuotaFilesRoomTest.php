@@ -22,6 +22,14 @@ return [
         check($p !== '', 'used + build over the soft limit must refuse');
         check(strpos(HermesInstall::roomProblem(null, 1000000000), 'GB') !== false, 'too little free space refuses');
         check(HermesInstall::roomProblem(null, null) === '', 'no quota found: the build is tried');
+        // 1 TiB quota with 50 GiB free: room when the user starts it, but an unattended build must leave 10% (~102 GiB) free
+        check(HermesInstall::roomProblem(null, 50 * 1073741824, 1024 * 1073741824) === '', 'attended build with 50 GiB free');
+        $p = HermesInstall::roomProblem(null, 50 * 1073741824, 1024 * 1073741824, true);
+        check(strpos($p, '10%') !== false, 'unattended build would leave the account over 90%: ' . $p);
+        check(HermesInstall::roomProblem(null, 200 * 1073741824, 1024 * 1073741824, true) === '', 'unattended build with 200 GiB free of 1 TiB');
+        check(HermesInstall::roomProblem(['used' => 60000, 'soft' => 125000, 'hard' => 157000], 260000000000) === '', 'attended: files fit');
+        check(strpos(HermesInstall::roomProblem(['used' => 60000, 'soft' => 125000, 'hard' => 157000], 260000000000, 268435456000, true), 'files') !== false, 'unattended: 125,000 files would end over 90%');
+        check(strpos((string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php'), "\$q['quota_limit_bytes'], \$unattended)") !== false, 'ensure() must pass unattended to the room check');
         $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php');
         preg_match('/function ensure\(.*?\n    }\n/s', $src, $m);
         $refuse = isset($m[0]) ? strpos($m[0], "return 'not installed: ' . \$room;") : false;

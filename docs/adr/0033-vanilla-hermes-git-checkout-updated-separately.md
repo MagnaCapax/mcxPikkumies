@@ -71,3 +71,6 @@ The operator, 2026-10-17: "infact pikkumies should be preinstalled ..... in most
 The runtime then builds the first time either of two things happens:
 - The account's daily `pikkumies update` runs. Its post-update step already builds where no tree exists, and the time of day comes from the uid, so neighbouring accounts build minutes apart.
 - The user runs `pikkumies`. A session with no runtime used to print "Hermes is not installed yet" and exit; it now starts the build (`HermesInstall::ensure`, with its quota check), says so, and exits. The user runs `pikkumies` again when `pikkumies doctor` shows it ready.
+
+## Addendum 2026-10-17: an automatic build leaves 10% of the quota free
+The preinstall also reaches accounts that already hold the customer's data, and on those nobody asked for the 2 GB build. The room check alone only required the build's own size free, so an account with 2.6 GB left would end with almost nothing, and its downloads would then stop at the quota. An unattended build (the daily update's post-update step) now also keeps `HermesInstall::UNATTENDED_RESERVE` (10%) of both the disk quota and the file quota free; when it cannot, it skips and says why. A build the user starts by running `pikkumies` or `pikkumies install` keeps the old check, because the user chose to spend that space. Test: `tests/QuotaFilesRoomTest.php`.

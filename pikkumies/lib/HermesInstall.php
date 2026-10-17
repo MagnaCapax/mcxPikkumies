@@ -360,19 +360,28 @@ class HermesInstall
     const BUILD_FILES = 65000;
     const BUILD_BYTES = 2684354560; // 2.5 GiB
 
+    /** Share of the disk and file quota an unattended build leaves free: nobody asked for it, so it must not fill the account. */
+    const UNATTENDED_RESERVE = 0.10;
+
     /**
      * Why the account has no room for a Hermes build, or '' when it has (or when the quota is unknown: then the build
      * is tried). A build that runs out of files or space stops half way with EDQUOT and leaves a broken tree, so the
      * account's file quota and free space are checked first. $files: Quota::files(); $freeBytes: quota_free_bytes.
+     * $unattended (a build nobody started, e.g. a preinstalled account's daily update) also keeps UNATTENDED_RESERVE of
+     * both quotas free, so it never fills a customer's account; $limitBytes: quota_limit_bytes.
      */
-    public static function roomProblem($files, $freeBytes)
+    public static function roomProblem($files, $freeBytes, $limitBytes = null, $unattended = false)
     {
-        if (is_array($files) && $files['soft'] > 0 && $files['used'] + self::BUILD_FILES > $files['soft']) {
-            return sprintf('Hermes needs about %s files and your account allows %s, with %s in use. The file quota grows with the disk quota; a larger plan has room.',
-                number_format(self::BUILD_FILES), number_format($files['soft']), number_format($files['used']));
+        $reserve = $unattended ? self::UNATTENDED_RESERVE : 0.0;
+        if (is_array($files) && $files['soft'] > 0 && $files['used'] + self::BUILD_FILES > $files['soft'] * (1 - $reserve)) {
+            return sprintf('Hermes needs about %s files and your account allows %s, with %s in use%s. The file quota grows with the disk quota; a larger plan has room.',
+                number_format(self::BUILD_FILES), number_format($files['soft']), number_format($files['used']),
+                $unattended ? '; an automatic build keeps 10% of it free, run `pikkumies` to build anyway' : '');
         }
-        if ($freeBytes !== null && $freeBytes < self::BUILD_BYTES) {
-            return sprintf('Hermes needs about %.1f GB and your quota has %.1f GB free.', self::BUILD_BYTES / 1073741824, $freeBytes / 1073741824);
+        $need = self::BUILD_BYTES + ($unattended && $limitBytes > 0 ? $limitBytes * $reserve : 0);
+        if ($freeBytes !== null && $freeBytes < $need) {
+            return sprintf('Hermes needs about %.1f GB and your quota has %.1f GB free%s.', self::BUILD_BYTES / 1073741824, $freeBytes / 1073741824,
+                $unattended ? '; an automatic build keeps 10% of the quota free, run `pikkumies` to build anyway' : '');
         }
         return '';
     }
@@ -399,7 +408,8 @@ class HermesInstall
         if ($unattended && CronTick::refuses($rootAvailable)) {
             return 'not installed: root is available and setpriv is missing, so no unattended build (ADR-0025); run `pikkumies install`';
         }
-        $room = self::roomProblem(Quota::files((string) getenv('HOME')), Quota::fields((string) getenv('HOME'))['quota_free_bytes']);
+        $q = Quota::fields((string) getenv('HOME'));
+        $room = self::roomProblem(Quota::files((string) getenv('HOME')), $q['quota_free_bytes'], $q['quota_limit_bytes'], $unattended);
         if ($room !== '') {
             return 'not installed: ' . $room;
         }
