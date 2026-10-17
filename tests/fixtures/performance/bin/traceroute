@@ -1,0 +1,7 @@
+<?php
+/** Fake `traceroute -n <target>`. */
+require __DIR__ . '/fakelib.php';
+perfFake('traceroute', $argv, "traceroute to 203.0.113.9 (203.0.113.9), 30 hops max, 60 byte packets\n"
+    . " 1  192.0.2.1  0.412 ms  0.398 ms  0.401 ms\n"
+    . " 2  198.51.100.1  1.204 ms  1.198 ms  1.300 ms\n"
+    . " 3  203.0.113.9  24.812 ms  24.900 ms  25.001 ms\n");

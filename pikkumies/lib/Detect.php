@@ -390,6 +390,27 @@ class Detect
      */
     public static function userShowLimits($home, $bin = null)
     {
+        $data = self::userShowLimitsData($home, $bin);
+        if ($data === null) {
+            return null;
+        }
+        $cpu = self::userShowLimitsMetric($data['sections'], 'cpu', 'CPU quota enforced', 'value');
+        $mem = self::userShowLimitsMetric($data['sections'], 'memory', 'memory', 'limit');
+        return [
+            'cpuQuota' => $cpu !== null && is_numeric($cpu) ? ['value' => round(((float) $cpu) / 100, 2), 'source' => 'userShowLimits'] : ['value' => null, 'source' => null],
+            'memMb'    => $mem !== null && is_numeric($mem) ? ['value' => round(((float) $mem) / 1048576, 1), 'source' => 'userShowLimits'] : ['value' => null, 'source' => null],
+        ];
+    }
+
+    /**
+     * The sections of `$HOME/bin/userShowLimits --json` (same run rules as userShowLimits: absolute path, 10 s
+     * timeout, fixed argv), for tools that report more than the CPU/memory ceiling (tools/system/performance).
+     * Returns ['generated_at', 'sections'] or null on any failure. The account's name and the server's name are
+     * dropped here, before any caller sees them: the top-level `user`/`host` keys and the `username`/`hostname`
+     * metrics of the account section (ADR-0023: identity stays out of what reaches the model).
+     */
+    public static function userShowLimitsData($home, $bin = null)
+    {
         $bin = $bin !== null ? $bin : $home . '/bin/userShowLimits';
         if (!is_file($bin) || !is_executable($bin)) {
             return null;
@@ -404,12 +425,15 @@ class Detect
         if (!is_array($data) || !isset($data['sections']) || !is_array($data['sections'])) {
             return null;
         }
-        $cpu = self::userShowLimitsMetric($data['sections'], 'cpu', 'CPU quota enforced', 'value');
-        $mem = self::userShowLimitsMetric($data['sections'], 'memory', 'memory', 'limit');
-        return [
-            'cpuQuota' => $cpu !== null && is_numeric($cpu) ? ['value' => round(((float) $cpu) / 100, 2), 'source' => 'userShowLimits'] : ['value' => null, 'source' => null],
-            'memMb'    => $mem !== null && is_numeric($mem) ? ['value' => round(((float) $mem) / 1048576, 1), 'source' => 'userShowLimits'] : ['value' => null, 'source' => null],
-        ];
+        $sections = $data['sections'];
+        foreach ($sections as $name => $section) {
+            if (is_array($section) && isset($section['metrics']) && is_array($section['metrics'])) {
+                $sections[$name]['metrics'] = array_values(array_filter($section['metrics'], function ($m) {
+                    return !(is_array($m) && isset($m['metric']) && in_array($m['metric'], ['username', 'hostname'], true));
+                }));
+            }
+        }
+        return ['generated_at' => isset($data['generated_at']) ? $data['generated_at'] : null, 'sections' => $sections];
     }
 
     private static function userShowLimitsMetric(array $sections, $section, $metricName, $field)

@@ -1,0 +1,5 @@
+<?php
+/** Fake iperf3 -J: a minimal end summary. */
+require __DIR__ . '/fakelib.php';
+perfFake('iperf3', $argv, json_encode(['end' => ['sum_sent' => ['bytes' => 1180000000, 'bits_per_second' => 944000000, 'seconds' => 10.0],
+    'sum_received' => ['bytes' => 1170000000, 'bits_per_second' => 936000000, 'seconds' => 10.0]]], JSON_UNESCAPED_SLASHES) . "\n");

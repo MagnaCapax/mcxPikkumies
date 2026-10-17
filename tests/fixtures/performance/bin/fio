@@ -1,0 +1,7 @@
+<?php
+/** Fake fio: a minimal --output-format=json result of a random-read job (clat in ns), whatever the job asked. */
+require __DIR__ . '/fakelib.php';
+perfFake('fio', $argv, json_encode(['fio version' => 'fio-3.33', 'jobs' => [['jobname' => 'probe', 'error' => 0,
+    'read' => ['io_bytes' => 262144, 'total_ios' => 64, 'iops' => 640.0, 'bw_bytes' => 2621440,
+        'clat_ns' => ['min' => 180000, 'max' => 9100000, 'mean' => 1500000, 'percentile' => ['50.000000' => 1200000, '95.000000' => 4100000]]],
+    'write' => ['io_bytes' => 0, 'total_ios' => 0]]]], JSON_UNESCAPED_SLASHES) . "\n");

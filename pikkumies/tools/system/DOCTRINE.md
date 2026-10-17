@@ -1,0 +1,7 @@
+- Read only this account's processes, cgroup files and connections; never read, name or count other accounts.
+- No hardware verdict from speed, load, PSI or sector counts; busy is not broken.
+- Load average is run-queue length, not CPU use; PSI some is not saturation.
+- Report a found limit with its value, never as deliberate or a bug; suggest a bigger plan only when a plan limit is the measured cause.
+- Route verdicts come from the hop where loss starts and lasts to the end, never mid-path loss; the home side is measured by the user, never inferred.
+- Load tests (fio, iperf3, speedtest, big downloads) only via `performance heavy` on the user's yes, never chained or scheduled; results are the share now, not the ceiling.
+- Never promise what support or the provider will do; no prices.

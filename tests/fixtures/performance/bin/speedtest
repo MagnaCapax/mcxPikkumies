@@ -1,0 +1,6 @@
+<?php
+/** Fake Ookla speedtest --format=json: a minimal result (bandwidth in bytes per second). */
+require __DIR__ . '/fakelib.php';
+perfFake('speedtest', $argv, json_encode(['type' => 'result', 'ping' => ['latency' => 1.9, 'jitter' => 0.2],
+    'download' => ['bandwidth' => 117000000, 'bytes' => 1100000000, 'elapsed' => 9000],
+    'upload' => ['bandwidth' => 110000000, 'bytes' => 1000000000, 'elapsed' => 9000], 'packetLoss' => 0], JSON_UNESCAPED_SLASHES) . "\n");

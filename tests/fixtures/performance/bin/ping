@@ -1,0 +1,5 @@
+<?php
+/** Fake iputils `ping -n -c N <target>` summary. */
+require __DIR__ . '/fakelib.php';
+perfFake('ping', $argv, "PING 203.0.113.9 (203.0.113.9) 56(84) bytes of data.\n\n--- 203.0.113.9 ping statistics ---\n"
+    . "20 packets transmitted, 20 received, 0% packet loss, time 19027ms\nrtt min/avg/max/mdev = 24.512/25.104/27.003/0.611 ms\n");

@@ -1,0 +1,45 @@
+<?php
+/**
+ * Fake PMSS ~/bin/userShowLimits --json, in the shape of PMSS etc/skel/bin/userShowLimits (pmssUserShowLimitsCollect):
+ * top-level user, host, generated_at, sections; the account section carries username and hostname metrics. Those
+ * name the account and the server, which Detect::userShowLimitsData must drop. Values are made up.
+ */
+require __DIR__ . '/fakelib.php';
+$m = function ($metric, $value, $limit, $unit, $source) {
+    return ['metric' => $metric, 'value' => $value, 'limit' => $limit, 'unit' => $unit, 'percent' => null, 'source' => $source];
+};
+$data = ['user' => 'fake-user-name', 'host' => 'fake-host.example', 'generated_at' => 1792224000, 'sections' => [
+    'account' => ['available' => true, 'metrics' => [
+        $m('username', 'fake-user-name', null, '', 'proc'),
+        $m('hostname', 'fake-host.example', null, '', 'proc'),
+        $m('PMSS version', '2026-10-01', null, '', 'proc'),
+        $m('Docker enabled', true, null, 'bool', 'account-config'),
+    ]],
+    'memory' => ['available' => true, 'metrics' => [
+        $m('memory', 805306368, 2147483648, 'bytes', 'cgroup'),
+        $m('memory pressure', 12, 100, 'percent', 'cgroup'),
+        $m('memory status', 'OK', null, '', 'cgroup'),
+        $m('OOM kills', 0, null, 'count', 'cgroup'),
+    ]],
+    'cpu' => ['available' => true, 'metrics' => [
+        $m('CPU weight enforced', '100', null, 'count', 'cgroup'),
+        $m('CPU quota enforced', 200, null, 'percent', 'cgroup'),
+    ]],
+    'disk I/O' => ['available' => true, 'metrics' => [
+        $m('I/O weight enforced', '100', null, 'count', 'cgroup'),
+        $m('read bps enforced', '104857600', null, 'bytes_per_second', 'cgroup'),
+        $m('write bps enforced', null, null, 'bytes_per_second', 'cgroup'),
+    ]],
+    'traffic' => ['available' => true, 'metrics' => [
+        $m('upload past 30 days', 1099511627776, 5497558138880, 'bytes', 'traffic-data'),
+        $m('inbound past 30 days', 549755813888, null, 'bytes', 'traffic-data'),
+    ]],
+    'server (shared by all accounts)' => ['available' => true, 'metrics' => [
+        $m('load average (run queue) 1m', '3.10', null, 'count', 'proc'),
+        $m('server-wide io pressure full avg10', '2.50', null, 'percent', 'proc'),
+    ]],
+]];
+if (!in_array('--json', $argv, true)) {
+    perfFake('userShowLimits', $argv, "use --json\n", true);
+}
+perfFake('userShowLimits', $argv, json_encode($data, JSON_UNESCAPED_SLASHES) . "\n");
