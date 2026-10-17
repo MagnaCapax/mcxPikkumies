@@ -128,6 +128,41 @@ class Update
             'every minute, from your crontab (log: local/update.log)', 'off (cron.disabled)');
     }
 
+    /**
+     * Put the two tagged lines back when they are missing: an account moved to another server arrives
+     * without its crontab (PMSS userTransfer does not carry it), and the daily line is what runs
+     * `update`, so nothing else would ever restore them. Reads the crontab once and calls schedule()
+     * / scheduleCronTick() only for a line that is absent while wanted or present while switched off.
+     * Returns the status lines of what changed, [] when the crontab is unchanged or unreadable.
+     */
+    public static function ensureScheduled(array $config, $uid, $rootAvailable, $logFile = null)
+    {
+        $before = self::readCrontab();
+        if ($before === null) {
+            return [];
+        }
+        $msgs = [];
+        $updateWanted = empty($config['autoUpdate']['disabled']) && self::cronLine($uid) !== '';
+        if ((strpos($before, self::CRON_TAG) !== false) !== $updateWanted) {
+            $msgs[] = 'auto-update ' . self::schedule($config, $uid);
+        }
+        $tickWanted = empty($config['cron']['disabled']) && !CronTick::refuses($rootAvailable) && self::cronTickLine() !== '';
+        if ((strpos($before, self::CRON_TICK_TAG) !== false) !== $tickWanted) {
+            $msgs[] = 'cron-tick ' . self::scheduleCronTick($config, $rootAvailable, $logFile);
+        }
+        return self::readCrontab() === $before ? [] : $msgs;
+    }
+
+    /** The current crontab text, '' when there is none yet, null when `crontab -l` failed otherwise. */
+    private static function readCrontab()
+    {
+        list($code, $current, $err) = self::exec([self::$crontab, '-l']);
+        if ($code === 0) {
+            return $current;
+        }
+        return stripos($err . $current, 'no crontab') !== false ? '' : null;
+    }
+
     /** Run a command without a shell; returns [exit code, stdout, stderr]. */
     public static function exec(array $argv)
     {

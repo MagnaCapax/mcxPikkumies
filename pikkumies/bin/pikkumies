@@ -293,6 +293,12 @@ switch ($cmd) {
             out('Hermes is not installed yet; see local/install.log');
             exit(1);
         }
+        // A moved account arrives without its crontab and nothing else restores the two lines (Update::ensureScheduled).
+        if (Launch::isSession($passArgs)) {
+            foreach (Update::ensureScheduled(Config::load(), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(), !empty(profile()['root']['available'])) as $msg) {
+                out('restored in your crontab: ' . $msg);
+            }
+        }
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
         $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';
         if ($isUpdate) {
