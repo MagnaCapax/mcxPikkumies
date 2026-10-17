@@ -4,3 +4,4 @@
 - The shared-file check sees only the client being called: when two clients seed the same files, check the other one before deleting with data.
 - `limit` makes one change and reads it back; give the user `was` to undo it. On PMSS the watchdog may set the upload cap again.
 - A client on another account's port is never contacted. "busy" means no answer in time: unknown, not down.
+- A release from its publisher: take its `.torrent` or magnet from the publisher's own page (list in ~/pikkumies/tools/torrent-clients/README.md, Sample tasks), never a third-party copy; check it against the publisher's SHA256SUMS. "Latest Ubuntu" = newest LTS; name the newer interim.

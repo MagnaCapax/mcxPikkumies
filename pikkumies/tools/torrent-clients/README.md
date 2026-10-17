@@ -65,3 +65,17 @@ The shared-file check sees only the torrents of the client being called: when tw
 | deluge | deluge-web on 127.0.0.1, port in `~/.delugeWebPort`; secret from `~/.config/deluge/auth` | `port` in `~/.config/deluge/web.conf` |
 
 A client on a port owned by another account is never contacted (ADR-0019). When a client cannot be reached, the error says which: not installed, not enabled, not running (with the config file it found when that file names the client but no binary is on `PATH`: a stopped client, or one run in a container), busy (no answer in time: unknown, not down), refused, or the port belongs to another account.
+
+## Sample tasks
+
+Things to ask that use only the verbs above and a publisher's own download page. Every one is legal content from its publisher.
+
+| Ask | What the agent does |
+|---|---|
+| "Find the latest Debian and Ubuntu ISO torrents and seed them" | Reads `cdimage.debian.org/debian-cd/current/amd64/bt-cd/` and `releases.ubuntu.com/`, picks the newest Debian netinst and the newest Ubuntu LTS (naming the newer interim release), then `add <url>` for each. |
+| "Download the latest Debian netinst by torrent and check it" | The same `add`, then `sha256sum` of the finished file against Debian's `SHA256SUMS` next to the ISO. |
+| "Seed this month's Arch Linux ISO" | Takes the magnet link from `archlinux.org/download/` and adds it. |
+| "Seed the newest Raspberry Pi OS Lite" | Finds the newest dated folder under `downloads.raspberrypi.com/raspios_lite_arm64/images/` and adds its `.torrent`. |
+| "Seed Big Buck Bunny, the Blender open movie" | Adds `archive.org/download/BigBuckBunny_124/BigBuckBunny_124_archive.torrent` (Creative Commons Attribution). |
+
+Checked on a PMSS account on 2026-10-17: rTorrent fetched the Debian 13.7.0 netinst torrent from its URL, downloaded the 792 MB image and was seeding it within 20 seconds. Seeding counts against the account's upload allowance (`stats`, `traffic`).
