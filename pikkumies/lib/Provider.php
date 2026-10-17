@@ -83,12 +83,21 @@ class Provider
      */
     public static function balance(array $prov)
     {
+        $r = self::balanceAnswer($prov);
+        if ($r === null) {
+            return null;
+        }
+        $data = json_decode($r['body'], true);
+        return $r['code'] === 200 && isset($data['balance']) && is_int($data['balance']) ? $data['balance'] : null;
+    }
+
+    /** The raw Http::request answer of GET {endpoint}/balance (the credits tool reads every field); null, without a request, when the endpoint or key is missing. */
+    public static function balanceAnswer(array $prov)
+    {
         if ($prov['endpoint'] === '' || $prov['key'] === '') {
             return null;
         }
-        $r = Http::request('GET', $prov['endpoint'] . '/balance', ['timeout' => 10, 'owners' => 'system', 'max' => 65536, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
-        $data = json_decode($r['body'], true);
-        return $r['code'] === 200 && isset($data['balance']) && is_int($data['balance']) ? $data['balance'] : null;
+        return Http::request('GET', $prov['endpoint'] . '/balance', ['timeout' => 10, 'owners' => 'system', 'max' => 65536, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
     }
 
     /** GET {endpoint}/models. Returns [httpCode, model ids]. */
