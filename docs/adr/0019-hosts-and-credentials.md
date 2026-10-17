@@ -11,7 +11,7 @@ The request of 2026-10-14: the tools must be "provider agnostic, work with us in
 The tools talk to the user's own torrent clients, *arr apps and media servers, which listen on 127.0.0.1 ports or unix sockets and need a password, an API key or a token.
 
 Facts this rests on, checked 2026-10-14:
-- On PMSS every account can reach every 127.0.0.1 port. There is no loopback isolation per user (sysadmin lesson of 2026-10-14 on qBittorrent's localhost bypass), so "localhost" is not private.
+- On PMSS every account can reach every 127.0.0.1 port. There is no loopback isolation per user (as qBittorrent's localhost authentication bypass showed, 2026-10-14), so "localhost" is not private.
 - PMSS keeps `/etc/seedbox/config` traversable by all users (PMSS `scripts/lib/systemStatus.php`), so it is a reliable first check. Other hosts are told apart by hostname (feralhosting.com, whatbox.ca, usbx.me and others).
 - `/proc/net/tcp` and `/proc/net/tcp6` list each listening socket with its owner uid.
 - PMSS stores only a PBKDF2 hash of the qBittorrent WebUI password, and qBittorrent bans an address after repeated failed logins. The panel proxy also connects from 127.0.0.1, so a ban would lock the user out of their own WebUI.

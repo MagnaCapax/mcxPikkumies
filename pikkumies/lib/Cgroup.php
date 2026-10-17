@@ -1,7 +1,7 @@
 <?php
 /**
  * Cgroup: this process's OWN effective CPU and memory ceiling, read straight from cgroupfs — no
- * subprocess, no privilege needed, nothing withheld (ADR-0023). `/tmp/gld15q/limits.md`, this
+ * subprocess, no privilege needed, nothing withheld (ADR-0023). a live host check, this
  * session: cgroup interface files are world-readable kernel paths for the account's own slice, and
  * every ancestor cgroup enforces its own limit independently, so a parent slice's quota binds even
  * when the leaf scope shows "max"/unlimited. Every reader here walks from the leaf (found via
@@ -212,7 +212,7 @@ class Cgroup
      * one unified hierarchy: every controller's line has an empty 2nd field and the same path.
      * v1/hybrid: the per-controller line's 2nd field names the controller(s) at that mount, and the
      * controller's own cgroupfs root is $base/$controller (the stock Debian/systemd layout this was
-     * verified against, `/tmp/gld15q/limits.md`). Returns [] when $selfCgroup cannot be read or has
+     * verified against on a live host). Returns [] when $selfCgroup cannot be read or has
      * no line for $controller.
      */
     private static function ancestorPaths($base, $selfCgroup, $controller)

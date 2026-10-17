@@ -6,7 +6,7 @@ Controls the user's own Jackett, the indexer proxy that turns tracker sites into
 
 - Upstream: `github.com/Jackett/Jackett`, branch `master` at `6fdd78f692617c7c7347ea0ee8b9c32c8742e4a4` (2026-10-14). Paths below are under `src/` at that commit.
 - LinuxServer.io image: `github.com/linuxserver/docker-jackett` at `62646e3ba8d1a966d081d82368e72012c095b0c2`.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## The key in the URL
 

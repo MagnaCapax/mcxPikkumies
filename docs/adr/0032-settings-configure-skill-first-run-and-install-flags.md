@@ -18,7 +18,7 @@ Facts this rests on, checked 2026-10-16 in the pinned Hermes v2026.9.24 (`hermes
 No telemetry sender or performance logger exists in Pikkumies.
 
 ## Options Considered
-- **Let the configure skill write any config key.** One tool for everything, but then the agent can turn off its own hooks, search-first, the root switch or the provider, and accept the terms for the person (vjoukahainen C1 on the plan). Rejected.
+- **Let the configure skill write any config key.** One tool for everything, but then the agent can turn off its own hooks, search-first, the root switch or the provider, and accept the terms for the person; an adversarial review of the plan found this. Rejected.
 - **Keep the settings in a separate file (local/settings.php).** Leaves hand comments in `local/config.php` alone, but splits the config in two places. The plan says local/config.php, and this ADR keeps it there.
 - **Ask the questions on every install, flags optional.** Hangs or breaks a PMSS install, which runs without a terminal. Rejected: prompts only on a terminal, and flags answer each one.
 - **Implement telemetry now.** There is nothing to send it to and no review of what it would contain. Rejected: the settings exist, the sender does not.

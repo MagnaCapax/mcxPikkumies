@@ -8,7 +8,7 @@
 class PerfLimits
 {
     // Runner
-    const KILL_AFTER_S = 2;               // provisional: `timeout -k 2`, SIGKILL this long after SIGTERM (catalog #717: a deadline must end the whole run)
+    const KILL_AFTER_S = 2;               // provisional: `timeout -k 2`, SIGKILL this long after SIGTERM (a deadline must end the whole run)
     const SCAN_NICE = 19;                 // provisional: lowest CPU priority for walks and probes (ToolProc::gentle precedent)
     const MEASURE_IO_LEVEL = 7;           // provisional: best-effort class, lowest level, for probes (the idle class would measure nothing on a busy disk)
 
@@ -47,8 +47,8 @@ class PerfLimits
     const HEAVY_TRAFFIC_MARGIN = 0.10;    // provisional: refuse when test bytes > this share of the remaining plan traffic
 
     // PSI: cpu some, io full, memory full (PMSS userShowLimits reads the same levels)
-    const PSI_IO_FULL_AVG10 = 15;         // catalog #595 anchor: io full avg10 burst
-    const PSI_IO_FULL_AVG60 = 10;         // catalog #595 anchor: io full avg60 sustained
+    const PSI_IO_FULL_AVG10 = 15;         // anchor: io full avg10 burst
+    const PSI_IO_FULL_AVG60 = 10;         // anchor: io full avg60 sustained
     const PSI_MEM_FULL_AVG10 = 10;        // provisional, no anchor: heavy gate only
     const PSI_CPU_SOME_AVG10 = 80;        // provisional, no anchor: heavy gate only
 

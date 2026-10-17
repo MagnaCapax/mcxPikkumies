@@ -1,7 +1,7 @@
 <?php
 /**
  * QbitApi: one WebUI API v2 session through lib/Http.php (never curl directly).
- * Sources (copies in /tmp/pkres1/src): every API call needs a session cookie except auth/login
+ * Sources (the qBittorrent WebUI API source): every API call needs a session cookie except auth/login
  * (webapp-5.0.0.cpp:323-324, 403 otherwise); login answers "Ok." with a session cookie or "Fails.",
  * and 403 when the address is banned (qbt-wiki-5.md:133-160). qBittorrent 5.2 answers 204 with the cookie
  * or 401 instead (release-5.2.4 authcontroller.cpp:43-60, webapplication.cpp:368-373, 424-425, 1016-1021;

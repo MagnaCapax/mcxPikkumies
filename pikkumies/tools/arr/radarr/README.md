@@ -5,7 +5,7 @@ Controls the user's own Radarr (movies): list and inspect movies, look up and ad
 ## Sources
 
 - API shapes: Radarr's OpenAPI file `src/Radarr.Api.V3/openapi.json` at commit `a96bf7c3ecb23cb76993770727285dc17a613fbc` (branch `master`, 2026-09-13), the branch PMSS installs (`RADARR_BRANCH` master: PMSS `etc/skel/install-media-stack.sh:1215`). Source files below are from the same commit.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Where Radarr is found
 

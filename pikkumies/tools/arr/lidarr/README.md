@@ -5,7 +5,7 @@ Controls the user's own Lidarr (music): list and inspect artists, look up and ad
 ## Sources
 
 - API shapes: Lidarr's OpenAPI file `src/Lidarr.Api.V1/openapi.json` at commit `0cfa30b928f9c51edfb397b86013966f121c1c2a` (branch `develop`, 2026-10-12). PMSS's updater takes Lidarr release builds from the `develop` or `master` channel into `/opt/Lidarr` (`scripts/lib/update/apps/arr.php:17`). Source files below are from the same commit.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Where Lidarr is found
 

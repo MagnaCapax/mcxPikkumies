@@ -5,7 +5,7 @@ Controls the user's own Prowlarr, the indexer manager: list and inspect indexers
 ## Sources
 
 - API shapes: Prowlarr's OpenAPI file `src/Prowlarr.Api.V1/openapi.json` at commit `12c327808314a7cae1b7301935ee10cabc19609f` (branch `master`, 2026-09-13), the branch PMSS installs (`PROWLARR_BRANCH` master: PMSS `etc/skel/install-media-stack.sh:1216`). Source files below are from the same commit.
-- PMSS facts: `/tmp/pmssh1` (commit `5b493872`), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`), read only.
 
 ## Where Prowlarr is found
 

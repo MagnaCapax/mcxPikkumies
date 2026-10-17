@@ -1,7 +1,7 @@
 <?php
 /**
  * A fake qBittorrent WebUI API v2 for the tests/Qbittorrent*Test.php files, run with `php -S`. State lives in the
- * JSON file named by QBIT_FAKE_STATE. Shapes follow the copies in /tmp/pkres1/src: login answers
+ * JSON file named by QBIT_FAKE_STATE. Shapes follow the qBittorrent WebUI API source: login answers
  * "Ok." + Set-Cookie SID or "Fails." (qbt-wiki-5.md:133-160); every other call needs the cookie,
  * else 403 (webapp-5.0.0.cpp:323-324); GET reads / POST changes, 405 otherwise (qbt-wiki-5.md:121-125);
  * torrents/info rows (:1202-1338), properties (:1340-1440), files (:1540-1600), transfer/info

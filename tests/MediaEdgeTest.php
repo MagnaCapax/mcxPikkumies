@@ -1,7 +1,7 @@
 <?php
 /**
- * Edge-case coverage for tools/media-servers (area 8 of the mcxPikkumies test-plan review,
- * /tmp/tst16a/areas/area8.md): MediaSecret's device id and unverified-login paths (never its save()/write
+ * Edge-case coverage for tools/media-servers (area 8 of the test-plan review):
+ * MediaSecret's device id and unverified-login paths (never its save()/write
  * path, owned by another builder), MediaDocker's ambiguity/availability guards, MediaHttp's refusal-before-
  * header-Closure and bare-query-string edges, MediaRestart's marker-file and never-answers paths,
  * MediaEndStream's dedup and stop-after-rejection rules, MediaServers' clamping/picking/scrubbing helpers,

@@ -1,6 +1,6 @@
 <?php
 /**
- * Edge-case coverage for tools/arr (area 8 of the mcxPikkumies test-plan review, /tmp/tst16a/areas/area8.md):
+ * Edge-case coverage for tools/arr (area 8 of the test-plan review):
  * ArrClient's 3xx/404 boundaries, ArrDelete's hash/label/overlap helpers, ArrRestart's marker and tmux-absent
  * paths, ArrLibrary's lookup/wanted edges, ArrLocate's Docker port ambiguity, and the per-app config readers
  * (Autobrr, Bazarr, Jackett) and WhisparrRun::detect()'s lenient swallow. Reuses tests/fixtures/arr/.

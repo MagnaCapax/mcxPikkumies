@@ -6,7 +6,7 @@ Controls the user's own Bazarr, the subtitle downloader for Sonarr and Radarr: l
 
 - Bazarr source `morpheus65535/bazarr` at commit `bfe4593b04caa16eb4a09c2a233777b0bd7723b6` (branch `master`, 2026-10-11): `bazarr/app/server.py`, `app/config.py`, `app/get_args.py`, `bazarr/api/**`, `frontend/src/apis/raw/base.ts`. Paths below are under `bazarr/` unless named otherwise.
 - LinuxServer.io image `linuxserver/docker-bazarr` at commit `8a64a4385efeb65f13939c17d61372dbc54d3a12` (branch `master`, 2026-10-14).
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Where Bazarr is found
 

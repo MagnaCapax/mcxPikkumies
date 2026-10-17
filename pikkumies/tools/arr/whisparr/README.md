@@ -8,7 +8,7 @@ Controls the user's own Whisparr: list and inspect what it holds, remove items w
   - v2: branch `v2-develop` at `c55fdc66a410ad94f2d09261ed2fbb5e00dbc8c0` (release `v2.2.0-develop.404`, 2026-09-19). Its OpenAPI file lives on branch `api-docs` at `dff667ed86dbf6d29fa9bb93b2eaa5b3d790e78f`, `src/Whisparr.Api.V3/openapi.json`.
   - v3: branch `eros` at `cc3fb2abcf60f7c0048eb0294015d291b82bde08` (2026-08-28); releases are tagged `v3.1.0.<n>` (`v3.1.0.2116` = `94480761`). OpenAPI file: `src/Whisparr.Api.V3/openapi.json` at that commit. It lacks the wanted routes, which the controllers have (`Wanted/MissingController.cs:18,40`, `Wanted/CutoffController.cs:18,44`).
   - Source files below are from those two commits (v2 / v3).
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Which Whisparr
 

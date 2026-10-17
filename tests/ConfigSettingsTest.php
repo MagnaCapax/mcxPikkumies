@@ -9,7 +9,7 @@ if (!function_exists('cfgScratchCopy')) {
     /**
      * A temp dir shaped like pikkumies/{lib,local}/, holding a copy of the real Config.php, so that a
      * subprocess requiring the copy has Config::root()/localDir() resolve under $tmp instead of the
-     * real repo (catalog #700: writeDefaultsIfMissing() and load() take no $file override). $localBody:
+     * real repo (writeDefaultsIfMissing() and load() take no $file override). $localBody:
      * contents to pre-seed local/config.php with, or null for none. Returns the copy's path.
      */
     function cfgScratchCopy($tmp, $localBody = null)
@@ -250,7 +250,7 @@ echo "ok";
     'config: writeDefaultsIfMissing creates the documented minimal stub, never touches an existing file, forces 0600, and makes a missing local/ at 0700' => function () {
         // #22-25, run against a scratch copy of Config.php because writeDefaultsIfMissing() has no $file
         // override and always targets self::localDir() — calling it in-process would write the real
-        // pikkumies/local/config.php (forbidden, catalog #700).
+        // pikkumies/local/config.php (forbidden).
         $dir = testTempDir('pk-wdim-stub');
         try {
             $copy = cfgScratchCopy($dir);

@@ -5,7 +5,7 @@ Controls the user's own autobrr, the release automation that watches tracker IRC
 ## Sources
 
 - autobrr source `autobrr/autobrr` at commit `32210b47a2f4246db8c4e01ac6e016a997ddaf0f` (branch `develop`, 2026-10-13): `internal/http/*.go`, `internal/domain/*.go`, `internal/config/config.go`, `internal/api/service.go`, `Dockerfile`. PMSS installs autobrr's latest GitHub release (`etc/skel/install-media-stack.sh:471-494`), so a user's copy can be older than this commit.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## The API key (ADR-0019)
 

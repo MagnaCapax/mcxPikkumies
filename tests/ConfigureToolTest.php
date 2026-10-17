@@ -6,7 +6,7 @@
  * The CLI-layer tests here run the real pikkumies-configure.php script with `show`/`get`/`review` —
  * all read-only (Config::load() reads, never writes). They deliberately avoid a real `set` through the
  * script, since that verb has no $file override and would write the real pikkumies/local/config.php
- * (forbidden, catalog #700); that scenario is covered one layer down, directly against
+ * (forbidden); that scenario is covered one layer down, directly against
  * ConfigureSettings::set($key, $value, $file), which takes the same override Config::set() does.
  */
 require_once dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/ConfigureSettings.php';
@@ -93,7 +93,7 @@ return [
     },
     'configure: set() round-trips a value containing spaces unchanged (the regex captures everything after the first "=" verbatim)' => function () {
         // #41 adapted from "through real argv": the CLI script's `set` verb has no $file override and
-        // would write the real pikkumies/local/config.php (forbidden, catalog #700). The quoting
+        // would write the real pikkumies/local/config.php (forbidden). The quoting
         // guarantee itself (a shell preserves one argv word) is runPhp()/escapeshellarg()'s job, already
         // exercised throughout this suite; what this test actually proves — that the value reaches
         // Config::set() exactly as given, spaces and all — lives in ConfigureSettings::set(), one layer

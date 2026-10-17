@@ -77,7 +77,7 @@ return [
             check($threw, 'parse accepted ' . json_encode($b));
         }
     },
-    'configure: set is limited to name, perf logging, telemetry and retention; every other key is refused (vjoukahainen C1)' => function () {
+    'configure: set is limited to name, perf logging, telemetry and retention; every other key is refused' => function () {
         $allowed = ['agent.name', 'privacy.perfLogging', 'privacy.telemetry', 'sessions.retentionDays'];
         check(array_keys(Config::SETTABLE) === $allowed, 'the settable list changed: ' . json_encode(array_keys(Config::SETTABLE)));
         $file = settingsFile('tool');

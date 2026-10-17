@@ -5,7 +5,7 @@ Reads the user's own Readarr (books and audiobooks): authors, queue, wanted book
 ## Sources
 
 - API shapes: Readarr's OpenAPI file `src/Readarr.Api.V1/openapi.json` at commit `0b79d3000d4e5f8425f499970b0190e2c421fceb` (branch `develop`, 2025-06-27, the last commit before the archive). PMSS's updater still installs Readarr release builds into `/opt/Readarr` (`scripts/lib/update/apps/arr.php:17`). Source files below are from the same commit.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Where Readarr is found
 

@@ -3,7 +3,7 @@
  * performance net (PerfNet, ADR-0035): the mtr report parse (no addresses reach the output), the traceroute/ping
  * fallback chain, the direction-aware reading (loss counts where it starts and lasts to the last answering hop;
  * loss at a middle hop that does not last is rate limiting; a silent target is not loss), the reverse-run
- * instructions, the refusal without a target, and no orphan after a deadline (catalog #717).
+ * instructions, the refusal without a target, and no orphan after a deadline.
  */
 require_once __DIR__ . '/fixtures/performance/harness.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/system/performance/PerfProbe.php';
@@ -220,7 +220,7 @@ return [
             perfDone($fx);
         }
     },
-    'performance net: an mtr that forks a child and never ends is stopped at a 1 s deadline with no marked process left (catalog #717)' => function () {
+    'performance net: an mtr that forks a child and never ends is stopped at a 1 s deadline with no marked process left' => function () {
         perfNetNeedWrappers();
         if (!is_dir('/proc/self')) {
             skip('no /proc here');

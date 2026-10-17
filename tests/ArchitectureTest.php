@@ -1,7 +1,7 @@
 <?php
 /**
- * Cross-cutting lint/contract checks for the PMSS-to-mcxPikkumies CI port review (verdict 2026-10-16,
- * /tmp/ci16b/verdict.md): every check here encodes a rule verified to hold today, against the real file set
+ * Cross-cutting lint/contract checks for the PMSS-to-mcxPikkumies CI port review (verdict 2026-10-16):
+ * every check here encodes a rule verified to hold today, against the real file set
  * (`git ls-files`, not `find`, per the verdict's own correction), not a re-derivation of production logic.
  */
 

@@ -5,7 +5,7 @@ Controls the user's own Sonarr (TV series): list and inspect series, look up and
 ## Sources
 
 - API shapes: Sonarr's OpenAPI file `src/Sonarr.Api.V3/openapi.json` at commit `bc54afbdd0e38bdb0fca4785fcf7d7a6af77bf9a` (branch `main`, 2026-10-12), the branch PMSS installs (`SONARR_BRANCH` main, `SONARR_MAJOR` 4: PMSS `etc/skel/install-media-stack.sh:1214,1218`). Source files below are from the same commit.
-- PMSS facts: the PMSS tree at `/tmp/pmssh1` (commit `5b493872`, 2026-10-08), read only.
+- PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
 ## Where Sonarr is found
 

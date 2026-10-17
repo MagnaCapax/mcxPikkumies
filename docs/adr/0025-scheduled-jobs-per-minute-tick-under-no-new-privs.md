@@ -23,7 +23,7 @@ exit=1
 ```
 Plain `sudo` succeeds for a sudo-group account; the identical call refuses once wrapped in `setpriv --no-new-privs`, including when sudo is invoked indirectly through `bash -c` (ruling out a direct-exec-only bypass). `setpriv` ships in Debian's `util-linux` package, present on every PMSS image already (`/usr/bin/setpriv` on this host); it is not an extra dependency to install.
 
-A round-18 adversarial review of the first draft (vjoukahainen) found two problems with a plain "add a regex cron-mode guard hook" approach: (1) unattended cron + passwordless sudo lets a job run root commands with no human in the loop even though `approval_detection.py`'s cron-mode deny only catches patterns it recognizes; (2) a hook built on that same regex is bypassable the same way the regex itself is (quoting, `bash -c`, an unlisted command). `setpriv --no-new-privs` is not a detection rule to evade; it is a kernel-enforced ceiling the process cannot raise on itself.
+An adversarial review of the first draft found two problems with a plain "add a regex cron-mode guard hook" approach: (1) unattended cron + passwordless sudo lets a job run root commands with no human in the loop even though `approval_detection.py`'s cron-mode deny only catches patterns it recognizes; (2) a hook built on that same regex is bypassable the same way the regex itself is (quoting, `bash -c`, an unlisted command). `setpriv --no-new-privs` is not a detection rule to evade; it is a kernel-enforced ceiling the process cannot raise on itself.
 
 ## Options Considered
 - **No ticker at all.** `hermes cron create` would schedule jobs that silently never run outside an interactive gateway session — the feature would exist but not work for Pikkumies' per-invocation model.

@@ -3,7 +3,7 @@
  * Detect: read-only probe of the machine Pikkumies runs on.
  *
  * Returns a plain array (the "profile"). No network calls (rDNS is a bounded resolver query, not
- * web access, ADR-0021; `ip route get` never sends a packet, verified in /tmp/gld15q/limits.md), no
+ * web access, ADR-0021; `ip route get` never sends a packet, verified on a live host), no
  * writes outside cached()'s own cache file, no LLM. Root is reported from what the OS says, never
  * from configuration (ADR-0004).
  */
@@ -179,7 +179,7 @@ class Detect
      * already answers "where am I"; a resolver round trip would add nothing). The primary IP comes
      * from the kernel's own route cache (`ip route get`, never a packet on the wire), and the PTR
      * lookup is a bounded subprocess (`timeout 3 getent hosts`), never PHP's unguarded
-     * `gethostbyaddr()` (verified unbounded in /tmp/gld15q/limits.md). Any failure at any step skips
+     * `gethostbyaddr()` (verified unbounded on a live host). Any failure at any step skips
      * rdns silently; it stays null.
      */
     public static function identity($family)
@@ -268,7 +268,7 @@ class Detect
     /**
      * {cpuQuota, cpuset, memMb, disk}, each {value, source}. PMSS reads its own
      * `$HOME/bin/userShowLimits --json` (the account's canonical, already-built limits tool,
-     * /tmp/pmd15q/pmss.md); every other host reads its own cgroup (Cgroup.php). cpuset (affinity, a
+     * the PMSS source); every other host reads its own cgroup (Cgroup.php). cpuset (affinity, a
      * different number from the CFS quota) always comes from the cgroup/`nproc` reader: PMSS's tool
      * does not expose it. disk always reuses the existing Quota::fields(), the one quota reader this
      * project has. On a dedicated (not shared) account, a limit that still cannot be determined
@@ -384,7 +384,7 @@ class Detect
      * own output interpolated into a shell string). null on any failure (binary missing, times out,
      * bad JSON, or the cpu/memory sections are unavailable): the caller falls back to the cgroup
      * reader. Field names verified by direct read of etc/skel/bin/userShowLimits this session
-     * (/tmp/pmd15q/pmss.md): cpu section carries a 'CPU quota enforced' metric (percent of one core,
+     * (PMSS etc/skel/bin/userShowLimits): cpu section carries a 'CPU quota enforced' metric (percent of one core,
      * source 'cgroup'); memory section carries a 'memory' metric whose LIMIT (not value, which is
      * current usage) is the enforced ceiling in bytes.
      */
