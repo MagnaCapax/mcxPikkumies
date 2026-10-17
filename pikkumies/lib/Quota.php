@@ -76,6 +76,70 @@ class Quota
         return null;
     }
 
+    /**
+     * The file (inode) quota from the same sources as read(): ['used', 'soft', 'hard'] as counts, or null. PMSS sets it
+     * from the disk quota (scripts/lib/user/resourcesList.php: max(disk GiB x 500, 15000) soft, x 1.25 hard), so a
+     * small account can run out of files long before it runs out of space.
+     */
+    public static function files($home)
+    {
+        $raw = self::$live !== null ? call_user_func(self::$live) : self::runQuota();
+        if (is_string($raw) && ($f = self::parseFiles($raw)) !== null) {
+            return $f;
+        }
+        $file = $home !== '' ? "$home/.quota" : '';
+        if ($file !== '' && is_file($file) && !is_link($file) && filesize($file) < 65536) {
+            return self::parseFiles((string) @file_get_contents($file));
+        }
+        return null;
+    }
+
+    /**
+     * The file columns of `quota -s` output: after the device come blocks used, soft, hard, a grace column only when
+     * over the soft limit, then files used, soft, hard. ['used', 'soft', 'hard'] or null (none, placeholder, no limit).
+     */
+    public static function parseFiles($raw)
+    {
+        if (preg_match('/\(uid 0\)/', $raw)) {
+            return null;
+        }
+        $tokens = [];
+        foreach (preg_split('/\r?\n/', trim($raw)) ?: [] as $line) {
+            $line = trim($line);
+            if ($tokens !== [] && $tokens[0] !== '' && count($tokens) === 1) {
+                $tokens = array_merge($tokens, preg_split('/\s+/', $line)); // the device on a line of its own
+                break;
+            }
+            if (preg_match('#^/dev/\S+#', $line) === 1) {
+                $tokens = preg_split('/\s+/', $line);
+                if (count($tokens) > 1) {
+                    break;
+                }
+            }
+        }
+        if ($tokens === [] || $tokens[0] === '/dev/null' || count($tokens) < 7) {
+            return null;
+        }
+        $i = preg_match('/^\d+(\.\d+)?[kmg]?\*?$/i', $tokens[4]) === 1 ? 4 : 5; // a grace column ("6days", "none") sits at 4 when over
+        if (!isset($tokens[$i + 2])) {
+            return null;
+        }
+        // `quota -s` prints file counts in decimal units rounded up (125000 -> "125k", 156250 -> "157k"), seen on PMSS.
+        $n = function ($v) {
+            if (preg_match('/^(\d+(?:\.\d+)?)([kmg]?)\*?$/i', (string) $v, $m) !== 1) {
+                return null;
+            }
+            return (int) round((float) $m[1] * ['' => 1, 'k' => 1000, 'm' => 1000000, 'g' => 1000000000][strtolower($m[2])]);
+        };
+        $used = $n($tokens[$i]);
+        $soft = $n($tokens[$i + 1]);
+        $hard = $n($tokens[$i + 2]);
+        if ($used === null || $soft === null || $hard === null || ($soft === 0 && $hard === 0)) {
+            return null;
+        }
+        return ['used' => $used, 'soft' => $soft > 0 ? $soft : $hard, 'hard' => $hard];
+    }
+
     /** "1024G", "977M", "1100G*" (over), "4K", a plain number (KiB blocks) -> bytes, or null. */
     public static function bytes($v)
     {

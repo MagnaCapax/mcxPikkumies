@@ -356,6 +356,27 @@ class HermesInstall
      * a root-capable host without setpriv (ADR-0025). $optionalTools: hermes.lazyInstalls (ADR-0021).
      * Returns a status line.
      */
+    /** What a Hermes build puts in the account, measured on a PMSS account (2026-10-17: 60,572 files, 2.0 GB), with a margin. */
+    const BUILD_FILES = 65000;
+    const BUILD_BYTES = 2684354560; // 2.5 GiB
+
+    /**
+     * Why the account has no room for a Hermes build, or '' when it has (or when the quota is unknown: then the build
+     * is tried). A build that runs out of files or space stops half way with EDQUOT and leaves a broken tree, so the
+     * account's file quota and free space are checked first. $files: Quota::files(); $freeBytes: quota_free_bytes.
+     */
+    public static function roomProblem($files, $freeBytes)
+    {
+        if (is_array($files) && $files['soft'] > 0 && $files['used'] + self::BUILD_FILES > $files['soft']) {
+            return sprintf('Hermes needs about %s files and your account allows %s, with %s in use. The file quota grows with the disk quota; a larger plan has room.',
+                number_format(self::BUILD_FILES), number_format($files['soft']), number_format($files['used']));
+        }
+        if ($freeBytes !== null && $freeBytes < self::BUILD_BYTES) {
+            return sprintf('Hermes needs about %.1f GB and your quota has %.1f GB free.', self::BUILD_BYTES / 1073741824, $freeBytes / 1073741824);
+        }
+        return '';
+    }
+
     public static function ensure($unattended = false, $rootAvailable = false, $optionalTools = false)
     {
         if (self::isComplete()) {
@@ -377,6 +398,10 @@ class HermesInstall
         }
         if ($unattended && CronTick::refuses($rootAvailable)) {
             return 'not installed: root is available and setpriv is missing, so no unattended build (ADR-0025); run `pikkumies install`';
+        }
+        $room = self::roomProblem(Quota::files((string) getenv('HOME')), Quota::fields((string) getenv('HOME'))['quota_free_bytes']);
+        if ($room !== '') {
+            return 'not installed: ' . $room;
         }
         list(, $tags) = self::git(['ls-remote', '--tags', '--', self::repo()]);
         $tag = self::latestTag($tags);
