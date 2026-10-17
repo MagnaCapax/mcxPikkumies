@@ -349,9 +349,11 @@ return [
                 check($code === 0, implode(' ', $args) . ': ' . $out);
             }
             $lines = array_values(array_filter(explode("\n", (string) @file_get_contents($log)), 'strlen'));
-            foreach ($lines as $l) {
-                check(preg_match('#^\d+ \S*/docker #', $l) === 1, 'not `timeout N docker ...`: ' . $l);
-            }
+            // Other helpers may run under timeout too (host detection runs `timeout 3 hostname -f` where nothing is
+            // cached, as in CI); the claim is about docker calls, so only lines that run the docker CLI are counted.
+            $lines = array_values(array_filter($lines, function ($l) {
+                return preg_match('#^\d+ \S*/docker #', $l) === 1;
+            }));
             $words = function (array $argvs) {
                 return implode(', ', array_map(function ($a) {
                     return implode(' ', array_slice($a, 0, 2));
