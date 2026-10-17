@@ -104,6 +104,12 @@ Every number is a constant in `PerfLimits.php`, provisional until measured on a 
 | `STEAL_PCT` | 5 | CPU steal share |
 | `NEAR_CAP_PCT` | 80 | share of a cap a measured rate must reach to count as at the cap |
 | `TRAFFIC_NEAR_PCT` | 90 | share of the plan traffic limit used that counts as near it |
+| `MTR_GRACE_S` | 10 | seconds mtr may wait for late replies after its last cycle |
+| `TRACEROUTE_S` | 40 | deadline for the traceroute fallback |
+| `PING_GRACE_S` | 5 | seconds after the last ping for its reply |
+| `NEAR_HOPS` | 3 | loss starting within this many hops of the server is a ticket |
+| `DD_MAX_S` | 10 | part of the disk budget the synced writes may use |
+| `ALLOCATED_SHARE` | 0.9 | share of a file's size that must be on disk for the read probe (not sparse) |
 | `SAMPLE_INTERVAL_MIN` | 15 | minutes between scheduled samples |
 | `SAMPLE_RUNS` | 96 | samples per scheduled job (24 hours) |
 | `SAMPLES_HOURS_DEFAULT` | 24 | `samples --hours` default |

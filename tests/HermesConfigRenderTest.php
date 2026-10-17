@@ -231,6 +231,13 @@ return [
         check($line === $want && substr_count($line, "\n") === 1, 'line: ' . $line);
         check(is_file(Units::toolsDir() . '/containers/docker/docker.php'), 'the script it runs must exist');
     },
+    'hermes performance sampling: the scheduled script is scripts/pikkumies-performance-sample.sh, exits 0 without the unit, else runs check --tick' => function () {
+        list($path, $text) = HermesConfig::performanceSampleScript('/h');
+        $php = Units::toolsDir() . '/system/performance/performance.php';
+        check($path === '/h/scripts/pikkumies-performance-sample.sh', 'path: ' . $path);
+        check($text === '[ -f ' . escapeshellarg($php) . " ] || exit 0\nexec " . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($php) . " check --tick\n", 'text: ' . $text);
+        check(is_file($php), 'the script it runs must exist');
+    },
     'hermes contract: the installed cron code still runs .sh with bash, only relative scripts, silent no_agent output, intervals, 50 kept' => function () {
         $src = HermesInstall::sourceDir();
         if ($src === '') {

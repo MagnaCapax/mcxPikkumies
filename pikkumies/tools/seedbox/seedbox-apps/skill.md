@@ -1,6 +1,6 @@
 ---
 name: seedbox-apps
-description: Check, restart and set up the user's seedbox apps (torrent clients, web UIs, media servers, Docker containers, S3 storage) on the PMSS platform, starting from the Pulsed Media wiki page for that app. Use when an app is down, slow, its web UI does not load, or the user wants to install or test one.
+description: Check, restart and set up the user's seedbox apps (torrent clients, web UIs, media servers, Docker containers, S3 storage) on the PMSS platform, starting from the Pulsed Media wiki page for that app. Use when an app is down, its web UI does not load, or the user wants to install or test one; for slowness use performance.
 ---
 
 # Seedbox apps

@@ -27,7 +27,6 @@ class DockerOps
     /** Log options worth showing; others (a splunk token...) are never printed. */
     const LOG_OPTS = ['max-size', 'max-file', 'mode', 'compress', 'max-buffer-size'];
     /** docker info warnings that mean per-container limits are not applied (swap-limit warnings do not). */
-    const LIMIT_WARNING_RE = '/\bNo (memory limit|cpu cfs quota|cpu cfs period|cpu shares|pids limit) support/i';
 
     /** stats: engine facts, space used, per-container use only where limits are enforced. */
     public static function stats(DockerCli $d, array $args, array $opt)
@@ -46,7 +45,7 @@ class DockerOps
             }) : null;
         $cgv = isset($info['CgroupVersion']) && ctype_digit((string) $info['CgroupVersion']) ? (int) $info['CgroupVersion'] : null;
         $drv = isset($info['CgroupDriver']) && is_string($info['CgroupDriver']) ? $info['CgroupDriver'] : null;
-        $enforced = self::limitsEnforced($rootless, $cgv, $drv, isset($info['Warnings']) && is_array($info['Warnings']) ? $info['Warnings'] : []);
+        $enforced = DockerCli::limitsEnforced($info);
         $compose = self::call($d, ['compose', 'version', '--format', 'json'], 15)['code'] === 0 ? 'plugin'
             : (ToolProc::which('docker-compose') !== null ? 'standalone' : 'none');
         $engine = ['kind' => 'engine', 'docker' => 'ok', 'engine' => $p['engine'], 'server_version' => $p['server'], 'client_version' => $p['client'],
@@ -83,27 +82,20 @@ class DockerOps
     }
 
     /**
-     * Per-container limits apply: a rootful daemon with a cgroup driver, or a rootless one on cgroup v2 with the
-     * systemd driver (a cgroupfs rootless daemon, which PMSS configures, cannot apply them), and docker does not warn
-     * that memory/cpu/pids limits are unsupported. null when docker did not say enough to tell.
+     * After the account's own deletes, the scheduled check starts a new baseline, so a remove or prune never becomes
+     * a "containers are gone" notice (DockerDiagnose::rebaseline). Nothing to do when nothing was deleted.
      */
+    private static function rebaseline(DockerCli $d, array $deleted)
+    {
+        if ($deleted && class_exists('DockerDiagnose') && isset($d->seams['local_dir'])) {
+            DockerDiagnose::rebaseline($d);
+        }
+    }
+
+    /** Whether per-container limits apply: DockerCli::limitsEnforcedFrom() (the one rule). */
     public static function limitsEnforced($rootless, $cgroupVersion, $driver, array $warnings)
     {
-        if ($rootless === null || $cgroupVersion === null || $driver === null) {
-            return null;
-        }
-        if ($driver === 'none') {
-            return false;
-        }
-        foreach ($warnings as $w) {
-            if (is_string($w) && preg_match(self::LIMIT_WARNING_RE, $w)) {
-                return false;
-            }
-        }
-        if ($rootless && !($cgroupVersion === 2 && $driver === 'systemd')) {
-            return false;
-        }
-        return true;
+        return DockerCli::limitsEnforcedFrom($rootless, $cgroupVersion, $driver, $warnings);
     }
 
     /** list: containers (running, or all with --all) with state, restart policy, health, log size and port exposure. */
@@ -274,10 +266,12 @@ class DockerOps
             }
             $r = self::call($d, ['rm', $id]); // never -f: a container that started meanwhile is refused by docker
             if ($r['code'] !== 0) {
+                self::rebaseline($d, $done);
                 throw self::failed('remove', self::nameOf(self::find($inv, $id)), $r, $inv, $done, array_slice($ids, $k + 1));
             }
             $done[] = $id;
         }
+        self::rebaseline($d, $done);
         return ['records' => self::removed($d, $inv, $done), 'status' => ['removed' => count($done)]];
     }
 
@@ -310,6 +304,7 @@ class DockerOps
         $gone = [];
         foreach ($plan['remove'] as $k => $img) {
             if ($d->remaining() < 15) {
+                self::rebaseline($d, $gone);
                 return ['records' => $records, 'status' => ['removed' => count($gone), 'remaining' => array_column(array_slice($plan['remove'], $k), 'ref'), 'complete' => false]];
             }
             $r = self::call($d, ['rmi', $img['ref']]); // never -f, never --force
@@ -323,6 +318,7 @@ class DockerOps
                 $records[] = ['ref' => $img['ref'], 'result' => 'failed', 'error_text' => $r['timed_out'] ? 'docker did not answer in time' : $err];
             }
         }
+        self::rebaseline($d, $gone);
         $left = array_column(self::imageRows($d), 'ref');
         return ['records' => $records, 'status' => ['removed' => count($gone), 'skipped' => count($records) - count($gone),
             'verified' => !array_intersect($gone, $left)]];

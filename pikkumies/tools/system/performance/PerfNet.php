@@ -15,10 +15,6 @@
  */
 class PerfNet
 {
-    const MTR_GRACE_S = 10;      // provisional: mtr waits for late replies after its last cycle, plus start-up
-    const TRACEROUTE_S = 40;     // provisional: traceroute -n -q 3 -w 2 -m 30 ends well before this
-    const PING_GRACE_S = 5;      // provisional: ping's last reply wait plus start-up
-    const NEAR_HOPS = 3;         // provisional (router table): loss starting this close to the server is a ticket
     const TRACEROUTE_PROBES = 3; // probes per hop of the traceroute fallback (-q 3)
 
     const ASK = 'ask the user: "test the route to the connection you are on?", then --target ssh; or ask for the address to test and pass --target <IP or hostname>';
@@ -44,7 +40,7 @@ class PerfNet
         $count = isset($params['count']) ? max(1, (int) $params['count']) : PerfLimits::NET_QUICK_COUNT;
         // test seam: the dispatcher never sets deadline_s (perfParams builds params from checked options only)
         $seam = isset($params['deadline_s']) ? max(1, (int) $params['deadline_s']) : null;
-        $mtrDeadline = $seam !== null ? $seam : $count + self::MTR_GRACE_S;
+        $mtrDeadline = $seam !== null ? $seam : $count + PerfLimits::MTR_GRACE_S;
         if ($mtrDeadline > PerfLimits::NET_ETA_NOTICE_S) {
             fwrite(STDERR, "net: route test, $count cycle(s), about $mtrDeadline s at most (until " . gmdate('H:i:s', time() + $mtrDeadline) . " UTC); the result is printed when it ends\n");
         }
@@ -197,7 +193,7 @@ class PerfNet
         }
         if ($run) {
             $k = $run[0]['hop'];
-            $near = $k <= self::NEAR_HOPS;
+            $near = $k <= PerfLimits::NEAR_HOPS;
             $ev = ["loss starts at hop $k (" . $run[0]['loss_pct'] . '%) and lasts to hop ' . $run[count($run) - 1]['hop'] . ', the last that answered (' . $run[count($run) - 1]['loss_pct'] . '%)'];
             if ($silentAfter) {
                 $ev[] = "the target did not answer after hop $last";
@@ -206,7 +202,7 @@ class PerfNet
                 'evidence' => array_merge($ev, $limited), 'negation' => 'loss at a middle hop that does not last is not this; only the run from hop ' . $k . ' to the end counts',
                 'disproved_by' => 'the same test with more cycles showing no loss at the later hops',
                 'next_step' => $near
-                    ? "the loss starts within the first " . self::NEAR_HOPS . " hops from this server: open a ticket with this output; add `check --share --with-ip` only if the user agrees to include the addresses"
+                    ? "the loss starts within the first " . PerfLimits::NEAR_HOPS . " hops from this server: open a ticket with this output; add `check --share --with-ip` only if the user agrees to include the addresses"
                     : 'the loss starts further along the route; ask the user to run the reverse test from their own computer (the reverse record) and paste it: both directions together show where it starts'] + $low;
         }
         if ($silentAfter) {
@@ -259,7 +255,7 @@ class PerfNet
             $probe->skipped[] = ['check' => 'traceroute', 'reason' => 'traceroute is not installed'];
             return null;
         }
-        $deadline = $seam !== null ? $seam : self::TRACEROUTE_S;
+        $deadline = $seam !== null ? $seam : PerfLimits::TRACEROUTE_S;
         $r = $probe->measure(['traceroute', '-n', '-q', (string) self::TRACEROUTE_PROBES, '-w', '2', '-m', '30', $target], $deadline);
         $hops = $r['code'] === 0 ? self::parseTraceroute($r['out']) : [];
         if (!$hops) {
@@ -276,7 +272,7 @@ class PerfNet
             $probe->skipped[] = ['check' => 'ping', 'reason' => 'ping is not installed'];
             return null;
         }
-        $deadline = $seam !== null ? $seam : $count + self::PING_GRACE_S;
+        $deadline = $seam !== null ? $seam : $count + PerfLimits::PING_GRACE_S;
         $r = $probe->measure(['ping', '-n', '-c', (string) $count, $target], $deadline);
         $e = in_array($r['code'], [0, 1], true) ? self::parsePing($r['out']) : null; // iputils ping exits 1 when replies were missing
         if ($e === null) {

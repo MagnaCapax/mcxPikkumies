@@ -120,7 +120,7 @@ class DockerLaunch
         $home = self::real($docker->home);
         $info = self::firstJson($docker->run(['info', '--format', '{{json .}}']));
         $rootless = isset($info['SecurityOptions']) && is_array($info['SecurityOptions']) && (bool) preg_grep('/(^|,)name=rootless(,|$)/', $info['SecurityOptions']);
-        $limitsEnforced = self::limitsEnforced($info, $rootless);
+        $limitsEnforced = DockerCli::limitsEnforced($info);
         $ps = $docker->run(['ps', '-a', '--format', '{{json .}}']);
         if ($ps['code'] !== 0) {
             throw new CliError('could not list the containers: ' . self::firstLine($ps['err']) . '; nothing was started', 'run `diagnose`');
@@ -590,17 +590,6 @@ class DockerLaunch
         $notes[] = 'labelled ' . self::GROUP_LABEL . '=' . implode(', ', array_unique(array_values($plan['group_of'])))
             . ': `list --label ' . self::GROUP_LABEL . '=' . reset($plan['group_of']) . '` shows the group';
         return $notes;
-    }
-
-    /** limits_enforced: false on cgroup v1, a rootless daemon on cgroupfs, or no cgroup driver; null when unknown. */
-    private static function limitsEnforced($info, $rootless)
-    {
-        $version = isset($info['CgroupVersion']) ? (string) $info['CgroupVersion'] : '';
-        $driver = isset($info['CgroupDriver']) ? (string) $info['CgroupDriver'] : '';
-        if ($version === '' && $driver === '') {
-            return null;
-        }
-        return !($version === '1' || $driver === 'none' || ($rootless && $driver === 'cgroupfs'));
     }
 
     /** `docker run -d ...` for one container, every valued option attached (--name=x), the image last. */

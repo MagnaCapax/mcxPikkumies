@@ -66,12 +66,12 @@ return [
         $f = DockerDiagnose::containerFindings(diagInspect('a', ['Status' => 'exited', 'Running' => false, 'ExitCode' => 2]), diagCtx());
         check(diagKinds($f) === ['crash'], 'exit 2 is a crash, got ' . json_encode(diagKinds($f)));
     },
-    'diagnose: limits are enforced only rootful, or rootless on cgroup v2 with systemd, and never with limit warnings or missing fields' => function () {
+    'diagnose: limits are enforced only rootful, or rootless on cgroup v2 with systemd, never with limit warnings; unknown when fields are missing' => function () {
         $rl = ['SecurityOptions' => ['name=seccomp,profile=builtin', 'name=rootless']];
         $rows = [
             [$rl + ['CgroupVersion' => '2', 'CgroupDriver' => 'cgroupfs'], false], [$rl + ['CgroupVersion' => '2', 'CgroupDriver' => 'systemd'], true],
             [$rl + ['CgroupVersion' => '1', 'CgroupDriver' => 'none'], false], [['CgroupVersion' => '1', 'CgroupDriver' => 'cgroupfs'], true],
-            [['CgroupVersion' => '2', 'CgroupDriver' => 'systemd', 'Warnings' => ['WARNING: No memory limit support']], false], [['ServerVersion' => '26'], false], [null, false],
+            [['CgroupVersion' => '2', 'CgroupDriver' => 'systemd', 'Warnings' => ['WARNING: No memory limit support']], false], [['ServerVersion' => '26'], null], [null, null],
         ];
         foreach ($rows as $r) {
             check(DockerDiagnose::limitsEnforced($r[0]) === $r[1], json_encode($r[0]) . ' -> expected ' . json_encode($r[1]));

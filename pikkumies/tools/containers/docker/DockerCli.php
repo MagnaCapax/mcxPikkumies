@@ -321,4 +321,43 @@ class DockerCli
         $lines = preg_split('/\r\n|\r|\n/', trim((string) $text));
         return $lines && $lines[0] !== '' ? substr($lines[0], 0, 300) : null;
     }
+    /** Docker's own warnings that a per-container limit is unsupported (a swap warning alone is not one). */
+    const LIMIT_WARNING_RE = '/\bNo (memory limit|cpu cfs quota|cpu cfs period|cpu shares|pids limit) support/i';
+
+    /**
+     * Whether per-container limits apply, from `docker info` (the one rule for stats, diagnose and launch): a rootful
+     * daemon with a cgroup driver, or a rootless one on cgroup v2 with the systemd driver (a cgroupfs rootless daemon,
+     * which PMSS configures, cannot apply them); never with driver "none" or docker's own limit warnings. null when
+     * docker did not say enough to tell.
+     */
+    public static function limitsEnforced($info)
+    {
+        if (!is_array($info)) {
+            return null;
+        }
+        // docker info always lists SecurityOptions; a rootless daemon names itself there, so no mention means rootful.
+        $rootless = (bool) array_filter(isset($info['SecurityOptions']) && is_array($info['SecurityOptions']) ? $info['SecurityOptions'] : [], function ($o) {
+            return is_string($o) && preg_match('/(^|,)name=rootless(,|$)/', $o);
+        });
+        $version = isset($info['CgroupVersion']) && ctype_digit((string) $info['CgroupVersion']) ? (int) $info['CgroupVersion'] : null;
+        $driver = isset($info['CgroupDriver']) && is_string($info['CgroupDriver']) ? $info['CgroupDriver'] : null;
+        return self::limitsEnforcedFrom($rootless, $version, $driver, isset($info['Warnings']) && is_array($info['Warnings']) ? $info['Warnings'] : []);
+    }
+
+    /** limitsEnforced() from its parts: rootless (bool|null), cgroup version (int|null), driver (string|null), warnings. */
+    public static function limitsEnforcedFrom($rootless, $cgroupVersion, $driver, array $warnings)
+    {
+        if ($rootless === null || $cgroupVersion === null || $driver === null) {
+            return null;
+        }
+        if ($driver === 'none') {
+            return false;
+        }
+        foreach ($warnings as $w) {
+            if (is_string($w) && preg_match(self::LIMIT_WARNING_RE, $w)) {
+                return false;
+            }
+        }
+        return !$rootless || ($cgroupVersion === 2 && $driver === 'systemd');
+    }
 }

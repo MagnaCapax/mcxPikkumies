@@ -261,6 +261,19 @@ return [
             containersDone($fx);
         }
     },
+    'containers ops: a successful remove clears the scheduled check baseline, so the user deleting containers is never reported as containers gone' => function () {
+        $fx = containersFixture(['containers' => [opsC('web-1', 'exited'), opsC('web-2', 'exited')]]);
+        try {
+            $state = $fx['dir'] . '/local/containers/state.json';
+            @mkdir(dirname($state), 0700, true);
+            file_put_contents($state, json_encode(['as_of' => 1, 'containers' => ['a' => 1, 'b' => 1], 'images' => 2, 'states' => [], 'events' => []]));
+            list($code) = containersRun($fx, ['remove', 'web-1', 'web-2', '--expect', '2']);
+            $after = json_decode((string) file_get_contents($state), true);
+            check($code === 0 && is_array($after) && !isset($after['containers']) && !isset($after['as_of']) && array_key_exists('events', $after), 'baseline not cleared after remove: ' . json_encode($after));
+        } finally {
+            containersDone($fx);
+        }
+    },
     'containers ops: images marks in_use; --prune-plan lists dangling unused images (all unused with --all) with expect and rebuildable' => function () {
         $fx = containersFixture(['containers' => [opsC('web-1')], 'images' => [opsImg('a', 'nginx', 'alpine'), opsImg('b', '<none>', '<none>'), opsImg('c', 'redis', '7')]]);
         try {
@@ -336,10 +349,16 @@ return [
                 check($code === 0, implode(' ', $args) . ': ' . $out);
             }
             $lines = array_values(array_filter(explode("\n", (string) @file_get_contents($log)), 'strlen'));
-            check(count(opsCalls($fx)) > 20 && count($lines) === count(opsCalls($fx)), 'timeout lines ' . count($lines) . ' vs docker calls ' . count(opsCalls($fx)));
             foreach ($lines as $l) {
                 check(preg_match('#^\d+ \S*/docker #', $l) === 1, 'not `timeout N docker ...`: ' . $l);
             }
+            $words = function (array $argvs) {
+                return implode(', ', array_map(function ($a) {
+                    return implode(' ', array_slice($a, 0, 2));
+                }, $argvs));
+            };
+            check(count(opsCalls($fx)) > 20 && count($lines) === count(opsCalls($fx)), 'timeout lines ' . count($lines) . ' vs docker calls ' . count(opsCalls($fx))
+                . '; timeout: ' . $words(array_map(function ($l) { return array_slice(explode(' ', $l), 2); }, $lines)) . '; calls: ' . $words(opsCalls($fx)));
         } finally {
             containersDone($fx);
         }

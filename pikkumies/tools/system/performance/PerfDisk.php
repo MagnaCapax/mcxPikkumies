@@ -16,8 +16,6 @@
  */
 class PerfDisk
 {
-    const DD_MAX_S = 10;          // provisional: share of the 20 s budget the synced writes may use
-    const ALLOCATED_SHARE = 0.9;  // provisional: a file to read must have at least this share of its size on disk (not sparse)
     const LAST_FILE = 'disk-last.json';
 
     public static function disk(PerfProbe $probe, array $params)
@@ -33,7 +31,7 @@ class PerfDisk
         $out = ['kind' => 'disk', 'write_commit_ms_mean' => null, 'writes' => 0, 'read_p50_ms' => null, 'read_p95_ms' => null, 'read_max_ms' => null, 'reads' => 0];
         $file = $probe->scratchFile('dsync.bin');
         $r = $probe->measure(['dd', 'if=/dev/urandom', 'of=' . $file, 'bs=' . PerfLimits::DISK_WRITE_BS, 'count=' . PerfLimits::DISK_WRITES, 'iflag=fullblock', 'oflag=dsync'],
-            self::left($end, self::DD_MAX_S));
+            self::left($end, PerfLimits::DD_MAX_S));
         $out['io_class'] = $r['io_class'];
         $w = $r['code'] === 0 ? self::parseDd($r['err']) : null;
         if ($w !== null) {
@@ -177,7 +175,7 @@ class PerfDisk
                 clearstatcache();
                 $st = $path !== '' && $path[0] === '/' && !is_link($path) && is_file($path) ? @stat($path) : false;
                 if ($st === false || $st['uid'] !== $euid || $st['size'] < PerfLimits::DISK_READ_FILE_MIN
-                    || $st['blocks'] * 512 < self::ALLOCATED_SHARE * $st['size']) {
+                    || $st['blocks'] * 512 < PerfLimits::ALLOCATED_SHARE * $st['size']) {
                     return true; // next candidate
                 }
                 $found = $path;

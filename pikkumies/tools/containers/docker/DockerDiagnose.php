@@ -122,26 +122,10 @@ class DockerDiagnose
         return $ids;
     }
 
-    /**
-     * Per-container limits are enforced (and per-container memory and oom are meaningful): a rootful daemon, or a
-     * rootless one on cgroup v2 with the systemd driver; never with driver "none" or docker's own limit warnings.
-     * A field docker did not give counts as not enforced.
-     */
+    /** Whether per-container limits apply (and per-container memory and oom mean something): DockerCli::limitsEnforced(). */
     public static function limitsEnforced($info)
     {
-        if (!is_array($info) || !isset($info['CgroupDriver'], $info['CgroupVersion'])) {
-            return false;
-        }
-        $rootless = in_array('name=rootless', isset($info['SecurityOptions']) ? (array) $info['SecurityOptions'] : [], true);
-        foreach (isset($info['Warnings']) ? (array) $info['Warnings'] : [] as $w) {
-            if (preg_match('/no (memory|swap|cpu|pids|kernel memory)[a-z ]*(limit|support)|no cpu cfs/i', (string) $w)) {
-                return false;
-            }
-        }
-        if ($info['CgroupDriver'] === 'none') {
-            return false;
-        }
-        return !$rootless || ((string) $info['CgroupVersion'] === '2' && $info['CgroupDriver'] === 'systemd');
+        return DockerCli::limitsEnforced($info);
     }
 
     /** Exposure facts for this host: shared tenancy (seam `shared`, else PMSS or more than one human account) and the provider's dropped ports. */

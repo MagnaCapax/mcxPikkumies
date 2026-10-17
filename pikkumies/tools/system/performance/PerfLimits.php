@@ -61,6 +61,13 @@ class PerfLimits
     const STEAL_PCT = 5;                  // provisional: CPU steal share
     const NEAR_CAP_PCT = 80;              // provisional: a measured rate at or above this share of its cap counts as at the cap (io cap, CPU quota, window/rtt)
     const TRAFFIC_NEAR_PCT = 90;          // provisional: plan traffic used at or above this share of its limit
+    // net and disk probes (PerfNet, PerfDisk)
+    const MTR_GRACE_S = 10;      // provisional: mtr waits for late replies after its last cycle, plus start-up
+    const TRACEROUTE_S = 40;     // provisional: traceroute -n -q 3 -w 2 -m 30 ends well before this
+    const PING_GRACE_S = 5;      // provisional: ping's last reply wait plus start-up
+    const NEAR_HOPS = 3;         // provisional (router table): loss starting this close to the server is a ticket
+    const DD_MAX_S = 10;          // provisional: share of the 20 s budget the synced writes may use
+    const ALLOCATED_SHARE = 0.9;  // provisional: a file to read must have at least this share of its size on disk (not sparse)
 
     // Sampling (a Hermes no_agent job the agent creates on the user's request)
     const SAMPLE_INTERVAL_MIN = 15;       // provisional: "every 15m"

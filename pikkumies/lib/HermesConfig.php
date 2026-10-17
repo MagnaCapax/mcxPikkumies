@@ -7,6 +7,7 @@
  *   A local skill must not reuse a shipped name: Hermes refuses an ambiguous name (ADR-0007).
  * - .env: provider key (0600). SOUL.md: what this machine allows (from detection), tools' notices + doctrine.
  * - scripts/pikkumies-docker-check.sh: what the scheduled Docker check runs (ADR-0034).
+ * - scripts/pikkumies-performance-sample.sh: what the scheduled performance sampling runs (ADR-0035).
  * Regenerated on install, update and run; hand edits belong in local/config.php, not here.
  * Every file is written to a temporary name and renamed: a full disk leaves the old file, never an
  * empty config without the safety hooks.
@@ -31,9 +32,11 @@ class HermesConfig
         // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($home . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         self::put($home . '/SOUL.md', self::renderSoul($profile, $config));
-        list($script, $line) = self::dockerCheckScript($home);
-        @mkdir(dirname($script), 0700, true);
-        self::put($script, $line, 0700);
+        foreach ([self::dockerCheckScript($home), self::performanceSampleScript($home)] as $job) {
+            list($script, $line) = $job;
+            @mkdir(dirname($script), 0700, true);
+            self::put($script, $line, 0700);
+        }
         return $home;
     }
 
@@ -287,6 +290,19 @@ class HermesConfig
         $home = $home !== null ? $home : self::home();
         $line = 'exec ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(Units::toolsDir() . '/containers/docker/docker.php') . " diagnose --changes\n";
         return [$home . '/scripts/pikkumies-docker-check.sh', $line];
+    }
+
+    /**
+     * The script the scheduled performance sampling runs (ADR-0035): HERMES_HOME/scripts/pikkumies-performance-sample.sh,
+     * `check --tick` (silent, one sample). Same rules as dockerCheckScript(); it exits 0 when the unit is missing, so a
+     * job left behind by an older install never fails every 15 minutes. Returns [path, content].
+     */
+    public static function performanceSampleScript($home = null)
+    {
+        $home = $home !== null ? $home : self::home();
+        $php = Units::toolsDir() . '/system/performance/performance.php';
+        $line = '[ -f ' . escapeshellarg($php) . " ] || exit 0\n" . 'exec ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($php) . " check --tick\n";
+        return [$home . '/scripts/pikkumies-performance-sample.sh', $line];
     }
 
     /** YAML double-quoted scalar; newlines and other control characters are escaped too (the model id comes from the endpoint). */
