@@ -55,6 +55,9 @@ $patterns = [
     '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
     '/\brclone\b.*\bconfig\s+(show|dump)\b/s' => 'rclone config show/dump prints cloud credentials, and what the agent reads goes to the model',
     // Registry logins (ADR-0019: passwords never in chat or on the command line).
+    // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
+    // `credits balance` answers balance questions without it.
+    '#\.(virsilipas|pikkumies)Key\b|hermes/\.env\b|HERMES_HOME\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
     "/\\b(docker|podman|nerdctl)\\b.*\\blogin\\b.*$v(-p|--password(?!-stdin))/s" => 'a registry password on the command line, where other processes can read it; the user types docker login in a terminal',
 ];
