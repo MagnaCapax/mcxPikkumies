@@ -21,7 +21,8 @@ class Update
 
     public static function git(array $args, &$code = null)
     {
-        $cmd = 'git -C ' . escapeshellarg(self::repoRoot());
+        // The daily cron runs this: a hook or fsmonitor written into .git/config must not run (as HermesInstall::git).
+        $cmd = 'git -c core.fsmonitor=false -c core.hooksPath=/dev/null -C ' . escapeshellarg(self::repoRoot());
         foreach ($args as $a) {
             $cmd .= ' ' . escapeshellarg($a);
         }
@@ -163,7 +164,7 @@ class Update
         return stripos($err . $current, 'no crontab') !== false ? '' : null;
     }
 
-    /** Run a command without a shell; returns [exit code, stdout, stderr]. */
+    /** Run a command through /bin/sh with every argument escaped; returns [exit code, stdout, stderr]. */
     public static function exec(array $argv)
     {
         $p = proc_open(implode(' ', array_map('escapeshellarg', $argv)), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);

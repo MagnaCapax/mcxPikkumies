@@ -80,6 +80,40 @@ class CronTick
     }
 
     /**
+     * False when Hermes has no job to run: no cron/jobs.json, or one whose job list is empty (Hermes' cron/jobs.py
+     * load_jobs returns [] for both). Then the tick does not start a Python process at all: started every minute for
+     * every account, an idle Hermes costs about 67 MB each (ADR-0024 addendum) at the same second. A file that does not
+     * parse is left to Hermes, which repairs or reports it.
+     */
+    public static function hasJobs($hermesHome)
+    {
+        $raw = @file_get_contents(rtrim($hermesHome, '/') . '/cron/jobs.json');
+        if ($raw === false) {
+            return false;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return true;
+        }
+        $jobs = array_key_exists('jobs', $data) ? $data['jobs'] : $data;
+        return !(is_array($jobs) && count($jobs) === 0);
+    }
+
+    /** argv run at the lowest CPU and I/O priority when nice and ionice exist; jobs never compete with the account's own work. */
+    public static function lowPriority(array $argv)
+    {
+        foreach ([['ionice', '-c', '3'], ['nice', '-n', '19']] as $prefix) {
+            foreach (explode(':', (string) getenv('PATH')) as $dir) {
+                if (substr($dir, 0, 1) === '/' && is_file("$dir/{$prefix[0]}") && is_executable("$dir/{$prefix[0]}")) {
+                    $argv = array_merge($prefix, $argv);
+                    break;
+                }
+            }
+        }
+        return $argv;
+    }
+
+    /**
      * Append one line to $logFile the first time a refusal is seen. $logFile is the same
      * local/update.log the daily auto-update line truncates on every run (Update::cronLine), so
      * this is "once per day" in practice, not "once forever" — and that is fine: the condition

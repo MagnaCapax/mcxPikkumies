@@ -271,6 +271,10 @@ return [
             check(launchBlocked(launchSummary($recs), '2 line(s) that are not NAME=value'), 'bare names passed: ' . json_encode(launchSummary($recs)));
             list(, $recs) = launchRun($fx, ['launch-plan', '--image', 'nginx:alpine', '--name', 'web', '--env-file', $fx['home'] . '/missing.env']);
             check(launchBlocked(launchSummary($recs), 'does not exist'), 'a missing env file passed');
+            file_put_contents($fx['home'] . '/.pikkumiesKey', "key=vsk-x\n");
+            chmod($fx['home'] . '/.pikkumiesKey', 0600);
+            list(, $recs) = launchRun($fx, ['launch-plan', '--image', 'nginx:alpine', '--name', 'web', '--env-file', $fx['home'] . '/.pikkumiesKey']);
+            check(launchBlocked(launchSummary($recs), 'AI key'), 'the AI key file passed as an env file: ' . json_encode(launchSummary($recs)));
         } finally {
             containersDone($fx);
         }
@@ -281,9 +285,10 @@ return [
             'SecurityOptions' => ['name=seccomp,profile=builtin', 'name=rootless'], 'DockerRootDir' => '/PLACEHOLDER']]]);
         try {
             $home = $fx['home'];
-            foreach (['.ssh', '.config/docker', '.local/share/docker', 'docker/ok', '.config/other'] as $d) {
+            foreach (['.ssh', '.config/docker', '.local/share/docker', 'docker/ok', '.config/other', '.docker'] as $d) {
                 mkdir("$home/$d", 0700, true);
             }
+            file_put_contents("$home/.virsilipasKey", "key=vsk-x\n");
             $st = containersState($fx);
             $st['engine']['info']['DockerRootDir'] = "$home/.local/share/docker";
             file_put_contents($fx['dir'] . '/run/docker.json', json_encode($st));
@@ -293,6 +298,8 @@ return [
             $cases = [
                 "$home:/data" => 'the home folder itself',
                 "~/.ssh:/data" => '~/.ssh',
+                "$home/.virsilipasKey:/k" => '~/.virsilipasKey',
+                "$home/.docker:/d" => '~/.docker',
                 "$home/innocent:/data" => '~/.ssh',
                 "$home/pk:/data" => 'pikkumies',
                 "$home/.config/docker:/data" => 'docker\'s config folder',

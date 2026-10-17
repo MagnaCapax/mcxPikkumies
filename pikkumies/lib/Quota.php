@@ -172,7 +172,7 @@ class Quota
         $bin = [];
         foreach (['quota', 'timeout'] as $name) {
             foreach (explode(':', (string) getenv('PATH')) as $dir) {
-                if (!isset($bin[$name]) && $dir !== '' && is_file("$dir/$name") && is_executable("$dir/$name")) {
+                if (!isset($bin[$name]) && substr($dir, 0, 1) === '/' && is_file("$dir/$name") && is_executable("$dir/$name")) {
                     $bin[$name] = "$dir/$name";
                 }
             }

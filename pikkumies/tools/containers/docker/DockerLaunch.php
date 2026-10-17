@@ -292,6 +292,14 @@ class DockerLaunch
             $blockers[] = "env file $path is not owned by this account";
             return [$path, [], []];
         }
+        // Pikkumies' own folder holds the AI key (local/hermes/.env) and stored passwords; neither goes into a container.
+        $real = self::real($path);
+        foreach ([self::real(Config::root()), $docker->home . '/.virsilipasKey', $docker->home . '/.pikkumiesKey'] as $d) {
+            if ($d !== '' && ($real === $d || strncmp($real, $d . '/', strlen($d) + 1) === 0)) {
+                $blockers[] = "env file $path holds Pikkumies' AI key or stored passwords: never passed to a container";
+                return [$path, [], []];
+            }
+        }
         if ($st['mode'] & 0077) {
             $blockers[] = "env file $path can be read by other accounts: run `chmod 600 $path` first";
             return [$path, [], []];
@@ -335,6 +343,9 @@ class DockerLaunch
         }
         $deny = array_filter([ // the home folder itself is checked on its own: everything else sits inside it
             '~/.ssh' => $home . '/.ssh',
+            'the AI key (~/.virsilipasKey)' => $home . '/.virsilipasKey',
+            'the AI key (~/.pikkumiesKey)' => $home . '/.pikkumiesKey',
+            'registry passwords (~/.docker)' => $home . '/.docker',
             'pikkumies\' own folder' => self::real(Config::root()),
             'docker\'s data folder' => isset($info['DockerRootDir']) && is_string($info['DockerRootDir']) && $info['DockerRootDir'] !== '' ? self::real($info['DockerRootDir']) : '',
             'docker\'s config folder' => $home . '/.config/docker',
@@ -558,10 +569,14 @@ class DockerLaunch
         $base = isset($docker->seams['cgroup_base']) ? $docker->seams['cgroup_base'] : '/sys/fs/cgroup';
         $self = isset($docker->seams['self_cgroup']) ? $docker->seams['self_cgroup'] : '/proc/self/cgroup';
         $u = Cgroup::usageAtLimit($base, $self);
-        $notes[] = $u['memory_max'] !== null
+        $notes[] = $u['memory_max'] !== null && $u['memory_shared']
+            ? 'memory: the lowest limit (' . self::size($u['memory_max']) . ') is on a level shared by every account of the server; this account\'s use against it is not shown'
+            : ($u['memory_max'] !== null
             ? 'memory: ' . ($u['memory_current'] !== null ? self::size($u['memory_current']) : 'unknown') . ' of ' . self::size($u['memory_max']) . ' used, shared by every process and container of the account (limit at ' . $u['memory_path'] . ')'
-            : 'memory: no account memory limit found';
-        if ($u['pids_max'] !== null) {
+            : 'memory: no account memory limit found');
+        if ($u['pids_max'] !== null && $u['pids_shared']) {
+            $notes[] = 'processes: the lowest limit (' . $u['pids_max'] . ') is on a level shared by every account of the server';
+        } elseif ($u['pids_max'] !== null) {
             $notes[] = 'processes: ' . ($u['pids_current'] !== null ? $u['pids_current'] : 'unknown') . ' of ' . $u['pids_max'] . ' (limit at ' . $u['pids_path'] . ')';
         }
         $notes[] = $plan['limits_enforced'] === true

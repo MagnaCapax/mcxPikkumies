@@ -204,7 +204,7 @@ switch ($cmd) {
         $config = Config::load();
         $prov = Provider::resolve($config);
         list($ok, $http) = Provider::check($prov);
-        out('endpoint: ' . ($prov['endpoint'] ?: '(not set)'));
+        out('endpoint: ' . ($prov['endpoint'] ? preg_replace('#^([a-z][a-z0-9+.-]*://)[^/@]*@#i', '$1', $prov['endpoint']) : '(not set)')); // never a user:password@ part
         $keyFrom = getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : Provider::keyFile($config['provider'])['path'];
         out('key:      ' . Provider::mask($prov['key']) . ($prov['key'] !== '' && $keyFrom !== '' ? ' (from ' . $keyFrom . ')' : ''));
         out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
@@ -393,6 +393,9 @@ switch ($cmd) {
         if (hermesBin() === '') {
             exit(0); // Hermes not installed yet; `run`/`doctor` already say so, no need to repeat every minute
         }
+        if (!CronTick::hasJobs(HermesConfig::home())) {
+            exit(0); // no scheduled job: no Python process this minute
+        }
         $hermesLock = HermesInstall::lock(false);
         if (!$hermesLock) {
             exit(0); // Hermes is being updated; the next minute's tick runs the due jobs
@@ -411,7 +414,7 @@ switch ($cmd) {
             exit(0);
         }
         $tickOut = [];
-        exec(implode(' ', array_map('escapeshellarg', $tickArgv)) . ' 2>&1', $tickOut, $tickCode);
+        exec(implode(' ', array_map('escapeshellarg', CronTick::lowPriority($tickArgv))) . ' 2>&1', $tickOut, $tickCode);
         CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', $tickCode, implode("\n", $tickOut));
         exit($tickCode);
 

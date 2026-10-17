@@ -15,7 +15,7 @@ class ToolProc
     public static function which($name)
     {
         foreach (explode(':', (string) getenv('PATH')) as $dir) {
-            if ($dir !== '' && is_file("$dir/$name") && is_executable("$dir/$name")) {
+            if (substr($dir, 0, 1) === '/' && is_file("$dir/$name") && is_executable("$dir/$name")) { // never . or a relative entry
                 return "$dir/$name";
             }
         }

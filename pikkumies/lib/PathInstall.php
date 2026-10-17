@@ -58,8 +58,9 @@ class PathInstall
     /** The marked PATH block for $dir, as shell source lines. */
     public static function block($dir)
     {
-        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $dir);
-        return self::MARK_START . "\n" . 'export PATH="' . $escaped . ':$PATH"' . "\n" . self::MARK_END . "\n";
+        // Single quotes: a $ or backtick in the path must never run at login.
+        $quoted = "'" . str_replace("'", "'\\''", $dir) . "'";
+        return self::MARK_START . "\n" . 'export PATH=' . $quoted . ':"$PATH"' . "\n" . self::MARK_END . "\n";
     }
 
     /**

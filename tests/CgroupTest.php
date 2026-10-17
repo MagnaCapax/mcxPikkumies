@@ -116,9 +116,14 @@ return [
         check($u['memory_max'] === 536870912.0 && $u['memory_current'] === 419430400.0 && $u['memory_path'] === $slice, 'v2 memory at the slice: ' . json_encode($u));
         check($u['pids_max'] === 500 && $u['pids_current'] === 123 && $u['pids_path'] === $slice, 'v2 pids at the slice: ' . json_encode($u));
         check(Cgroup::memoryCurrent($base, $self) === 209715200.0, 'memoryCurrent() must still read the leaf (system-status relies on it)');
-        file_put_contents("$base/user.slice/memory.max", "536870912\n"); // the same limit one level up: the topmost holder wins the tie
+        file_put_contents("$base/user.slice/memory.max", "536870912\n"); // the same limit one level up: the account's own level wins the tie
         file_put_contents("$base/user.slice/memory.current", "629145600\n");
-        check(Cgroup::usageAtLimit($base, $self)['memory_path'] === "$base/user.slice", 'on a tie the topmost level (the larger usage) is the conservative one');
+        $u = Cgroup::usageAtLimit($base, $self);
+        check($u['memory_path'] === $slice && $u['memory_current'] === 419430400.0 && $u['memory_shared'] === false, 'on a tie the account\'s own slice: ' . json_encode($u));
+        file_put_contents("$base/user.slice/memory.max", "268435456\n"); // a lower limit on user.slice, which every account shares
+        $u = Cgroup::usageAtLimit($base, $self);
+        check($u['memory_path'] === "$base/user.slice" && $u['memory_max'] === 268435456.0 && $u['memory_shared'] === true && $u['memory_current'] === null,
+            'a shared level: its limit, never every account\'s usage shown as this one\'s: ' . json_encode($u));
         exec('rm -rf ' . escapeshellarg($base));
         list($base, $self) = cgroupV1Fixture();
         file_put_contents("$base/memory/user.slice/user-1000.slice/memory.usage_in_bytes", "314572800\n");
@@ -131,6 +136,6 @@ return [
         check($u['pids_max'] === 300 && $u['pids_current'] === 42 && $u['pids_path'] === "$base/pids/user.slice/user-1000.slice", 'v1 pids in its own hierarchy: ' . json_encode($u));
         exec('rm -rf ' . escapeshellarg($base));
         $none = Cgroup::usageAtLimit('/nonexistent-cg', '/nonexistent-self-cgroup');
-        check($none === ['memory_max' => null, 'memory_current' => null, 'memory_path' => null, 'pids_max' => null, 'pids_current' => null, 'pids_path' => null], 'unreadable: all null, never a guess');
+        check($none === ['memory_max' => null, 'memory_current' => null, 'memory_path' => null, 'memory_shared' => false, 'pids_max' => null, 'pids_current' => null, 'pids_path' => null, 'pids_shared' => false], 'unreadable: all null, never a guess');
     },
 ];

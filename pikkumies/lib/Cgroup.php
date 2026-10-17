@@ -56,22 +56,23 @@ class Cgroup
      * What is used against the binding limits (ADR-0034: launch preflight), read where each limit is set, not at the
      * leaf: memoryCurrent() is this process's own scope, which on a per-user slice says nothing about the account's
      * other processes (the torrent client, containers). Returns memory_max, memory_current, memory_path (the ancestor
-     * with the lowest memory limit, the topmost on a tie), pids_max, pids_current, pids_path (the same for pids, its
+     * with the lowest memory limit, the account's own level on a tie), memory_shared, and the same four for pids (its
      * own hierarchy on cgroup v1). A value is null when unlimited or unreadable; a path is null when no level sets
-     * a limit.
+     * a limit. *_shared is true when that level is above the account's own user-<uid>.slice (user.slice holds every
+     * account): its usage is every account's together, so *_current is null rather than shown as this account's.
      */
     public static function usageAtLimit($base = '/sys/fs/cgroup', $selfCgroup = '/proc/self/cgroup')
     {
-        list($memMax, $memPath) = self::minOverAncestors($base, $selfCgroup, 'memory', [self::class, 'memoryLimitAt']);
-        list($pidsMax, $pidsPath) = self::minOverAncestors($base, $selfCgroup, 'pids', [self::class, 'pidsLimitAt']);
-        return [
-            'memory_max' => $memMax,
-            'memory_current' => $memPath === null ? null : self::numberIn($memPath, ['memory.current', 'memory.usage_in_bytes']),
-            'memory_path' => $memPath,
-            'pids_max' => $pidsMax === null ? null : (int) $pidsMax,
-            'pids_current' => $pidsPath === null ? null : self::intOrNull(self::numberIn($pidsPath, ['pids.current'])),
-            'pids_path' => $pidsPath,
-        ];
+        $out = [];
+        foreach (['memory' => ['memoryLimitAt', ['memory.current', 'memory.usage_in_bytes']], 'pids' => ['pidsLimitAt', ['pids.current']]] as $c => $how) {
+            list($max, $path) = self::minOverAncestors($base, $selfCgroup, $c, [self::class, $how[0]]);
+            $userLevel = preg_grep('#/user-[0-9]+\.slice(/|$)#', self::ancestorPaths($base, $selfCgroup, $c));
+            $shared = $path !== null && $userLevel && !preg_match('#/user-[0-9]+\.slice(/|$)#', $path);
+            $cur = $path === null || $shared ? null : self::numberIn($path, $how[1]);
+            $out += [$c . '_max' => $c === 'pids' && $max !== null ? (int) $max : $max,
+                $c . '_current' => $c === 'pids' ? self::intOrNull($cur) : $cur, $c . '_path' => $path, $c . '_shared' => (bool) $shared];
+        }
+        return $out;
     }
 
     /** [lowest limit over the ancestors of $controller, the directory holding it], [null, null] when none sets one. */
@@ -81,7 +82,7 @@ class Cgroup
         $at = null;
         foreach (self::ancestorPaths($base, $selfCgroup, $controller) as $p) {
             $v = call_user_func($limitAt, $p);
-            if ($v !== null && ($min === null || $v < $min)) {
+            if ($v !== null && ($min === null || $v <= $min)) { // top-down: on a tie the deeper, more specific level
                 $min = $v;
                 $at = $p;
             }

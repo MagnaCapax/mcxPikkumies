@@ -15,15 +15,33 @@ if (!is_array($payload) && trim($stdin) !== '') {
     echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: the tool call could not be read to check it. Not run; tell the user this safety check is failing.']) . "\n";
     exit(0);
 }
-// The terminal command, or the code of execute_code (which can run the same programs).
+// The terminal command, the code of execute_code (which can run the same programs), or the text written into a
+// background process's stdin (process_manage write/submit, which a shell started in the background runs).
 $tool = is_array($payload) && isset($payload['tool_name']) ? $payload['tool_name'] : '';
+$input = is_array($payload) && isset($payload['tool_input']) && is_array($payload['tool_input']) ? $payload['tool_input'] : [];
 $field = $tool === 'terminal' ? 'command' : ($tool === 'execute_code' ? 'code' : '');
-if ($field === '') {
+if ($tool === 'process_manage' && isset($input['action']) && in_array($input['action'], ['write', 'submit'], true)) {
+    $field = 'data';
+}
+// Hermes' file tools reach the same files without a command: only the path (and a search pattern) is checked, and only
+// against the stored-password and AI-key rules below, so an ordinary file whose name looks like a command is not asked.
+$fileTool = in_array($tool, ['read_file', 'write_file', 'patch', 'search_files'], true);
+// A scheduled job with a script runs that script every time it is due, with no guard and nobody to ask.
+$scheduleTool = $tool === 'cronjob_manage';
+if ($field === '' && !$fileTool && !$scheduleTool) {
     exit(0); // no opinion
 }
-$command = isset($payload['tool_input'][$field]) ? (string) $payload['tool_input'][$field] : '';
-// The shell joins r"m", 'r'm and r\m into rm: every pattern also reads the command without quotes and backslashes.
-$texts = array_unique([$command, str_replace(['"', "'", '\\'], '', $command)]);
+if ($fileTool) {
+    $command = (isset($input['path']) ? (string) $input['path'] : '') . ' ' . (isset($input['pattern']) ? (string) $input['pattern'] : '');
+} elseif ($scheduleTool) {
+    $command = json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+} else {
+    $command = isset($input[$field]) ? (string) $input[$field] : '';
+}
+// The shell joins r"m", 'r'm and r\m into rm: every pattern also reads the command without quotes and backslashes,
+// and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
+$bare = str_replace(['"', "'", '\\'], '', $command);
+$texts = array_unique([$command, $bare, preg_replace('#/(\./)*/*#', '/', $bare)]);
 
 /** preg_match over every form of the command: 1 on a hit, false on a regex engine error, else 0. */
 function guardMatch($re, array $texts)
@@ -41,7 +59,41 @@ function guardMatch($re, array $texts)
 $v = '[\s"\',\[(]+';
 $lh = '(127\.[0-9.]+|localhost|0\.0\.0\.0|\[::1?\])';
 
-$patterns = [
+// Stored passwords and the AI key: checked for every tool above, file tools included.
+$secretPatterns = [
+    '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
+    // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
+    // `credits balance` answers balance questions without it.
+    '#\.(virsilipas|pikkumies)Key\b|hermes/\.env\b|HERMES_HOME\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
+    '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
+];
+if ($fileTool) {
+    foreach ($secretPatterns as $re => $why) {
+        if (guardMatch($re, $texts) !== 0) {
+            echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run."]) . "\n";
+            exit(0);
+        }
+    }
+    exit(0);
+}
+if ($scheduleTool) {
+    $script = false;
+    foreach (['script', 'monitor_script', 'monitor', 'no_agent'] as $k) {
+        $script = $script || !empty($input[$k]);
+    }
+    if (!$script) {
+        exit(0);
+    }
+    if (strlen($command) > 4000) {
+        echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a scheduled script job too long to show the user in full. Not run.']) . "\n";
+        exit(0);
+    }
+    $id = substr(sha1($command), 0, 16);
+    echo json_encode(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => "Pikkumies: schedules a script that then runs by itself whenever it is due, with nobody asked. Job [$id]: " . $command]) . "\n";
+    exit(0);
+}
+
+$patterns = $secretPatterns + [
     '/\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i' => 'recursive force delete',
     '/\bmkfs(\.|\s)/'                              => 'filesystem format',
     '/\bdd\s+[^|]*\bof=\/dev\//'                    => 'raw write to a device',
@@ -52,13 +104,8 @@ $patterns = [
     // A verb behind a name the shell expands (alias x=rm; X=rm; $X -rf) is out of sight of the patterns here.
     '/\b[A-Za-z_][A-Za-z0-9_]*=["\']?(rm|unlink|shred|truncate|dd)([\s"\';]|$)/' => 'a destructive command renamed through an alias or a variable',
     '/^(?=.*\bbase64\s+(-\S+\s+)*(-d|--decode|-D)\b)(?=.*(\|\s*(sudo\s+)?(ba|z|da|k)?sh\b|\beval\b|\b(ba|z|da|k)?sh\s+(-c|<)|<\())/s' => 'decoded text run as a shell command, which cannot be checked',
-    '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
     '/\brclone\b.*\bconfig\s+(show|dump)\b/s' => 'rclone config show/dump prints cloud credentials, and what the agent reads goes to the model',
     // Registry logins (ADR-0019: passwords never in chat or on the command line).
-    // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
-    // `credits balance` answers balance questions without it.
-    '#\.(virsilipas|pikkumies)Key\b|hermes/\.env\b|HERMES_HOME\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
-    '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
     "/\\b(docker|podman|nerdctl)\\b.*\\blogin\\b.*$v(-p|--password(?!-stdin))/s" => 'a registry password on the command line, where other processes can read it; the user types docker login in a terminal',
 ];
 foreach ($patterns as $re => $why) {
@@ -176,8 +223,19 @@ $approve = [
     "/\\brestic\\b.*{$v}(key{$v}remove|repair{$v}snapshots.*--forget|restore)\\b/s"            => ['delete', 'restic removes a key, rewrites snapshots, or restores over existing files'],
     "/\\bborg\\b.*{$v}(check.*--repair|extract)\\b/s"                                      => ['delete', 'borg repairs the repository or extracts over existing files'],
     "/\\bkopia\\b.*{$v}(snapshot{$v}restore|restore)\\b|\\bduplicacy\\b.*-overwrite\\b/s"   => ['delete', 'a restore that can overwrite existing files'],
-    '/\b(rsync|lftp)\b.*--(delete[a-z-]*|remove-source-files|Remove-source-files)\b/s'          => ['delete', 'deletes files on one side of a transfer'],
+    // --del is rsync's own short name for --delete-during.
+    '/\b(rsync|lftp)\b.*--(delete[a-z-]*|del|remove-source-files|Remove-source-files)\b/s'      => ['delete', 'deletes files on one side of a transfer'],
+    '/\bgit\b.*\b(clean\b.*(\s-[a-zA-Z]*f|--force\b)|reset\b.*--hard\b)/s'                     => ['delete', 'git clean or reset --hard deletes files and changes that were never committed'],
+    '/\bcrontab\b[^;&|\n]*\s-[a-zA-Z]*r\b/'                                                    => ['delete', 'crontab -r deletes every scheduled job of this account'],
+    // The list form in code: subprocess.run(["rm", "-r", p]).
+    '/[\[(,]\s*["\']?(rm|unlink|shred|truncate)["\']?\s*,/'                                     => ['delete', 'deletes or empties files'],
     '/\brclone\b.*\bserve\b(?!.*--addr[=\s]+["\']?(127\.|localhost|\[::1\]|unix:))/s'         => ['exposure', 'rclone serve without a loopback --addr publishes files to the network'],
+    '/\brclone\b.*--rc-(no-auth\b|addr[=\s]+["\']?(?!(127\.|localhost|\[::1\]|unix:)))/s'      => ['exposure', 'rclone remote control without a password or on a network address'],
+    // A web server, web shell or tunnel on every interface serves files or a shell beyond this account.
+    '/\bpython[0-9.]*\s+(-\S+\s+)*-m\s+http\.server\b(?!.*(-b|--bind)[=\s]+["\']?(127\.|localhost|::1))/s' => ['exposure', 'a web server on every interface serves this folder'],
+    '/\bphp\b[^;&|\n]*\s-S\s*+["\']?+(?!(127\.|localhost|\[::1\]))/'                             => ['exposure', 'a web server on a network address serves files'],
+    '/(^|[\s;&|(`\/"\'])(ttyd|gotty|ngrok|cloudflared)(?=[\s"\']|$)(?!\s+(--version|--help|-v|-V|-h)\s*($|[;&|]))/' => ['exposure', 'a web shell or tunnel makes this account reachable from the internet'],
+    '/\b(dockerd(-rootless(\.sh)?)?|containerd)\b.*(-H|--host)[=\s]+["\']?tcp:\/\//s'          => ['exposure', 'a container engine API on a network address, which anyone who reaches it can use to run code as this account'],
     '/(^|[\s"\',\[(])--replace\b/'                                                             => ['delete', 'replaces existing files through a Pikkumies tool'],
     // Re-running the media installer can delete an app's settings and users (PMSS install-media-stack.sh
     // asks on stdin, which a pipe can answer); stopping or starting one app is safe.

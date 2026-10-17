@@ -33,11 +33,28 @@ class Provider
         return ['endpoint' => '', 'key' => '', 'path' => ''];
     }
 
-    public static function readKeyFile($path)
+    /**
+     * A key file is trusted like SecretFile::read trusts a secret: a regular file (never a symlink) owned by this
+     * account. One others could read (mode & 077, e.g. written under umask 022) is set back to 0600 with a note on
+     * stderr, then used; a chmod that fails, or another owner, reads as no key. $uid: a test seam.
+     */
+    public static function readKeyFile($path, $uid = null)
     {
         $empty = ['endpoint' => '', 'key' => ''];
         if ($path === '' || !is_file($path) || is_link($path) || !is_readable($path)) {
             return $empty;
+        }
+        clearstatcache(true, $path);
+        $st = @lstat($path);
+        $uid = $uid !== null ? (int) $uid : (function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());
+        if ($st === false || (int) $st['uid'] !== $uid) {
+            return $empty;
+        }
+        if ($st['mode'] & 077) {
+            if (!@chmod($path, 0600)) {
+                return $empty;
+            }
+            fwrite(STDERR, sprintf("note: %s was mode %04o (others could read the key); set to 0600\n", $path, $st['mode'] & 0777));
         }
         $ini = @parse_ini_file($path, false, INI_SCANNER_RAW);
         if (!is_array($ini)) {
@@ -52,7 +69,8 @@ class Provider
     public static function mask($key)
     {
         $len = strlen($key);
-        return $len === 0 ? '(none)' : substr($key, 0, 4) . str_repeat('*', max(4, $len - 8)) . substr($key, -4);
+        // A key under 16 characters is shown as stars only: showing 8 of it would show most of it.
+        return $len === 0 ? '(none)' : ($len < 16 ? str_repeat('*', 8) : substr($key, 0, 4) . str_repeat('*', $len - 8) . substr($key, -4));
     }
 
     /** GET {endpoint}/models as a reachability + key check. Returns [ok, httpCode]. */
