@@ -1,7 +1,9 @@
 <?php
 /**
- * Provider: endpoint + key resolution. The key file is INI ("endpoint=..." and "key=...").
- * Precedence: env PIKKUMIES_ENDPOINT / PIKKUMIES_KEY, then local config, then the key file.
+ * Provider: endpoint + key resolution. Key files are INI ("endpoint=..." and "key=...").
+ * Precedence: env PIKKUMIES_ENDPOINT / PIKKUMIES_KEY, then local config, then ~/.pikkumiesKey, then
+ * ~/.virsilipasKey (the file the platform writes for its own proxy, ADR-0004 amendment); the first key file
+ * holding a key is the one used, for its endpoint too.
  * The key is never printed; use mask().
  */
 require_once __DIR__ . '/Config.php';
@@ -12,10 +14,23 @@ class Provider
     public static function resolve(array $config)
     {
         $p = $config['provider'];
-        $file = self::readKeyFile($p['keyFile']);
+        $file = self::keyFile($p);
         $endpoint = getenv('PIKKUMIES_ENDPOINT') ?: ($p['endpoint'] !== '' ? $p['endpoint'] : $file['endpoint']);
         $key = getenv('PIKKUMIES_KEY') ?: $file['key'];
         return ['endpoint' => rtrim((string) $endpoint, '/'), 'key' => (string) $key, 'model' => (string) $p['model']];
+    }
+
+    /** The first key file in $p (keyFile, then virsilipasKeyFile) holding a key: ['endpoint', 'key', 'path'], all '' when none. */
+    public static function keyFile(array $p)
+    {
+        foreach (['keyFile', 'virsilipasKeyFile'] as $name) {
+            $path = isset($p[$name]) ? (string) $p[$name] : '';
+            $file = self::readKeyFile($path);
+            if ($file['key'] !== '') {
+                return $file + ['path' => $path];
+            }
+        }
+        return ['endpoint' => '', 'key' => '', 'path' => ''];
     }
 
     public static function readKeyFile($path)
@@ -59,6 +74,21 @@ class Provider
         }
         list(, $ids) = self::models($prov);
         return $ids ? $ids[0] : '';
+    }
+
+    /**
+     * Credits left on the key, from GET {endpoint}/balance (the platform proxy's route; its `balance` is already net of
+     * running requests). null when the endpoint has no such route or answers anything else, so other providers just
+     * show no line.
+     */
+    public static function balance(array $prov)
+    {
+        if ($prov['endpoint'] === '' || $prov['key'] === '') {
+            return null;
+        }
+        $r = Http::request('GET', $prov['endpoint'] . '/balance', ['timeout' => 10, 'owners' => 'system', 'max' => 65536, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
+        $data = json_decode($r['body'], true);
+        return $r['code'] === 200 && isset($data['balance']) && is_int($data['balance']) ? $data['balance'] : null;
     }
 
     /** GET {endpoint}/models. Returns [httpCode, model ids]. */

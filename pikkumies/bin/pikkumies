@@ -149,7 +149,7 @@ switch ($cmd) {
         } catch (Exception $x) {
             out('  path: not set up: ' . $x->getMessage());
         }
-        out('Next: set your provider in local/config.php or ~/.pikkumiesKey, then `pikkumies doctor`.');
+        out('Next: set your provider in local/config.php or ~/.pikkumiesKey (a platform key in ~/.virsilipasKey is used too), then `pikkumies doctor`.');
         out('Then open a new shell (or `hash -r`) and type `pikkumies`.');
         break;
 
@@ -205,8 +205,13 @@ switch ($cmd) {
         $prov = Provider::resolve($config);
         list($ok, $http) = Provider::check($prov);
         out('endpoint: ' . ($prov['endpoint'] ?: '(not set)'));
-        out('key:      ' . Provider::mask($prov['key']));
+        $keyFrom = getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : Provider::keyFile($config['provider'])['path'];
+        out('key:      ' . Provider::mask($prov['key']) . ($prov['key'] !== '' && $keyFrom !== '' ? ' (from ' . $keyFrom . ')' : ''));
         out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
+        $credits = $ok ? Provider::balance($prov) : null;
+        if ($credits !== null) {
+            out('credits:  ' . number_format($credits, 0, '.', ' ') . ' left on this key');
+        }
         out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
         if (HermesInstall::isComplete()) {
             $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());

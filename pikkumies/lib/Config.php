@@ -12,6 +12,7 @@ class Config
                 'endpoint' => '',                 // OpenAI-compatible base URL, e.g. https://host/v1
                 'model'    => '',
                 'keyFile'  => $home . '/.pikkumiesKey',
+                'virsilipasKeyFile' => $home . '/.virsilipasKey', // written by the platform for its proxy; read after keyFile (ADR-0004)
             ],
             'root'  => ['disabled' => false],     // UX switch only; the OS decides what root can do
             'skills' => ['disabled' => []],        // shipped skill names to hide, e.g. after copying one (ADR-0007)
