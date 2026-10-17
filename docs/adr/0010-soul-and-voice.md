@@ -33,3 +33,7 @@ The soul named the agent and its working loop but never stated its job, who may 
 - ADR-0003 (Hermes integration, SOUL.md assembly), ADR-0006 (the "This machine" block opens SOUL.md)
 - *Kalevala*, Elias Lönnrot, 1849 (Project Gutenberg #7000); J. M. Crawford's English translation, 1888 (Project Gutenberg #5186)
 - Hermes Agent source: `agent/system_prompt.py`, `agent/prompt_builder.py` (`DEFAULT_AGENT_IDENTITY`, `CONTEXT_FILE_MAX_CHARS`)
+
+## Amendment 2026-10-17
+
+The 8000-byte budget above is withdrawn: it was based on reading Hermes' 20 000-character floor as the limit. SOUL.md is now checked only against the cut Hermes really applies (ADR-0029 amendment). The doctrine's accuracy section was restored in full: a source for every fact about the machine, no typical values in place of read ones, proof for causes, checks that could have found what is claimed absent, more than one check for big claims, and saying "I don't know".

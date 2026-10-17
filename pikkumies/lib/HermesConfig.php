@@ -242,6 +242,12 @@ class HermesConfig
             . "\n\nSkills for other machines are listed too; use one only if it matches. Tool index: " . Units::toolsDir() . "/INDEX.md.";
     }
 
+    // Hermes cuts a context file past 6% of the model's window in characters (4 per token), at least 20 000.
+    // 61 440 is that cap at Hermes' fallback window of 256 000 tokens, used when the provider reports none;
+    // a 1M-token window allows 240 000. A smaller reported window cuts sooner, keeping the first 70% and
+    // telling the agent to read the rest (agent/prompt_builder.py, agent/model_metadata.py; ADR-0029).
+    const SOUL_MAX = 61440;     // bytes of the whole SOUL.md (bytes >= characters, so this is on the safe side)
+    const DOCTRINE_MAX = 16384; // bytes of one tools/<category>/DOCTRINE.md
     const NOTICES_MAX = 2;      // notice lines in SOUL.md
     const NOTICE_BYTES = 120;   // bytes of text per line
 

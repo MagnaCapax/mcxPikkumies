@@ -34,3 +34,14 @@ Each tool category already states rules for the agent in its README (storage "Sa
 - ADR-0003 (SOUL.md assembly), ADR-0010 (soul and voice, the 8000-byte budget), ADR-0015 (tool units, `tools.disabled`), ADR-0022 (regenerated on every run), ADR-0032 (the agent's name line in SOUL.md)
 - Tests: `tests/DoctrineTest.php`, `tests/CoreTest.php` (soul budget)
 - Hermes Agent v2026.9.24: `agent/prompt_builder.py` (`CONTEXT_FILE_MAX_CHARS`)
+
+## Amendment 2026-10-17: the size budgets measure Hermes' real cut, not chosen numbers
+
+The 1200-byte cap per DOCTRINE.md, the 8000-byte core and the 16 000-byte total were never measured against anything. They came from reading Hermes' `CONTEXT_FILE_MAX_CHARS = 20 000` as the limit, but that is only the floor. Hermes cuts a context file past 6% of the model's context window in characters (4 per token), clamped to 20 000..500 000, and an explicit `context_file_max_chars` in config.yaml overrides it (`agent/prompt_builder.py`, `_dynamic_context_file_max_chars`). The window comes from the provider's model list, or Hermes' fallback of 256 000 tokens (`agent/model_metadata.py`), which gives 61 440 characters; a 1M-token window gives 240 000. The 20 000 floor applies only when no window is known at all. Past the cap Hermes keeps the first 70% and the last 20% and tells the agent to read the whole file, so the static doctrine near the top survives and the tail (tool doctrine) is what is lost.
+
+Fitting text to the chosen numbers cost real rules: a load-bearing steer was dropped once (2026-10-14, restored with a test), the accuracy rules were condensed, and a torrent rule was cut to a pointer. The maintainer, 2026-10-17: "1200 bytes is abysmal safety constraint, make it more like 16k".
+
+- `HermesConfig::SOUL_MAX` = 61 440 bytes for the whole SOUL.md, every profile, with the longest name and two notices (bytes are at least characters, so this errs safe). The separate 8000-byte core budget is gone.
+- `HermesConfig::DOCTRINE_MAX` = 16 384 bytes per DOCTRINE.md.
+- A rule that does not fit is a reason to look at the limit, not to shorten the rule. Before cutting text to fit any size check, find what the check protects and measure it.
+- Load-bearing sentences are pinned by tests (the built-in memory steer, the accuracy rule), so a later edit fails loudly instead of losing them.

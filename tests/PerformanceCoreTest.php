@@ -318,9 +318,9 @@ return [
         }
         check(!array_diff_key($rows, $constants), 'the README lists constants PerfLimits does not have: ' . implode(', ', array_keys(array_diff_key($rows, $constants))));
     },
-    'performance docs: tools/system/DOCTRINE.md is at most 1200 bytes and the README quotes every line of it' => function () {
+    'performance docs: tools/system/DOCTRINE.md is within HermesConfig::DOCTRINE_MAX and the README quotes every line of it' => function () {
         $file = dirname(__DIR__) . '/pikkumies/tools/system/DOCTRINE.md';
-        check(filesize($file) <= 1200, 'DOCTRINE.md is ' . filesize($file) . ' bytes');
+        check(filesize($file) <= HermesConfig::DOCTRINE_MAX, 'DOCTRINE.md is ' . filesize($file) . ' bytes');
         $readme = (string) file_get_contents(perfTestUnitDir() . '/README.md');
         $lines = array_filter(array_map('trim', explode("\n", (string) file_get_contents($file))), 'strlen');
         check(count($lines) >= 5, 'DOCTRINE.md lines missing');

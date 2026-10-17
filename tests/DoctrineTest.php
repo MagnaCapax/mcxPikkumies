@@ -14,14 +14,14 @@ function soulProfiles()
 }
 
 return [
-    'doctrine: each shipped DOCTRINE.md is a category file of at most 1200 bytes' => function () {
+    'doctrine: each shipped DOCTRINE.md is a category file of at most HermesConfig::DOCTRINE_MAX bytes' => function () {
         $files = (array) glob(Units::toolsDir() . '/*/DOCTRINE.md');
         check(count($files) >= 2, 'expected seeded DOCTRINE.md files');
         $categories = array_unique(array_column(Units::all(), 'category'));
         foreach ($files as $f) {
             $cat = basename(dirname($f));
             check(in_array($cat, $categories, true), "$cat/DOCTRINE.md is not in a tool category");
-            check(filesize($f) <= 1200, "$cat/DOCTRINE.md is " . filesize($f) . ' bytes; keep it at or under 1200');
+            check(filesize($f) <= HermesConfig::DOCTRINE_MAX, "$cat/DOCTRINE.md is " . filesize($f) . ' bytes; the cap is ' . HermesConfig::DOCTRINE_MAX);
             check(trim((string) file_get_contents($f)) !== '', "$cat/DOCTRINE.md is empty");
         }
         check(!glob(Units::toolsDir() . '/*/*/DOCTRINE.md'), 'DOCTRINE.md belongs at category level, not in a tool unit');
@@ -69,7 +69,7 @@ return [
         $none = Config::merge(Config::defaults(), ['tools' => ['disabled' => $cats]]);
         check(strpos(HermesConfig::renderSoul($p, $none), '## Tool doctrine') === false, 'no section when every category with doctrine is off');
     },
-    'doctrine: core SOUL <= 8000 bytes and total <= 16000 for every profile (Hermes cuts context files at 20000)' => function () {
+    'doctrine: SOUL.md fits under the Hermes context-file cut for every profile (ADR-0029 amendment)' => function () {
         CronTick::$setprivPresentOverride = true; // the cron line present: the longest capability block
         Generate::$dockerPresentOverride = true; // the containers doctrine on (it is off only without a docker CLI)
         $notices = testTempDir('pk-soul-notices'); // two notices at their longest
@@ -77,13 +77,9 @@ return [
         file_put_contents("$notices/bb-longest-name-for-a-notice-32b.txt", str_repeat('n', 500));
         $named = Config::merge(Config::defaults(), ['agent' => ['name' => str_repeat('N', Config::NAME_MAX)]]); // the name line at its longest
         foreach (soulProfiles() as $name => $p) {
-            // Notices come and go like tool doctrine, so they count against the total, not the static core (ADR-0034).
-            HermesConfig::$noticesDir = "$notices/none";
-            $core = strlen(HermesConfig::renderSoul($p, $named, false));
             HermesConfig::$noticesDir = $notices;
             $total = strlen(HermesConfig::renderSoul($p, $named));
-            check($core <= 8000, "$name: core SOUL.md is $core bytes with a " . Config::NAME_MAX . "-character name; tighten the text, keep it at or under 8000");
-            check($total <= 16000, "$name: SOUL.md with tool doctrine is $total bytes; keep it at or under 16000");
+            check($total <= HermesConfig::SOUL_MAX, "$name: SOUL.md is $total bytes with a " . Config::NAME_MAX . "-character name and two notices; Hermes would cut it past " . HermesConfig::SOUL_MAX);
         }
         CronTick::$setprivPresentOverride = null;
         Generate::$dockerPresentOverride = null;

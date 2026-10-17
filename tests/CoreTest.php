@@ -67,14 +67,13 @@ return [
             Generate::$dockerPresentOverride = null;
         }
     },
-    'soul stays within its size budget (sent to the model on every turn)' => function () {
-        // Core (without tool doctrine) <= 8000, total <= 16000; every profile is checked in DoctrineTest (ADR-0029).
-        $core = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults(), false);
-        check(strlen($core) <= 8000, 'core SOUL.md is ' . strlen($core) . ' bytes; keep it at or under 8000');
+    'soul fits under the Hermes context-file cut and keeps its load-bearing rules' => function () {
+        // The only size limit is Hermes' own: every profile is checked in DoctrineTest (ADR-0029 amendment).
         $s = HermesConfig::renderSoul(['pmss' => true, 'root' => ['available' => true, 'via' => 'sudo']], Config::defaults());
-        check(strlen($s) <= 16000, 'SOUL.md with tool doctrine is ' . strlen($s) . ' bytes; keep it at or under 16000');
+        check(strlen($s) <= HermesConfig::SOUL_MAX, 'SOUL.md is ' . strlen($s) . ' bytes; Hermes would cut it past ' . HermesConfig::SOUL_MAX);
         // ADR-0007: a live run saved a lesson into the built-in memory; the doctrine must steer away from it.
         check(strpos($s, 'never the built-in memory tool') !== false, 'the built-in memory steer is missing from SOUL.md');
+        check(strpos($s, "Don't know? Check. Can't check? Say \"I don't know\"") !== false, 'the accuracy rule is missing from SOUL.md');
     },
     'soul starts with what this machine allows, and nothing else from the profile' => function () {
         $p = ['pmss' => true, 'root' => ['available' => false, 'via' => 'none'], 'apps' => ['secretapp'], 'user' => 'someone'];
