@@ -295,7 +295,9 @@ switch ($cmd) {
 
     case 'run':
         if (hermesBin() === '') {
-            out('Hermes is not installed yet; see local/install.log');
+            // A preinstalled account (PMSS, ADR-0033 addendum) has no runtime until the daily update or this first run builds it.
+            out('The agent runtime is not ready yet: ' . HermesInstall::ensure(false, !empty(profile()['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
+            out('Run `pikkumies` again when it is ready (a few minutes); `pikkumies doctor` shows the progress.');
             exit(1);
         }
         // A moved account arrives without its crontab and nothing else restores the two lines (Update::ensureScheduled).

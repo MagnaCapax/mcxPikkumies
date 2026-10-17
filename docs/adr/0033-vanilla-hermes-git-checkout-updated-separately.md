@@ -64,3 +64,10 @@ In a throwaway HOME (never the real `~/.hermes`): `pikkumies install` until `loc
 ## References
 - ADR-0001 (layout), ADR-0003 (HERMES_HOME), ADR-0009 (superseded), ADR-0013 (daily update), ADR-0014 (standalone Python, no longer used), ADR-0020 (approvals), ADR-0021 (lazy installs), ADR-0025 (setpriv), ADR-0026 (own logins)
 - Upstream source: `setup-hermes.sh`, `scripts/install.sh`, `pm/lock.json`, `pm/cli.py`, `pm/defaults.py`, `pm/packages.py`, `pyproject.toml`, `hermes_cli/update_channel.py`, `hermes_cli/source_releases.py`, `hermes_cli/_launchers.py`, `hermes_cli/venv_sync.py`, `hermes_cli/update_cmd.py`, `hermes_cli/update_cmd_stash.py`, `pm/client.py`, `pm/libatomic.py`, `pm/environments.py`, `hermes_cli/hooks.py`
+
+## Addendum 2026-10-17: a preinstalled account builds the runtime later
+The operator, 2026-10-17: "infact pikkumies should be preinstalled ..... in most cases that is, if enough ram." PMSS now runs the installer for each new account with at least 1000 MiB RAM (PMSS ADR 0090), with `PIKKUMIES_SKIP_HERMES=1`, so account creation clones Pikkumies and writes its config but starts no build. Accounts created together, as when a server's users move to a new one, would otherwise each start a 2 GB build at the same moment.
+
+The runtime then builds the first time either of two things happens:
+- The account's daily `pikkumies update` runs. Its post-update step already builds where no tree exists, and the time of day comes from the uid, so neighbouring accounts build minutes apart.
+- The user runs `pikkumies`. A session with no runtime used to print "Hermes is not installed yet" and exit; it now starts the build (`HermesInstall::ensure`, with its quota check), says so, and exits. The user runs `pikkumies` again when `pikkumies doctor` shows it ready.

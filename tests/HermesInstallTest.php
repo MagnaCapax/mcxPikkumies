@@ -508,4 +508,16 @@ return [
         $ignore = (string) file_get_contents("$root/.gitignore");
         check(strpos($ignore, "pikkumies/hermes/\n") !== false && strpos($ignore, "pikkumies/hermes.broken-*/\n") !== false && strpos($ignore, "pikkumies/include/.hermes-ready\n") !== false, '.gitignore must cover the checkout, moved-aside trees and the marker');
     },
+    'hermes: a session with no runtime starts the build instead of only saying it is missing (a preinstalled account, ADR-0033 addendum)' => function () {
+        if (HermesInstall::bin() !== '') {
+            skip('Hermes is installed in this checkout, so a session would start it; checked in CI');
+        }
+        $home = testTempDir('pk-run-nobuild');
+        $cmd = 'HOME=' . escapeshellarg($home) . ' PIKKUMIES_SKIP_HERMES=1 ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/pikkumies/bin/pikkumies') . ' run < /dev/null 2>&1';
+        exec($cmd, $out, $code);
+        $text = implode("\n", $out);
+        check($code === 1, "expected exit 1, got $code: $text");
+        check(strpos($text, 'The agent runtime is not ready yet: skipped (PIKKUMIES_SKIP_HERMES=1)') !== false, 'run did not go through HermesInstall::ensure: ' . $text);
+        testRmTree($home);
+    },
 ];

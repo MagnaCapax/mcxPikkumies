@@ -25,6 +25,8 @@ key=your-key
 
 Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
+On a Pulsed Media seedbox with at least 1000 MiB RAM, Pikkumies comes preinstalled on new accounts. The platform runs the installer with `PIKKUMIES_SKIP_HERMES=1`, which skips the agent runtime build. The runtime then builds at the account's daily update time, or the first time you run `pikkumies`: that run starts the build and asks you to come back in a few minutes (ADR-0033).
+
 On a terminal, the install and the first session ask what to call your agent, and the first interactive session shows the [terms of service](https://pulsedmedia.com/terms.php) and [privacy policy](https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy) and starts only once you accept them. Flags answer every question, so a scripted install (PMSS) asks nothing:
 
 ```sh
