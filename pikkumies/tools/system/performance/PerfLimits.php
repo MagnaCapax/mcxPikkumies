@@ -59,6 +59,8 @@ class PerfLimits
     const MEM_ANON_PCT = 90;              // provisional: anon memory / limit in both samples
     const CPU_THROTTLE_PCT = 20;          // provisional: nr_throttled / nr_periods over the window
     const STEAL_PCT = 5;                  // provisional: CPU steal share
+    const NEAR_CAP_PCT = 80;              // provisional: a measured rate at or above this share of its cap counts as at the cap (io cap, CPU quota, window/rtt)
+    const TRAFFIC_NEAR_PCT = 90;          // provisional: plan traffic used at or above this share of its limit
 
     // Sampling (a Hermes no_agent job the agent creates on the user's request)
     const SAMPLE_INTERVAL_MIN = 15;       // provisional: "every 15m"

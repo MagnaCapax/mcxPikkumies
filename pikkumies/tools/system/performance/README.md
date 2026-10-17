@@ -102,6 +102,8 @@ Every number is a constant in `PerfLimits.php`, provisional until measured on a 
 | `MEM_ANON_PCT` | 90 | memory in use (not cache) against the limit, in both samples |
 | `CPU_THROTTLE_PCT` | 20 | share of CPU periods throttled |
 | `STEAL_PCT` | 5 | CPU steal share |
+| `NEAR_CAP_PCT` | 80 | share of a cap a measured rate must reach to count as at the cap |
+| `TRAFFIC_NEAR_PCT` | 90 | share of the plan traffic limit used that counts as near it |
 | `SAMPLE_INTERVAL_MIN` | 15 | minutes between scheduled samples |
 | `SAMPLE_RUNS` | 96 | samples per scheduled job (24 hours) |
 | `SAMPLES_HOURS_DEFAULT` | 24 | `samples --hours` default |
