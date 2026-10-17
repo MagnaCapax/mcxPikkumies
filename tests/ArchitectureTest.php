@@ -81,19 +81,33 @@ return [
             }
         }
     },
-    'architecture: README.md relative links resolve to a real file' => function () {
+    'architecture: README.md and docs/*.md relative links resolve to a real file' => function () {
+        $root = dirname(__DIR__);
+        $pages = array_merge(["$root/README.md"], (array) glob("$root/docs/*.md"));
+        check(count($pages) >= 5, 'expected the README and the docs/ pages (ADR-0036); found ' . count($pages));
+        foreach ($pages as $page) {
+            $name = substr($page, strlen($root) + 1);
+            $text = (string) file_get_contents($page);
+            check(preg_match_all('/\]\(([^)]+)\)/', $text, $m) > 0, "no links found in $name; this check would be vacuous");
+            $checked = 0;
+            foreach ($m[1] as $link) {
+                if (strpos($link, '://') !== false || $link === '' || $link[0] === '#') {
+                    continue; // external or anchor-only
+                }
+                $checked++;
+                check(is_file(dirname($page) . "/$link"), "$name links to '$link', which does not exist");
+            }
+            check($checked >= 1, "no relative links were found to check in $name (it may have changed shape)");
+        }
+    },
+    'architecture: the README\'s first code block is the one-line install (ADR-0036)' => function () {
         $root = dirname(__DIR__);
         $text = (string) file_get_contents("$root/README.md");
-        check(preg_match_all('/\]\(([^)]+)\)/', $text, $m) > 0, 'no links found in README.md; this check would be vacuous');
-        $checked = 0;
-        foreach ($m[1] as $link) {
-            if (strpos($link, '://') !== false || $link === '' || $link[0] === '#') {
-                continue; // external or anchor-only
-            }
-            $checked++;
-            check(is_file("$root/$link"), "README.md links to '$link', which does not exist");
-        }
-        check($checked >= 1, 'no relative links were found to check (README.md may have changed shape)');
+        check(preg_match('/```[a-z]*\n(.*?)\n```/s', $text, $m) === 1, 'README.md has no code block');
+        $line = trim($m[1]);
+        check(strpos($line, "\n") === false, 'the first code block is not a single line: ' . $line);
+        check(strpos($line, 'https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh') !== false && preg_match('/&& bash \S+$/', $line) === 1, 'the first code block is not the install.sh one-liner: ' . $line);
+        check(is_file("$root/install.sh") && is_executable("$root/install.sh"), 'install.sh is missing or not executable');
     },
     'architecture: every tests/*Test.php top-level test name is globally unique (static scan, never re-requiring the files)' => function () {
         $seen = [];

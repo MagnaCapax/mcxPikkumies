@@ -16,4 +16,5 @@ A lightweight helper agent that runs on the server it manages: as the user by de
 - **Privacy.** The agent works on its user's data at that user's request. It never sends anything off the machine that the user did not ask it to. Detection reads only the user's own processes. Performance telemetry is a user setting (`privacy.telemetry`, default on per the operator's decision of 2026-10-16), shown at first run and changeable with the `pikkumies-configure` skill or `install --telemetry=off`; nothing is sent until a sender exists, and Hermes' own telemetry stays off (ADR-0032).
 - **Keep it small.** Each feature has to earn its lines. If the OS, Hermes or an existing tool already does it, leave it there.
 - **Tool units, hooks, documentation sources:** follow `pikkumies/doctrine/SOP/make-a-skill-tool-hook-or-pack.md`.
+- **Documentation:** a feature is documented in a `docs/` page or in its unit README. The root README gets at most one line and a link; its first code block stays the one-line install (ADR-0036).
 - **Tests:** `php tests/run.php` must pass; CI runs it on PHP 7.3, 8.2 and 8.4.

@@ -1,0 +1,30 @@
+# What Pikkumies is meant to be
+
+- **It runs as you.** By default it works under the user's own account, inside that user's slice of the server. Root access is one more capability layer on top of that. When the agent detects sudo or root deterministically, it can do full server administration. When it doesn't, it manages only that slice. A config switch turns the root layer off.
+- **It knows where to look.** Basic memory (lessons), documentation sources it downloads and searches locally (`pikkumies/config/documentationSources.md`, ADR-0011), and a small doctrine: verify before claiming, cite the source and its trust level, ask before anything destructive. On the first turn of a task it searches before it acts.
+- **It grows by tool units.** Every capability is one directory under `pikkumies/tools/<category>/<tool>/`: a skill, its tool, USAGE.md and README.md. Every tool prints JSON Lines for the agent and `--human` for people. All units load on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0015 to ADR-0017).
+- **It asks before deleting data.** A torrent's files, a backup prune or an rclone sync go to the user for approval in the chat (ADR-0020).
+- **It learns, can undo, and can run tasks later.** Hermes' own self-improvement is on from install: after a turn it may save a memory or write or patch a skill, and every skill it writes is scanned before it runs again. File edits are snapshotted, and `/rollback` in a session restores them. Ask it to do something on a schedule and the job runs from a per-minute line in your crontab, without the privileges sudo would give (ADR-0024, ADR-0025). `cron.disabled` in `local/config.php` removes that line.
+- **Your model, your keys.** It talks to any OpenAI-compatible endpoint. A deployment chooses its own provider and keys.
+- **It is not only for sysadmin work.** General investigation and research are in scope too.
+
+## Layout
+
+```
+pikkumies/            the runtime (~/pikkumies)
+  bin/pikkumies       entrypoint
+  lib/                core PHP
+  tools/<category>/<tool>/  tool units: skill.md, USAGE.md, README.md, <tool>.php; INDEX.md is generated
+  skills/             core skills not yet moved into units (Hermes SKILL.md format)
+  hooks/<category>/<hook>/  hook units: hook.md, README.md, <hook>.php; orchestrator.php runs them per event; INDEX.md is generated
+  config/             documentationSources.md: the wikis and knowledge bases it searches
+  doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
+  memory/             your lessons, one markdown file each (never tracked)
+  hermes/             Hermes Agent: an unmodified upstream git checkout (never tracked); its Python, tools and dependencies are in local/hermes/
+  include/            install state, never tracked: the Hermes ready marker and build lock
+  local/              your config, machine profile and agent state (never tracked)
+docs/                 install, commands, design and name pages; adr/ holds the architecture decisions
+tests/                php tests/run.php
+```
+
+[Back to the README](../README.md)

@@ -1,113 +1,52 @@
 # mcxPikkumies
 
-A lightweight sysadmin helper agent that lives on the server it looks after. Its first home is the PMSS seedbox platform, but it is built general enough to run on other systems with your own API and keys.
-
-**Status:** early. The layout, installer, detection, memory and Hermes wiring work; the tool units are a first set, with torrent clients, *arr apps, media servers and backup tools on the way.
+A small helper agent that lives on the server it looks after. Ask it in plain words to check disk space, fix a stuck app, add a torrent, look after containers or backups, or explain what is going on, and it does the work with tools built for that, asking before it deletes anything. Its first home is the PMSS seedbox platform; it runs on other Linux servers with your own model provider.
 
 ## Install
 
 ```sh
-git clone --depth 1 https://github.com/MagnaCapax/mcxPikkumies ~/.mcxPikkumies
-~/.mcxPikkumies/pikkumies/bin/pikkumies install
+curl -fsSLo install-pikkumies.sh https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh && bash install-pikkumies.sh
 ```
 
-The installer needs no root and returns in seconds. It:
-- links `~/pikkumies` to the runtime;
-- detects the machine (OS, which seedbox host it is, root access, running apps, resources);
-- generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
-- installs Hermes Agent in the background: an unmodified checkout of its newest release in `pikkumies/hermes`, set up by Hermes' own package manager (its pinned, checksum-verified uv and Python) in your own account, with no root and without Hermes' installer scripts, which would edit your shell files (ADR-0033);
-- puts `pikkumies` on your `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is already on `PATH`, otherwise one marked block added to `~/.bashrc` and `~/.profile` (never duplicated on a re-run; ADR-0022). Open a new shell (or `hash -r`) afterwards.
+No curl? `wget -qO install-pikkumies.sh https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh && bash install-pikkumies.sh`. The [installer](install.sh) is a dozen lines: it clones this repository into `~/.mcxPikkumies` and runs `pikkumies install`, in your own account, with no root. It needs git and PHP 7.3 or newer. Run it again to update.
 
-Then give it a model key. A platform key in `~/.virsilipasKey` (on Pulsed Media: the key shown under AI credits in the client area, pasted after `key=`) is used as it is. For your own provider, write a key file `~/.pikkumiesKey` (`endpoint=` and `key=` lines, then `chmod 600 ~/.pikkumiesKey`); it wins over the platform key. A key file others can read is set to 0600 when Pikkumies reads it. `~/pikkumies/local/config.php` can set the endpoint and the model, never the key.
-
-```ini
-endpoint=https://your-openai-compatible-endpoint/v1
-key=your-key
-```
-
-Check everything with `pikkumies doctor`, then just type `pikkumies`.
-
-On a terminal, the install and the first session ask what to call your agent, and the first interactive session shows the [terms of service](https://pulsedmedia.com/terms.php) and [privacy policy](https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy) and starts only once you accept them. Flags answer every question, so a scripted install (PMSS) asks nothing:
+Then:
 
 ```sh
-~/.mcxPikkumies/pikkumies/bin/pikkumies install --name=Helper --accept-terms --telemetry=on --perf-logging=on --retention-days=0
+pikkumies doctor    # the model provider, your key (masked), credits, and whether the agent runtime is ready
+pikkumies           # start a session
 ```
 
-`--retention-days=0` keeps session history forever (the default); a number of days lets Hermes prune older ended sessions. Telemetry and performance logging are settings only for now: nothing is sent or logged. Runs without a terminal (cron, scripts, piped one-shot prompts) never ask and are never blocked. The settings can be reviewed and changed later with the `pikkumies-configure` skill (ADR-0032).
+The first install builds the agent runtime in the background, so `doctor` may say "still building" for a few minutes. If `pikkumies` is not found, open a new shell.
 
-## Update
+**Model key:** on a PMSS seedbox, your key goes in `~/.virsilipasKey`; with your own OpenAI-compatible provider, in `~/.pikkumiesKey`. Details in [docs/install.md](docs/install.md).
 
-```sh
-~/pikkumies/bin/pikkumies update
-```
+**Experimental:** Pikkumies is early software. Keep backups of anything that matters. It asks before deleting data, but it can still be wrong, so read what it proposes before you say yes.
 
-Install also adds a daily `pikkumies update` to your own crontab (one tagged line; `autoUpdate.disabled` in `local/config.php` removes it; ADR-0013). Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. Hermes is updated separately, when you choose: `/update` in a session, or `pikkumies run update` from a shell with no other session open. Each start checks a changed Hermes against the settings Pikkumies relies on and refuses to run it if they no longer apply (ADR-0033). To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
+## What it can do
 
-## Commands
+- Disk space, quota and rclone cloud or SFTP remotes: [storage](pikkumies/tools/storage/README.md)
+- Torrent clients (rTorrent, qBittorrent, Deluge): [torrent clients](pikkumies/tools/torrent-clients/README.md)
+- Sonarr, Radarr, Prowlarr and the other *arr apps: [arr](pikkumies/tools/arr/README.md)
+- Plex, Jellyfin and Emby: [media servers](pikkumies/tools/media-servers/README.md)
+- Rootless Docker containers: [containers](pikkumies/tools/containers/README.md)
+- Backups with restic and borg: [backup](pikkumies/tools/backup/README.md)
+- Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)
+- Know-how for the apps on a PMSS seedbox, with the wiki pages to read: [seedbox apps](pikkumies/tools/seedbox/seedbox-apps/README.md)
+- Server administration when it has root: [server admin](pikkumies/tools/server-admin/server-admin/README.md)
+- Lessons it saves and the documentation it searches: [memory](pikkumies/tools/memory/pikkumies/README.md)
+- Longer research questions: [deep research](pikkumies/tools/research/deep-research/README.md)
 
-| Command | What it does |
-|---|---|
-| `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, install Hermes in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
-| `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); never updates Hermes |
-| `pikkumies detect` | Print the machine profile (JSON) |
-| `pikkumies doctor` | Show provider, masked key, Hermes and tool status |
-| `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
-| `pikkumies` | Start a plain interactive session (same as `pikkumies run` with no further arguments) |
-| `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
-| `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
-| `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …) |
-| `pikkumies run update` | Update Hermes with its own updater, separately from Pikkumies; refuses while another session runs |
-| `pikkumies tmux [1-9]` | Open window `pmN` (default `pm1`) of the tmux session `pikkumies`, running `pikkumies`; the session and the window are created when missing. Without tmux it says so |
+It is not only for server work: it answers general questions and investigates too.
 
-Any number of `pikkumies` instances can run at once in one account: they share `HERMES_HOME` on purpose (so sessions, memory and auth live in one place) and Hermes itself is built for several writers at a time; everything *pikkumies* regenerates on every run is written under a lock or through an atomic rename, so two instances starting together never race each other (ADR-0022).
+## Documentation
 
-To keep several sessions one keystroke away, add aliases to your `~/.bashrc` (the installer does not add them):
-
-```sh
-alias pm1='pikkumies tmux 1'
-alias pm2='pikkumies tmux 2'   # ... up to pm9
-```
-
-`pm2` attaches to the `pikkumies` tmux session at window `pm2`, starting a new agent session there if that window is not open yet; detach with `Ctrl-b d` and the sessions keep running.
-
-## What it is meant to be
-
-- **It runs as you.** By default it works under the user's own account, inside that user's slice of the server. Root access is one more capability layer on top of that. When the agent detects sudo or root deterministically, it can do full server administration. When it doesn't, it manages only that slice. A config switch turns the root layer off.
-- **It knows where to look.** Basic memory (lessons), documentation sources it downloads and searches locally (`pikkumies/config/documentationSources.md`, ADR-0011), and a small doctrine: verify before claiming, cite the source and its trust level, ask before anything destructive. On the first turn of a task it searches before it acts.
-- **It grows by tool units.** Every capability is one directory under `pikkumies/tools/<category>/<tool>/`: a skill, its tool, USAGE.md and README.md. Every tool prints JSON Lines for the agent and `--human` for people. All units load on every machine; the agent is told what the machine allows, and each skill checks that it applies (ADR-0015 to ADR-0017).
-- **It asks before deleting data.** A torrent's files, a backup prune or an rclone sync go to the user for approval in the chat (ADR-0020).
-- **It learns, can undo, and can run tasks later.** Hermes' own self-improvement is on from install: after a turn it may save a memory or write or patch a skill, and every skill it writes is scanned before it runs again. File edits are snapshotted, and `/rollback` in a session restores them. Ask it to do something on a schedule and the job runs from a per-minute line in your crontab, without the privileges sudo would give (ADR-0024, ADR-0025). `cron.disabled` in `local/config.php` removes that line.
-- **Your model, your keys.** It talks to any OpenAI-compatible endpoint. A deployment chooses its own provider and keys.
-- **It is not only for sysadmin work.** General investigation and research are in scope too.
-
-## Layout
-
-```
-pikkumies/            the runtime (~/pikkumies)
-  bin/pikkumies       entrypoint
-  lib/                core PHP
-  tools/<category>/<tool>/  tool units: skill.md, USAGE.md, README.md, <tool>.php; INDEX.md is generated
-  skills/             core skills not yet moved into units (Hermes SKILL.md format)
-  hooks/<category>/<hook>/  hook units: hook.md, README.md, <hook>.php; orchestrator.php runs them per event; INDEX.md is generated
-  config/             documentationSources.md: the wikis and knowledge bases it searches
-  doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
-  memory/             your lessons, one markdown file each (never tracked)
-  hermes/             Hermes Agent: an unmodified upstream git checkout (never tracked); its Python, tools and dependencies are in local/hermes/
-  include/            install state, never tracked: the Hermes ready marker and build lock
-  local/              your config, machine profile and agent state (never tracked)
-docs/adr/             architecture decisions
-tests/                php tests/run.php
-```
-
-## The name
-
-*Pikkumies*, the little man from the sea, comes from Runo II of the Kalevala. A great oak has grown until it "päivän peitti paistamasta" (hid the sun from shining), and nobody can fell it. Väinämöinen calls for someone of the water folk to fell it, and a man no taller than a thumb rises from the sea: "Olen mie mokoma miesi, uros pieni, veen väkeä. Tulin tammen taittamahan" (I am such a man, a little hero of the water folk; I came to fell the oak). Väinämöinen doubts him. The little man then grows into a giant and fells the tree in three strokes.
-
-He comes back in Runo XLVIII. Väinämöinen needs someone to beat the water and drive the fish into his net, and the little man rises from the sea again and asks: "Tarvonko väen mukahan, oike'in olan takoa, vai tarvon asun mukahan?" (Shall I beat the water with all my strength, the full swing from the shoulder, or as the work needs?) Väinämöinen answers: "Jos tarvot asun mukahan, äijä on siinä tarpomista" (As the work needs: that is plenty). He does, and drives a great many fish into the net.
-
-That is the job description: small by default, sent for when there is work, as big as the task needs, and no more effort than the work needs.
-
-Verses: *Kalevala* (Elias Lönnrot, 1849), Runo II 137-142 and Runo XLVIII 151-176. The English is ours, from the Finnish. "Asun mukahan" is read from Runo XXXV, where the same couplet pairs it with "tarpehen takoa" (as the need demands); J. M. Crawford's 1888 translation is loose in this passage.
+- [Installing and updating](docs/install.md): what the installer does, key files, a scripted install, updates
+- [Commands](docs/commands.md): every command, several sessions at once, tmux
+- [Design](docs/design.md): what it is meant to be, and the directory layout
+- [The name](docs/name.md): the little man from the sea in the Kalevala
+- [Decisions](docs/adr/0000-template.md): one ADR per decision in `docs/adr/`
+- [Contributing](AGENTS.md)
 
 ## Attribution
 
