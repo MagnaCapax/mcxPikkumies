@@ -12,7 +12,8 @@
  * at 10) delays each answer, for time-limit tests. State keys: engine {version, info, df, compose}, containers [{id,
  * name, image, state, exit_code, ports [{ip, host, container, proto}], labels {}, env [], mounts [], restart,
  * auto_remove, started_at, finished_at, restart_count, log_path, oom, created, logs [{stream, text}], stats {}}],
- * images [{id, repository, tag, size, created}], fail {command: {code, err}}, calls [argv...], contexts [DOCKER_CONTEXT
+ * images [{id, repository, tag, size, created, arch?, os?, user?, labels?}] (`image inspect` defaults arch amd64, os linux;
+ * `info` reports Architecture x86_64), fail {command: {code, err}}, calls [argv...], contexts [DOCKER_CONTEXT
  * seen by each call, null when unset].
  */
 $sock = preg_replace('#^unix://#', '', (string) getenv('DOCKER_HOST'));
@@ -66,7 +67,7 @@ function containersFake(array $s, array $args, $file)
     $alias = ['container ls' => 'ps', 'container list' => 'ps', 'container inspect' => 'inspect', 'container rm' => 'rm', 'container remove' => 'rm',
         'image ls' => 'images', 'image list' => 'images', 'image rm' => 'rmi', 'image remove' => 'rmi', 'container start' => 'start',
         'container stop' => 'stop', 'container restart' => 'restart', 'container logs' => 'logs', 'container run' => 'run', 'system df' => 'df',
-        'compose version' => 'compose-version', 'container stats' => 'stats'];
+        'compose version' => 'compose-version', 'container stats' => 'stats', 'image inspect' => 'image-inspect'];
     $two = isset($args[1]) ? $args[0] . ' ' . $args[1] : '';
     if (isset($alias[$two])) {
         $cmd = $alias[$two];
@@ -94,7 +95,8 @@ function containersFake(array $s, array $args, $file)
             return 0;
         case 'info':
             $out(isset($e['info']) ? $e['info'] : ['ServerVersion' => '26.1.5', 'Driver' => 'fuse-overlayfs', 'CgroupDriver' => 'none', 'CgroupVersion' => '1',
-                'SecurityOptions' => ['name=seccomp,profile=builtin', 'name=rootless'], 'Containers' => count($s['containers']), 'Images' => count($s['images']), 'Warnings' => []]);
+                'SecurityOptions' => ['name=seccomp,profile=builtin', 'name=rootless'], 'Containers' => count($s['containers']), 'Images' => count($s['images']), 'Warnings' => [],
+                'Architecture' => 'x86_64', 'OSType' => 'linux']);
             return 0;
         case 'compose-version':
             if (empty($e['compose'])) {
@@ -139,6 +141,29 @@ function containersFake(array $s, array $args, $file)
                     'Repository' => (string) $img['repository'], 'SharedSize' => 'N/A', 'Size' => containersFakeSize((int) $img['size']), 'Tag' => (string) $img['tag'], 'UniqueSize' => 'N/A', 'VirtualSize' => containersFakeSize((int) $img['size'])]);
             }
             return 0;
+        case 'image-inspect':
+            // One object per ref, matched by repository:tag (a bare repository means :latest), full id or a 12+ hex id prefix.
+            $code = 0;
+            foreach (containersFakeRefs($rest, ['--format', '-f']) as $ref) {
+                $hit = null;
+                foreach ($s['images'] as $img) {
+                    $bare = preg_replace('/^sha256:/', '', $img['id']);
+                    $name = strpos($ref, ':') === false || strncmp($ref, 'sha256:', 7) === 0 ? $ref . ':latest' : $ref;
+                    if ($name === $img['repository'] . ':' . $img['tag'] || $ref === $img['id'] || (preg_match('/^[0-9a-f]{12,}$/', $ref) && strpos($bare, $ref) === 0)) {
+                        $hit = $img;
+                        break;
+                    }
+                }
+                if ($hit === null) {
+                    fwrite(STDERR, "Error: No such image: $ref\n");
+                    $code = 1;
+                    continue;
+                }
+                $out(['Id' => (string) $hit['id'], 'RepoTags' => [$hit['repository'] . ':' . $hit['tag']], 'Architecture' => isset($hit['arch']) ? (string) $hit['arch'] : 'amd64',
+                    'Os' => isset($hit['os']) ? (string) $hit['os'] : 'linux', 'Size' => (int) $hit['size'],
+                    'Config' => ['User' => isset($hit['user']) ? (string) $hit['user'] : '', 'Labels' => isset($hit['labels']) ? (array) $hit['labels'] : null]]);
+            }
+            return $code;
         case 'stats':
             foreach ($s['containers'] as $c) {
                 if ($c['state'] === 'running') {
