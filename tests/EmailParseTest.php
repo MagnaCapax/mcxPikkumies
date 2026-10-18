@@ -24,6 +24,17 @@ return [
         $deep = str_repeat("Content-Type: message/rfc822\r\n\r\n", 50) . "Content-Type: text/plain\r\n\r\nbottom";
         check(is_array(MailParse::parse($deep)), 'deep nesting must stop, not loop');
     },
+    'email parse: HTML with a wrong or missing charset still gives its text; nesting stops at DEPTH levels' => function () {
+        foreach (["Content-Type: text/html\r\n\r\n<p>caf\xE9 au lait</p><p>ok</p>", "Content-Type: text/html; charset=UTF-8\r\n\r\n<p>caf\xE9\xA0au lait</p>"] as $raw) {
+            $t = MailParse::parse($raw)['text'];
+            check(strpos($t, 'caf') === 0 && strpos($t, 'au lait') !== false && preg_match('//u', $t), 'html text lost: ' . json_encode(bin2hex($t)));
+        }
+        $nest = function ($levels) {
+            return str_repeat("Content-Type: message/rfc822\r\n\r\n", $levels) . "Content-Type: text/plain\r\n\r\nbottom";
+        };
+        check(MailParse::parse($nest(MailParse::DEPTH))['text'] === 'bottom', 'a message within the depth cap was not read');
+        check(MailParse::parse($nest(MailParse::DEPTH + 1))['text'] === '', 'nesting past DEPTH was read');
+    },
     'email path: attachment names are decoded, cut to one plain name, stripped of dots, dashes and controls, capped at 200 bytes' => function () {
         $cases = ['../../.ssh/authorized_keys' => 'authorized_keys', '..\\..\\x.php' => 'x.php', '.bashrc' => 'bashrc', '-rf' => 'rf',
             '' => 'attachment-3', '..' => 'attachment-3', '.' => 'attachment-3', "a\0b\x01c.txt" => 'abc.txt', 'naïve résumé.pdf' => 'naïve résumé.pdf',

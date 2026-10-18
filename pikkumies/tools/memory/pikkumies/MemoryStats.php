@@ -11,6 +11,8 @@ require_once __DIR__ . '/MemoryMetrics.php';
 class MemoryStats
 {
     const MISSES_SHOWN = 10;
+    /** ADR-0041, Consequences: what found_no_lesson_then_saved can and cannot say. */
+    const UPPER_BOUND = 'found_no_lesson_then_saved is an upper bound: a save within 2 hours is not proof that it answers that search, and several searches before one save all count';
 
     /** One record: the last $days days' searches and saves, lessons on disk, docs pages. Prunes old metrics first. */
     public static function compute($days, $now = null)
@@ -63,6 +65,7 @@ class MemoryStats
             'last_found_nothing' => array_reverse($last),
             'found_no_lesson' => $c['noLesson'],
             'found_no_lesson_then_saved' => $c['thenSaved'],
+            'note' => self::UPPER_BOUND,
             'lessons_on_disk' => array_sum($byKind),
             'by_kind' => $byKind,
             'by_topic' => $byTopic,
@@ -101,6 +104,7 @@ class MemoryStats
             $out .= $row('found nothing', $s['found_nothing'], self::pct($s['found_nothing'], $s['searches']));
             $out .= $row('found no lesson', $s['found_no_lesson'], self::pct($s['found_no_lesson'], $s['searches']));
             $out .= $row('  then saved in 2 h', $s['found_no_lesson_then_saved'], self::pct($s['found_no_lesson_then_saved'], $s['found_no_lesson']));
+            $out .= "(\"then saved\" is an upper bound: a save in the 2 hours is not proof that it answers that search)\n";
         }
         $out .= $row('memory files saved', $s['saved']);
         foreach ($s['by_kind'] as $kind => $count) {

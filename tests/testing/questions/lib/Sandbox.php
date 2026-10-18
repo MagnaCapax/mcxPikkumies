@@ -10,9 +10,12 @@ class Sandbox
     /** Where the agent leaves traces between questions; files not in the snapshot are deleted before each question. */
     const TRACES = ['home', 'checkout/pikkumies/memory', 'checkout/pikkumies/local/state', 'checkout/pikkumies/local/hermes/sessions',
         'checkout/pikkumies/local/hermes/memories', 'checkout/pikkumies/local/hermes/logs', 'checkout/pikkumies/local/hermes/cron', 'checkout/pikkumies/local/docs-cache'];
+    /** The settings file: a question that changes a setting (telemetry, the agent's name) must not hand it to the next. */
+    const CONFIG = 'checkout/pikkumies/local/config.php';
     public $root;
     public $home;
     private $snapshot = [];
+    private $config = null;
 
     public function __construct($root)
     {
@@ -91,9 +94,11 @@ class Sandbox
         return !$free;
     }
 
-    /** Remember what exists now in the trace directories, and copy Hermes' session database. */
+    /** Remember what exists now in the trace directories and the settings file, and copy Hermes' session database. */
     public function snapshot()
     {
+        $cfg = $this->root . '/' . self::CONFIG;
+        $this->config = is_file($cfg) && !is_link($cfg) ? (string) file_get_contents($cfg) : null;
         $this->snapshot = [];
         foreach (self::TRACES as $t) {
             foreach (self::walk($this->root . "/$t") as $p) {
@@ -107,9 +112,21 @@ class Sandbox
         }
     }
 
-    /** Back to the snapshot: delete what is new (a link is unlinked, never followed), restore the session database. */
+    /**
+     * Back to the snapshot: delete what is new (a link is unlinked, never followed), put the settings file back as it
+     * was (or remove it when there was none), restore the session database.
+     */
     public function reset()
     {
+        $cfg = $this->root . '/' . self::CONFIG;
+        $inside = strpos((string) realpath(dirname($cfg)) . '/', realpath($this->root) . '/') === 0; // local/ itself may be a planted link
+        if ($inside && ($this->config === null || is_link($cfg) || !is_file($cfg) || file_get_contents($cfg) !== $this->config)) {
+            @unlink($cfg);
+            if ($this->config !== null) {
+                file_put_contents($cfg, $this->config);
+                chmod($cfg, 0600);
+            }
+        }
         $root = realpath($this->root) . '/';
         foreach (self::TRACES as $t) {
             foreach (array_reverse(self::walk($this->root . "/$t")) as $p) {

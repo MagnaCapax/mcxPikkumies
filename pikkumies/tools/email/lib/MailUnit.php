@@ -37,17 +37,39 @@ class MailUnit
         }
     }
 
-    /** One line in local/logs/email/YYYYMMDD.jsonl; a log that cannot be written never fails the verb. */
+    /**
+     * One line in local/logs/email/YYYYMMDD.jsonl (UTC); a log that cannot be written never fails the verb. A new
+     * day's file prunes files older than sessions.retentionDays (0 = keep forever), as the command log and the halt
+     * guard log do.
+     */
     public static function log($stateDir, array $fields)
     {
         $dir = dirname(rtrim($stateDir, '/')) . '/logs/email';
         if (!is_dir($dir)) {
             @mkdir($dir, 0700, true);
         }
-        $file = $dir . '/' . date('Ymd') . '.jsonl';
+        $file = $dir . '/' . gmdate('Ymd') . '.jsonl';
+        $new = !is_file($file);
         $old = umask(0077);
         @file_put_contents($file, json_encode(['ts' => time()] + $fields, JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
         umask($old);
+        $config = Config::load();
+        $days = isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0;
+        if ($new && $days > 0) {
+            $cut = gmdate('Ymd', time() - $days * 86400);
+            foreach ((array) glob($dir . '/[0-9]*.jsonl') as $f) {
+                if (basename($f, '.jsonl') < $cut) {
+                    @unlink($f);
+                }
+            }
+        }
+    }
+
+    /** --limit with a per-call $cap: default Cli::LIMIT; 0 (or less) means as many as one call takes, as in Cli. */
+    public static function limit(array $opt, $cap)
+    {
+        $n = isset($opt['limit']) ? (int) $opt['limit'] : Cli::LIMIT;
+        return $n <= 0 ? $cap : min($cap, $n);
     }
 
     /** The positional uids of a verb, at least one. */

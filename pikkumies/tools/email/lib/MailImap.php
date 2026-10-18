@@ -155,6 +155,31 @@ class MailImap
         $this->run($folder, 'UID STORE ' . self::uidSet($uids) . " {$sign}FLAGS.SILENT ($flag)");
     }
 
+    /** Sets these uids back to unseen (a body or header read set \Seen): every uid a verb started to read. */
+    public function restoreUnseen($folder, array $uids)
+    {
+        if ($uids) {
+            $this->store($folder, $uids, '-', '\\Seen');
+        }
+    }
+
+    /**
+     * After a read failed with $e: still sets $uids back to unseen, and returns $e for the caller to throw. A restore
+     * that fails too (often the same dropped connection) never hides $e: the uids left marked read go into its hint.
+     */
+    public function restoreAfterFailure($folder, array $uids, Throwable $e)
+    {
+        try {
+            $this->restoreUnseen($folder, $uids);
+        } catch (Throwable $restore) {
+            if ($e instanceof CliError) {
+                $e->hint = trim($e->hint . '; unseen flags not restored for uids ' . implode(',', $uids)
+                    . ' (they show as read; mark them unread in a mail client)', '; ');
+            }
+        }
+        return $e;
+    }
+
     /** Moves uids to $dest: MOVE, else COPY + \Deleted + UID EXPUNGE of those uids; refused without MOVE or UIDPLUS. */
     public function move($folder, array $uids, $dest)
     {

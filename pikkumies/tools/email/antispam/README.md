@@ -9,4 +9,4 @@ The user's own spam rules over their IMAP mailbox (ADR-0053). It uses the `imap`
 
 ## Tests
 
-`tests/EmailAntispamTest.php`, against a scripted fake transport (`tests/fixtures/email/`); no network.
+`tests/EmailAntispamTest.php` and `tests/EmailReadTest.php`, against a scripted fake transport (`tests/fixtures/email/`); no network.

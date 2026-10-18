@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Extends ADR-0018 (memory unit), ADR-0031 (search tiers) and ADR-0032 (`privacy.perfLogging`, which until now kept nothing). Amended 2026-10-18 after an adversarial review: words only for searches with no tier-1 hit, no paths, mode or ms; save lines carry only the time; "found nothing" and "found no lesson" kept apart; pruning by `sessions.retentionDays`; the first-start settings note corrected.
+- Status: Accepted. Extends ADR-0018 (memory unit), ADR-0031 (search tiers) and ADR-0032 (`privacy.perfLogging`, which until now kept nothing). Amended 2026-10-18 after an adversarial review: words only for searches with no tier-1 hit, no paths, mode or ms; save lines carry only the time; "found nothing" and "found no lesson" kept apart; pruning by `sessions.retentionDays`; the first-start settings note corrected. Amended again 2026-10-18: files written before that amendment are rewritten once (MetricsLog, marker `.scrubbed-1`) to drop the fields no longer kept (paths, mode, ms, save kind, topic and path, and the words of searches that found a lesson); this runs on the first append, `stats` or doctor of the new code, also while perfLogging is off, so "files already written stay until deleted" holds for the fields still kept.
 
 ## Context
 The operator's three requests of 2026-10-18, verbatim:
@@ -40,4 +40,4 @@ What was found:
 
 ## References
 - ADR-0011, ADR-0018, ADR-0030 (hook units), ADR-0031, ADR-0032.
-- `pikkumies/lib/DocSources.php` (`recordSearch`, `appendMetric`), `pikkumies/lib/MetricsLog.php`, `pikkumies/lib/Launch.php` (`settingsNote`), `pikkumies/tools/memory/pikkumies/` (`MemoryMetrics.php`, `MemoryStats.php`, `Lessons.php`, `pikkumies.php`), `pikkumies/hooks/search/save-reminder/`, `pikkumies/tools/research/deep-research/skill.md`, `tests/MemoryMetricsTest.php`.
+- `pikkumies/lib/DocSources.php` (`recordSearch`, `appendMetric`), `pikkumies/lib/MetricsLog.php`, `pikkumies/lib/Launch.php` (`settingsNote`), `pikkumies/tools/memory/pikkumies/` (`MemoryMetrics.php`, `MemoryStats.php`, `Lessons.php`, `pikkumies.php`), `pikkumies/hooks/search/save-reminder/`, `pikkumies/tools/research/deep-research/skill.md`, `tests/MemoryMetricsTest.php`, `tests/MemoryMetricsEdgeTest.php`, `tests/MemoryMetricsScrubTest.php`.

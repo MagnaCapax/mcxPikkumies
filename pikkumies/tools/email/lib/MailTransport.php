@@ -58,7 +58,9 @@ class MailTransport
             CURLOPT_USE_SSL => CURLUSESSL_ALL,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2, // the minimum; newer is negotiated
+            // TLS 1.2 as the minimum on libcurl 7.54 and newer, which negotiates a newer version when both sides have
+            // it; on older libcurl (the ADR names 7.52) this setting means exactly TLS 1.2.
+            CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
             CURLOPT_USERNAME => $this->user,
             CURLOPT_PASSWORD => $this->secret,
             CURLOPT_CONNECTTIMEOUT => 15,
@@ -81,12 +83,13 @@ class MailTransport
         }
         if (isset($r['upload'])) {
             $data = (string) $r['upload'];
+            $pos = 0; // an offset, so each call copies only its own piece (up to 20 MiB in pieces of about 16 KiB)
             $o += [CURLOPT_MAIL_FROM => '<' . $r['from'] . '>', CURLOPT_MAIL_RCPT => array_map(function ($a) {
                 return "<$a>";
             }, $r['rcpt']), CURLOPT_UPLOAD => true, CURLOPT_INFILESIZE => strlen($data),
-                CURLOPT_READFUNCTION => function ($ch, $fd, $n) use (&$data) {
-                    $out = (string) substr($data, 0, $n);
-                    $data = (string) substr($data, strlen($out));
+                CURLOPT_READFUNCTION => function ($ch, $fd, $n) use ($data, &$pos) {
+                    $out = (string) substr($data, $pos, $n);
+                    $pos += strlen($out);
                     return $out;
                 }];
         }

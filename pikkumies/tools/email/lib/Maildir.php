@@ -3,11 +3,15 @@
  * Maildir: the one Maildir writer of the email units (imap archive, pop fetch; ADR-0053). A message is streamed into
  * tmp/ through the transport's byte-capped sink (never held whole in memory), then linked into new/ without replacing
  * a file that is already there, so a second run of the same message is a no-op. Directories 0700, files 0600, created
- * with fopen 'x'. roomProblem() is the unattended stop: a run nobody watches keeps HermesInstall::UNATTENDED_RESERVE
- * (10%) of the disk and file quota free, the same rule as an unattended Hermes build.
+ * with fopen 'x'. The tmp/ name is unique per run, so a file left there by a killed run never blocks the message;
+ * such leftovers of the same message are removed once untouched for STALE seconds (a live transfer keeps writing, and
+ * the transport stops one that stalls for a minute). roomProblem() is the unattended stop: a run nobody watches keeps
+ * HermesInstall::UNATTENDED_RESERVE (10%) of the disk and file quota free, the same rule as an unattended Hermes build.
  */
 class Maildir
 {
+    const STALE = 3600;
+
     public static function ensure($dir)
     {
         foreach (['', '/cur', '/new', '/tmp'] as $sub) {
@@ -36,7 +40,12 @@ class Maildir
         if (!preg_match('/^[A-Za-z0-9._,=-]+\z/', $name) || self::has($dir, $name)) {
             return 0;
         }
-        $tmp = "$dir/tmp/$name";
+        foreach ((array) glob("$dir/tmp/$name*") as $left) { // $name holds no glob character (checked above)
+            if (is_file($left) && !is_link($left) && filemtime($left) < time() - self::STALE) {
+                @unlink($left);
+            }
+        }
+        $tmp = "$dir/tmp/$name." . getmypid() . '.' . bin2hex(random_bytes(4));
         $old = umask(0077);
         $fh = @fopen($tmp, 'x');
         umask($old);

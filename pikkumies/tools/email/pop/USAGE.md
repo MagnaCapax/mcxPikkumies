@@ -7,7 +7,7 @@ The user's own POP3 mailbox over TLS, port 995 (ADR-0053). Shared rules: `tools/
 | login | | yes | The user types the server, user name and password (hidden) at a terminal. The login is tried, then stored in `pikkumies/local/secrets/email-pop` (0600). |
 | status | | no | The stored login: `login` (bool), `host`, `port`, `user`; never the password. No connection is made. |
 | list | | no | One record per message: `n`, `size_bytes`, `uidl`. |
-| fetch | `--to MAILDIR [--limit N]` | yes (new files) | Downloads up to N messages (default 20) not fetched before, by UIDL, into the Maildir `MAILDIR` (created when missing; inside the home, not under a dot-directory, `~/www`, `~/bin` or `pikkumies/`). Never deletes on the server. Stops before less than 10% of the disk or file quota would be free (`stopped`); messages over 50 MiB are skipped and listed. One record: `dir`, `fetched`, `bytes`, `skipped_too_large`, `left`. |
+| fetch | `--to MAILDIR [--limit N]` | yes (new files) | Downloads up to N messages (default 20, at most 1000; `--limit 0` means 1000) not fetched before, by UIDL, into the Maildir `MAILDIR` (created when missing; inside the home, not under a dot-directory, `~/www`, `~/bin` or `pikkumies/`). Never deletes on the server. Stops before less than 10% of the disk or file quota would be free (`stopped`); messages over 50 MiB are skipped and listed. One record: `dir`, `fetched` (messages downloaded now; one already in the Maildir is not counted), `bytes`, `skipped_too_large`, `left`. |
 | delete | `<n>... --expect UIDL[,UIDL...]` | deletes | Deletes exactly these messages after checking that each still has the UIDL list showed (same order). Asks the user first. Status `verified` (read back on a new connection). |
 
 ```sh

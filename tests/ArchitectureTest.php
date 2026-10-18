@@ -5,14 +5,34 @@
  * (`git ls-files`, not `find`, per the verdict's own correction), not a re-derivation of production logic.
  */
 
-/** Every tracked file under $dir with a .md/.php extension, read fresh each call (no caching: builders are editing concurrently). */
+/**
+ * Every .php file under pikkumies/lib, tools and hooks, at any depth (units may nest, ADR-0055), read fresh each call
+ * (no caching: builders are editing concurrently). Symlinks are not followed. $root: a test tree instead of the repo.
+ */
 if (!function_exists('actTrackedPhp')) {
-    function actTrackedPhp()
+    function actTrackedPhp($root = null)
     {
-        $root = dirname(__DIR__);
-        return array_merge((array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/tools/*/*.php"),
-            (array) glob("$root/pikkumies/tools/*/*/*.php"), (array) glob("$root/pikkumies/hooks/*/*/*.php"),
-            (array) glob("$root/pikkumies/hooks/*.php"));
+        $root = $root === null ? dirname(__DIR__) : $root;
+        $out = [];
+        foreach (['lib', 'tools', 'hooks'] as $top) {
+            $dirs = is_dir("$root/pikkumies/$top") ? ["$root/pikkumies/$top"] : [];
+            while ($dirs) {
+                $dir = array_shift($dirs);
+                foreach ((array) scandir($dir) as $name) {
+                    $p = "$dir/$name";
+                    if ($name === '.' || $name === '..' || is_link($p)) {
+                        continue;
+                    }
+                    if (is_dir($p)) {
+                        $dirs[] = $p;
+                    } elseif (substr($name, -4) === '.php') {
+                        $out[] = $p;
+                    }
+                }
+            }
+        }
+        sort($out);
+        return $out;
     }
 }
 
@@ -33,6 +53,22 @@ if (!function_exists('actStripComments')) {
 }
 
 return [
+    'architecture: the PHP lint list reaches files at any depth under lib, tools and hooks' => function () {
+        $tmp = testTempDir('pk-arch');
+        try {
+            foreach (['lib/a.php', 'tools/email/imap/fetch/lib/deep.php', 'hooks/guard/x/y/z.php', 'tools/email/README.md'] as $f) {
+                @mkdir(dirname("$tmp/pikkumies/$f"), 0700, true);
+                file_put_contents("$tmp/pikkumies/$f", "<?php\n");
+            }
+            $got = array_map(function ($f) use ($tmp) {
+                return substr($f, strlen("$tmp/pikkumies/"));
+            }, actTrackedPhp($tmp));
+            check($got === ['hooks/guard/x/y/z.php', 'lib/a.php', 'tools/email/imap/fetch/lib/deep.php'], 'listed: ' . json_encode($got));
+            check(count(actTrackedPhp()) >= 200, 'the repository list shrank: ' . count(actTrackedPhp()));
+        } finally {
+            testRmTree($tmp);
+        }
+    },
     'adr: every docs/adr/NNNN-*.md has an H1 "# ADR-NNNN: ..." matching its own file number, and no number repeats' => function () {
         $root = dirname(__DIR__);
         $files = (array) glob("$root/docs/adr/*.md");

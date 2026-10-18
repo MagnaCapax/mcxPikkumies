@@ -16,30 +16,32 @@ function antispamScan($secretDir, $rulesFile, array $opt)
 {
     $imap = new MailImap(MailLogin::transport(MailLogin::need($secretDir, 'imap')));
     $folder = MailImap::text(isset($opt['folder']) && is_string($opt['folder']) ? $opt['folder'] : 'INBOX', 'folder');
-    $limit = max(1, min(200, isset($opt['limit']) ? (int) $opt['limit'] : Cli::LIMIT));
+    $limit = MailUnit::limit($opt, 200);
     $rules = AntispamRules::load($rulesFile);
     $uids = array_reverse(array_slice($imap->search($folder, 'ALL'), -$limit));
     $meta = $uids ? $imap->meta($folder, $uids) : [];
     $records = [];
     $spam = [];
     $unseen = [];
-    foreach ($uids as $uid) {
-        if (!isset($meta[$uid])) {
-            continue;
+    try {
+        foreach ($uids as $uid) {
+            if (!isset($meta[$uid])) {
+                continue;
+            }
+            if (!in_array('\\Seen', $meta[$uid]['flags'], true)) {
+                $unseen[] = $uid; // before the read: a read that fails may still have set \Seen
+            }
+            list($h) = MailParse::split($imap->fetch($folder, $uid, AntispamRules::HEAD, ['max' => 262144]));
+            $r = ['uid' => $uid] + AntispamRules::score($h, $rules);
+            if ($r['spam']) {
+                $spam[] = $uid;
+            }
+            $records[] = $r;
         }
-        list($h) = MailParse::split($imap->fetch($folder, $uid, AntispamRules::HEAD, ['max' => 262144]));
-        $r = ['uid' => $uid] + AntispamRules::score($h, $rules);
-        if ($r['spam']) {
-            $spam[] = $uid;
-        }
-        if (!in_array('\\Seen', $meta[$uid]['flags'], true)) {
-            $unseen[] = $uid;
-        }
-        $records[] = $r;
+    } catch (Throwable $e) {
+        throw $imap->restoreAfterFailure($folder, $unseen, $e); // a header read sets \Seen; scanning changes nothing
     }
-    if ($unseen) {
-        $imap->store($folder, $unseen, '-', '\\Seen'); // a header read sets \Seen; scanning changes nothing
-    }
+    $imap->restoreUnseen($folder, $unseen);
     return [$records, $folder, $spam, $imap];
 }
 

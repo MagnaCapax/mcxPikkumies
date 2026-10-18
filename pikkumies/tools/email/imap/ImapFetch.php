@@ -22,10 +22,13 @@ class ImapFetch
         if ($q['quota_free_bytes'] !== null && $q['quota_limit_bytes'] > 0 && $q['quota_free_bytes'] < $size) {
             throw new CliError("not enough free quota for a $size-byte message; nothing saved", 'free some space first (storage stats)');
         }
-        $p = MailParse::parse($imap->fetch($folder, $uid, null, ['max' => self::MAX]), 0, true);
-        if (!in_array('\\Seen', $meta[(int) $uid]['flags'], true)) {
-            $imap->store($folder, [$uid], '-', '\\Seen');
+        $unseen = in_array('\\Seen', $meta[(int) $uid]['flags'], true) ? [] : [$uid];
+        try {
+            $p = MailParse::parse($imap->fetch($folder, $uid, null, ['max' => self::MAX]), 0, true);
+        } catch (Throwable $e) {
+            throw $imap->restoreAfterFailure($folder, $unseen, $e);
         }
+        $imap->restoreUnseen($folder, $unseen);
         if (!$p['attachments']) {
             return ['records' => [], 'status' => ['dir' => null, 'note' => 'the message has no attachments; nothing saved']];
         }

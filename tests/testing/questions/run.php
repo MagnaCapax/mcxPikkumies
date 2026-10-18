@@ -23,6 +23,10 @@ for ($i = 1; $i < count($argv); $i++) {
     $o[$m[1]] = is_bool($o[$m[1]]) ? true : (isset($m[2]) ? $m[2] : (isset($argv[$i + 1]) ? $argv[++$i] : fail("--{$m[1]} needs a value", 2)));
 }
 // --max-tokens is the older spelling of --token-budget (a budget for the whole run, not a per-request output cap).
+// Both at once is refused: which one wins would be a guess.
+if ($o['token-budget'] !== null && $o['max-tokens'] !== null) {
+    fail('give --token-budget only; --max-tokens is its older spelling', 2);
+}
 if ($o['token-budget'] === null) {
     $o['token-budget'] = $o['max-tokens'];
 }
@@ -59,17 +63,17 @@ if ($o['regrade'] !== '') {
 if ($problems) {
     fail(implode("\n", $problems) . "\nself-test failed; nothing asked");
 }
-$uid = posix_geteuid();
-$realHome = posix_getpwuid($uid)['dir'];
-if ($uid === 0 || !is_file("$realHome/.pikkumies-qa-user")) {
-    fail("refusing to ask: the agent's terminal runs as this account and a throwaway HOME does not confine it. Run as a dedicated\n"
-        . "user that holds no fleet or SSH keys, and create $realHome/.pikkumies-qa-user there (never as root). See README.md.");
-}
 if ($o['token-budget'] === null || !ctype_digit((string) $o['token-budget'])) {
     fail('--token-budget N is required for an asking run (0 = no limit, chosen on purpose)', 2);
 }
 if (!ctype_digit($o['timeout']) || ($o['max-turns'] !== '' && !ctype_digit($o['max-turns']))) {
     fail('--timeout and --max-turns take a whole number', 2);
+}
+$uid = posix_geteuid();
+$realHome = posix_getpwuid($uid)['dir'];
+if ($uid === 0 || !is_file("$realHome/.pikkumies-qa-user")) {
+    fail("refusing to ask: the agent's terminal runs as this account and a throwaway HOME does not confine it. Run as a dedicated\n"
+        . "user that holds no fleet or SSH keys, and create $realHome/.pikkumies-qa-user there (never as root). See README.md.");
 }
 $t = Targets::load($o['targets'], true, $o['target']);
 $targets = $t['targets'];

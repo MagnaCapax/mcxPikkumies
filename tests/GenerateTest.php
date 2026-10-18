@@ -75,6 +75,22 @@ return [
             exec('rm -rf ' . escapeshellarg($tmp));
         }
     },
+    'generate: the stale-skill cleanup never goes through a symlinked or dot directory in the generated dir (ADR-0055)' => function () {
+        $tmp = generateFixture();
+        try {
+            Generate::run([], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            mkdir("$tmp/elsewhere/skill", 0700, true);
+            file_put_contents("$tmp/elsewhere/skill/SKILL.md", 'not ours');
+            symlink("$tmp/elsewhere", "$tmp/out/linked");
+            mkdir("$tmp/out/.hidden/skill", 0700, true);
+            file_put_contents("$tmp/out/.hidden/skill/SKILL.md", 'not ours either');
+            $r = Generate::run([], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            check($r['removed'] === 0 && is_file("$tmp/elsewhere/skill/SKILL.md") && is_link("$tmp/out/linked"), 'the cleanup went through a symlink: ' . json_encode($r));
+            check(is_file("$tmp/out/.hidden/skill/SKILL.md"), 'the cleanup went into a dot directory');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tmp));
+        }
+    },
     'units: frontmatter and verbs table parsing' => function () {
         list($meta, $body) = Units::frontmatter("---\nname: a\ndescription: \"b: c\"\n---\nbody\n");
         check($meta === ['name' => 'a', 'description' => 'b: c'] && $body === "body\n", 'frontmatter parse');

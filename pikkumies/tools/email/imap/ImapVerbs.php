@@ -14,37 +14,43 @@ class ImapVerbs
         return MailImap::text(isset($opt['folder']) && is_string($opt['folder']) ? $opt['folder'] : 'INBOX', 'folder');
     }
 
+    /** --limit for list and search: default 20, at most 100; 0 means as many as one call takes (100). */
     public static function limit(array $opt)
     {
-        return max(1, min(100, isset($opt['limit']) ? (int) $opt['limit'] : Cli::LIMIT));
+        return MailUnit::limit($opt, 100);
     }
 
-    /** Header records of the newest $limit of $uids (newest first), with the folder's uidvalidity. */
+    /**
+     * Header records of the newest $limit of $uids (newest first). Status: `matched` (how many uids matched, all of
+     * them, not only the ones shown) and the folder's uidvalidity. (`total` is Cli's own field, printed only when its
+     * output is cut, so it would never reach the caller here.)
+     */
     public static function summaries(MailImap $imap, $folder, array $uids, $limit)
     {
         $st = $imap->status($folder);
-        $total = count($uids);
         $pick = array_reverse(array_slice($uids, -$limit));
         $meta = $pick ? $imap->meta($folder, $pick) : [];
         $records = [];
         $unseen = [];
-        foreach ($pick as $uid) {
-            if (!isset($meta[$uid])) {
-                continue; // gone since the search
+        try {
+            foreach ($pick as $uid) {
+                if (!isset($meta[$uid])) {
+                    continue; // gone since the search
+                }
+                $seen = in_array('\\Seen', $meta[$uid]['flags'], true);
+                if (!$seen) {
+                    $unseen[] = $uid; // before the read: a read that fails may still have set \Seen
+                }
+                list($h) = MailParse::split($imap->fetch($folder, $uid, self::HEAD, ['max' => 262144]));
+                $records[] = ['uid' => $uid, 'folder' => $folder, 'from' => MailParse::header($h, 'from'), 'to' => MailParse::header($h, 'to'),
+                    'subject' => MailParse::header($h, 'subject'), 'date' => MailParse::header($h, 'date'), 'size_bytes' => $meta[$uid]['size'],
+                    'seen' => $seen, 'flagged' => in_array('\\Flagged', $meta[$uid]['flags'], true)];
             }
-            list($h) = MailParse::split($imap->fetch($folder, $uid, self::HEAD, ['max' => 262144]));
-            $seen = in_array('\\Seen', $meta[$uid]['flags'], true);
-            if (!$seen) {
-                $unseen[] = $uid;
-            }
-            $records[] = ['uid' => $uid, 'folder' => $folder, 'from' => MailParse::header($h, 'from'), 'to' => MailParse::header($h, 'to'),
-                'subject' => MailParse::header($h, 'subject'), 'date' => MailParse::header($h, 'date'), 'size_bytes' => $meta[$uid]['size'],
-                'seen' => $seen, 'flagged' => in_array('\\Flagged', $meta[$uid]['flags'], true)];
+        } catch (Throwable $e) {
+            throw $imap->restoreAfterFailure($folder, $unseen, $e);
         }
-        if ($unseen) {
-            $imap->store($folder, $unseen, '-', '\\Seen');
-        }
-        return ['records' => $records, 'status' => ['total' => $total, 'uidvalidity' => $st['uidvalidity']]];
+        $imap->restoreUnseen($folder, $unseen);
+        return ['records' => $records, 'status' => ['matched' => count($uids), 'uidvalidity' => $st['uidvalidity']]];
     }
 
     /** One message as a record: headers, attachment list and the body as untrusted_text (at most 8000 bytes). */
@@ -58,10 +64,13 @@ class ImapVerbs
         if ($m['size'] !== null && $m['size'] > self::SHOW_MAX) {
             throw new CliError("message $uid is {$m['size']} bytes, too large to show", 'use fetch to save its attachments');
         }
-        $p = MailParse::parse($imap->fetch($folder, $uid, null, ['max' => self::SHOW_MAX]));
-        if (!in_array('\\Seen', $m['flags'], true)) {
-            $imap->store($folder, [$uid], '-', '\\Seen');
+        $unseen = in_array('\\Seen', $m['flags'], true) ? [] : [$uid];
+        try {
+            $p = MailParse::parse($imap->fetch($folder, $uid, null, ['max' => self::SHOW_MAX]));
+        } catch (Throwable $e) {
+            throw $imap->restoreAfterFailure($folder, $unseen, $e);
         }
+        $imap->restoreUnseen($folder, $unseen);
         $h = $p['headers'];
         return ['uid' => (int) $uid, 'folder' => $folder, 'from' => MailParse::header($h, 'from'), 'to' => MailParse::header($h, 'to'),
             'cc' => MailParse::header($h, 'cc'), 'subject' => MailParse::header($h, 'subject'), 'date' => MailParse::header($h, 'date'),

@@ -73,6 +73,22 @@ return [
             emDone($fx);
         }
     },
+    'email smtp: an attachment changed after drafting to other bytes of the same size, or a login now sending as another From, sends nothing' => function () {
+        $fx = emSmtpFixture();
+        try {
+            list(, $lines) = emRun($fx, 'smtp', ['send', '--to', 'a@example.com', '--subject', 'x', '--body-file', $fx['body'], '--attach', $fx['home'] . '/docs/photo.jpg']);
+            $sha = $lines[0]['draft'];
+            file_put_contents($fx['home'] . '/docs/photo.jpg', str_repeat("\xfe", 3000)); // same 3000 bytes, other content
+            list($code, $lines, $reqs) = emRun($fx, 'smtp', ['send-draft', $sha]);
+            check($code === 1 && !$reqs && strpos(end($lines)['error'], 'attachment changed') !== false, 'a same-size changed attachment was sent: ' . json_encode($lines));
+            file_put_contents($fx['home'] . '/docs/photo.jpg', str_repeat("\xff", 3000));
+            emLogin($fx, 'smtp', ['from' => 'other@example.org', 'allowlist' => ['other@example.org']]);
+            list($code, $lines, $reqs) = emRun($fx, 'smtp', ['send-draft', $sha]);
+            check($code === 1 && !$reqs && strpos(end($lines)['error'], 'now sends as other@example.org') !== false, 'a draft from another From was sent: ' . json_encode($lines));
+        } finally {
+            emDone($fx);
+        }
+    },
     'email smtp: CR/LF, <> or a display name in an address, and CR/LF in the subject, are refused before any draft is written' => function () {
         $fx = emSmtpFixture();
         try {

@@ -57,6 +57,23 @@ return [
             check($o[CURLOPT_MAIL_RCPT] === ['<c@d.example>'] && $o[CURLOPT_MAIL_FROM] === '<a@b.example>', 'envelope wrong');
         }
     },
+    'email transport: the upload callback hands out the message once, in order, by offset (a 20 MiB message in 16 KiB reads is quick)' => function () {
+        $t = new MailTransport('smtps', 'mail.example.org', 465, 'me', 'pw');
+        $read = $t->options(['url' => 'x', 'upload' => 'abcdefghij', 'from' => 'a@b.example', 'rcpt' => ['c@d.example']], 'strlen')[CURLOPT_READFUNCTION];
+        $got = [$read(null, null, 3), $read(null, null, 4), $read(null, null, 100), $read(null, null, 5)];
+        check($got === ['abc', 'defg', 'hij', ''], 'pieces: ' . json_encode($got));
+        $msg = str_repeat('0123456789abcdef', 1310720); // 20 MiB
+        $read = $t->options(['url' => 'x', 'upload' => $msg, 'from' => 'a@b.example', 'rcpt' => ['c@d.example']], 'strlen')[CURLOPT_READFUNCTION];
+        $start = microtime(true);
+        $n = 0;
+        $hash = hash_init('sha256');
+        while (($piece = $read(null, null, 16384)) !== '') {
+            $n += strlen($piece);
+            hash_update($hash, $piece);
+        }
+        // Copying the rest on every call moved about 13 GB here (several seconds); an offset moves the 20 MiB once.
+        check($n === strlen($msg) && hash_final($hash) === hash('sha256', $msg) && microtime(true) - $start < 1.5, 'upload slow or wrong: ' . round(microtime(true) - $start, 2) . ' s');
+    },
     'email transport: the byte cap stops in the write callback; a recipient with CR/LF or <> never reaches curl' => function () {
         $t = new MailTransport('imaps', 'mail.example.org', 993, 'me', 'pw');
         MailTransport::$fake = function () {

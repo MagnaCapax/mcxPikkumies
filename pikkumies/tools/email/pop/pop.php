@@ -64,44 +64,48 @@ Cli::run($argv, [
     'fetch' => function ($args, $opt) use ($emailSecretDir, $emailStateDir) {
         $login = MailLogin::need($emailSecretDir, 'pop');
         $home = HomePath::home();
-        $to = isset($opt['to']) && is_string($opt['to']) && $opt['to'] !== '' && $opt['to'][0] === '/' ? rtrim($opt['to'], '/') : null;
-        $parent = $to !== null ? realpath(dirname($to)) : false;
-        if ($parent === false || is_link($to)) {
-            throw new CliError('fetch needs --to <full path of a Maildir folder> whose parent exists', 'e.g. --to ' . $home . '/mail-pop');
-        }
-        $dir = Maildir::ensure(MailPath::fence($parent . '/' . basename($to), $home, 'the Maildir'));
+        $dir = Maildir::ensure(MailPath::mailRoot(isset($opt['to']) ? $opt['to'] : null, $home, 'fetch'));
         $t = MailLogin::transport($login);
         $stateFile = rtrim($emailStateDir, '/') . '/email-pop/' . sha1($login['host'] . "\0" . $login['user']) . '.json';
         $state = MailUnit::readState($stateFile);
         $seen = isset($state['uidl']) && is_array($state['uidl']) ? array_flip($state['uidl']) : [];
-        $limit = max(1, min(1000, isset($opt['limit']) ? (int) $opt['limit'] : Cli::LIMIT));
+        $limit = MailUnit::limit($opt, 1000);
         $q = Quota::fields($home);
         $files = Quota::files($home);
         $got = ['fetched' => 0, 'bytes' => 0, 'skipped_too_large' => [], 'left' => 0];
         $stopped = null;
-        foreach (popMessages($t) as $n => $m) {
-            if ($m['uidl'] === null || isset($seen[$m['uidl']])) {
-                continue;
+        $msgs = popMessages($t);
+        // The state keeps only UIDLs still on the server, so it stays as large as the mailbox (RFC 1939 asks a server
+        // not to reuse a UIDL). It is written once, at the end or on a failure. A run killed before that loses
+        // nothing: a message already in the Maildir is found there and not downloaded again.
+        $seen = array_intersect_key($seen, array_flip(array_filter(array_column($msgs, 'uidl'), 'is_string')));
+        try {
+            foreach ($msgs as $n => $m) {
+                if ($m['uidl'] === null || isset($seen[$m['uidl']])) {
+                    continue;
+                }
+                if ($got['fetched'] >= $limit || $stopped !== null) {
+                    $got['left']++;
+                    continue;
+                }
+                if ($m['size'] > POP_MAX) {
+                    $got['skipped_too_large'][] = $n;
+                    continue;
+                }
+                $room = Maildir::roomProblem($q, $files, $got['bytes'], $got['fetched'], $m['size'], HermesInstall::UNATTENDED_RESERVE, @disk_total_space($home));
+                if ($room !== '') {
+                    $stopped = "$room; fetch keeps 10% free and stopped";
+                    $got['left']++;
+                    continue;
+                }
+                $bytes = Maildir::deliver($dir, 'P' . substr(sha1($m['uidl']), 0, 20) . '.pikkumies', function ($sink) use ($t, $n) {
+                    return $t->request('/' . $n, ['max' => POP_MAX, 'sink' => $sink]);
+                });
+                $got['bytes'] += $bytes;
+                $got['fetched'] += $bytes > 0 ? 1 : 0; // 0: it was already in the Maildir, nothing downloaded
+                $seen[$m['uidl']] = true;
             }
-            if ($got['fetched'] >= $limit || $stopped !== null) {
-                $got['left']++;
-                continue;
-            }
-            if ($m['size'] > POP_MAX) {
-                $got['skipped_too_large'][] = $n;
-                continue;
-            }
-            $room = Maildir::roomProblem($q, $files, $got['bytes'], $got['fetched'], $m['size'], HermesInstall::UNATTENDED_RESERVE, @disk_total_space($home));
-            if ($room !== '') {
-                $stopped = "$room; fetch keeps 10% free and stopped";
-                $got['left']++;
-                continue;
-            }
-            $got['bytes'] += Maildir::deliver($dir, 'P' . substr(sha1($m['uidl']), 0, 20) . '.pikkumies', function ($sink) use ($t, $n) {
-                return $t->request('/' . $n, ['max' => POP_MAX, 'sink' => $sink]);
-            });
-            $got['fetched']++;
-            $seen[$m['uidl']] = true;
+        } finally {
             MailUnit::writeState($stateFile, ['uidl' => array_keys($seen)]);
         }
         MailUnit::log($emailStateDir, ['verb' => 'pop fetch', 'messages' => $got['fetched'], 'bytes' => $got['bytes'], 'stopped' => $stopped !== null]);

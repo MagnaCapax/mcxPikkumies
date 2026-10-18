@@ -151,6 +151,11 @@ class MailParse
     /** HTML to plain text: scripts, styles and comments dropped, tags removed, entities decoded, blank runs folded. */
     public static function htmlText($html)
     {
+        if (!preg_match('//u', (string) $html)) {
+            // A wrong or missing charset leaves bytes that are not UTF-8; the /u patterns below would then return null
+            // and the body would come out empty. Such bytes become U+FFFD first (the same idiom as Cli::cleanString).
+            $html = (string) json_decode(json_encode((string) $html, JSON_INVALID_UTF8_SUBSTITUTE));
+        }
         $t = (string) preg_replace(['#<(script|style|head)\b.*?</\1\s*>#is', '/<!--.*?-->/s', '#<(br|/p|/div|/tr|/li|/h[1-6])\b[^>]*>#i'], ['', '', "\n"], $html);
         $t = html_entity_decode(strip_tags($t), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         return trim((string) preg_replace(["/[ \t\x{A0}]+/u", "/\n\s*\n+/"], [' ', "\n\n"], $t));

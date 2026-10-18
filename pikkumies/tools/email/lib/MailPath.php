@@ -54,6 +54,29 @@ class MailPath
         return $real;
     }
 
+    /**
+     * The --to folder of imap archive and pop fetch, the one rule for both: a full path inside the home, outside
+     * dot-directories, ~/www, ~/bin and Pikkumies, whose parent exists, not a symlink, no . or .. part. Created 0700
+     * when missing (an existing folder is fine: both add to it). Returns its real path.
+     */
+    public static function mailRoot($to, $home, $verb)
+    {
+        $example = 'e.g. --to ' . $home . '/' . ($verb === 'archive' ? 'mail-archive' : 'mail-pop');
+        if (!is_string($to) || $to === '' || $to[0] !== '/') {
+            throw new CliError("$verb needs --to <full path of a folder for the Maildir>", $example);
+        }
+        $to = rtrim($to, '/');
+        $parent = realpath(dirname($to));
+        if ($parent === false || is_link($to) || preg_match('#(^|/)\.\.?(/|$)#', $to)) {
+            throw new CliError("$to is not a usable folder (missing parent, a symlink, or . or .. in it)", $example);
+        }
+        $real = self::fence($parent . '/' . basename($to), $home, 'the Maildir folder');
+        if (!is_dir($real) && !@mkdir($real, 0700)) {
+            throw new CliError("cannot create $real", 'check the parent directory and the quota (storage stats)');
+        }
+        return $real;
+    }
+
     /** A message's attachment name made safe: one plain file name of at most 200 bytes, extension kept. */
     public static function safeName($name, $n)
     {
