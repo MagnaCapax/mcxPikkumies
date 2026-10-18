@@ -10,16 +10,21 @@ require_once "$lib/Config.php";
 require_once "$lib/Provider.php";
 require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
+require_once __DIR__ . "/CreditsLine.php";
 
 // Test seam: a test may set this before including the file, so the checkout's real local/config.php is never read.
 $creditsConfig = isset($creditsConfig) ? $creditsConfig : Config::load();
+// The same seam for the line's cache directory (local/state/credits/).
+$creditsStateDir = isset($creditsStateDir) ? $creditsStateDir : CreditsLine::stateDir();
 
 $creditsKeyHint = 'a key comes from ~/.virsilipasKey (the Pulsed Media AI key; also shown in the Pulsed Media client area on the page'
     . ' "Virsilipas AI key" under "AI credits") or from ~/.pikkumiesKey for your own provider. Never read or print the key itself';
 
 $usage = <<<'U'
-usage: php credits.php balance [--human]
+usage: php credits.php balance [--human] | line [--tmux] [--ascii] [--jsonl]
   balance  credits left on this account's AI key, what is reserved and running, the key's limits, the last minute's use
+  line     one line: credits left, a bar of what is left of the newest grant, an estimate of the tokens it buys, today's use;
+           --jsonl prints the record instead, --tmux the tmux status form. Prints nothing when credits cannot be read
 U;
 
 Cli::run($argv, [
@@ -67,4 +72,18 @@ Cli::run($argv, [
             'endpoint_host' => $host,
         ]];
     },
-], $usage);
+    // Prints its own output and exits 0 always: the tmux status line and the start banner show nothing rather than an error.
+    'line' => function ($args, $opt) use ($creditsConfig, $creditsStateDir) {
+        try {
+            $record = CreditsLine::record(Provider::resolve($creditsConfig), $creditsStateDir);
+            if ($record !== null) {
+                $utf8 = CreditsFormat::utf8Locale();
+                $mode = !empty($opt['tmux']) ? 'tmux' : (!empty($opt['ascii']) || !$utf8 ? 'ascii' : 'utf8');
+                echo !empty($opt['jsonl']) ? Cli::json($record) : CreditsFormat::render($record, $mode, $utf8 && empty($opt['ascii'])), "\n";
+            }
+        } catch (Throwable $e) {
+            // silent by design (ADR-0040)
+        }
+        exit(0);
+    },
+], $usage, ['tmux', 'ascii']);

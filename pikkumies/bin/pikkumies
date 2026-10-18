@@ -386,6 +386,15 @@ switch ($cmd) {
             out('not starting: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) . '. Run `pikkumies doctor`.');
             exit(1);
         }
+        // The credits line once, before Hermes starts (ADR-0040): a library call, silent when credits cannot be read.
+        if (Launch::isTty() && Launch::isSession($passArgs)) {
+            require_once dirname(__DIR__) . '/tools/system/credits/CreditsLine.php';
+            $creditsUtf8 = CreditsFormat::utf8Locale();
+            $creditsBanner = CreditsLine::text(Provider::resolve(Config::load()), CreditsLine::stateDir(), $creditsUtf8 ? 'utf8' : 'ascii');
+            if ($creditsBanner !== '') {
+                out($creditsBanner);
+            }
+        }
         $args = array_map('escapeshellarg', $passArgs);
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);
@@ -442,7 +451,9 @@ switch ($cmd) {
             $windows = $windowList;
         }
         $insideTmux = (string) getenv('TMUX') !== '';
-        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__));
+        // The session's status line shows the credits line, refreshed every minute (ADR-0040).
+        $creditsCmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
+        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__), $creditsCmd);
         $attach = array_pop($plan);
         foreach ($plan as $step) {
             exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);

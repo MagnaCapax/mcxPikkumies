@@ -112,10 +112,19 @@ class Provider
     /** The raw Http::request answer of GET {endpoint}/balance (the credits tool reads every field); null, without a request, when the endpoint or key is missing. */
     public static function balanceAnswer(array $prov)
     {
+        return self::routeAnswer($prov, '/balance');
+    }
+
+    /**
+     * The raw Http::request answer of GET {endpoint}{$route} with the key; null, without a request, when the endpoint
+     * or key is missing. For short read-only calls with their own timeout (the credits line uses 2 seconds).
+     */
+    public static function routeAnswer(array $prov, $route, $timeout = 10, $max = 65536)
+    {
         if ($prov['endpoint'] === '' || $prov['key'] === '') {
             return null;
         }
-        return Http::request('GET', $prov['endpoint'] . '/balance', ['timeout' => 10, 'owners' => 'system', 'max' => 65536, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
+        return Http::request('GET', $prov['endpoint'] . $route, ['timeout' => (int) $timeout, 'owners' => 'system', 'max' => (int) $max, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
     }
 
     /** GET {endpoint}/models. Returns [httpCode, model ids]. */

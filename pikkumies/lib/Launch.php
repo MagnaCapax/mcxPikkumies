@@ -79,9 +79,11 @@ class Launch
      * tmux commands for `pikkumies tmux N`, as argv lists to run in order; the last one attaches
      * (switch-client when already inside tmux). Window pmN of session "pikkumies" runs $cmd, made
      * when missing; named windows, so tmux's base-index and other windows never matter. $windows: the
-     * session's window names, or null when the session does not exist.
+     * session's window names, or null when the session does not exist. $statusCmd, when given, is a shell command
+     * whose output leads the session's status-right, refreshed every minute: the credits line (ADR-0040). Set on
+     * this session only, never with -g, so the person's other tmux sessions keep their own status line.
      */
-    public static function tmuxPlan($n, $windows, $insideTmux, $cmd)
+    public static function tmuxPlan($n, $windows, $insideTmux, $cmd, $statusCmd = '')
     {
         $s = '=' . self::TMUX_SESSION;
         $w = 'pm' . $n;
@@ -90,6 +92,11 @@ class Launch
             $plan[] = ['tmux', 'new-session', '-d', '-s', self::TMUX_SESSION, '-n', $w, $cmd];
         } elseif (!in_array($w, $windows, true)) {
             $plan[] = ['tmux', 'new-window', '-d', '-t', $s . ':', '-n', $w, $cmd];
+        }
+        if ($statusCmd !== '') {
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', '#(' . $statusCmd . ') %H:%M'];
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right-length', '90'];
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-interval', '60'];
         }
         $plan[] = ['tmux', 'select-window', '-t', "$s:$w"];
         $plan[] = $insideTmux ? ['tmux', 'switch-client', '-t', $s] : ['tmux', 'attach-session', '-t', $s];

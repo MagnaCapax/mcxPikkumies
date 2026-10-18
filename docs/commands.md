@@ -25,6 +25,8 @@ alias pm2='pikkumies tmux 2'   # ... up to pm9
 
 `pm2` attaches to the `pikkumies` tmux session at window `pm2`, starting a new agent session there if that window is not open yet; detach with `Ctrl-b d` and the sessions keep running.
 
+With a Pulsed Media AI key, `pikkumies` prints the credits line when a session starts, and the `pikkumies` tmux session shows it at the right of its status line, refreshed every minute: `💳 4.7M credits ▰▰▰▰▰▰▰▰▰▱ 94% left · ≈1.2M–4.7M tokens · today 35k`. The bar is what is left of the newest grant; the tokens are an estimate from the model's rates, since the platform counts credits. Your other tmux sessions are not changed, and a provider that does not report usage shows nothing. The same line on demand: `php ~/pikkumies/tools/system/credits/credits.php line` (ADR-0040).
+
 ## Forcing settings for one run
 
 Three environment variables override the settings for one command, without editing `local/config.php` (ADR-0038):
