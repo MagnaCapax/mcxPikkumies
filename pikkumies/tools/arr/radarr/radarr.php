@@ -9,6 +9,7 @@ $usage = 'usage: php radarr.php <verb> [arguments] [--human]
 verbs: list [--search T] [--limit N] | show <id>... [--files] | stats | health | history [--since TIME] | restart
        lookup <title|tmdb:N|imdb:ttN> | add <tmdb:N|imdb:ttN>... [--profile P] [--root DIR] [--no-search]
        remove <id>... [--with-data --expect SIZE] | search <id>... | queue | wanted [--cutoff]
-ids: the movie ids `list` prints; tmdb:/imdb: ids come from `lookup`. See USAGE.md.';
+       releases <id> | grab <handle>
+ids: the movie ids `list` prints; tmdb:/imdb: ids come from `lookup`; a release handle comes from `releases`. See USAGE.md.';
 
 Arr::run($argv, 'radarr', $usage);

@@ -24,3 +24,18 @@ if ($method === 'GET' && $rel === 'search') {
     $s['searched'][] = $q;
     $send(200, $s['releases']);
 }
+// grab (docs/adr/0046 §2): GrabRelease, SearchController.cs:55-87.
+if ($method === 'POST' && $rel === 'search') {
+    $s['grabbed'][] = $body;
+    $mode = isset($s['grabMode']) ? $s['grabMode'] : 'ok';
+    if ($mode === '404') {
+        $send(404, ['message' => "Couldn't find requested release in cache, try searching again"]);
+    }
+    if ($mode === '409') {
+        $send(409, ['message' => 'Getting release from indexer failed']);
+    }
+    $send(200, $body);
+}
+if ($method === 'GET' && $rel === 'downloadclient') {
+    $send(200, isset($s['downloadclients']) ? $s['downloadclients'] : []);
+}

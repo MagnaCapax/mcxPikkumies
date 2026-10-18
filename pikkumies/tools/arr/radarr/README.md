@@ -31,6 +31,8 @@ config.xml validity, parsing and error order: as in `tools/arr/README.md` (insta
 | queue | `GET queue?page&pageSize&includeUnknownMovieItems=false&includeMovie=false` | spec `QueueResource` |
 | wanted | `GET wanted/missing` or `wanted/cutoff` with `monitored=true` | spec `MovieResourcePagingResource` |
 | delete check | `GET config/mediamanagement` (`recycleBin`) | spec |
+| releases | `GET release?movieId=<id>` | `Indexers/ReleaseController.cs` `GetReleases`, read from the upstream source on 2026-10-18 |
+| grab | `POST release {guid, indexerId}` (`DownloadRelease`; 404 "Couldn't find requested release in cache, try searching again", 409 "Getting release from indexer failed"); Radarr then sends it to its own configured download client | `Indexers/ReleaseController.cs` `DownloadRelease`; 30-minute cache (`TimeSpan.FromMinutes(30)`), the same TTL `ArrReleases` uses; docs/adr/0046 |
 
 ## Deleting data
 
@@ -51,3 +53,4 @@ As in `tools/arr/sonarr/README.md`: 60 s wait bound below the agent's 180 s term
 - [UNVERIFIED] Nothing was run against a live Radarr: JSON casing and exact error texts come from the spec and source only.
 - [UNVERIFIED] A lookup by `imdb:` returns the movie with its `imdbId` set, which is how `add imdb:tt…` matches it; the metadata service's answer was not observed.
 - [UNVERIFIED] .NET's ApplicationData folder on Linux, and how its recursive delete treats symlinks (the tool never follows them).
+- [UNVERIFIED] `releases`' `quality` column reads `quality.quality.name`, as for Sonarr (`tools/arr/sonarr/README.md` Unverified); Radarr's own `ReleaseResource` was not read, only Sonarr's.

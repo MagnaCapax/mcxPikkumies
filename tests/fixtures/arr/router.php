@@ -36,6 +36,18 @@ $send = function ($code, $data, $type = 'application/json') use ($save) {
 $prefix = $s['base'] . '/api/' . $s['api'] . '/';
 $rel = strpos($path, $prefix) === 0 ? substr($path, strlen($prefix)) : null;
 $s['calls'][] = ['method' => $method, 'path' => $rel === null ? $path : $rel, 'query' => $raw];
+// Prowlarr's download proxy (NewznabController.cs GetDownload, docs/adr/0046): unversioned path, key
+// in the query (ConvertToProxyLink), never a header; answered before the ordinary api-key rules below.
+if ($s['app'] === 'prowlarr' && $method === 'GET' && preg_match('#^' . preg_quote($s['base'], '#') . '/[0-9]+/download$#', $path)) {
+    $dl = isset($s['downloadProxy']) ? $s['downloadProxy'] : ['code' => 200, 'body' => 'd4:infodee'];
+    if (isset($dl['location'])) {
+        header('Location: ' . $dl['location']);
+        $save();
+        http_response_code($dl['code']);
+        exit;
+    }
+    $send($dl['code'], $dl['body'], isset($dl['type']) ? $dl['type'] : 'text/plain');
+}
 foreach (array_keys($q) as $k) {
     if (strtolower($k) === 'apikey') {
         $s['violations'][] = "apikey in the query of $path";

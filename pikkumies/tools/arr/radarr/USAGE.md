@@ -16,6 +16,8 @@ The user's own Radarr through its API on 127.0.0.1 (`/api/v3` under the UrlBase 
 | search | `<id>...` | yes | Starts the app's own search (one `MoviesSearch` for all the ids) and waits up to 60 s: one record per movie, `id`, `title`, then that command's `command_id`, `name`, `state` (completed, or still queued/started with a note). It may download and replace files. |
 | queue | `[--limit N]` | no | Tracked downloads: `id`, `item`, `title`, `status`, `tracked`, `size`, `left_bytes`, `finishes_at`, `client`, `protocol`, `message`. Read only. |
 | wanted | `[--cutoff] [--limit N]` | no | Missing monitored movies, as `list` records. `--cutoff`: below the quality cutoff instead. |
+| releases | `<id>` | no | Releases for one movie: `handle`, `title`, `size`, `quality`, `indexer`, `seeders`, `rejected`, `rejection` (the first reason, if rejected). Guids and links are never printed; `handle` names the result for `grab`, for 30 minutes. |
+| grab | `<handle>` | yes | Sends the named release (from `releases`) to Radarr's own `DownloadRelease`, which hands it to Radarr's configured download client: `result`, `title`, `size`. |
 
 ```sh
 T=~/pikkumies/tools/arr/radarr/radarr.php
@@ -26,8 +28,10 @@ php $T stats --human
 php $T show 12 --files --limit 0         # show the user every file and the expect value
 php $T remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $T history --since "-2 days"
+php $T releases 12
+php $T grab a1b2c3
 ```
 
-- Plain numbers are library ids from `list`; `tmdb:N\|imdb:ttN` ids are only for `lookup` and `add`.
+- Plain numbers are library ids from `list`; `tmdb:N\|imdb:ttN` ids are only for `lookup` and `add`; a release handle comes from `releases` and expires after 30 minutes or the next `releases` call.
 - Output is JSON Lines; the last line says `ok`, or gives `error` and `hint`. `--human` prints the same for people.
 - The API key is read from config.xml on every call and never printed.

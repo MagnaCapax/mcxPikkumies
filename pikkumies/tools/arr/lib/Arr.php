@@ -10,7 +10,8 @@ foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Http'] as $f) {
     require_once "$lib/$f.php";
 }
 foreach (['ArrApps', 'ArrAppsMore', 'ArrConfig', 'ArrShell', 'ArrLocate', 'ArrClient', 'ArrErrorText', 'ArrRecords', 'ArrCommand',
-    'ArrPages', 'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrIndexers'] as $f) {
+    'ArrPages', 'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrReleases', 'ArrIndexers',
+    'ArrGrabClient', 'ArrGrab', 'ArrLibraryReleases'] as $f) {
     require_once __DIR__ . "/$f.php";
 }
 
@@ -49,9 +50,20 @@ class Arr
             $verbs += empty($app['noAdd']) ? $lib : array_diff_key($lib, array_flip(['lookup', 'add']));
             $flags = empty($app['noAdd']) ? ['files', 'with-data', 'no-search', 'cutoff'] : ['files', 'with-data', 'cutoff'];
             $options = array_merge($options, empty($app['noAdd']) ? ['expect', 'profile', 'root'] : ['expect']);
+            if (in_array($app['id'], ['sonarr', 'radarr'], true)) { // the exact-release path; the API shape was checked only for these two (docs/adr/0046 §3)
+                $verbs += ArrLibraryReleases::verbs($app, $c);
+                $options = array_merge($options, ['season', 'episode']);
+            }
         } else {
             $verbs += ArrIndexers::verbs($app, $c);
             $options[] = 'indexer';
+            if ($app['id'] === 'prowlarr') {
+                $verbs['grab'] = function ($args, $opt) use ($c) {
+                    return ArrGrab::grab($c(), self::account(), $args, $opt);
+                };
+                $flags[] = 'via-prowlarr';
+                $options[] = 'client';
+            }
         }
         return [$verbs, $flags, $options];
     }
@@ -70,6 +82,13 @@ class Arr
             $over = isset($cfg['arr'][$app['id']]) && is_array($cfg['arr'][$app['id']]) ? $cfg['arr'][$app['id']] : [];
             return ArrLocate::find($app, $home, $family, $uid, $over, $lenient);
         };
+    }
+
+    /** [home, uid] of this account, the way locator() finds them (grab's in-process torrent-client path). */
+    public static function account()
+    {
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        return [ArrLocate::home($uid), $uid];
     }
 
     /** Seconds per API call: 15, or PIKKUMIES_ARR_TIMEOUT (1-60, the tests). */

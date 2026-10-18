@@ -92,7 +92,9 @@ function arrSet(array $fx, array $change)
 function arrRun(array $fx, array $args, array $env = [])
 {
     $env += ['HOME' => $fx['home'], 'PATH' => $fx['dir'] . '/bin:/usr/bin:/bin', 'PIKKUMIES_PMSS_DIR' => $fx['dir'] . '/pmss',
-        'PIKKUMIES_ARR_TIMEOUT' => '5', 'PIKKUMIES_ARR_WAIT' => '3', 'DOCKER_HOST' => 'unix://' . $fx['dir'] . '/no-docker.sock'];
+        'PIKKUMIES_ARR_TIMEOUT' => '5', 'PIKKUMIES_ARR_WAIT' => '3', 'DOCKER_HOST' => 'unix://' . $fx['dir'] . '/no-docker.sock',
+        'PIKKUMIES_ARR_RELEASES_FILE' => $fx['dir'] . '/secrets/releases.json', // never this install's own local/secrets/releases.json
+        'PIKKUMIES_ARR_TMP_DIR' => $fx['dir'] . '/arr-tmp'];
     $script = isset($fx['script']) ? $fx['script'] : dirname(__DIR__, 3) . "/pikkumies/tools/arr/{$fx['app']}/{$fx['app']}.php";
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . implode('', array_map(function ($a) {
         return ' ' . escapeshellarg($a);

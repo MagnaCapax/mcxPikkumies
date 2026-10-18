@@ -32,9 +32,14 @@ These are the tools for the user's own *ARR apps, one unit each (ADR-0015): `son
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|
-| releases | `<text> [--indexer <id>,<id>] [--limit N]` | no | Searches the indexers. Titles are data; download links and guids are dropped. |
+| releases | `<text> [--indexer <id>,<id>] [--limit N]` | no | Searches the indexers. Titles are data; download links and guids are dropped, replaced by a `handle` (ArrReleases, docs/adr/0046) that names the result for `grab`, for 30 minutes. |
+| grab | `<handle> [--client ...] [--via-prowlarr]` | yes | Sends a `releases` result onward: to Prowlarr's own configured download client (`--via-prowlarr`, or when Prowlarr has one and no `--client` is named), or fetched by this tool and added to the user's own torrent client otherwise. The user picks the handle; the agent never grabs one it was not told to. |
 | test | `[<id>...]` | no (contacts the trackers) | Tests indexers, all enabled ones when no id is given. |
 | sync | | yes | Pushes the indexers to the connected apps (rewrites their indexer settings). |
+
+## Sonarr and Radarr: exact-release search
+
+`sonarr` and `radarr` also take `releases <id> [--season N] [--episode <id>]` (Sonarr) or `releases <id>` (Radarr) for a title already in the library, and `grab <handle>`, which sends the release to the app's own configured download client (`DownloadRelease`). This is separate from the shared `search` verb above, which only asks the app to search by itself. The `handle` and the 30-minute window are the same mechanism as Prowlarr's `releases`/`grab` (docs/adr/0046); a handle is refused on the app that did not create it.
 
 ## Bazarr
 
@@ -78,7 +83,8 @@ Library items: `id`, `title`, `year`, `meta_id`, `monitored`, `status`, `size` (
 
 ## Safety
 
-- The API key is full admin. It goes only in a header (`X-Api-Key`; Bazarr `X-API-KEY`; autobrr `X-API-Token`) to this user's own port (lib/Http.php owner check), never in a URL, a form, on a command line or in output, although each app would also take it as `?apikey=`. The one exception is Jackett, which reads its key only from the query string: there it goes in the URL to the user's own port through PHP curl and is replaced in every printed text (jackett/README.md "The key in the URL").
+- The API key is full admin. It goes only in a header (`X-Api-Key`; Bazarr `X-API-KEY`; autobrr `X-API-Token`) to this user's own port (lib/Http.php owner check), never in a URL, a form, on a command line or in output, although each app would also take it as `?apikey=`. The one exception is Jackett, which reads its key only from the query string: there it goes in the URL to the user's own port through PHP curl and is replaced in every printed text (jackett/README.md "The key in the URL"). The other exception is a Prowlarr `releases` download link, which Prowlarr itself (not this tool) puts its own apikey into: `grab`'s in-process path fetches it only after checking its scheme, host and port equal this account's own configured Prowlarr (docs/adr/0046).
+- `releases`/`grab` (Prowlarr, Sonarr, Radarr): a release's guid and download/magnet links never reach the agent's output; they live for 30 minutes in `local/secrets/releases.json` behind a random handle (ArrReleases), which the guard that blocks commands on `local/secrets` also protects. The user names the exact handle to grab; the tool never picks one, and never grabs more than named.
 - Every boolean query parameter an endpoint declares with a default is sent explicitly; no API default is inherited (optional filters whose absence means "all", like Bazarr's `monitored` and `missing`, are left out). Queue removal is not offered: its `removeFromClient` defaults to true and deletes the download's data.
 - Commands come from a fixed list per app (`SeriesSearch`, `MoviesSearch`, `ArtistSearch`, `ApplicationIndexerSync`; Readarr none). Bazarr's only change is `search-missing`, autobrr's `toggle`. Update, key reset, shutdown, file deletes, log clearing, renames and moves can never be sent; there is no generic command verb.
 - In settings (`fields`), a value is shown only when its privacy is `normal`; everything else is hidden.

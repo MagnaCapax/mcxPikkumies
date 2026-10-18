@@ -157,6 +157,28 @@ if ($method === 'GET' && preg_match('#^command/([0-9]+)$#', $rel, $m) && isset($
     }
     $send(200, $c);
 }
+// Sonarr/Radarr exact-release path (docs/adr/0046 §3): ReleaseController.cs GetReleases/DownloadRelease.
+if ($method === 'GET' && $rel === 'release' && in_array($s['app'], ['sonarr', 'radarr'], true)) {
+    if ($s['app'] === 'radarr') {
+        if ($one('movieId') === null) {
+            $send(400, ['message' => 'movieId is required (the fake never serves the RSS fallback)']);
+        }
+    } elseif ($one('episodeId') === null && ($one('seriesId') === null || $one('seasonNumber') === null)) {
+        $send(400, ['message' => 'seriesId and seasonNumber must be provided together']);
+    }
+    $send(200, $s['releases']);
+}
+if ($method === 'POST' && $rel === 'release' && in_array($s['app'], ['sonarr', 'radarr'], true)) {
+    $s['grabbed'][] = $body;
+    $mode = isset($s['grabMode']) ? $s['grabMode'] : 'ok';
+    if ($mode === '404') {
+        $send(404, ['message' => "Couldn't find requested release in cache, try searching again"]);
+    }
+    if ($mode === '409') {
+        $send(409, ['message' => 'Getting release from indexer failed']);
+    }
+    $send(200, $body);
+}
 if ($s['app'] === 'prowlarr') {
     require __DIR__ . '/prowlarr-routes.php';
 }

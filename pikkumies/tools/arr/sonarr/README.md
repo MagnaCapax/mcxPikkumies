@@ -31,6 +31,8 @@ config.xml is valid when non-empty and containing `</Config>`, the installer's o
 | queue | `GET queue?page&pageSize&includeUnknownSeriesItems=false&includeSeries=false&includeEpisode=false` | spec `QueueResource` |
 | wanted | `GET wanted/missing` or `wanted/cutoff` with `includeSeries=false&includeImages=false&monitored=true` (cutoff also `includeEpisodeFile=false`) | spec `EpisodeResource` |
 | delete check | `GET config/mediamanagement` (`recycleBin`) | spec `MediaManagementConfigResource` |
+| releases | `GET release?episodeId=<id>` or `?seriesId=<id>&seasonNumber=<n>` (both required together; neither given falls back to the RSS feed, which this unit never asks for) | `Indexers/ReleaseController.cs:171-190` (`GetReleases`), read from the upstream source on 2026-10-18, not the pinned commit |
+| grab | `POST release {guid, indexerId}` (`DownloadRelease`; 404 "Couldn't find requested release in cache, try searching again", 409 "Getting release from indexer failed"); Sonarr then sends it to its own configured download client | `Indexers/ReleaseController.cs` `DownloadRelease`; `MapDecision` caches a release 30 minutes (`TimeSpan.FromMinutes(30)`), the same TTL `ArrReleases` uses; docs/adr/0046 |
 
 ## Deleting data
 
@@ -60,3 +62,4 @@ Commands, deletes and restarts wait at most 60 s (`ArrCommand::WAIT`), well belo
 - [UNVERIFIED] The Docker host port is owned by this user's uid under rootless Docker; if it is not, lib/Http.php refuses the port, which fails safe.
 - [UNVERIFIED] `.NET`'s ApplicationData folder on Linux (step 3 above).
 - [UNVERIFIED] .NET's recursive folder delete and symlinks inside a series folder: the tool lists symlinks with 0 bytes and never follows them.
+- [UNVERIFIED] `releases`' `quality` column reads `quality.quality.name` from `ReleaseResource.Quality` (a `QualityModel`); the field exists and is `QualityModel` typed (`ReleaseResource.cs`, read from the upstream source on 2026-10-18), but its exact JSON nesting was not observed live. `Rejections` is confirmed `IEnumerable<string>` from the same read, so `rejection` is printed as the plain string Sonarr sends, not extracted from a nested object.

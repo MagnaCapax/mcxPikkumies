@@ -1,8 +1,11 @@
 <?php
 /**
- * ArrIndexers: Prowlarr's verbs (tools/arr/README.md Table 3): releases, test, sync, and `show` for an
- * indexer. Indexer settings carry tracker keys in `fields`: ArrRecords::scrub drops every value whose
- * privacy is not "normal" before anything is printed. Releases lose downloadUrl, magnetUrl and guid.
+ * ArrIndexers: Prowlarr's verbs (tools/arr/README.md Table 3): releases, grab, test, sync, and
+ * `show` for an indexer. Indexer settings carry tracker keys in `fields`: ArrRecords::scrub drops
+ * every value whose privacy is not "normal" before anything is printed. `releases` never prints
+ * downloadUrl, magnetUrl or guid; they go only into the handle cache (ArrReleases, docs/adr/0046),
+ * which is why the search call asks for `raw` data (scrub would have dropped them before `releases`
+ * could store them for `grab`).
  */
 class ArrIndexers
 {
@@ -25,16 +28,23 @@ class ArrIndexers
                     Arr::resolve($app, Arr::all($c(), $app), $ids, true); // unknown ids fail before anything is searched
                     $q['indexerIds'] = array_map('intval', $ids);
                 }
-                $rows = array_values(array_filter((array) $c()->call('GET', 'search', $q, null, ['timeout' => 60]), 'is_array'));
-                $out = array_map(function ($r) {
-                    return ['title' => ArrRecords::s($r, 'title'), 'indexer' => ArrRecords::s($r, 'indexer'), 'indexer_id' => isset($r['indexerId']) ? (int) $r['indexerId'] : 0,
+                // raw: true (skips ArrRecords::scrub) so guid/downloadUrl/magnetUrl reach ArrReleases::save(); never printed (below).
+                $rows = array_values(array_filter((array) $c()->call('GET', 'search', $q, null, ['timeout' => 60, 'raw' => true]), 'is_array'));
+                $cache = ArrReleases::save(array_map(function ($r) {
+                    return ['indexerId' => isset($r['indexerId']) ? (int) $r['indexerId'] : 0, 'indexer' => ArrRecords::s($r, 'indexer'),
+                        'guid' => ArrRecords::s($r, 'guid'), 'downloadUrl' => ArrRecords::s($r, 'downloadUrl'), 'magnetUrl' => ArrRecords::s($r, 'magnetUrl'),
+                        'title' => ArrRecords::s($r, 'title'), 'size' => isset($r['size']) ? (int) $r['size'] : 0,
+                        'seeders' => isset($r['seeders']) ? (int) $r['seeders'] : null, 'protocol' => ArrRecords::s($r, 'protocol')];
+                }, $rows), 'prowlarr');
+                $out = array_map(function ($r, $n) use ($cache) {
+                    return ['handle' => $cache[$n]['handle'], 'title' => ArrRecords::s($r, 'title'), 'indexer' => ArrRecords::s($r, 'indexer'), 'indexer_id' => isset($r['indexerId']) ? (int) $r['indexerId'] : 0,
                         'size' => isset($r['size']) ? (int) $r['size'] : 0, 'age_hours' => isset($r['ageHours']) ? round((float) $r['ageHours'], 1) : null,
                         'seeders' => isset($r['seeders']) ? (int) $r['seeders'] : null, 'leechers' => isset($r['leechers']) ? (int) $r['leechers'] : null,
                         'protocol' => ArrRecords::s($r, 'protocol'), 'published_at' => ArrRecords::time($r, 'publishDate'), 'info_url' => ArrRecords::s($r, 'infoUrl'),
                         'categories' => array_values(array_filter(array_map(function ($k) {
                             return is_array($k) ? ArrRecords::s($k, 'name') : '';
                         }, isset($r['categories']) ? (array) $r['categories'] : []), 'strlen'))];
-                }, $rows);
+                }, $rows, array_keys($rows));
                 // SearchController.cs:181-186: an unexpected failure inside Prowlarr is logged and answered with an empty list.
                 return ['records' => $out, 'status' => $out ? [] : ['note' => 'no releases; an empty answer can also mean the search failed inside Prowlarr (see its log, System, Logs)']];
             },
