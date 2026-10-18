@@ -1,11 +1,11 @@
 <?php
 /**
- * tools/storage/lib/HomePath.php and ToolText.php, exercised directly in-process: neither class has
+ * pikkumies/lib/HomePath.php and tools/storage/lib/ToolText.php, exercised directly in-process: neither class has
  * ANY existing test (grep confirmed zero hits across tests/*.php) even though every storage, backup
  * and rclone verb's safety rests on HomePath's containment checks, and ToolText is the one place
  * backup/rclone error text is cleaned of credentials before it can reach a ticket or a log.
  */
-require_once dirname(__DIR__) . '/pikkumies/tools/storage/lib/HomePath.php';
+require_once dirname(__DIR__) . '/pikkumies/lib/HomePath.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/storage/lib/ToolText.php';
 
 if (!function_exists('heHome')) {

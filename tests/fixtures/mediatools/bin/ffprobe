@@ -1,0 +1,12 @@
+#!/usr/bin/env php
+<?php
+// Fake ffprobe: logs its argv, then prints the scripted JSON (ffprobe_json) or a failure.
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+$s = fmState();
+if (isset($s['ffprobe_code']) && (int) $s['ffprobe_code'] !== 0) {
+    fwrite(STDERR, isset($s['ffprobe_err']) ? $s['ffprobe_err'] : "fake ffprobe error\n");
+    exit((int) $s['ffprobe_code']);
+}
+echo isset($s['ffprobe_json']) ? $s['ffprobe_json'] : '{}';
+exit(0);

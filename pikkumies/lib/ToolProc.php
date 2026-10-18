@@ -1,10 +1,12 @@
 <?php
 /**
  * ToolProc: runs a program found in PATH with an argv, never a shell string built from user text
- * (storage and backup units). PHP 7.3 proc_open takes a string, so every word is escapeshellarg'd,
- * as lib/Update.php exec() does, and `exec` replaces the shell so a stop signal reaches the program.
- * Nothing here installs anything. The backup units use it too; it belongs in pikkumies/lib once a
- * third category needs it. Error text (ToolText) and listing size (ToolList) are their own classes.
+ * (storage, backup, containers, performance and media units). PHP 7.3 proc_open takes a string, so
+ * every word is escapeshellarg'd, as lib/Update.php exec() does, and `exec` replaces the shell so a
+ * stop signal reaches the program. Nothing here installs anything. Moved from tools/storage/lib/ to
+ * pikkumies/lib/ once a third category (media, ADR-0045) needed it (tools/storage/README.md). Error
+ * text (tools/storage/lib/ToolText.php) and listing size (tools/storage/lib/ToolList.php) stay their
+ * own classes in storage/lib: storage, backup and media use ToolText, only storage and backup ToolList.
  */
 class ToolProc
 {

@@ -1,12 +1,12 @@
 <?php
 /**
- * tools/storage/lib/ToolProc.php and ToolList.php (neither has ANY existing test; grep confirmed
+ * pikkumies/lib/ToolProc.php and tools/storage/lib/ToolList.php (neither has ANY existing test; grep confirmed
  * zero hits), plus RcloneCmd/RclonePlan's version-parsing fallback. ToolProc is the one place every
  * storage/backup/rclone verb runs an external program; its escaping and output caps are the safety
  * boundary the whole tools/storage tree depends on.
  */
 require_once __DIR__ . '/fixtures/storage/harness.php';
-require_once dirname(__DIR__) . '/pikkumies/tools/storage/lib/ToolProc.php';
+require_once dirname(__DIR__) . '/pikkumies/lib/ToolProc.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/storage/lib/ToolList.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/storage/lib/ToolText.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/storage/rclone/RclonePlace.php';

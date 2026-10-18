@@ -1,0 +1,42 @@
+#!/usr/bin/env php
+<?php
+// Fake ffmpeg: logs its argv, then either fails (ffmpeg_code/ffmpeg_err) or creates the output
+// file(s) a real conversion would have left. Segment mode (`-f segment ... <pattern>`) creates
+// segment_count placeholder files from the %03d pattern; otherwise the last argument is the output
+// (ffmpeg_bytes: its size, as a sparse file). Like real ffmpeg with -nostdin, an existing output
+// without -y is refused with "already exists. Exiting." and exit code 0.
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+$s = fmState();
+$code = isset($s['ffmpeg_code']) ? (int) $s['ffmpeg_code'] : 0;
+if ($code !== 0) {
+    fwrite(STDERR, isset($s['ffmpeg_err']) ? $s['ffmpeg_err'] : "fake ffmpeg error\n");
+    exit($code);
+}
+$last = end($argv);
+$segment = in_array('segment', $argv, true) && strpos($last, '%03d') !== false;
+if (!$segment && file_exists($last) && !in_array('-y', $argv, true)) {
+    fwrite(STDERR, "File '$last' already exists. Exiting.\nError opening output file $last.\n");
+    exit(0);
+}
+if (!isset($s['ffmpeg_write']) || $s['ffmpeg_write']) {
+    if ($segment) {
+        $n = isset($s['segment_count']) ? (int) $s['segment_count'] : 2;
+        for ($i = 0; $i < $n; $i++) {
+            fmTouch(str_replace('%03d', sprintf('%03d', $i), $last));
+        }
+    } else {
+        fmTouch($last);
+        if (isset($s['ffmpeg_bytes'])) {
+            truncate($last, (int) $s['ffmpeg_bytes']);
+        }
+    }
+}
+exit(0);
+
+function truncate($path, $bytes)
+{
+    $h = fopen($path, 'r+');
+    ftruncate($h, $bytes);
+    fclose($h);
+}

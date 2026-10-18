@@ -1,0 +1,25 @@
+#!/usr/bin/env php
+<?php
+// Fake cmake: logs its argv. `--version` prints a scripted version (cmake_version, default 3.99.0).
+// `--build <dir> ...` copies the fake whisper-cli onto <dir>/bin/whisper-cli, as a real build would
+// leave an executable there, unless cmake_build_code says the build failed.
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+$s = fmState();
+if (in_array('--version', $argv, true)) {
+    echo 'cmake version ' . (isset($s['cmake_version']) ? $s['cmake_version'] : '3.99.0') . "\n";
+    exit(0);
+}
+$code = isset($s['cmake_build_code']) ? (int) $s['cmake_build_code'] : 0;
+if ($code !== 0) {
+    fwrite(STDERR, "fake cmake build error\n");
+    exit($code);
+}
+$i = array_search('--build', $argv, true);
+if ($i !== false && isset($argv[$i + 1])) {
+    $bin = $argv[$i + 1] . '/bin/whisper-cli';
+    @mkdir(dirname($bin), 0700, true);
+    copy(getenv('FAKE_DIR') . '/bin/whisper-cli', $bin);
+    chmod($bin, 0755);
+}
+exit(0);

@@ -5,10 +5,10 @@
  * `bigfiles` run one bounded scan each. Freeing space goes through the tool that owns the data.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'Quota'] as $storageClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'Quota', 'ToolProc', 'HomePath'] as $storageClass) {
     require_once "$lib/$storageClass.php";
 }
-foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+foreach (['ToolText', 'ToolList'] as $toolLib) {
     require_once dirname(__DIR__) . "/lib/$toolLib.php";
 }
 require_once __DIR__ . '/StorageStats.php';

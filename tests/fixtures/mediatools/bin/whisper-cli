@@ -1,0 +1,22 @@
+#!/usr/bin/env php
+<?php
+// Fake whisper-cli: logs its argv, then writes <-of value>.txt (TranscribeLocal::run's -otxt output).
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+$s = fmState();
+$code = isset($s['whisper_code']) ? (int) $s['whisper_code'] : 0;
+if ($code !== 0) {
+    fwrite(STDERR, isset($s['whisper_err']) ? $s['whisper_err'] : "fake whisper-cli error\n");
+    exit($code);
+}
+$of = null;
+foreach ($argv as $i => $a) {
+    if ($a === '-of' && isset($argv[$i + 1])) {
+        $of = $argv[$i + 1];
+    }
+}
+if ($of !== null) {
+    fmTouch("$of.txt");
+    file_put_contents("$of.txt", isset($s['whisper_text']) ? $s['whisper_text'] : 'fake transcript');
+}
+exit(0);

@@ -7,7 +7,7 @@ Works with the user's own rclone: lists remotes and folders, previews and runs c
 - **Binary**: `rclone` in PATH. PMSS installs rclone 1.69.1 to `/usr/bin/rclone` on every server (PMSS `scripts/lib/update/apps/rclone.php:36, 69`). Debian's own package is older: 1.53.3 in bullseye, 1.60.1 in bookworm and trixie (sources.debian.org/api/src/rclone, read 2026-10-14). Without it every verb says "not installed" (exit 1).
 - **Config**: whatever `rclone config file` prints on its last line (rclone 1.69.1 `fs/config/ui.go:639-650`); by default `~/.config/rclone/rclone.conf` (rclone 1.69.1 `docs/content/docs.md`, `--config`). The file is opened only to see whether it is encrypted: the first line that is not empty or a comment starts with `RCLONE_ENCRYPT_V` (`fs/config/crypt.go:68-77`). Then every verb but `stats` stops: the user runs rclone in their own terminal. Every call also passes `--ask-password=false`, so rclone fails instead of prompting (`docs.md`, "Configuration Encryption").
 - **WebUI (PMSS)**: the panel toggle writes `~/.rcloneEnable`, and the watchdog runs `rclone rcd --rc-web-gui --rc-addr 127.0.0.1:<~/.rclonePort>` (PMSS `scripts/cron/checkRcloneInstances.php:13-21`, `etc/skel/www/scriptsInc.php:1122`). `stats` reports it; `running` is true only when the port's listener belongs to this account (`lib/Host.php`). The tool has no verb to start or stop it: the panel and the watchdog own it.
-- **Mounts**: FUSE mounts in `/proc/self/mountinfo` whose `user_id=` is this account (`tools/storage/lib/HomePath.php`).
+- **Mounts**: FUSE mounts in `/proc/self/mountinfo` whose `user_id=` is this account (`pikkumies/lib/HomePath.php`).
 
 ## Calls
 
@@ -22,7 +22,7 @@ Works with the user's own rclone: lists remotes and folders, previews and runs c
 | move | the plan, then `move <src> <dst>`, then `size --json <src>` (0 files left, or exit 3/4: gone) | `rclone_move.md`; `docs.md` "List of exit codes" |
 | unmount | `fusermount3 -u <path>` (else `fusermount -u`) | PM wiki `tiered-media-storage-with-rclone-and-mergerfs`:137 (only `fusermount -u`, never kill), :187 (fuse3 ships), :191 (never delete the VFS cache) |
 
-All docs are rclone v1.69.1 (`github.com/rclone/rclone/tree/v1.69.1`). The arguments are an argv quoted word by word, with `--` before the places (`tools/storage/lib/ToolProc.php`).
+All docs are rclone v1.69.1 (`github.com/rclone/rclone/tree/v1.69.1`). The arguments are an argv quoted word by word, with `--` before the places (`pikkumies/lib/ToolProc.php`).
 
 ## Changing files
 

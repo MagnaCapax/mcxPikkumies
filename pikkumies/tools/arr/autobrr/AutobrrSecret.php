@@ -37,22 +37,10 @@ class AutobrrSecret
         SecretFile::write($this->file, ['key' => $key], 'autobrr API key');
     }
 
-    /** Reads the key from the terminal without echo; refuses when stdin is not a terminal. */
+    /** Reads the key from the terminal without echo; refuses when stdin is not a terminal (pikkumies/lib/SecretFile.php). */
     public static function prompt($label)
     {
-        $tty = function_exists('stream_isatty') ? @stream_isatty(STDIN) : (function_exists('posix_isatty') && @posix_isatty(STDIN));
-        if (!$tty) {
-            throw new CliError('login reads the API key from a terminal, and stdin is not one', 'the user runs `php '
-                . dirname(__FILE__) . '/autobrr.php login` in their own terminal (never pass the key on the command line or in chat)');
-        }
-        fwrite(STDERR, $label);
-        @shell_exec('stty -echo 2>/dev/null');
-        register_shutdown_function(function () {
-            @shell_exec('stty echo 2>/dev/null');
-        });
-        $line = fgets(STDIN);
-        @shell_exec('stty echo 2>/dev/null');
-        fwrite(STDERR, "\n");
-        return trim((string) $line);
+        return SecretFile::prompt($label, 'login reads the API key from a terminal, and stdin is not one', 'the user runs `php '
+            . dirname(__FILE__) . '/autobrr.php login` in their own terminal (never pass the key on the command line or in chat)');
     }
 }

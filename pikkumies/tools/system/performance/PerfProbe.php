@@ -14,8 +14,8 @@
  *  - The one PSI parser (cpu some, io full, memory full; avg10 and avg60) and the gate that refuses heavy tests
  *    on a server under pressure.
  */
-$perfStorageLib = dirname(__DIR__, 2) . '/storage/lib/ToolProc.php';
-require_once $perfStorageLib; // ToolProc stays in storage/lib; backup requires it the same way (tools/backup/lib/Backup.php)
+$perfToolProc = dirname(__DIR__, 3) . '/lib/ToolProc.php';
+require_once $perfToolProc; // ToolProc moved to pikkumies/lib (tools/storage/README.md); every category requires it the same way
 require_once __DIR__ . '/PerfLimits.php';
 require_once __DIR__ . '/PerfFs.php';
 

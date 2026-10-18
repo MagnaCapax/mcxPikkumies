@@ -5,10 +5,10 @@
  * sync and move need the --expect count the user saw; copy never overwrites without --replace.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Host'] as $rcloneClass) {
+foreach (['Cli', 'CliHuman', 'Host', 'ToolProc', 'HomePath'] as $rcloneClass) {
     require_once "$lib/$rcloneClass.php";
 }
-foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+foreach (['ToolText', 'ToolList'] as $toolLib) {
     require_once dirname(__DIR__) . "/lib/$toolLib.php";
 }
 foreach (['RcloneCmd', 'RclonePlace', 'RclonePlan', 'RcloneInfo', 'RcloneTransfer'] as $rcloneClass) {

@@ -23,7 +23,7 @@ Tells the user how full their account is and what is using the space. It reads t
 - run one at a time per account (`flock` on `local/storage/scan.lock`);
 - write nothing into the scanned tree. When the quota is full the cache or lock cannot be written; the scan still runs.
 
-The commands are built as an argv and quoted word by word (`tools/storage/lib/ToolProc.php`), the path is resolved with `realpath` and must be inside the home unless named with `--path`, and then a directory this account owns, never `/` or a system directory (`tools/storage/lib/HomePath.php`). `du -0` and `find -printf ...\0` end each record with a NUL byte, so a file name holding a newline cannot add a made-up row.
+The commands are built as an argv and quoted word by word (`pikkumies/lib/ToolProc.php`), the path is resolved with `realpath` and must be inside the home unless named with `--path`, and then a directory this account owns, never `/` or a system directory (`pikkumies/lib/HomePath.php`). `du -0` and `find -printf ...\0` end each record with a NUL byte, so a file name holding a newline cannot add a made-up row.
 
 GNU coreutils `du` prints `<size>\t<path>`, `-k` in KiB, `--inodes` as counts (`du --help`, coreutils 9.7, read on the build host 2026-10-14; `--inodes` exists since coreutils 8.22 [UNVERIFIED]).
 

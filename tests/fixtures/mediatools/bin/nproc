@@ -1,0 +1,8 @@
+#!/usr/bin/env php
+<?php
+// Fake nproc: logs its argv, then prints the scripted core count (nproc_n, default 4).
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+$s = fmState();
+echo isset($s['nproc_n']) ? (int) $s['nproc_n'] : 4, "\n";
+exit(0);

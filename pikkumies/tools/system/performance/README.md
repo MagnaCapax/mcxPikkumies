@@ -22,7 +22,7 @@ The client-area Diagnose button on PMSS checks the account and the server with t
 
 ## Runner
 
-- Every program runs with an argv through `ToolProc::run` (required from `tools/storage/lib`, as the backup units do), with `nice -n 19` and `timeout -k 2 <seconds>` in front: a program that does not stop is killed two seconds later, with its children.
+- Every program runs with an argv through `ToolProc::run` (`pikkumies/lib/ToolProc.php`, shared with the storage, backup and media units), with `nice -n 19` and `timeout -k 2 <seconds>` in front: a program that does not stop is killed two seconds later, with its children.
 - Walks (`find`) use scan mode: the idle I/O class, so they wait for everyone else. Probes use measure mode: best-effort level 7, because a probe in the idle class on a busy disk measures only its own waiting. The class is printed with each probe result.
 - Niceness and the I/O class order work only inside the account's own group [inferred from how the kernel groups scheduling per cgroup]; what protects other accounts is the OS's per-account weights and limits, and the small, capped probes (the Budgets table).
 - One run at a time per account (a non-blocking lock on `local/performance/run.lock`). Probe files live in `local/performance/scratch/<pid>/` (0700, files 0600 created exclusively), inside the account's quota, never in `/tmp`; the run removes them, and the next run removes what a killed run left.

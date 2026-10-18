@@ -15,7 +15,7 @@ $dockerLib = dirname(__DIR__, 3) . '/lib';
 foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Cgroup'] as $dockerClass) {
     require_once "$dockerLib/$dockerClass.php";
 }
-require_once dirname(__DIR__, 2) . '/storage/lib/ToolProc.php';
+require_once dirname(__DIR__, 3) . '/lib/ToolProc.php';
 
 class DockerCli
 {

@@ -40,6 +40,7 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - Torrent clients (rTorrent, qBittorrent, Deluge): [torrent clients](pikkumies/tools/torrent-clients/README.md)
 - Sonarr, Radarr, Prowlarr and the other *arr apps: [arr](pikkumies/tools/arr/README.md)
 - Plex, Jellyfin and Emby: [media servers](pikkumies/tools/media-servers/README.md)
+- Converting or probing one of your own media files, and speech-to-text transcription (cloud or local): [media](pikkumies/tools/media/README.md)
 - Rootless Docker containers: [containers](pikkumies/tools/containers/README.md)
 - Backups with restic and borg: [backup](pikkumies/tools/backup/README.md)
 - Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)

@@ -1,0 +1,6 @@
+#!/usr/bin/env php
+<?php
+// Fake build toolchain presence check: logs its argv, exits 0. Never actually invoked to build anything (cmake fake does that).
+require __DIR__ . '/fakelib.php';
+fmLog($argv);
+exit(0);

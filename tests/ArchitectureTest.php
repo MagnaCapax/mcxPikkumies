@@ -144,6 +144,9 @@ return [
             "$root/pikkumies/lib/Provider.php" => 'OpenAI-compatible',
             "$root/pikkumies/lib/Config.php" => 'OpenAI-compatible',
             "$root/pikkumies/hooks/orchestrator.php" => 'Claude-Code',
+            "$root/pikkumies/tools/media/transcribe/TranscribeSecret.php" => 'OpenAI-compatible',
+            "$root/pikkumies/tools/media/transcribe/TranscribeCloud.php" => 'OpenAI-compatible',
+            "$root/pikkumies/tools/media/transcribe/transcribe.php" => 'OpenAI-compatible',
         ];
         $deny = '/\b(openai|anthropic|claude|chatgpt|gpt-?[0-9]|gemini|mistral|cohere|llama|grok|deepseek|ollama|qwen)\b/i';
         foreach (actTrackedPhp() as $f) {

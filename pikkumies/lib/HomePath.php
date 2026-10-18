@@ -1,11 +1,12 @@
 <?php
 /**
- * HomePath: which paths a storage or backup verb may touch (tools/storage/README.md, safety rules).
- * A path is resolved with realpath and must be inside $HOME, unless the user named it with --path,
+ * HomePath: which paths a storage, backup or media verb may touch (tools/storage/README.md, safety
+ * rules; ADR-0045). A path is resolved with realpath and must be inside $HOME, unless the user named it with --path,
  * and even then never / or a system directory, and only a directory this account owns. Restores go only to a new or empty directory that
  * is not inside a FUSE mount. FUSE mounts come from /proc/self/mountinfo (Linux
  * Documentation/filesystems/proc.rst §3.5, v6.12); the mount's owner is its `user_id=` super option
- * (Documentation/filesystems/fuse.rst, v6.12).
+ * (Documentation/filesystems/fuse.rst, v6.12). Moved from tools/storage/lib/ to pikkumies/lib/ once a
+ * third category (media) needed it.
  */
 class HomePath
 {

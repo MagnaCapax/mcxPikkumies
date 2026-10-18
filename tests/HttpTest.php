@@ -9,6 +9,7 @@ $p = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 if ($p === "/redirect") { header("Location: http://example.invalid/"); http_response_code(302); exit; }
 if ($p === "/big") { echo str_repeat("x", 300000); exit; }
 if ($p === "/echo") { echo json_encode(["method" => $_SERVER["REQUEST_METHOD"], "auth" => isset($_SERVER["HTTP_AUTHORIZATION"]) ? $_SERVER["HTTP_AUTHORIZATION"] : "", "body" => file_get_contents("php://input")]); exit; }
+if ($p === "/multipart") { echo json_encode(["fields" => $_POST, "file_name" => isset($_FILES["file"]["name"]) ? $_FILES["file"]["name"] : null, "file_bytes" => isset($_FILES["file"]["size"]) ? $_FILES["file"]["size"] : null]); exit; }
 http_response_code(404);
 ');
     $srv = stream_socket_server('tcp://127.0.0.1:0'); // a free port: a fixed one could already answer (seen: 307)
@@ -65,6 +66,26 @@ return [
                     break;
                 }
             }
+        } finally {
+            proc_terminate($proc);
+            proc_close($proc);
+        }
+    },
+    'http: fields builds a real multipart/form-data upload (CURLFile included), and body+fields together is refused before any request' => function () {
+        if (!function_exists('curl_init')) {
+            skip('curl extension missing (CI installs it; a machine without it cannot run the tools either)');
+        }
+        $r = Http::request('POST', 'http://127.0.0.1:1/', ['body' => 'a=1', 'fields' => ['a' => '1']]);
+        check($r['code'] === 0 && strpos($r['error'], 'exclusive') !== false, 'body+fields was not refused: ' . json_encode($r));
+        list($proc, $base) = httpFixtureServer();
+        try {
+            $tmp = sys_get_temp_dir() . '/pk-http-upload-' . getmypid() . '.bin';
+            file_put_contents($tmp, 'hello upload');
+            $r = Http::request('POST', "$base/multipart", ['fields' => ['model' => 'm1', 'file' => new CURLFile($tmp)]]);
+            $d = json_decode($r['body'], true);
+            check($r['code'] === 200 && $d['fields']['model'] === 'm1' && $d['file_name'] === basename($tmp) && $d['file_bytes'] === 12,
+                'multipart upload not received as sent: ' . $r['body']);
+            unlink($tmp);
         } finally {
             proc_terminate($proc);
             proc_close($proc);

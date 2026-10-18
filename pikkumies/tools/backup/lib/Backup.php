@@ -5,10 +5,10 @@
  * and "one backup job at a time" live here once, so restic and borg behave the same.
  */
 $backupLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config'] as $backupClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath'] as $backupClass) {
     require_once "$backupLib/$backupClass.php";
 }
-foreach (['ToolProc', 'ToolText', 'ToolList', 'HomePath'] as $toolLib) {
+foreach (['ToolText', 'ToolList'] as $toolLib) {
     require_once dirname(__DIR__, 2) . "/storage/lib/$toolLib.php";
 }
 require_once __DIR__ . '/BackupTool.php';

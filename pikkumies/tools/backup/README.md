@@ -38,7 +38,7 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 
 ## Restoring
 
-`restore <id> --target <dir>` creates `<dir>` (or uses it when it exists and is empty). It refuses a path outside the home, a symlink, an existing non-empty directory, and anything inside a FUSE mount (`tools/storage/lib/HomePath.php`). Restored files keep their stored path inside the target. To put a file back in place, the user moves it with `mv -n` (never over an existing file).
+`restore <id> --target <dir>` creates `<dir>` (or uses it when it exists and is empty). It refuses a path outside the home, a symlink, an existing non-empty directory, and anything inside a FUSE mount (`pikkumies/lib/HomePath.php`). Restored files keep their stored path inside the target. To put a file back in place, the user moves it with `mv -n` (never over an existing file).
 
 ## Passwords and repositories
 

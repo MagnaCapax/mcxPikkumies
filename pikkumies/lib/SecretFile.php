@@ -58,4 +58,33 @@ class SecretFile
             throw new CliError("cannot store the $what", "check that $dir is writable");
         }
     }
+
+    /**
+     * Reads one line from the terminal, writing $label to stderr first; refuses when stdin is not a
+     * terminal (never the chat, never a command line). $hide (default true) turns terminal echo off
+     * for the value and back on again, for a secret; an endpoint or a model name is typed with echo
+     * on ($hide = false), so the user can see and correct it. The shared helper behind
+     * AutobrrSecret::prompt() and media/transcribe's login; QbitSecret and MediaSecret still keep
+     * their own copies.
+     */
+    public static function prompt($label, $notTtyError, $notTtyHint, $hide = true)
+    {
+        $tty = function_exists('stream_isatty') ? @stream_isatty(STDIN) : (function_exists('posix_isatty') && @posix_isatty(STDIN));
+        if (!$tty) {
+            throw new CliError($notTtyError, $notTtyHint);
+        }
+        fwrite(STDERR, $label);
+        if ($hide) {
+            @shell_exec('stty -echo 2>/dev/null'); // stty works on its stdin, which is our terminal
+            register_shutdown_function(function () {
+                @shell_exec('stty echo 2>/dev/null');
+            });
+        }
+        $line = fgets(STDIN);
+        if ($hide) {
+            @shell_exec('stty echo 2>/dev/null');
+        }
+        fwrite(STDERR, "\n");
+        return trim((string) $line);
+    }
 }

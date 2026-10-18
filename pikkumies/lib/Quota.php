@@ -163,7 +163,7 @@ class Quota
     }
 
     /**
-     * `quota` and `timeout` come from PATH, like every program the storage tools run (tools/storage/lib/ToolProc.php),
+     * `quota` and `timeout` come from PATH, like every program the storage tools run (pikkumies/lib/ToolProc.php),
      * and the found path is the one run: the old check of fixed paths ran whatever `quota` the shell found in PATH.
      * PATH costs no safety here: it runs as the user, so a `quota` of the user's own only misreports their own quota.
      */

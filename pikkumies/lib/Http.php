@@ -12,7 +12,8 @@ class Http
     const MAX = 5242880; // default response cap, bytes
 
     /**
-     * Options: headers (list of "Name: value"), body (string), timeout (s, default 15),
+     * Options: headers (list of "Name: value"), body (string), fields (array name => string|CURLFile:
+     * a multipart/form-data request, curl builds it; exclusive with body), timeout (s, default 15),
      * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener, or 'system'),
      * discard (true: count the response bytes and keep none, for a throughput test; reaching max or the timeout
      * after the first byte ends the transfer and is not an error).
@@ -25,6 +26,9 @@ class Http
     {
         if (!function_exists('curl_init')) {
             return ['code' => 0, 'body' => '', 'headers' => [], 'error' => 'the PHP curl extension is missing'];
+        }
+        if (isset($o['body']) && isset($o['fields'])) {
+            return ['code' => 0, 'body' => '', 'headers' => [], 'error' => "'body' and 'fields' are exclusive; pass one or the other"];
         }
         $refusal = self::foreignLocalListener($url, isset($o['owners']) ? $o['owners'] : [], $pin);
         if ($refusal !== '') {
@@ -60,6 +64,8 @@ class Http
         ];
         if (isset($o['body'])) {
             $opts[CURLOPT_POSTFIELDS] = (string) $o['body'];
+        } elseif (isset($o['fields'])) {
+            $opts[CURLOPT_POSTFIELDS] = (array) $o['fields']; // curl builds the multipart/form-data body itself
         }
         $opts[CURLOPT_HEADERFUNCTION] = function ($ch, $line) use (&$headers) {
             $p = strpos($line, ':');
