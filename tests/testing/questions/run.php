@@ -4,7 +4,7 @@
  * and said. Not part of tests/run.php or CI: it needs provider keys and spends tokens. Read README.md first.
  *
  *   php run.php --self-test | --list [--targets F] | --regrade DIR
- *   php run.php --targets F --max-tokens N [--target NAME] [--only ID] [--tag T] [--max-turns N] [--timeout S]
+ *   php run.php --targets F --token-budget N [--target NAME] [--only ID] [--tag T] [--max-turns N] [--timeout S]
  *               [--out DIR] [--install DIR] [--keep]
  */
 umask(0077);
@@ -14,13 +14,17 @@ require_once "$repo/pikkumies/lib/Provider.php";
 foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report'] as $lib) {
     require_once "$here/lib/$lib.php";
 }
-$o = ['targets' => (string) getenv('PIKKUMIES_QA_TARGETS'), 'target' => '', 'only' => '', 'tag' => '', 'regrade' => '', 'max-tokens' => null,
+$o = ['targets' => (string) getenv('PIKKUMIES_QA_TARGETS'), 'target' => '', 'only' => '', 'tag' => '', 'regrade' => '', 'token-budget' => null, 'max-tokens' => null,
     'max-turns' => '', 'timeout' => '900', 'out' => '', 'install' => '', 'list' => false, 'self-test' => false, 'keep' => false];
 for ($i = 1; $i < count($argv); $i++) {
     if (!preg_match('/^--([a-z-]+)(?:=(.*))?$/s', $argv[$i], $m) || !array_key_exists($m[1], $o)) {
         fail("unknown argument: {$argv[$i]} (see the top of run.php)", 2);
     }
     $o[$m[1]] = is_bool($o[$m[1]]) ? true : (isset($m[2]) ? $m[2] : (isset($argv[$i + 1]) ? $argv[++$i] : fail("--{$m[1]} needs a value", 2)));
+}
+// --max-tokens is the older spelling of --token-budget (a budget for the whole run, not a per-request output cap).
+if ($o['token-budget'] === null) {
+    $o['token-budget'] = $o['max-tokens'];
 }
 function fail($message, $code = 1)
 {
@@ -61,8 +65,8 @@ if ($uid === 0 || !is_file("$realHome/.pikkumies-qa-user")) {
     fail("refusing to ask: the agent's terminal runs as this account and a throwaway HOME does not confine it. Run as a dedicated\n"
         . "user that holds no fleet or SSH keys, and create $realHome/.pikkumies-qa-user there (never as root). See README.md.");
 }
-if ($o['max-tokens'] === null || !ctype_digit((string) $o['max-tokens'])) {
-    fail('--max-tokens N is required for an asking run (0 = no limit, chosen on purpose)', 2);
+if ($o['token-budget'] === null || !ctype_digit((string) $o['token-budget'])) {
+    fail('--token-budget N is required for an asking run (0 = no limit, chosen on purpose)', 2);
 }
 if (!ctype_digit($o['timeout']) || ($o['max-turns'] !== '' && !ctype_digit($o['max-turns']))) {
     fail('--timeout and --max-turns take a whole number', 2);
@@ -96,8 +100,8 @@ try {
     $refreshed = [];
     foreach ($targets as $name => $s) {
         foreach ($questions as $q) {
-            if ((int) $o['max-tokens'] > 0 && $used >= (int) $o['max-tokens']) {
-                echo "token ceiling reached: $used of {$o['max-tokens']} used; the remaining questions were not asked\n";
+            if ((int) $o['token-budget'] > 0 && $used >= (int) $o['token-budget']) {
+                echo "token budget reached: $used of {$o['token-budget']} used; the remaining questions were not asked\n";
                 break 2;
             }
             $family = implode('', Questions::values($q, 'family')) ?: (isset($s['family']) ? (string) $s['family'] : '');

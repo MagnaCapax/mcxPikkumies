@@ -44,11 +44,11 @@ Then run `php tests/testing/questions/run.php --self-test`: it lints every quest
 
 ```sh
 php tests/testing/questions/run.php --list                        # the questions
-php tests/testing/questions/run.php --targets ~/.qa-targets.php --max-tokens 2000000
-php tests/testing/questions/run.php --targets ~/.qa-targets.php --max-tokens 0 --target target-a --tag memory
+php tests/testing/questions/run.php --targets ~/.qa-targets.php --token-budget 2000000
+php tests/testing/questions/run.php --targets ~/.qa-targets.php --token-budget 0 --target target-a --tag memory
 ```
 
-`--max-tokens N` is required: the run stops starting new questions once the agent's and the judge's tokens reach N (`0` means no limit, chosen on purpose). Other flags: `--only ID`, `--max-turns N` (passed to Hermes), `--timeout S` per question (default 900), `--out DIR`, `--keep` (keep the throwaway install), `--install DIR` (reuse a kept install; a runtime build takes minutes), `--regrade DIR` (grade an earlier run's transcripts again with the current question files, no tokens).
+`--token-budget N` is required: the run stops starting new questions once the agent's and the judge's tokens reach N (`0` means no limit, chosen on purpose). It is a budget for the whole run, not a per-request output cap; the older spelling `--max-tokens` is still accepted. Other flags: `--only ID`, `--max-turns N` (passed to Hermes), `--timeout S` per question (default 900), `--out DIR`, `--keep` (keep the throwaway install), `--install DIR` (reuse a kept install; a runtime build takes minutes), `--regrade DIR` (grade an earlier run's transcripts again with the current question files, no tokens).
 
 One install serves every target. Before each question the throwaway install goes back to how it was after the install and the documentation download: new lessons, sessions and files are deleted and the session database is restored.
 
