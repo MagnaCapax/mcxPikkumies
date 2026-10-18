@@ -4,14 +4,15 @@
  * fetches and caches, this turns the API's answers into one record and one line of text.
  *
  * The API meters credits, not tokens. The pot is what the newest grant left to spend: the balance plus every credit
- * charged since that grant's UTC day. Tokens are an estimate from the model's rates, so they are always shown with ≈.
+ * charged since the newest positive grant's UTC day (a negative grant is a refund). Tokens are a floor: what the
+ * balance buys at the model's highest rate, so no mix of input and output buys fewer. Remaining figures round down.
  */
 class CreditsFormat
 {
     const CELLS = 10;
 
     /**
-     * The record from GET /usage (days=N, grants=1) and the model rates [['id', 'input', 'output'], ...] (first =
+     * The record from GET /usage (days=N, grants=10) and the model rates [['id', 'input', 'output'], ...] (first =
      * the first model the endpoint lists). $model: the configured model, '' for the first one. $today: 'Y-m-d' UTC.
      */
     public static function record(array $usage, array $rates, $model, $today)
@@ -28,7 +29,7 @@ class CreditsFormat
                 break;
             }
         }
-        list($low, $high) = $rate === null ? [null, null] : self::tokens($balance, $rate['output'], $rate['input']);
+        $tokensMin = $rate === null ? null : self::tokens($balance, max($rate['output'], $rate['input']));
         $todayCredits = 0;
         foreach ($daily as $d) {
             if (isset($d['day'], $d['credits']) && $d['day'] === $today && is_int($d['credits'])) {
@@ -39,22 +40,27 @@ class CreditsFormat
             'balance' => $balance,
             'pot' => $pot,
             'pct_left' => self::pct($balance, $pot),
-            'tokens_low' => $low,
-            'tokens_high' => $high,
+            'tokens_min' => $tokensMin,
             'model' => $rate === null ? ($model === '' ? null : $model) : $rate['id'],
             'today_credits' => $todayCredits,
-            // tokens: always an estimate; pot: the newest grant is older than the usage window, so some spending is missing.
-            'approx' => ['tokens' => true, 'pot' => $potApprox],
+            // pot: the grant is older than the usage window, so some spending is missing and the percent may read high.
+            'approx' => ['pot' => $potApprox],
         ];
     }
 
-    /** [pot, approx]: balance + credits charged on and after the newest grant's UTC day; [null, false] with no grant. */
+    /** [pot, approx]: balance + credits charged on and after the newest positive grant's UTC day; [null, false] with none. */
     public static function pot($balance, array $daily, array $grants, $since = null)
     {
-        if (!$grants || !isset($grants[0]['created_at']) || !is_int($grants[0]['created_at'])) {
+        $at = null;
+        foreach ($grants as $g) { // newest first; a refund (negative credits) is not a pot
+            if (isset($g['credits'], $g['created_at']) && is_int($g['credits']) && is_int($g['created_at']) && $g['credits'] > 0) {
+                $at = $g['created_at'];
+                break;
+            }
+        }
+        if ($at === null) {
             return [null, false];
         }
-        $at = $grants[0]['created_at'];
         $day = gmdate('Y-m-d', $at);
         $spent = 0;
         foreach ($daily as $d) {
@@ -66,42 +72,34 @@ class CreditsFormat
         return [$balance + $spent, $sinceDay !== null && strcmp($day, $sinceDay) < 0];
     }
 
-    /** Percent left, one decimal; null when there is no pot to measure against. */
+    /** Percent left, one decimal rounded down; 0 at a zero or negative balance; null when there is no pot. */
     public static function pct($balance, $pot)
     {
-        return $pot === null || $pot <= 0 ? null : round($balance * 100 / $pot, 1);
+        if ($balance <= 0) {
+            return 0.0; // nothing left; below zero only after a refund
+        }
+        return $pot === null || $pot <= 0 ? null : floor($balance * 1000 / $pot) / 10;
     }
 
-    /** Filled cells of the 10-cell bar: percent / 10 rounded half up, clamped to 0..10. */
+    /** Filled cells of the 10-cell bar: percent / 10 rounded down, so a full bar means 100% left; clamped to 0..10. */
     public static function cells($pct)
     {
-        return (int) max(0, min(self::CELLS, floor($pct / 10 + 0.5 + 1e-9)));
+        return (int) max(0, min(self::CELLS, floor($pct / 10)));
     }
 
-    /** [low, high] tokens the balance buys: at the output rate and at the input rate (credits per million tokens). */
-    public static function tokens($balance, $outputRate, $inputRate)
+    /** Tokens the balance buys at $rate credits per million tokens, rounded down; null without a usable rate. */
+    public static function tokens($balance, $rate)
     {
-        $at = function ($rate) use ($balance) {
-            return is_int($rate) && $rate > 0 ? (int) floor(max(0, $balance) * 1000000 / $rate) : null;
-        };
-        return [$at($outputRate), $at($inputRate)];
+        return is_int($rate) && $rate > 0 ? (int) floor(max(0, $balance) * 1000000 / $rate) : null;
     }
 
-    /** 950 -> "950", 35000 -> "35k", 1234567 -> "1.2M": one decimal, a trailing ".0" dropped. */
+    /** 950 -> "950", 35000 -> "35k", 4960000 -> "4.9M": one decimal rounded down (never more than is left), a trailing ".0" dropped. */
     public static function short($n)
     {
-        $sign = $n < 0 ? '-' : '';
         $a = abs($n);
-        $unit = '';
-        if (round($a / 1000, 1) >= 1000) {
-            $a = $a / 1000000;
-            $unit = 'M';
-        } elseif ($a >= 1000) {
-            $a = $a / 1000;
-            $unit = 'k';
-        }
-        $s = $unit === '' ? (string) (int) round($a) : number_format(floor($a * 10 + 0.5) / 10, 1, '.', '');
-        return $sign . (substr($s, -2) === '.0' ? substr($s, 0, -2) : $s) . $unit;
+        list($div, $unit) = $a >= 1000000 ? [1000000, 'M'] : ($a >= 1000 ? [1000, 'k'] : [1, '']);
+        $s = $unit === '' ? (string) (int) $n : number_format(floor($n * 10 / $div) / 10, 1, '.', '');
+        return (substr($s, -2) === '.0' ? substr($s, 0, -2) : $s) . $unit;
     }
 
     /** True when the first set of LC_ALL, LC_CTYPE, LANG names UTF-8. $env: a test seam (name => value). */
@@ -128,10 +126,11 @@ class CreditsFormat
                 $colour = $r['pct_left'] > 25 ? 'green' : ($r['pct_left'] >= 10 ? 'yellow' : 'red');
                 $bar = "#[fg=$colour,bg=black]$bar#[default]"; // black behind the bar: tmux's default status bar is green
             }
-            $parts[0] .= ' ' . $bar . ' ' . (int) max(0, min(100, floor($r['pct_left'] + 0.5))) . '% left';
+            $approx = !empty($r['approx']['pot']) ? '~' : '';
+            $parts[0] .= ' ' . $bar . ' ' . $approx . (int) max(0, min(100, floor($r['pct_left']))) . '% left';
         }
-        if ($r['tokens_low'] !== null && $r['tokens_high'] !== null) {
-            $parts[] = ($u ? '≈' : '~') . self::short($r['tokens_low']) . ($u ? '–' : '-') . self::short($r['tokens_high']) . ' tokens';
+        if ($r['tokens_min'] !== null) {
+            $parts[] = ($u ? '≥' : '>=') . self::short($r['tokens_min']) . ' tokens';
         }
         $parts[] = 'today ' . self::short($r['today_credits']);
         return implode($u ? ' · ' : ' | ', $parts);

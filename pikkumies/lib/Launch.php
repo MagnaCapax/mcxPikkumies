@@ -94,7 +94,8 @@ class Launch
             $plan[] = ['tmux', 'new-window', '-d', '-t', $s . ':', '-n', $w, $cmd];
         }
         if ($statusCmd !== '') {
-            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', '#(' . $statusCmd . ') %H:%M'];
+            // tmux expands formats (#) and strftime (%) inside #() too: doubled, a path holding them still runs.
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', '#(' . strtr($statusCmd, ['%' => '%%', '#' => '##']) . ') %H:%M'];
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right-length', '90'];
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-interval', '60'];
         }

@@ -23,7 +23,7 @@ $creditsKeyHint = 'a key comes from ~/.virsilipasKey (the Pulsed Media AI key; a
 $usage = <<<'U'
 usage: php credits.php balance [--human] | line [--tmux] [--ascii] [--jsonl]
   balance  credits left on this account's AI key, what is reserved and running, the key's limits, the last minute's use
-  line     one line: credits left, a bar of what is left of the newest grant, an estimate of the tokens it buys, today's use;
+  line     one line: credits left, a bar of what is left of the newest grant, the least number of tokens it buys, today's use;
            --jsonl prints the record instead, --tmux the tmux status form. Prints nothing when credits cannot be read
 U;
 

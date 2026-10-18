@@ -3,11 +3,12 @@
  * CreditsLine: the credits line's record, fetched and cached (ADR-0040). Used by `credits line` (the tmux status
  * line runs it every minute) and by `pikkumies` itself for the start banner, as a library call.
  *
- * Two read-only requests, GET {endpoint}/usage and GET {endpoint}/models, 2 seconds each at most. Under
- * local/state/credits/ (0700, files 0600): the record for 60 s, so several windows cost one request a minute; the
- * model rates for a day; and "this endpoint has no usage route" (HTTP 404) for a day, so another provider is asked
- * once a day, not every minute. Any failure is null: the caller prints nothing. The key goes only into the request's
- * Authorization header; it is never printed and never written here.
+ * Two read-only requests, GET {endpoint}/usage and GET {endpoint}/models, each with curl's 2-second timeout (the
+ * name lookup in Http comes before it). Under local/state/credits/ (0700, files 0600): the record for 60 s, so
+ * several windows cost one request a minute; the model rates for a day; a 404 on /usage (no usage route: another
+ * provider) for a day; any other failed answer, of either route, for 10 minutes. Each cache is for one endpoint and
+ * one key, told apart by a short sha256 of the key. Any failure is null: the caller prints nothing. The key goes only
+ * into the request's Authorization header; it is never printed and never written here.
  */
 require_once __DIR__ . '/CreditsFormat.php';
 
@@ -16,6 +17,7 @@ class CreditsLine
     const LINE_TTL = 60;
     const RATES_TTL = 86400;
     const NO_ROUTE_TTL = 86400;
+    const FAIL_TTL = 600;
     const TIMEOUT = 2;
     /** The longest usage window the API gives (days); the newest grant's day is found inside it. */
     const DAYS = 400;
@@ -44,53 +46,60 @@ class CreditsLine
             return null;
         }
         $line = self::read("$dir/line.json");
-        if (self::fresh($line, $prov['endpoint'], self::LINE_TTL, $now) && isset($line['model'], $line['record']) && $line['model'] === $prov['model']) {
+        if (self::fresh($line, $prov, self::LINE_TTL, $now) && isset($line['model'], $line['record']) && $line['model'] === $prov['model']) {
             return $line['record'];
         }
-        if (self::fresh(self::read("$dir/no-usage-route.json"), $prov['endpoint'], self::NO_ROUTE_TTL, $now)) {
+        $failed = self::read("$dir/usage-failed.json");
+        if (self::fresh($failed, $prov, isset($failed['code']) && $failed['code'] === 404 ? self::NO_ROUTE_TTL : self::FAIL_TTL, $now)) {
             return null;
         }
-        $r = Provider::routeAnswer($prov, '/usage?days=' . self::DAYS . '&grants=1', self::TIMEOUT, 1048576);
-        if ($r !== null && $r['code'] === 404) {
-            self::write($dir, 'no-usage-route.json', ['at' => $now, 'endpoint' => $prov['endpoint']]);
+        // Up to 10 grants: the newest can be a refund (negative); the pot is the newest positive one.
+        $r = Provider::routeAnswer($prov, '/usage?days=' . self::DAYS . '&grants=10', self::TIMEOUT, 1048576);
+        if ($r === null) {
+            return null;
         }
-        $usage = $r !== null && $r['code'] === 200 ? json_decode($r['body'], true) : null;
+        $usage = $r['code'] === 200 ? json_decode($r['body'], true) : null;
         if (!is_array($usage) || !isset($usage['balance']) || !is_int($usage['balance'])) {
+            self::write($dir, 'usage-failed.json', self::stamp($prov, $now) + ['code' => $r['code']]); // 0: no answer
             return null;
         }
         $record = CreditsFormat::record($usage, self::rates($prov, $dir, $now), $prov['model'], gmdate('Y-m-d', $now));
-        self::write($dir, 'line.json', ['at' => $now, 'endpoint' => $prov['endpoint'], 'model' => $prov['model'], 'record' => $record]);
+        self::write($dir, 'line.json', self::stamp($prov, $now) + ['model' => $prov['model'], 'record' => $record]);
         return $record;
     }
 
-    /** [['id', 'input', 'output'], ...] in the endpoint's order, cached a day; [] when the rates cannot be had (no token estimate then). */
+    /** [['id', 'input', 'output'], ...] in the endpoint's order, cached a day; [] when the rates cannot be had (no token figure then), cached 10 minutes. */
     public static function rates(array $prov, $dir, $now)
     {
         $cache = self::read("$dir/rates.json");
-        if (self::fresh($cache, $prov['endpoint'], self::RATES_TTL, $now) && isset($cache['rates']) && is_array($cache['rates'])) {
+        if (isset($cache['rates']) && is_array($cache['rates']) && self::fresh($cache, $prov, $cache['rates'] ? self::RATES_TTL : self::FAIL_TTL, $now)) {
             return $cache['rates'];
         }
         $r = Provider::routeAnswer($prov, '/models', self::TIMEOUT, 1048576);
         $data = $r !== null && $r['code'] === 200 ? json_decode($r['body'], true) : null;
-        if (!isset($data['data']) || !is_array($data['data'])) {
-            return [];
-        }
         $rates = [];
-        foreach ($data['data'] as $m) {
+        foreach (isset($data['data']) && is_array($data['data']) ? $data['data'] : [] as $m) {
             $c = isset($m['credits_per_million_tokens']) ? $m['credits_per_million_tokens'] : null;
             if (isset($m['id'], $c['input'], $c['output']) && is_string($m['id']) && is_int($c['input']) && is_int($c['output'])) {
                 $rates[] = ['id' => $m['id'], 'input' => $c['input'], 'output' => $c['output']];
             }
         }
-        if ($rates) {
-            self::write($dir, 'rates.json', ['at' => $now, 'endpoint' => $prov['endpoint'], 'rates' => $rates]);
-        }
+        self::write($dir, 'rates.json', self::stamp($prov, $now) + ['rates' => $rates]);
         return $rates;
     }
 
-    private static function fresh($cache, $endpoint, $ttl, $now)
+    /** What every cache file starts with: when, which endpoint, and which key as the first 12 hex of its sha256 (never the key). */
+    private static function stamp(array $prov, $now)
     {
-        return is_array($cache) && isset($cache['at'], $cache['endpoint']) && is_int($cache['at']) && $cache['endpoint'] === $endpoint
+        return ['at' => $now, 'endpoint' => $prov['endpoint'], 'key_sha256' => substr(hash('sha256', $prov['key']), 0, 12)];
+    }
+
+    /** Written for this endpoint and key, not in the future (a clock set back), and younger than $ttl. */
+    private static function fresh($cache, array $prov, $ttl, $now)
+    {
+        $want = self::stamp($prov, $now);
+        return is_array($cache) && isset($cache['at'], $cache['endpoint'], $cache['key_sha256']) && is_int($cache['at'])
+            && $cache['endpoint'] === $want['endpoint'] && $cache['key_sha256'] === $want['key_sha256']
             && $cache['at'] <= $now && $cache['at'] > $now - $ttl;
     }
 
