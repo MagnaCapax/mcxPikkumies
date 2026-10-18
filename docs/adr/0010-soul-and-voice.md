@@ -37,3 +37,7 @@ The soul named the agent and its working loop but never stated its job, who may 
 ## Amendment 2026-10-17
 
 The 8000-byte budget above is withdrawn: it was based on reading Hermes' 20 000-character floor as the limit. SOUL.md is now checked only against the cut Hermes really applies (ADR-0029 amendment). The doctrine's accuracy section was restored in full: a source for every fact about the machine, no typical values in place of read ones, proof for causes, checks that could have found what is claimed absent, more than one check for big claims, and saying "I don't know".
+
+## Amendment 2026-10-18: reports are made to be scanned
+
+Request of 2026-10-18: "the doctrine specifies output formats easy to read and pretty a bit like our /vreport pretty tables, using emojis colors etc." `doctrine/voice.md` gains a short "Reports" section: for a status, a check of several things or a comparison, the first line gives the result; same-shaped items go in a table of at most 5 short columns within 80 characters; status marks (✅ ⚠️ ❌ ⏳) start a row; a share is a 10-cell bar with its number. One-line questions still get one-line answers. Colour comes from the marks, never from escape codes, because Hermes shows the final answer with its markdown stripped (`display.final_response_markdown: strip`, its default, which Pikkumies does not change) and realigns pipe tables to the terminal width, counting wide characters (`agent/markdown_tables.py`, Hermes 2026.9.24); escape codes in model text would not be a reliable way to colour. About 600 bytes more on every turn.
