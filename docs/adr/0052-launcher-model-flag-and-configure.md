@@ -40,3 +40,6 @@ What was found:
 ## References
 - ADR-0022 (launcher routing), ADR-0032 (settings and the configure skill), ADR-0038 (overlay), ADR-0040 (credits line), ADR-0047 (halt guard), ADR-0050 (model list, credits per model)
 - Hermes Agent v2026.9.24: `hermes_cli/_parser.py` (`_build_chat_parser`: `-m`, `--reasoning`, `-s`; `-q` TTY behaviour), `hermes_cli/cli_init_mixin.py` (`self.model = model or _config_model`)
+
+## Amendment 2026-10-18
+ADR-0020 (amendment 2026-10-18): `pikkumies run chat …` stays the full passthrough for the user; started from inside an agent (`PIKKUMIES_DEPTH` 1 or more) it refuses the flags listed under "Never passed by the launcher", and `-z`, a top-level `--oneshot`, `--profile`/`-p`, `profile use` and `config set approvals.…`.

@@ -314,6 +314,11 @@ switch ($cmd) {
         $passArgs = Launch::CONFIGURE_ARGS;
         // falls through: the same checks and first-start questions as any session
     case 'run':
+        // Started from inside an agent: no flag that turns approvals, hooks or rules off; the user's own shell is untouched (ADR-0020).
+        if (($nested = NestedAgent::refusal($passArgs)) !== '') {
+            out($nested);
+            exit(2);
+        }
         if (hermesBin() === '') {
             // A preinstalled account (PMSS, ADR-0033 addendum) has no runtime until the daily update or this first run builds it.
             out('The agent runtime is not ready yet: ' . HermesInstall::ensure(false, !empty(profile()['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
@@ -387,6 +392,7 @@ switch ($cmd) {
         }
         putenv('HERMES_HOME=' . HermesConfig::home());
         putenv('HERMES_RUNTIME_DIR'); // pm's tool store follows HERMES_HOME, as at install (ADR-0033)
+        putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // what the agent starts sees it was started by one (ADR-0020)
         if ($isUpdate) {
             passthru(implode(' ', array_map('escapeshellarg', $updateArgv)), $code);
             // The same checks every start makes, right away, so a broken update is reported here.
@@ -453,6 +459,7 @@ switch ($cmd) {
         }
         putenv('HERMES_HOME=' . HermesConfig::home());
         putenv('HERMES_RUNTIME_DIR');
+        putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // scheduled agents count as agents, as in run (ADR-0020)
         $problems = HermesInstall::checkBeforeStart(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : []);
         if ($problems) {
             CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', 3, 'not run: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems));

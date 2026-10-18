@@ -45,3 +45,6 @@ For PATH:
 ## References
 - ADR-0001 (layout, install and update: the `~/pikkumies` symlink), ADR-0003 (`HERMES_HOME`), ADR-0009 (Hermes is pinned; `pikkumies run update` is refused), ADR-0013 (the crontab line this PATH block's merge logic mirrors), ADR-0015 (tool units / `Generate::run`'s lock)
 - Hermes Agent `v2026.9.24` source (the pinned release, verified by its sha256 in `local/config.php`'s default): `hermes_cli/_parser.py` (`-q`/`--query` TTY behaviour), `hermes_state_dbfile.py` and `hermes_cli/active_sessions.py` (cross-process session safety)
+
+## Amendment 2026-10-18
+ADR-0020 (amendment 2026-10-18): started from inside an agent (`PIKKUMIES_DEPTH` 1 or more), `pikkumies run` refuses the Hermes flags and commands that turn approvals, hooks or rules off or pick another config; for the user it stays the full passthrough.

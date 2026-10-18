@@ -8,6 +8,17 @@
  * This is a safety prompt for the agent's own mistakes, NOT a security boundary: the user
  * owns this file and Hermes' config. Real limits come from the OS (permissions, no sudo).
  */
+require_once dirname(__DIR__, 3) . '/lib/NestedAgent.php';
+
+/** Print the answer. An agent started by another agent blocks what it would ask: whoever answers there is an agent (ADR-0020). */
+function guardSay(array $answer)
+{
+    if ($answer['action'] === 'approve' && NestedAgent::unattended()) {
+        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so the one answering this question would be an agent, not the user. Not run. Tell the user the command. Asked: ' . $answer['message']];
+    }
+    echo json_encode($answer) . "\n";
+    exit(0);
+}
 $stdin = (string) stream_get_contents(STDIN);
 $payload = json_decode($stdin, true, 100000);
 if (!is_array($payload) && trim($stdin) !== '') {
@@ -89,8 +100,7 @@ if ($scheduleTool) {
         exit(0);
     }
     $id = substr(sha1($command), 0, 16);
-    echo json_encode(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => "Pikkumies: schedules a script that then runs by itself whenever it is due, with nobody asked. Job [$id]: " . $command]) . "\n";
-    exit(0);
+    guardSay(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => "Pikkumies: schedules a script that then runs by itself whenever it is due, with nobody asked. Job [$id]: " . $command]);
 }
 
 $patterns = $secretPatterns + [
@@ -107,7 +117,7 @@ $patterns = $secretPatterns + [
     '/\brclone\b.*\bconfig\s+(show|dump)\b/s' => 'rclone config show/dump prints cloud credentials, and what the agent reads goes to the model',
     // Registry logins (ADR-0019: passwords never in chat or on the command line).
     "/\\b(docker|podman|nerdctl)\\b.*\\blogin\\b.*$v(-p|--password(?!-stdin))/s" => 'a registry password on the command line, where other processes can read it; the user types docker login in a terminal',
-];
+] + NestedAgent::guardPatterns(); // another agent with approvals, hooks or rules off (ADR-0020 amendment 2026-10-18)
 foreach ($patterns as $re => $why) {
     $hit = guardMatch($re, $texts);
     if ($hit === false) {
@@ -118,13 +128,17 @@ foreach ($patterns as $re => $why) {
         exit(0);
     }
 }
+// A Hermes command line read word by word: -z anywhere, --oneshot before the subcommand, -p, profile use (ADR-0020).
+if (NestedAgent::guardCommand($texts)) {
+    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: ' . NestedAgent::WHY_START . '. Not run. Show the user the exact command and ask them to run it themselves if they want it.']) . "\n";
+    exit(0);
+}
 
 // Email (ADR-0053): logins blocked, smtp commands without shell expansion, send-draft and test asked with what they send.
 require __DIR__ . '/GuardMail.php';
 $mail = guardMail($command, $texts);
 if ($mail !== null) {
-    echo json_encode($mail) . "\n";
-    exit(0);
+    guardSay($mail);
 }
 
 // Other accounts' resource files and connections are not the agent's business (AGENTS.md, privacy).
@@ -272,8 +286,7 @@ foreach ($approve as $re => $rule) {
         }
         $id = substr(sha1($command), 0, 16);
         $key = ($kind === 'load' ? 'pikkumies-load:' : 'pikkumies-delete:') . $id;
-        echo json_encode(['action' => 'approve', 'rule_key' => $key, 'message' => "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command]) . "\n";
-        exit(0);
+        guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command]);
     }
 }
 exit(0);
