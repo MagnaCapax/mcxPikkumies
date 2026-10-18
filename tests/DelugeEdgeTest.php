@@ -56,11 +56,13 @@ return [
     },
     'DelugeLocate::absent distinguishes "found a config but no deluged binary on PATH" from "Deluge is not installed at all"' => function () {
         $home = testTempDir();
+        // [] overrides installed()'s fixed /usr/bin/deluged, /usr/local/bin/deluged check: on a real PMSS host those
+        // exist regardless of PATH, which would mask this case (DelugeLocate.php:10,79).
         $withPath = testWithEnv(['PATH' => $home . '/empty-bin'], function () use ($home) {
-            return DelugeLocate::absent($home, 'pmss', 'no deluge-web port found', 'web.conf')->getMessage();
+            return DelugeLocate::absent($home, 'pmss', 'no deluge-web port found', 'web.conf', [])->getMessage();
         });
         $withoutFound = testWithEnv(['PATH' => $home . '/empty-bin'], function () use ($home) {
-            return DelugeLocate::absent($home, 'pmss', 'no deluge-web port found')->getMessage();
+            return DelugeLocate::absent($home, 'pmss', 'no deluge-web port found', '', [])->getMessage();
         });
         check(strpos($withPath, 'found web.conf but no deluged binary') !== false, 'a config-found-but-no-binary case was not distinguished: ' . $withPath);
         check($withoutFound === 'Deluge is not installed on this machine', 'a nothing-found-at-all case gained the wrong message: ' . $withoutFound);

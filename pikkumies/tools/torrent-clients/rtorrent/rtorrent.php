@@ -34,5 +34,6 @@ Torrents::run($argv, function () {
     if ($home === '' || !is_dir($home)) {
         throw new CliError('cannot find your home directory ($HOME is not set or not a directory)', 'run the tool as the seedbox user, from a login shell');
     }
-    return new RtorrentClient(Host::family(), $home, $uid);
+    // PIKKUMIES_PMSS_DIR exists for the tests (a fake PMSS marker), the same seam deluge.php uses; unset in production.
+    return new RtorrentClient(Host::family(getenv('PIKKUMIES_PMSS_DIR') ?: '/etc/seedbox/config'), $home, $uid);
 }, $usage);

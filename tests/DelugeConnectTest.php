@@ -4,11 +4,17 @@ require_once __DIR__ . '/fixtures/deluge/helpers.php';
 
 return [
     'deluge: deluge-web is never pointed at a daemon port nobody of ours listens on (it would send the secret)' => function () {
-        $s = stream_socket_server('tcp://127.0.0.1:0');
-        $free = (int) substr(strrchr(stream_socket_get_name($s, false), ':'), 1);
-        fclose($s); // now nothing listens there; on a shared host another account could
-        $fx = delugeFixture(['hosts' => [['h1', '127.0.0.1', $free, 'localclient']]]);
+        // The fixture starts first and its own deluge-web listener holds its port throughout this test, so the
+        // free-port pick below can never land on the same port the kernel could otherwise re-hand out between
+        // delugeFixture()'s own bind-and-close and this one (both use the same technique).
+        $fx = delugeFixture();
         try {
+            $s = stream_socket_server('tcp://127.0.0.1:0');
+            $free = (int) substr(strrchr(stream_socket_get_name($s, false), ':'), 1);
+            fclose($s); // now nothing listens there; on a shared host another account could
+            delugeEdit($fx, function (&$state) use ($free) {
+                $state['hosts'] = [['h1', '127.0.0.1', $free, 'localclient']];
+            });
             list($code, $l, $out) = delugeRun($fx, ['list']);
             check($code === 1 && strpos($out, "nothing listens on the deluged port $free") !== false, 'connected to an unowned port: ' . $out);
             $calls = json_decode((string) file_get_contents($fx['dir'] . '/state.json'), true)['calls'];

@@ -49,7 +49,11 @@ return [
                 $r = Http::request('GET', $url);
                 check($r['code'] === 200, "own listener not reached through $url: " . $r['error']);
             }
-            foreach (['file:///etc/passwd', "http:/127.0.0.1:$port/", "http://127.0.0.1:0$port/", 'gopher://127.0.0.1:70/', 'http://0x7f000001.invalid./'] as $url) {
+            // A 6-digit, zero-padded port is unparseable for every real port value 1-65535 (parse_url() returns
+            // false for the whole URL, checked directly): "0$port" stayed a valid, lower port number whenever
+            // $port itself was 4 digits (PMSS's ephemeral range is almost entirely reserved, so a free port here
+            // is usually 4 digits), which this test's own listener then answered with a 404 instead of a refusal.
+            foreach (['file:///etc/passwd', "http:/127.0.0.1:$port/", sprintf('http://127.0.0.1:%06d/', $port), 'gopher://127.0.0.1:70/', 'http://0x7f000001.invalid./'] as $url) {
                 $r = Http::request('GET', $url);
                 check($r['code'] === 0 && $r['error'] !== '', "unchecked address was used: $url");
             }

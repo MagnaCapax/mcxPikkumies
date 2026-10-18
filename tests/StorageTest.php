@@ -19,7 +19,12 @@ return [
                 . "       /dev/md2    100G   1024G   1280G               5       0       0\n");
             list($code, $l) = stStorage($fx, ['stats']);
             $r = $l[0];
-            $q = Quota::fields($fx['home']);
+            Quota::$live = function () { return null; }; // this process's own PATH/account quota must never leak in; QuotaTest.php:25 does the same
+            try {
+                $q = Quota::fields($fx['home']);
+            } finally {
+                Quota::$live = null;
+            }
             check($code === 0 && $r['quota_source'] === '~/.quota' && $r['quota_free_bytes'] === $q['quota_free_bytes']
                 && $r['quota_free_bytes'] === 924 * $g, 'figures not from Quota: ' . json_encode($r));
             check($r['quota_state'] === 'ok' && $r['quota_hard_bytes'] === 1280 * $g && $r['quota_used_percent'] === 9.8

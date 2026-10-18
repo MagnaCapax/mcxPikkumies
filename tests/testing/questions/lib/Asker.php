@@ -61,7 +61,28 @@ class Asker
         $r = self::parseStream($box->root . '/raw.jsonl');
         $r['seconds'] = (int) round(microtime(true) - $start);
         $r['error'] = $timedOut ? "timed out after $timeout s" : ($r['error'] !== '' ? $r['error'] : ($r['exit'] ? 'Hermes exit code ' . $r['exit'] : ''));
+        if (strpos($r['error'], 'no stream-json from Hermes') === 0) {
+            // Hermes' own stderr says WHY nothing was on stdout (e.g. "unrecognized arguments"); without it a QA
+            // report only ever shows "other" (QaVerdict.php), never the cause.
+            $r['error'] .= self::stderrTail($box->root . '/raw.err');
+        }
         return $r;
+    }
+
+    /** The last ~400 bytes of $path (Hermes' stderr), with anything key-shaped masked; '' when empty or missing. */
+    public static function stderrTail($path, $take = 400)
+    {
+        if (!is_file($path)) {
+            return '';
+        }
+        $size = filesize($path);
+        $raw = trim((string) ($size > $take ? @file_get_contents($path, false, null, $size - $take) : @file_get_contents($path)));
+        if ($raw === '') {
+            return '';
+        }
+        $masked = preg_replace('/\bBearer\s+\S+/i', 'Bearer [masked]', $raw);
+        $masked = preg_replace('/\b(?:vsk|sk)-[A-Za-z0-9._-]+/i', '[masked-key]', $masked);
+        return '; stderr: ' . $masked;
     }
 
     /** Kill every process of this account whose environment has HOME=$home (a sandbox home); the count killed. */

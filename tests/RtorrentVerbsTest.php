@@ -44,12 +44,31 @@ return [
             list($code, $out) = rtorrentRun($h, ['limit', '--down', '2MiB/s', '--up', '512']);
             check($code === 1 && strpos($out, '1024') !== false && count(rtorrentCalls($h, 'throttle.global_down.max_rate.set')) === 1,
                 'under 1 KiB/s: ' . $out);
-            list($code, $out, $l) = rtorrentRun($h, ['limit', '--down', '1500']);
+            // run-generic.php fixes the host family at 'generic' (rtorrentHome()): rtorrent.php itself always calls
+            // Host::family() against the real /etc/seedbox/config, so on a real PMSS host this would pick up the
+            // PMSS note below regardless of args.
+            list($code, $out, $l) = rtorrentRun($h, ['limit', '--down', '1500'], "$h/run-generic.php");
             check($code === 0 && $l[0]['down_limit'] === 1024 && $l[1]['verified'] === true, 'cut to whole KiB/s: ' . $out);
             check(strpos($l[0]['note'], 'PMSS') === false, 'a PMSS note on a generic host: ' . $out);
             list($code, $out, $l) = rtorrentRun($h, ['limit', '--up', '1MiB/s'], "$h/run-pmss.php");
             check($code === 0 && strpos($l[0]['note'], 'watchdog') !== false && strpos($l[0]['note'], 'cap') !== false,
                 'PMSS cap not mentioned: ' . $out);
+            // rtorrent.php itself (no $script override) honours PIKKUMIES_PMSS_DIR like deluge.php: this is the same
+            // mechanism a real PMSS host's /etc/seedbox/config would trigger, proved here without touching the real path.
+            $fakePmss = "$h/fake-pmss-config";
+            mkdir($fakePmss, 0700, true);
+            try {
+                putenv("PIKKUMIES_PMSS_DIR=$fakePmss");
+                list($code, $out, $l) = rtorrentRun($h, ['limit', '--up', '2MiB/s']);
+                check($code === 0 && strpos($l[0]['note'], 'PMSS') !== false,
+                    'PIKKUMIES_PMSS_DIR pointing at an existing marker did not add the PMSS note: ' . $out);
+                putenv("PIKKUMIES_PMSS_DIR=$h/no-such-pmss-dir");
+                list($code, $out, $l) = rtorrentRun($h, ['limit', '--up', '2MiB/s']);
+                check($code === 0 && strpos($l[0]['note'], 'PMSS') === false,
+                    'PIKKUMIES_PMSS_DIR pointing at a missing marker still added the PMSS note: ' . $out);
+            } finally {
+                putenv('PIKKUMIES_PMSS_DIR');
+            }
             $doc = dirname(__DIR__) . '/pikkumies/tools/torrent-clients/rtorrent/';
             check(strpos((string) file_get_contents($doc . 'USAGE.md'), 'PMSS watchdog') !== false
                 && strpos((string) file_get_contents($doc . 'README.md'), 'root.h:88-89') !== false

@@ -56,13 +56,17 @@ class DelugeLocate
         return ['url' => "http://127.0.0.1:$port/json", 'port' => $port, 'secret' => $secret, 'daemon_port' => $daemon, 'how' => $how];
     }
 
-    /** The error for a client that cannot be reached: not installed, not enabled, or $why. $found: the config that named the port. */
-    public static function absent($home, $family, $why, $found = '')
+    /**
+     * The error for a client that cannot be reached: not installed, not enabled, or $why. $found: the config that
+     * named the port. $binaries (test seam, default unchanged): the fixed PMSS binary paths installed() checks
+     * instead of self::PMSS_BINARIES; production callers never pass it.
+     */
+    public static function absent($home, $family, $why, $found = '', ?array $binaries = null)
     {
-        if (!self::installed($family) && $found !== '') { // a config but no binary: stopped, or run elsewhere (a container)
+        if (!self::installed($family, $binaries) && $found !== '') { // a config but no binary: stopped, or run elsewhere (a container)
             return new CliError("$why; found $found but no deluged binary is on PATH", 'start Deluge the way your provider documents it');
         }
-        if (!self::installed($family)) {
+        if (!self::installed($family, $binaries)) {
             return new CliError('Deluge is not installed on this machine', 'ask the provider; on PMSS Deluge comes with the server');
         }
         if ($family === 'pmss' && !file_exists("$home/.delugeEnable")) {
@@ -73,10 +77,12 @@ class DelugeLocate
         return new CliError($why, $hint);
     }
 
-    public static function installed($family)
+    /** $binaries (test seam, default unchanged): the fixed PMSS binary paths to check instead of self::PMSS_BINARIES. */
+    public static function installed($family, ?array $binaries = null)
     {
         $dirs = array_filter(explode(':', (string) getenv('PATH')), 'strlen');
-        $paths = array_merge($family === 'pmss' ? self::PMSS_BINARIES : [], array_map(function ($d) {
+        $fixed = $family === 'pmss' ? ($binaries !== null ? $binaries : self::PMSS_BINARIES) : [];
+        $paths = array_merge($fixed, array_map(function ($d) {
             return rtrim($d, '/') . '/deluged';
         }, $dirs));
         foreach ($paths as $p) {
