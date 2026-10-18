@@ -28,7 +28,6 @@ Cli::run($argv, [
         }
         $limit = isset($opt['limit']) ? max(1, (int) $opt['limit']) : 5; // per tier (ADR-0031)
         $offline = !empty($opt['offline']);
-        $start = microtime(true);
         list($hits, $notes, $tiers) = DocSources::search($query, $limit, $offline);
         $mode = 'keywords';
         if (!$hits) {
@@ -60,9 +59,7 @@ Cli::run($argv, [
             $notes[] = 'nothing in tiers 1-2: other providers\' documentation is now downloaded by the background fill (at most '
                 . DocSources::PEER_FILL_REQUESTS . ' pages a source a day) and searched as tier 3 once it is on disk';
         }
-        $ms = (int) round((microtime(true) - $start) * 1000);
-        DocSources::recordSearch($tiers, $perTier, ['words' => substr($query, 0, 500), 'mode' => $mode,
-            'paths' => array_slice(array_column($records, 'path'), 0, 3), 'ms' => $ms]); // metrics only with privacy.perfLogging on (ADR-0041)
+        DocSources::recordSearch($tiers, $perTier, $query); // metrics only with privacy.perfLogging on; the words only when tier 1 found nothing (ADR-0041)
         $status = ['matched' => $mode, 'tiers_searched' => $tiers, 'hits_per_tier' => $perTier, 'notes' => $notes];
         $next = !$hits ? NEXT_STEP : ($perTier[1] + $perTier[2] === 0 ? PEER_NEXT : '');
         if ($perTier[1] === 0) { // no lesson settles it: the search ends with a saved lesson, resolved or not (ADR-0041)

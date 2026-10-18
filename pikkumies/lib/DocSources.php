@@ -23,6 +23,7 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Detect.php';
 require_once __DIR__ . '/TextSearch.php';
 require_once __DIR__ . '/Http.php';
+require_once __DIR__ . '/MetricsLog.php';
 require_once __DIR__ . '/Cli.php'; // CliError from listPages
 
 class DocSources
@@ -652,10 +653,11 @@ class DocSources
 
     /**
      * Written by the memory search when it completes: the time, the tiers it searched and the hits per tier.
-     * $metric (the search words, mode, first paths and ms) is also appended to the memory metrics when
-     * privacy.perfLogging is on (ADR-0041); the memory search is the only caller that passes it.
+     * With $words (the memory search is the only caller that passes them) the search is also appended to
+     * the memory metrics when privacy.perfLogging is on (ADR-0041): time, tiers and hits, and the words
+     * only when tier 1 found no lesson (the searches `stats` reads them for).
      */
-    public static function recordSearch(array $tiers, array $hitsPerTier, array $metric = [])
+    public static function recordSearch(array $tiers, array $hitsPerTier, $words = null)
     {
         $dir = self::searchStateDir();
         @mkdir($dir, 0700, true);
@@ -668,8 +670,9 @@ class DocSources
         } else {
             @unlink($tmp);
         }
-        if ($metric) {
-            self::appendMetric('searches', ['ts' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier] + $metric);
+        if ($words !== null) {
+            $noLesson = isset($hitsPerTier[1]) && (int) $hitsPerTier[1] === 0;
+            self::appendMetric('searches', ['ts' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier] + ($noLesson ? ['words' => substr((string) $words, 0, 500)] : []));
         }
     }
 
@@ -679,25 +682,14 @@ class DocSources
         return self::root() . '/local/state/memory-metrics';
     }
 
-    /** Append one record to <kind>-YYYYMM.jsonl (UTC) when privacy.perfLogging is on; returns whether it was written. */
+    /** Append one record (MetricsLog) when privacy.perfLogging is on, pruning by sessions.retentionDays; true when written. */
     public static function appendMetric($kind, array $rec)
     {
         $config = Config::load();
         if (empty($config['privacy']['perfLogging'])) {
             return false;
         }
-        $dir = self::metricsDir();
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-            return false;
-        }
-        @chmod($dir, 0700);
-        $file = $dir . '/' . $kind . '-' . gmdate('Ym', isset($rec['ts']) ? (int) $rec['ts'] : time()) . '.jsonl';
-        if (!is_file($file)) {
-            @touch($file);
-            @chmod($file, 0600); // before the first line: the search words are the user's
-        }
-        $line = json_encode($rec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n";
-        return @file_put_contents($file, $line, FILE_APPEND | LOCK_EX) === strlen($line);
+        return MetricsLog::append(self::metricsDir(), $kind, $rec, isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0);
     }
 
     /**

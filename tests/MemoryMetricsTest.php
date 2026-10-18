@@ -47,8 +47,9 @@ if (!function_exists('memMetricsTree')) {
 require_once dirname(__DIR__) . '/pikkumies/tools/memory/pikkumies/MemoryStats.php';
 
 return [
-    'memory metrics: with perfLogging on, a search and a save each append one 0600 line (words, mode, tiers, hits, paths, ms; after_miss)' => function () {
+    'memory metrics: with perfLogging on, a search and a save each append one 0600 line (time, tiers, hits; words only without a lesson; a save only its time)' => function () {
         $tree = memMetricsTree(true);
+        $umask = umask(0022); // a permissive umask: only the explicit chmod makes the file 0600
         try {
             $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
             list($code, $out) = runPhp($tool, ['search', 'zebra', 'quantum', '--offline']);
@@ -56,18 +57,19 @@ return [
             $dir = "$tree/pikkumies/local/state/memory-metrics";
             $file = "$dir/searches-" . gmdate('Ym') . '.jsonl';
             $l = memMetricsLines($file);
-            check(count($l) === 1 && $l[0]['words'] === 'zebra quantum' && $l[0]['mode'] === 'any words' && $l[0]['tiers'] === [1, 2, 3]
-                && $l[0]['hits'] === ['1' => 0, '2' => 0, '3' => 0] && $l[0]['paths'] === [] && is_int($l[0]['ms']) && $l[0]['ts'] >= time() - 60, 'search line: ' . json_encode($l));
+            check(count($l) === 1 && array_keys($l[0]) === ['ts', 'tiers', 'hits', 'words'] && $l[0]['words'] === 'zebra quantum' && $l[0]['tiers'] === [1, 2, 3]
+                && $l[0]['hits'] === ['1' => 0, '2' => 0, '3' => 0] && $l[0]['ts'] >= time() - 60, 'search line: ' . json_encode($l));
             check((fileperms($dir) & 0777) === 0700 && (fileperms($file) & 0777) === 0600, 'modes: ' . decoct(fileperms($dir) & 0777) . ' ' . decoct(fileperms($file) & 0777));
             file_put_contents("$tree/body.md", "Zebra quantum is not a setting here.\n");
             list($code, $out) = runPhp($tool, ['save', '--topic', 'misc', '--title', 'zebra quantum is not a thing', '--sources', 'search', '--no-related', 'first', '--body-file', "$tree/body.md"]);
             check($code === 0, 'save failed: ' . $out);
             $s = memMetricsLines("$dir/saves-" . gmdate('Ym') . '.jsonl');
-            check(count($s) === 1 && $s[0]['kind'] === 'lesson' && $s[0]['topic'] === 'misc' && $s[0]['after_miss'] === true && strpos($s[0]['path'], '/lessons/misc/') !== false, 'save line: ' . json_encode($s));
+            check(count($s) === 1 && array_keys($s[0]) === ['ts'] && $s[0]['ts'] >= time() - 60, 'save line: ' . json_encode($s));
             list(, $out) = runPhp($tool, ['search', 'rtorrent', 'disk', '--offline']);
             $l = memMetricsLines($file);
-            check(count($l) === 2 && $l[1]['hits'][1] === 1 && count($l[1]['paths']) === 1, 'second search line: ' . json_encode($l));
+            check(count($l) === 2 && $l[1]['hits'][1] === 1 && !isset($l[1]['words']), 'a search that found a lesson keeps no words: ' . json_encode($l));
         } finally {
+            umask($umask);
             testRmTree($tree);
         }
     },
@@ -115,7 +117,7 @@ return [
             file_put_contents("$tmp/memory/README.md", "# not a lesson\n");
             $now = time();
             $s = MemoryStats::compute(30, $now);
-            check($s['searches'] === 0 && $s['with_hit_pct'] === null && $s['misses'] === 0 && $s['last_misses'] === [], 'empty: ' . json_encode($s));
+            check($s['searches'] === 0 && $s['with_hit_pct'] === null && $s['found_nothing'] === 0 && $s['last_found_nothing'] === [] && $s['found_no_lesson'] === 0, 'empty: ' . json_encode($s));
             check($s['lessons_on_disk'] === 2 && $s['by_kind'] === ['lesson' => 1, 'reference' => 1, 'research' => 0] && $s['by_topic'] === ['disk' => 1], 'disk: ' . json_encode($s));
             $dir = DocSources::metricsDir();
             mkdir($dir, 0700, true);
@@ -126,24 +128,28 @@ return [
             file_put_contents("$dir/searches-" . gmdate('Ym', $now) . '.jsonl', $lines);
             file_put_contents("$dir/searches-200001.jsonl", json_encode(['ts' => 946684800, 'words' => 'ancient', 'hits' => [1 => 1]]) . "\n");
             $s = MemoryStats::compute(30, $now);
-            check($s['searches'] === 12 && $s['with_hit'] === 0 && $s['with_hit_pct'] === 0 && $s['misses'] === 12, 'all misses: ' . json_encode($s));
-            check(count($s['last_misses']) === 10 && $s['last_misses'][0] === 'miss 11' && $s['last_misses'][9] === 'miss 2', 'newest 10 misses first: ' . json_encode($s['last_misses']));
-            // Mixed: 12 misses + 3 with a lesson + 1 with only a tier-2 hit = 16 searches, 4 found something (25%), 3 lessons (19%).
+            check($s['searches'] === 12 && $s['with_hit'] === 0 && $s['with_hit_pct'] === 0 && $s['found_nothing'] === 12 && $s['found_no_lesson'] === 12, 'all misses: ' . json_encode($s));
+            check(count($s['last_found_nothing']) === 10 && $s['last_found_nothing'][0] === 'miss 11' && $s['last_found_nothing'][9] === 'miss 2', 'newest 10 misses first: ' . json_encode($s['last_found_nothing']));
+            // Mixed: 12 found nothing + 3 with a lesson + 1 with only a tier-2 hit = 16 searches, 4 found something (25%), 3 lessons (19%), 13 found no lesson.
             $mixed = '';
             foreach ([[1 => 2, 2 => 0, 3 => 0], [1 => 1, 2 => 4, 3 => 0], [1 => 1, 2 => 0, 3 => 0], [1 => 0, 2 => 3, 3 => 0]] as $i => $h) {
                 $mixed .= json_encode(['ts' => $now - 10 + $i, 'words' => "hit $i", 'hits' => $h]) . "\n";
             }
             file_put_contents("$dir/searches-" . gmdate('Ym', $now) . '.jsonl', $mixed, FILE_APPEND);
-            file_put_contents("$dir/saves-" . gmdate('Ym', $now) . '.jsonl', json_encode(['ts' => $now - 5, 'after_miss' => true]) . "\n" . json_encode(['ts' => $now - 4, 'after_miss' => false]) . "\n");
+            // Two saves in one second, at now-95: the 6 no-lesson searches at now-100..now-95 were followed by a save (each once), the 7 later ones were not.
+            file_put_contents("$dir/saves-" . gmdate('Ym', $now) . '.jsonl', json_encode(['ts' => $now - 95]) . "\n" . json_encode(['ts' => $now - 95]) . "\n");
             $s = MemoryStats::compute(30, $now);
-            check($s['searches'] === 16 && $s['with_hit'] === 4 && $s['with_hit_pct'] === 25 && $s['with_lesson_hit'] === 3 && $s['with_lesson_hit_pct'] === 19 && $s['misses'] === 12, 'mixed: ' . json_encode($s));
-            check($s['saved'] === 2 && $s['saved_after_miss'] === 1, 'saves: ' . json_encode($s));
-            check(strpos(MemoryStats::human($s), '▰▰▰▱▱▱▱▱▱▱ 25%') !== false, 'human bar: ' . MemoryStats::human($s));
-            file_put_contents("$tmp/on.php", "<?php return ['privacy' => ['perfLogging' => true]];\n");
+            check($s['searches'] === 16 && $s['with_hit'] === 4 && $s['with_hit_pct'] === 25 && $s['with_lesson_hit'] === 3 && $s['with_lesson_hit_pct'] === 19 && $s['found_nothing'] === 12 && $s['found_no_lesson'] === 13, 'mixed: ' . json_encode($s));
+            check($s['saved'] === 2 && $s['found_no_lesson_then_saved'] === 6, 'saves: ' . json_encode($s));
+            $human = MemoryStats::human($s);
+            check(strpos($human, '▰▰▰▱▱▱▱▱▱▱ 25%') !== false && preg_match('/^found no lesson +13  ▰▰▰▰▰▰▰▰▱▱ 81%$/mu', $human) === 1
+                && preg_match('/^  then saved in 2 h +6  ▰▰▰▰▰▱▱▱▱▱ 46%$/mu', $human) === 1, 'human: ' . $human);
+            file_put_contents("$tmp/on.php", "<?php return ['privacy' => ['perfLogging' => true], 'sessions' => ['retentionDays' => 7]];\n");
             $line = testWithEnv(['PIKKUMIES_CONFIG' => "$tmp/on.php"], function () {
                 return MemoryStats::doctorLine();
             });
-            check($line === 'memory:   2 lessons · 16 searches in 30 days · 25% found something · 12 misses', 'doctor: ' . $line);
+            check($line === 'memory:   2 lessons · 16 searches in 30 days · 25% found something · 12 found nothing · 13 found no lesson, 6 then saved', 'doctor: ' . $line);
+            check(!is_file("$dir/searches-200001.jsonl") && count(memMetricsLines("$dir/searches-" . gmdate('Ym', $now) . '.jsonl')) === 16, 'doctor with retentionDays 7 must prune only the old month');
         } finally {
             DocSources::$root = null;
             testRmTree($tmp);
@@ -175,6 +181,10 @@ return [
             check(memMetricsRemind($tree) !== '', 'a new missed search got no reminder');
             memMetricsRecord($tree, time() - 7201, [1 => 0, 2 => 0, 3 => 0]);
             check(memMetricsRemind($tree) === '', 'reminded about a search over 2 hours old');
+            $t = time() - 15;
+            memMetricsRecord($tree, $t, [1 => 0, 2 => 0, 3 => 0]);
+            touch("$tree/pikkumies/memory/lessons/disk/20261001-rtorrent-full-disk.md", $t); // appended to in the search's own second
+            check(memMetricsRemind($tree) === '', 'reminded although a memory file changed in the same second as the search');
             memMetricsRecord($tree, time() - 10, [1 => 0, 2 => 0, 3 => 0]);
             file_put_contents("$tree/pikkumies/memory/lessons/disk/20261018-saved.md", "# saved\n");
             check(memMetricsRemind($tree) === '', 'reminded although a lesson was saved after the search');
