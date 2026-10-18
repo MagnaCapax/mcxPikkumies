@@ -1,13 +1,13 @@
 ---
 name: docker
-description: "Docker containers: list, logs, start, diagnose, launch; also stats, stop, restart, remove, images and prune, on the user's own Docker daemon only (rootless on PMSS, own daemon elsewhere)."
+description: "Docker containers: whether Docker works on this account; list, logs, start, diagnose, launch; also stats, stop, restart, remove, images and prune, on the user's own Docker daemon only (rootless on PMSS, own daemon elsewhere)."
 ---
 
 # Docker
 
 Use this for the user's own containers. It works only with a daemon this account owns; root's daemon, another account's and `tcp://` are refused, and that refusal is final. For an app's own settings and its wiki page use seedbox-apps; if Hermes' optional docker-management skill is installed, prefer this one here (it checks the socket owner, who can reach each port and this account's limits).
 
-1. **Look first.** `stats` says whether Docker works here and how (`limits_enforced`, `compose`, the provider facts); `list --all` gives names, ports and `exposure`. Copy names from `list`; never guess one.
+1. **Look first, with this tool.** `stats` says whether Docker works here and how (`limits_enforced`, `compose`, the provider facts), so "can I run Docker here?" starts with it, not with a raw `systemctl --user`, `docker info` or a curl on the socket; `list --all` gives names, ports and `exposure`. Copy names from `list`; never guess one.
 2. **Something is wrong:** `diagnose`. Read `state` and do exactly its `next_step`; when `needs_user_ok` is true, ask the user first and say what `effect` means. On PMSS the platform runs the daemon: never stop, restart or kill it to fix something. Down: wait 5 minutes, then `systemctl --user start docker.service`, then support. Wedged: only on the user's yes, follow the platform's documented recovery that `diagnose` links (it stops every container), then check that no dockerd-rootless process of the account is left. Before a recovery step, search the wiki ("Docker Rootless", "Docker on PMSS"); if the page disagrees, the page wins and you say so. One container: `diagnose <name>`. Exit 137 or 143 means stopped by a signal, often on purpose (also after a server move); not a crash. Never restart exited containers on your own: the user or a server move stopped them.
 3. **Start, stop, restart** by name; each prints the state read back: report that, not what you expected.
 4. **Deleting is the user's decision.** Containers: `list --all`, show the user which, then `remove <names> --expect <count>`. Images: `images --prune-plan`, show the list and `expect`, then `prune --expect <that>`. Pikkumies asks the user to approve. A refusal ("now N", "running") means: show the new list, do not work around it.

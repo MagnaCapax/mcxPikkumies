@@ -1,6 +1,6 @@
 ---
 name: system-status
-description: Machine snapshot (OS, host, root, own running apps, CPU, memory, disk, load) before diagnosing anything.
+description: Machine snapshot (OS, host, root, own running apps, CPU, memory, disk, load) before diagnosing anything; slowness and whether the server is busy go to performance.
 ---
 
 # System status

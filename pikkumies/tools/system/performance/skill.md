@@ -1,11 +1,11 @@
 ---
 name: performance
-description: "Performance diagnostics: why it is slow, stalls, lags or seems capped (CPU, memory, disk I/O, packet loss, route), light by default; a speed test or benchmark only on the user's yes."
+description: "Performance diagnostics: why it is slow (also downloads to the user's PC), stalls, lags or seems capped, or whether the server is overloaded or busy now (CPU, memory, disk I/O, packet loss, route), light by default; a speed test or benchmark only on the user's yes."
 ---
 
 # Performance
 
-Use this when the user says something is slow, stalls, lags, is capped, loses packets, or asks for a speed test or benchmark. It reads only your own account. Start light; a load test comes last and only after the user says yes.
+Use this when the user says something is slow, stalls, lags, is capped, loses packets, asks whether the server is overloaded or busy, or asks for a speed test or benchmark. It reads only your own account. Measure before you explain: a documentation page gives the background, only `check` measures this account now. Start light; a load test comes last and only after the user says yes.
 
 1. **Run `check` first**, with the symptom in the user's words mapped to `--symptom` (slow-download, slow-upload, capped, stalls, torrents, lag; otherwise leave it out). Lead with the `verdict` record: say its class in plain words, the evidence, and its `next_step`. If `negation` or `disproved_by` matter for what the user believes, say them too. `skipped` lists what could not be read here; never fill a gap with a guess.
 2. **The route** needs a target. Ask the user "test the route to the connection you are on?" and on yes run `net --target ssh` (20 cycles, labelled quick). The full wiki procedure is `--count 1000` (about 17 minutes): offer to wait or run it in the background. Read the hop where loss starts and lasts to the end; loss at one middle hop that does not continue is that router limiting its replies, not packet loss. The other direction runs on the user's own computer: give them the printed instructions (WinMTR on Windows, `mtr -rwc 1000 <your server address>` on macOS/Linux) and read what they paste.
