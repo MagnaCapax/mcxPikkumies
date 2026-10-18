@@ -147,4 +147,37 @@ return [
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
         check(strpos($bin, 'promptWrite(Launch::settingsNote($firstConfig));') !== false, 'the first interactive start must show the settings');
     },
+    'launch: `configure` alone routes to configure; `configure my plex` stays a prompt (ADR-0052)' => function () {
+        check(Launch::route(['pikkumies', 'configure']) === ['configure', []], 'bare configure');
+        check(in_array('configure', Launch::SUBCOMMANDS, true), 'configure must be a subcommand');
+        list($cmd, $args) = Launch::route(['pikkumies', 'configure', 'my', 'plex']);
+        check($cmd === 'run' && $args === ['chat', '--query=configure my plex'], 'configure with words must stay a prompt: ' . json_encode([$cmd, $args]));
+    },
+    'launch: configure without a terminal prints the settings review and starts nothing; on one it runs a session with the configure skill' => function () {
+        list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/bin/pikkumies', ['configure']);
+        check($code === 0 && strpos($out, 'sessions.retentionDays') !== false && strpos($out, 'terms.accepted') !== false, 'no TTY: the review must print, exit 0: ' . $code . ' ' . $out);
+        check(strpos($out, 'Not starting') === false && strpos($out, 'runtime is not ready') === false && strpos($out, 'restored in your crontab') === false
+            && preg_match('/\nok, 5 shown\n$/', $out) === 1, 'no TTY: only the review, nothing may start: ' . $out);
+        check(Launch::CONFIGURE_ARGS[0] === 'chat' && array_slice(Launch::CONFIGURE_ARGS, 1, 2) === ['-s', 'pikkumies-configure'] && Launch::isSession(Launch::CONFIGURE_ARGS), 'configure args: ' . json_encode(Launch::CONFIGURE_ARGS));
+        check(strpos((string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/skill.md'), "\nname: pikkumies-configure\n") !== false, 'the preloaded skill name must be the unit\'s');
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(preg_match("/\n    case 'configure':(.*?)\n    case 'run':/s", $bin, $m) === 1, "configure must sit right before case 'run'");
+        check(strpos($m[1], 'if (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT))') !== false && strpos($m[1], ' review --human') !== false, 'configure must print the review without a terminal');
+        $tail = (string) strstr($m[1], '$passArgs = Launch::CONFIGURE_ARGS;');
+        check($tail !== '' && strpos($tail, 'break;') === false && strpos($tail, 'exit(') === false, 'configure on a terminal must fall through into run, with its checks: ' . $tail);
+    },
+    'launch: first start ends with the review warnings and one line on how to configure, never a session of its own' => function () {
+        $hint = Launch::setupHint([['key' => 'agent.name', 'value' => 'K'], ['key' => 'sessions.retentionDays', 'value' => 0, 'warning' => 'kept forever']]);
+        check($hint === "  sessions.retentionDays: kept forever\nRun `pikkumies configure` or ask me to review your setup.\n", 'hint: ' . json_encode($hint));
+        check(Launch::setupHint([]) === "Run `pikkumies configure` or ask me to review your setup.\n", 'no warnings: just the line');
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(strpos($bin, "Config::acceptTerms();\n                    // What the settings review warns about") !== false && strpos($bin, 'promptWrite(Launch::setupHint(ConfigureSettings::review(') !== false, 'the hint must follow the accepted terms');
+    },
+    'launch: the start banner gets the model given with -m, so its token floor is for that model' => function () {
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        $set = strpos($bin, "if ((\$runModel = RunFlags::model(\$passArgs)) !== '') {\n                \$creditsProv['model'] = \$runModel;");
+        $use = strpos($bin, 'CreditsLine::text($creditsProv, ');
+        check($set !== false && $use !== false && $set < $use, 'the banner must use the -m model');
+        check(RunFlags::model(Launch::route(['pikkumies', '-m', 'X', 'hi'])[1]) === 'X', 'the model the banner reads is the routed one');
+    },
 ];

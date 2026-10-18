@@ -1,6 +1,7 @@
 <?php
 /**
- * lib/Launch.php routing edges not covered by LaunchTest.php (ADR-0022, ADR-0032): route()'s tmux
+ * lib/Launch.php routing edges not covered by LaunchTest.php (ADR-0022, ADR-0032, ADR-0052): the leading
+ * -m/--model/--reasoning flags (lib/RunFlags.php), route()'s tmux
  * digit/force-prompt boundaries, the small pure helpers (allFlags/promptArgs/tmuxPlan) called
  * directly, and the Launch::SUBCOMMANDS <-> bin/pikkumies dispatch wiring contract. installFlags,
  * askName, askTerms, settingsNote and isTty belong to another builder's package and are not touched
@@ -58,5 +59,43 @@ return [
         $missingFromLaunch = array_diff($binCases, Launch::SUBCOMMANDS);
         check($missingFromBin === [] && $missingFromLaunch === [], 'wiring drift between Launch::SUBCOMMANDS and bin/pikkumies dispatch: '
             . 'in SUBCOMMANDS but no case=' . json_encode(array_values($missingFromBin)) . '; case but not in SUBCOMMANDS=' . json_encode(array_values($missingFromLaunch)));
+    },
+    'launch: leading -m/--model/--model=/--reasoning pick the model and reasoning for one session, with or without text (ADR-0052)' => function () {
+        check(Launch::route(['pikkumies', '-m', 'X']) === ['run', ['chat', '-m', 'X']], '-m alone: ' . json_encode(Launch::route(['pikkumies', '-m', 'X'])));
+        check(Launch::route(['pikkumies', '-m', 'X', 'fix', 'my', 'plex']) === ['run', ['chat', '-m', 'X', '--query=fix my plex']], '-m with text');
+        check(Launch::route(['pikkumies', '--model', 'X', 'hi']) === ['run', ['chat', '-m', 'X', '--query=hi']], '--model X');
+        check(Launch::route(['pikkumies', '--model=X', 'hi']) === ['run', ['chat', '-m', 'X', '--query=hi']], '--model=X');
+        check(Launch::route(['pikkumies', '--reasoning', 'high']) === ['run', ['chat', '--reasoning', 'high']], '--reasoning alone');
+        check(Launch::route(['pikkumies', '--reasoning=low', '-m', 'Y', 'why', 'slow']) === ['run', ['chat', '-m', 'Y', '--reasoning', 'low', '--query=why slow']], '--reasoning= with -m and text: ' . json_encode(Launch::route(['pikkumies', '--reasoning=low', '-m', 'Y', 'why', 'slow'])));
+        check(Launch::isSession(Launch::route(['pikkumies', '-m', 'X'])[1]), 'a -m run is a session: every first-start check applies');
+    },
+    'launch: a launcher flag without a value, or with one starting with "-", is an error and starts nothing (exit 2)' => function () {
+        foreach ([['-m'], ['--model'], ['--model='], ['--reasoning'], ['--reasoning='], ['-m', '-v'], ['--model', '--reasoning', 'high'], ['-m', ' '], ['-m', 'X', '--reasoning']] as $words) {
+            list($cmd, $args) = Launch::route(array_merge(['pikkumies'], $words));
+            check($cmd === 'error' && count($args) === 1 && strpos($args[0], 'needs a') !== false, json_encode($words) . ' must be an error: ' . json_encode([$cmd, $args]));
+        }
+        list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/bin/pikkumies', ['-m']);
+        check($code === 2 && strpos($out, 'Not starting: -m needs a model name') === 0, '-m without a model must stop with exit 2: ' . $code . ' ' . $out);
+    },
+    'launch: a repeated launcher flag keeps the last value; `--` after the flags forces the rest to be the prompt' => function () {
+        check(Launch::route(['pikkumies', '-m', 'A', '--model', 'B', 'hi']) === ['run', ['chat', '-m', 'B', '--query=hi']], 'last -m wins');
+        check(Launch::route(['pikkumies', '--reasoning', 'low', '--reasoning=high']) === ['run', ['chat', '--reasoning', 'high']], 'last --reasoning wins');
+        check(Launch::route(['pikkumies', '-m', 'X', '--', '-m', 'means', 'what']) === ['run', ['chat', '-m', 'X', '--query=-m means what']], '-- after the flags must force a prompt');
+        check(Launch::route(['pikkumies', '-m', 'X', '--']) === ['run', ['chat', '-m', 'X']], '-- with nothing after it: a plain session with the model');
+    },
+    'launch: after leading flags a subcommand name is prompt text; other leading flags and `--` first behave as before (ADR-0022)' => function () {
+        foreach (['update', 'install', 'configure', 'tmux', 'run', 'doctor'] as $w) {
+            check(Launch::route(['pikkumies', '-m', 'X', $w]) === ['run', ['chat', '-m', 'X', '--query=' . $w]], "$w after -m must stay a prompt");
+        }
+        check(Launch::route(['pikkumies', '-v', 'hello']) === ['run', ['chat', '--query=-v hello']], '-v is not a launcher flag: unchanged prompt');
+        check(Launch::route(['pikkumies', '-c', 'fix', 'it']) === ['run', ['chat', '--query=-c fix it']], '-c is not a launcher flag');
+        check(Launch::route(['pikkumies', '--', '-m', 'X']) === ['run', ['chat', '--query=-m X']], '-- first still forces the prompt "-m X"');
+        check(Launch::route(['pikkumies', 'hi', '-m', 'X']) === ['run', ['chat', '--query=hi -m X']], 'flags only count at the start');
+    },
+    'launch: RunFlags::model reads the -m of a chat run, the last one; other runs have none' => function () {
+        check(RunFlags::model(['chat', '-m', 'A', '--query=x']) === 'A', '-m');
+        check(RunFlags::model(['chat', '--model=B', '-m', 'C']) === 'C', 'last one wins');
+        check(RunFlags::model(['chat', '--query=-m X']) === '', 'a prompt is never a flag');
+        check(RunFlags::model(['sessions', '-m', 'A']) === '' && RunFlags::model([]) === '', 'not a chat run');
     },
 ];

@@ -1,7 +1,8 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | run [args...] | <free text prompt>
+ * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | configure | run [args...]
+ *            | [-m <model>] [--reasoning <level>] <free text prompt>
  *
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
  * (ADR-0003) and Hermes' own session database and active-session registry are built for
@@ -100,6 +101,10 @@ function askNameIfMissing()
 }
 
 list($cmd, $passArgs) = Launch::route($argv);
+if ($cmd === 'error') { // a launcher flag without its value (ADR-0052): nothing is started
+    out('Not starting: ' . $passArgs[0]);
+    exit(2);
+}
 
 switch ($cmd) {
     case 'install':
@@ -300,6 +305,14 @@ switch ($cmd) {
         out('generated ' . $r['skills'] . ' skills (' . $r['written'] . ' written, ' . $r['removed'] . ' removed) and tools/INDEX.md');
         break;
 
+    case 'configure': // the settings review; on a terminal, a session with the configure skill (ADR-0052)
+        if (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT)) {
+            // Nobody to answer: a one-shot session would spend credits (and halt-guard resumes) on a fixed review.
+            passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/pikkumies-configure/pikkumies-configure.php') . ' review --human', $code);
+            exit($code);
+        }
+        $passArgs = Launch::CONFIGURE_ARGS;
+        // falls through: the same checks and first-start questions as any session
     case 'run':
         if (hermesBin() === '') {
             // A preinstalled account (PMSS, ADR-0033 addendum) has no runtime until the daily update or this first run builds it.
@@ -353,6 +366,9 @@ switch ($cmd) {
                         exit(1);
                     }
                     Config::acceptTerms();
+                    // What the settings review warns about, and where to change things; no session is started for it (ADR-0052).
+                    require_once dirname(__DIR__) . '/tools/system/pikkumies-configure/ConfigureSettings.php';
+                    promptWrite(Launch::setupHint(ConfigureSettings::review(Config::load(), Config::localDir() . '/hermes/state.db')));
                 }
             } catch (Exception $x) {
                 out('not starting: ' . $x->getMessage());
@@ -392,7 +408,11 @@ switch ($cmd) {
         if (Launch::isTty() && Launch::isSession($passArgs)) {
             require_once dirname(__DIR__) . '/tools/system/credits/CreditsLine.php';
             $creditsUtf8 = CreditsFormat::utf8Locale();
-            $creditsBanner = CreditsLine::text(Provider::resolve(Config::load()), CreditsLine::stateDir(), $creditsUtf8 ? 'utf8' : 'ascii');
+            $creditsProv = Provider::resolve(Config::load());
+            if (($runModel = RunFlags::model($passArgs)) !== '') {
+                $creditsProv['model'] = $runModel; // -m for this session: the token floor of the model actually used (ADR-0052)
+            }
+            $creditsBanner = CreditsLine::text($creditsProv, CreditsLine::stateDir(), $creditsUtf8 ? 'utf8' : 'ascii');
             if ($creditsBanner !== '') {
                 out($creditsBanner);
             }
@@ -481,6 +501,8 @@ switch ($cmd) {
         out('       pikkumies run update                       update Hermes with its own updater (separate from `pikkumies update`)');
         out('       pikkumies <free text>                      start a session with that as the first prompt');
         out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
+        out('       pikkumies -m <model> [free text]           a session with that model (also --model, and --reasoning <level>)');
+        out('       pikkumies configure                        review your settings and change them with the agent');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N]');
 }

@@ -10,6 +10,8 @@
 | `pikkumies` | Start a plain interactive session (same as `pikkumies run` with no further arguments) |
 | `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
 | `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
+| `pikkumies -m <model> [free text]` | A session with that model, for this session only; `--model <model>` and `--model=<model>` work too. `--reasoning <level>` sets the reasoning effort the same way. Only at the start of the line: the words after them are the prompt, even a name from above. `php ~/pikkumies/tools/system/credits/credits.php models` lists the models (ADR-0052) |
+| `pikkumies configure` | On a terminal: a session that reviews your settings and helps you change them. Without one: prints the settings review and starts nothing (ADR-0052) |
 | `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …) |
 | `pikkumies run update` | Update Hermes with its own updater, separately from Pikkumies; refuses while another session runs |
 | `pikkumies tmux [1-9]` | Open window `pmN` (default `pm1`) of the tmux session `pikkumies`, running `pikkumies`; the session and the window are created when missing. Without tmux it says so |

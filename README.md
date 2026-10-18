@@ -15,6 +15,7 @@ Then:
 ```sh
 pikkumies doctor    # the model provider, your key (masked), credits, and whether the agent runtime is ready
 pikkumies           # start a session
+pikkumies configure # review your settings and change them with the agent
 ```
 
 The first install builds the agent runtime in the background, so `doctor` may say "still building" for a few minutes. If `pikkumies` is not found, open a new shell.
@@ -57,7 +58,7 @@ It is not only for server work: it answers general questions and investigates to
 ## Documentation
 
 - [Installing and updating](docs/install.md): what the installer does, key files, a scripted install, updates
-- [Commands](docs/commands.md): every command, several sessions at once, tmux
+- [Commands](docs/commands.md): every command, a model for one session, several sessions at once, tmux
 - [Design](docs/design.md): what it is meant to be, and the directory layout
 - [The name](docs/name.md): the little man from the sea in the Kalevala
 - [Claude Code](integrations/remote/claude/README.md): a skill that asks Pikkumies on a server over SSH

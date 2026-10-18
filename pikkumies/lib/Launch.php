@@ -10,6 +10,8 @@
  * word after it is a flag (`pikkumies detect --refresh`): a prompt such as "update my plex" stays a
  * prompt instead of starting a self-update. `pikkumies -- <text>` always forces a prompt.
  * `pikkumies tmux [N]` opens window pmN of the tmux session "pikkumies" (ADR-0032).
+ * Leading `-m <model>` / `--reasoning <level>` pairs pick the model or reasoning for one session (RunFlags, ADR-0052);
+ * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052).
  *
  * First start (ADR-0032): on a terminal, `install` and the first interactive `run` ask for the
  * agent's name, and an interactive `run` asks the person to accept the terms and privacy policy.
@@ -18,8 +20,10 @@
 class Launch
 {
     /** Subcommands bin/pikkumies dispatches on its own. */
-    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux'];
+    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'configure'];
     const HELP = ['help', '--help', '-h'];
+    /** `pikkumies configure` on a terminal: a session with the configure skill loaded and this first prompt (ADR-0052). */
+    const CONFIGURE_ARGS = ['chat', '-s', 'pikkumies-configure', '--query=Review my setup and help me configure Pikkumies'];
     const TMUX_SESSION = 'pikkumies';
     const TERMS_URL = 'https://pulsedmedia.com/terms.php';
     const PRIVACY_URL = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy';
@@ -27,8 +31,8 @@ class Launch
     const INSTALL_FLAGS = ['name' => 'agent.name', 'telemetry' => 'privacy.telemetry', 'perf-logging' => 'privacy.perfLogging', 'retention-days' => 'sessions.retentionDays'];
 
     /**
-     * [cmd, passArgs]: cmd is one of SUBCOMMANDS or 'help'. passArgs is only meaningful for 'run':
-     * [] for a plain interactive session, or ['chat', '--query=text'] to seed one prompt. $argv is the
+     * [cmd, passArgs]: cmd is one of SUBCOMMANDS, 'help', or 'error' with passArgs [one line for the person]. For 'run',
+     * passArgs is [] for a plain interactive session, or ['chat', (-m model, --reasoning level,) '--query=text']. $argv is the
      * script's own argv (index 0 is the script path, same shape PHP gives bin/pikkumies).
      */
     public static function route(array $argv)
@@ -41,6 +45,15 @@ class Launch
         }
         if ($argv[1] === '--') {
             return ['run', self::promptArgs(array_slice($argv, 2))];
+        }
+        // Leading -m/--model/--reasoning pairs: everything after them is prompt text, a subcommand name too; `--` may end them.
+        if (RunFlags::isFlag($argv[1])) {
+            list($flags, $words, $error) = RunFlags::peel(array_slice($argv, 1));
+            if ($error !== '') {
+                return ['error', [$error]];
+            }
+            $words = isset($words[0]) && $words[0] === '--' ? array_slice($words, 1) : $words;
+            return ['run', array_merge(['chat'], $flags, array_slice(self::promptArgs($words), 1))];
         }
         $rest = array_slice($argv, 2);
         // `tmux` or `tmux <number>`; "tmux kill my session" is a prompt.
@@ -199,6 +212,18 @@ class Launch
             . ' (when on, it keeps on this machine only, never sent: the words of memory searches, result counts and lesson saves)'
             . ', session history kept ' . ($days > 0 ? "$days days" : 'forever')
             . ". Change them with the pikkumies-configure skill (ask your agent) or `pikkumies install --telemetry=off` and the other flags.\n";
+    }
+
+    /** After the first start's questions: the settings review's warnings, if any, and where to change things (ADR-0052). */
+    public static function setupHint(array $review)
+    {
+        $text = '';
+        foreach ($review as $r) {
+            if (isset($r['warning'])) {
+                $text .= '  ' . $r['key'] . ': ' . $r['warning'] . "\n";
+            }
+        }
+        return $text . "Run `pikkumies configure` or ask me to review your setup.\n";
     }
 
     /** Show the terms and privacy policy and ask until yes or no; true only for yes. End of input is a no. */
