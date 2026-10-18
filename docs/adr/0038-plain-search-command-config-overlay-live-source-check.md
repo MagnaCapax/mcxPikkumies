@@ -6,7 +6,7 @@
 - Status: Accepted. Amends ADR-0011 and ADR-0031 (how the gate recognises a search) and adds a setting surface beside `local/config.php`.
 
 ## Context
-The request of 2026-10-18: "that memory search and then the search from known sources is being enforced and it is fully functional, test each provider sources, ask questions etc." and "you need to /vplan the testing so that provider and other configs can be forced, both sometimes automation might get it wrong but also for testing suite."
+The request of 2026-10-18: "that memory search and then the search from known sources is being enforced and it is fully functional, test each provider sources, ask questions etc." and "you need to [plan] the testing so that provider and other configs can be forced, both sometimes automation might get it wrong but also for testing suite."
 
 What was found:
 - The search-first gate opened when the search command appeared anywhere in a terminal command. `echo tools/memory/pikkumies/pikkumies.php search x; rm -rf /tmp/x` opened it without searching, and every later call in that session went through. The read allowances (the memory unit's `list` and `sources`, the wiki and kb units' `search` and `list`) had the same hole: `kb.php search x; <anything>` passed as a read.
