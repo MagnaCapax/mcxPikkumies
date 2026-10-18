@@ -101,8 +101,8 @@ return [
             check($threw, 'parse accepted ' . json_encode($b));
         }
     },
-    'configure: set is limited to name, perf logging, telemetry and retention; every other key is refused' => function () {
-        $allowed = ['agent.name', 'privacy.perfLogging', 'privacy.telemetry', 'sessions.retentionDays'];
+    'configure: set is limited to name, perf logging, telemetry, retention and update channel; every other key is refused' => function () {
+        $allowed = ['agent.name', 'privacy.perfLogging', 'privacy.telemetry', 'sessions.retentionDays', 'update.channel'];
         check(array_keys(Config::SETTABLE) === $allowed, 'the settable list changed: ' . json_encode(array_keys(Config::SETTABLE)));
         $file = settingsFile('tool');
         $refuse = array_merge(['terms.accepted', 'hooks.reword', 'hooks.llm.disabled', 'searchFirst.disabled', 'root.disabled', 'provider.endpoint', 'provider.keyFile',
@@ -131,7 +131,7 @@ return [
         $config = Config::merge(Config::defaults(), require $file);
         check(ConfigureSettings::get($config, 'agent.name')['value'] === 'Helper', 'get after set');
         $show = array_column(ConfigureSettings::show($config), 'value', 'key');
-        check($show['privacy.telemetry'] === false && $show['sessions.retentionDays'] === 0 && count($show) === 5, 'show: ' . json_encode($show));
+        check($show['privacy.telemetry'] === false && $show['sessions.retentionDays'] === 0 && count($show) === 6, 'show: ' . json_encode($show));
         $review = [];
         foreach (ConfigureSettings::review($config) as $row) {
             check($row['means'] !== '', $row['key'] . ' has no explanation');

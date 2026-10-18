@@ -1,6 +1,7 @@
 <?php
 /**
- * Update: fast-forward the checkout to origin/main. Never stashes, never merges, never resets:
+ * Update: fast-forward the checkout to the newest release, or to a branch of origin when the channel
+ * says so (UpdateChannel, ADR-0057). Never stashes, never merges, never resets:
  * if tracked files were edited, it stops and lists them. local/ and the lesson files in memory/ are
  * gitignored, so user state is never touched.
  */
@@ -178,9 +179,16 @@ class Update
         return [proc_close($p), (string) $out, (string) $err];
     }
 
-    /** Returns [ok, message]. */
-    public static function run()
+    /**
+     * Returns [ok, message]. $channel is `release` (the newest date tag, fast-forward only; main until a
+     * release exists) or `git/<branch>` (ADR-0057); $used is set to what was followed.
+     */
+    public static function run($channel = 'release', &$used = null)
     {
+        $used = is_string($channel) ? $channel : json_encode($channel);
+        if (!Config::validChannel($channel)) {
+            return [false, 'update.channel is not valid (' . json_encode($channel) . '): use release or git/<branch>; nothing changed'];
+        }
         $dirty = self::git(['status', '--porcelain', '--untracked-files=no'], $code);
         if ($code !== 0) {
             return [false, "not a git checkout:\n" . implode("\n", $dirty)];
@@ -189,10 +197,24 @@ class Update
             return [false, "tracked files were changed locally; update stopped so nothing is overwritten:\n" . implode("\n", $dirty) . "\nMove your changes to local/ (or a local skill) and run update again."];
         }
         $before = trim(implode('', self::git(['rev-parse', '--short', 'HEAD'])));
+        $branch = substr($channel, 4);
+        if ($channel === 'release') {
+            $tag = UpdateChannel::newest($out);
+            if ($tag === null) {
+                return [false, "fetch failed:\n" . implode("\n", $out)];
+            }
+            if ($tag !== '') {
+                $used = "release $tag";
+                return UpdateChannel::toRelease($tag, $before);
+            }
+            $used = 'release (none published yet: following main)';
+            $branch = 'main';
+        }
         // No --depth: on a shallow clone a depth-1 fetch grafts the new tip as a parentless root,
         // so the fast-forward sees unrelated histories. A plain fetch stops at the existing shallow
         // boundary and downloads only the new commits.
-        $fetch = self::git(['fetch', 'origin', 'main'], $code);
+        // refs/heads/ explicitly: only a real branch, never a tag or another ref such as a pull-request head.
+        $fetch = self::git(['fetch', 'origin', 'refs/heads/' . $branch], $code);
         if ($code !== 0) {
             return [false, "fetch failed:\n" . implode("\n", $fetch)];
         }

@@ -1,7 +1,7 @@
 <?php
 /**
  * pikkumies-configure: show, explain and change Pikkumies' own user settings (ADR-0032). `set` writes
- * only agent.name, privacy.perfLogging, privacy.telemetry and sessions.retentionDays to
+ * only agent.name, privacy.perfLogging, privacy.telemetry, sessions.retentionDays and update.channel to
  * local/config.php; everything else, the terms above all, is the person's.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
@@ -14,7 +14,8 @@ $usage = <<<'U'
 usage: php pikkumies-configure.php <verb> [arguments] [--human]
   show                 the current settings
   get <key>            one setting
-  set <key> <value>    agent.name, privacy.perfLogging, privacy.telemetry (on|off), sessions.retentionDays (0 = forever)
+  set <key> <value>    agent.name, privacy.perfLogging, privacy.telemetry (on|off), sessions.retentionDays (0 = forever),
+                       update.channel (release|git/<branch>)
   review               every setting with what it means and any warning
 U;
 

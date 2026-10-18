@@ -26,6 +26,7 @@ class Config
             'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => ''],
             'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
             'cron' => ['disabled' => false],        // per-minute `cron-tick` from the user's crontab, runs Hermes' own due jobs (ADR-0025)
+            'update' => ['channel' => 'release'], // what `pikkumies update` follows: release (the newest date tag) or git/<branch> (ADR-0057)
             // Hermes itself is a vanilla checkout that updates on its own path (ADR-0033); no version here.
             // lazyInstalls: let Hermes download optional packages and a browser at runtime (ADR-0021).
             'hermes' => ['lazyInstalls' => false],
@@ -44,6 +45,7 @@ class Config
         'privacy.perfLogging' => 'bool',
         'privacy.telemetry' => 'bool',
         'sessions.retentionDays' => 'days',
+        'update.channel' => 'channel',
     ];
     const NAME_MAX = 32;
     const DAYS_MAX = 36500;
@@ -52,6 +54,21 @@ class Config
     public static function validName($name)
     {
         return is_string($name) && preg_match('/^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,' . (self::NAME_MAX - 1) . '}\z/u', $name) === 1;
+    }
+
+    /**
+     * An update channel: `release`, or `git/<branch>` where the branch starts with a letter or digit and
+     * has only letters, digits and . _ / - (no "..", "//", "@{", trailing "/", "." or ".lock"), so it can
+     * never be read as a git option or a revision expression (ADR-0057).
+     */
+    public static function validChannel($channel)
+    {
+        if ($channel === 'release') {
+            return true;
+        }
+        return is_string($channel) && preg_match('#^git/[A-Za-z0-9][A-Za-z0-9._/-]{0,99}\z#', $channel) === 1
+            && strpos($channel, '..') === false && strpos($channel, '//') === false
+            && !preg_match('#(/|\.|\.lock)\z#', $channel) && strpos($channel, '/.') === false;
     }
 
     /**
@@ -76,6 +93,11 @@ class Config
                     throw new InvalidArgumentException("$key takes a whole number of days, 0 to " . self::DAYS_MAX . ' (0 = keep forever)');
                 }
                 return (int) $text;
+            case 'channel':
+                if (!self::validChannel($text)) {
+                    throw new InvalidArgumentException("$key takes release or git/<branch> (for example git/main)");
+                }
+                return $text;
             default:
                 if ($text !== '' && !self::validName($text)) {
                     throw new InvalidArgumentException("$key: 1-" . self::NAME_MAX . ' letters, digits, spaces, dots, dashes or underscores, starting with a letter or digit');
@@ -97,7 +119,8 @@ class Config
         $type = self::SETTABLE[$key];
         $ok = ($type === 'bool' && is_bool($value))
             || ($type === 'days' && is_int($value) && $value >= 0 && $value <= self::DAYS_MAX)
-            || ($type === 'name' && is_string($value) && ($value === '' || self::validName($value)));
+            || ($type === 'name' && is_string($value) && ($value === '' || self::validName($value)))
+            || ($type === 'channel' && self::validChannel($value));
         if (!$ok) {
             throw new InvalidArgumentException("$key: wrong value " . var_export($value, true));
         }

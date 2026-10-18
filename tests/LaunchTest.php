@@ -157,7 +157,7 @@ return [
         list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/bin/pikkumies', ['configure']);
         check($code === 0 && strpos($out, 'sessions.retentionDays') !== false && strpos($out, 'terms.accepted') !== false, 'no TTY: the review must print, exit 0: ' . $code . ' ' . $out);
         check(strpos($out, 'Not starting') === false && strpos($out, 'runtime is not ready') === false && strpos($out, 'restored in your crontab') === false
-            && preg_match('/\nok, 5 shown\n$/', $out) === 1, 'no TTY: only the review, nothing may start: ' . $out);
+            && preg_match('/\nok, 6 shown\n$/', $out) === 1, 'no TTY: only the review, nothing may start: ' . $out);
         check(Launch::CONFIGURE_ARGS[0] === 'chat' && array_slice(Launch::CONFIGURE_ARGS, 1, 2) === ['-s', 'pikkumies-configure'] && Launch::isSession(Launch::CONFIGURE_ARGS), 'configure args: ' . json_encode(Launch::CONFIGURE_ARGS));
         check(strpos((string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/skill.md'), "\nname: pikkumies-configure\n") !== false, 'the preloaded skill name must be the unit\'s');
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');

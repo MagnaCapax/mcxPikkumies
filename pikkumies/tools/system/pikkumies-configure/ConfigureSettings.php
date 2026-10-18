@@ -12,6 +12,7 @@ class ConfigureSettings
         'privacy.perfLogging' => 'Whether Pikkumies keeps performance logs, on this machine only and never sent: today the time and result counts of each memory search, its words only when it found no lesson, and the time of each lesson save (local/state/memory-metrics/). Off stops new lines; files already written stay until deleted. With sessions.retentionDays above 0, lines older than that are pruned.',
         'privacy.telemetry' => 'Whether Pikkumies may send performance telemetry. A setting only: nothing is sent yet, no sender exists.',
         'sessions.retentionDays' => 'Days of ended Hermes sessions to keep; older ones are pruned at start. 0 keeps them forever.',
+        'update.channel' => 'What `pikkumies update` follows: release (the newest release, the default) or git/<branch> (every change on that branch as it lands, for example git/main).',
         'terms.accepted' => 'Whether the person accepted the terms of service and privacy policy. Only the person sets it.',
     ];
 

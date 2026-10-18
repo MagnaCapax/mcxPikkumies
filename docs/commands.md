@@ -3,9 +3,9 @@
 | Command | What it does |
 |---|---|
 | `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, install Hermes in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
-| `pikkumies update` | Fast-forward to the latest version (refuses to overwrite local edits); never updates Hermes |
+| `pikkumies update` | Fast-forward to the newest release, or to a branch when `update.channel` is `git/<branch>`, and print the channel (refuses to overwrite local edits, never moves backwards); never updates Hermes (ADR-0057) |
 | `pikkumies detect` | Print the machine profile (JSON) |
-| `pikkumies doctor` | Show provider, masked key, Hermes and tool status |
+| `pikkumies doctor` | Show provider, masked key, the update channel and the release or commit installed, Hermes and tool status |
 | `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
 | `pikkumies` | Start a plain interactive session (same as `pikkumies run` with no further arguments) |
 | `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |

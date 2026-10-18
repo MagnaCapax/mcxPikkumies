@@ -22,7 +22,7 @@ return [
         unset($missing['sessions']);
         check(ConfigureSettings::get($missing, 'sessions.retentionDays')['value'] === null, 'get() on a missing section must return null, not notice/crash');
         $showMissing = array_column(ConfigureSettings::show($missing), 'value', 'key');
-        check($showMissing['sessions.retentionDays'] === null && count($showMissing) === 5, 'show() on a missing section: ' . json_encode($showMissing));
+        check($showMissing['sessions.retentionDays'] === null && count($showMissing) === 6, 'show() on a missing section: ' . json_encode($showMissing));
     },
     'configure: get() on a real-but-unexposed key throws, listing the actual setting names verbatim' => function () {
         // #31 distinguishes "not a setting at all" (this) from "a setting but refused for writing"

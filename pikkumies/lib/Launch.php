@@ -28,7 +28,7 @@ class Launch
     const TERMS_URL = 'https://pulsedmedia.com/terms.php';
     const PRIVACY_URL = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy';
     /** install flag => the setting it writes (Config::SETTABLE); --accept-terms is separate. */
-    const INSTALL_FLAGS = ['name' => 'agent.name', 'telemetry' => 'privacy.telemetry', 'perf-logging' => 'privacy.perfLogging', 'retention-days' => 'sessions.retentionDays'];
+    const INSTALL_FLAGS = ['name' => 'agent.name', 'telemetry' => 'privacy.telemetry', 'perf-logging' => 'privacy.perfLogging', 'retention-days' => 'sessions.retentionDays', 'channel' => 'update.channel'];
 
     /**
      * [cmd, passArgs]: cmd is one of SUBCOMMANDS, 'help', or 'error' with passArgs [one line for the person]. For 'run',
@@ -151,7 +151,7 @@ class Launch
 
     /**
      * install flags -> [settings [key => typed value], acceptTerms, errors]. Only --name=, --telemetry=,
-     * --perf-logging=, --retention-days= and --accept-terms; anything else is an error, so a mistyped
+     * --perf-logging=, --retention-days=, --channel= and --accept-terms; anything else is an error, so a mistyped
      * flag never installs without the setting the person meant.
      */
     public static function installFlags(array $flags)
@@ -165,7 +165,7 @@ class Launch
                 continue;
             }
             if (!preg_match('/^--([a-z-]+)=(.*)$/s', $f, $m) || !isset(self::INSTALL_FLAGS[$m[1]])) {
-                $errors[] = "unknown flag $f (flags: --name=, --accept-terms, --telemetry=on|off, --perf-logging=on|off, --retention-days=N)";
+                $errors[] = "unknown flag $f (flags: --name=, --accept-terms, --telemetry=on|off, --perf-logging=on|off, --retention-days=N, --channel=release|git/<branch>)";
                 continue;
             }
             $key = self::INSTALL_FLAGS[$m[1]];

@@ -10,6 +10,7 @@ git clone --depth 1 https://github.com/MagnaCapax/mcxPikkumies ~/.mcxPikkumies
 ```
 
 The installer needs no root and returns in seconds. It:
+- on a fresh clone, moves it to the newest release (a tag named by its date, `YYYY-MM-DD`, or `YYYY-MM-DD.N` for a second release that day) unless you install with `--channel=git/<branch>`; with no release published yet it stays on `main` (ADR-0057);
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, which seedbox host it is, root access, running apps, resources);
 - generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
@@ -30,7 +31,7 @@ On a Pulsed Media seedbox with at least 1000 MiB RAM, Pikkumies comes preinstall
 On a terminal, the install and the first session ask what to call your agent, and the first interactive session shows the [terms of service](https://pulsedmedia.com/terms.php) and [privacy policy](https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy) and starts only once you accept them. Flags answer every question, so a scripted install (PMSS) asks nothing:
 
 ```sh
-~/.mcxPikkumies/pikkumies/bin/pikkumies install --name=Helper --accept-terms --telemetry=on --perf-logging=on --retention-days=0
+~/.mcxPikkumies/pikkumies/bin/pikkumies install --name=Helper --accept-terms --telemetry=on --perf-logging=on --retention-days=0 --channel=release
 ```
 
 `--retention-days=0` keeps session history forever (the default); a number of days lets Hermes prune older ended sessions. Telemetry is a setting only for now: nothing is sent. Performance logging keeps, on this machine only and never sent, the time and result counts of each memory search, its words only when it found no lesson, and the time of each lesson save (`local/state/memory-metrics/`, shown by the memory skill's `stats`). With `--retention-days` above 0, lines older than that are pruned; with 0 they are kept until you delete them. `--perf-logging=off` stops new lines; files already written stay until you delete them. Every shell command the agent runs is logged, always, on this machine only: one line per command in `local/logs/commands/YYYYMMDD.jsonl` (UTC day) with the time, session, directory, the command with passwords and tokens removed, the exit code and duration, never the output; kept as long as the session history (ADR-0044). Runs without a terminal (cron, scripts, piped one-shot prompts) never ask and are never blocked. The settings can be reviewed and changed later with the `pikkumies-configure` skill (ADR-0032).
@@ -41,6 +42,13 @@ On a terminal, the install and the first session ask what to call your agent, an
 ~/pikkumies/bin/pikkumies update
 ```
 
-Install also adds a daily `pikkumies update` to your own crontab (one tagged line; `autoUpdate.disabled` in `local/config.php` removes it; ADR-0013). Updates fast-forward to the latest `main`. Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. Hermes is updated separately, when you choose: `/update` in a session, or `pikkumies run update` from a shell with no other session open. Each start checks a changed Hermes against the settings Pikkumies relies on and refuses to run it if they no longer apply (ADR-0033). To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
+Install also adds a daily `pikkumies update` to your own crontab (one tagged line; `autoUpdate.disabled` in `local/config.php` removes it; ADR-0013). Updates follow the update channel (ADR-0057):
+
+- `release` (the default): move to the newest release, fast-forward only. A checkout already ahead of the newest release (for example one that followed `main` before releases existed) stays where it is until a newer release comes out, and says so. Until the first release is published, updates follow `main` as before.
+- `git/<branch>`: follow that branch of the repository, fast-forward only; `git/main` gets every change as it lands.
+
+Choose it at install with `--channel=git/main` (or `--channel=release`), or later with `pikkumies configure` (or ask the agent; the `pikkumies-configure` skill sets `update.channel`). `pikkumies update` prints the channel it followed, and `pikkumies doctor` shows the channel and the release or commit you are on.
+
+Your own state is never touched: config, lessons, Hermes state and local skills are all outside version control. If a tracked file was edited, the update stops, lists the file and changes nothing. Hermes is updated separately, when you choose: `/update` in a session, or `pikkumies run update` from a shell with no other session open. Each start checks a changed Hermes against the settings Pikkumies relies on and refuses to run it if they no longer apply (ADR-0033). To customise a shipped skill, copy it to a local skill under a new name (directory and the `name:` field), and list the shipped name under `skills.disabled` in `local/config.php`; never reuse the shipped name, because Hermes refuses to load a name that exists twice (ADR-0007).
 
 [Back to the README](../README.md)

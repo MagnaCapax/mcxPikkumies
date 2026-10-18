@@ -114,6 +114,18 @@ switch ($cmd) {
             out('install stopped, nothing changed: ' . implode('; ', $flagErrors));
             exit(2);
         }
+        // A fresh clone is main's newest commit. On the release channel it first moves to the newest release
+        // and the install runs again from that code. Only before local/ exists: install.sh runs `update` and
+        // then `install` on an existing checkout, and that is never moved (ADR-0057).
+        $channel = isset($installSettings['update.channel']) ? $installSettings['update.channel'] : Config::load()['update']['channel'];
+        list($moved, $moveMsg) = UpdateChannel::firstInstallMove($channel, Config::localDir());
+        if ($moveMsg !== '') {
+            out('release: ' . $moveMsg);
+        }
+        if ($moved) {
+            passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' install ' . implode(' ', array_map('escapeshellarg', $passArgs)), $code);
+            exit($code);
+        }
         $home = getenv('HOME');
         $link = $home . '/pikkumies';
         if (!file_exists($link)) {
@@ -146,6 +158,7 @@ switch ($cmd) {
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  hermes: ' . HermesInstall::ensure(false, !empty($profile['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
+        out('  version: ' . UpdateChannel::describe(Config::load()['update']['channel']));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));
         out('  docs: ' . startDocsFill());
@@ -159,7 +172,8 @@ switch ($cmd) {
         break;
 
     case 'update':
-        list($ok, $msg) = Update::run();
+        list($ok, $msg) = Update::run(Config::load()['update']['channel'], $used);
+        out('channel: ' . $used);
         out($msg);
         if (!$ok) {
             exit(1);
@@ -223,6 +237,7 @@ switch ($cmd) {
             out('credits:  ' . number_format($credits, 0, '.', ' ') . ' left on this key');
         }
         out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in ' . Config::shown(Config::localDir() . '/config.php') . ')'));
+        out('pikkumies: ' . UpdateChannel::describe($config['update']['channel'])); // read from the checkout, never fetched (ADR-0057)
         if (HermesInstall::isComplete()) {
             $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());
             $py = 'python ' . ($pyPin !== '' ? $pyPin : '?') . ' managed by Hermes (pm/lock.json)';
@@ -511,5 +526,5 @@ switch ($cmd) {
         out('       pikkumies -m <model> [free text]           a session with that model (also --model, and --reasoning <level>)');
         out('       pikkumies configure                        review your settings and change them with the agent');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
-        out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N]');
+        out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }

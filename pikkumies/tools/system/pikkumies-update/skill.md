@@ -7,12 +7,18 @@ description: Update Pikkumies itself to the latest version without losing local 
 
 Run `~/pikkumies/bin/pikkumies update`.
 
-- **"updated A -> B"**: done. The agent config was regenerated, so new tools and skills take effect in the next session. `pikkumies update` never updates Hermes; it only builds Hermes when none is installed yet ("hermes: building …", log in `~/pikkumies/local/install.log`).
-- **"already up to date"**: nothing to do.
+The first line, `channel: …`, says what the update followed: `release <tag>` (the default), `release (none published yet: following main)`, or `git/<branch>` (ADR-0057).
+
+- **"updated A -> B"** (with `(release <tag>)` on the release channel): done. The agent config was regenerated, so new tools and skills take effect in the next session. `pikkumies update` never updates Hermes; it only builds Hermes when none is installed yet ("hermes: building …", log in `~/pikkumies/local/install.log`).
+- **"already up to date"** or **"already at the latest release T"**: nothing to do.
+- **"ahead of the latest release T; staying here until a newer release"**: normal, not a fault. This checkout already has everything in release T (it followed `main` before releases existed, or was installed from `main`); it moves again when a newer release comes out. Do not "fix" it by switching to `git/main` or by resetting: only change `update.channel` when the user asks for the latest code.
+- **"fetch of release T failed"**: usually no network; if git's text says it "would clobber existing tag", the release tag was moved on the repository after this install fetched it, and the update refuses it on purpose. Report the text to the user; never delete or force the local tag.
+- **"could not compare with release T (fetching the full history failed)"**: this install was cloned with only its newest commit, and fetching the rest failed (network). Nothing changed; the next daily update tries again. Report it if it keeps happening.
+- **"update.channel is not valid"**: `update.channel` in `~/pikkumies/local/config.php` was edited by hand to something other than `release` or `git/<branch>`. Nothing changed. Tell the user; with their go-ahead, set it back with the `pikkumies-configure` skill (`set update.channel release`).
 - It also runs daily from the user's crontab (the line tagged `# pikkumies-update`); the last run's output is in `~/pikkumies/local/update.log`.
 - **"tracked files were changed locally"**: the update stopped and changed nothing. It lists the edited files. Do not stash, reset or delete them: they are the user's work. Tell the user which files were changed and suggest moving the change to a local skill or `local/` config, then run update again.
 - **"cannot fast-forward"**: the checkout's history differs from upstream. Report it to the user. Do not try to repair the git history yourself.
-- **"fetch failed"**: usually no network or no access to the repository. Report the error text.
+- **"fetch failed"**: usually no network or no access to the repository; on a `git/<branch>` channel also a branch that does not exist ("couldn't find remote ref"). Report the error text.
 
 Never edit files under `~/pikkumies` that git tracks. To change how a shipped skill behaves, make a local copy under a new name (for example `seedbox-apps-local`) in `~/pikkumies/local/hermes/skills/`, set `name:` in the copy's SKILL.md to that new name, then turn the shipped one off by adding its name to `skills.disabled` in `~/pikkumies/local/config.php` (the Hermes config is regenerated from it). Do not reuse the shipped name: Hermes refuses to load a skill name that exists twice (ADR-0007).
 

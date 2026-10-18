@@ -231,7 +231,7 @@ echo "ok";
     "config: SETTABLE's contract matches the configure tool's USAGE.md row and ADR-0032's stated limits" => function () {
         // #7, #20, #21 docs/code drift guards. SETTABLE is read live, not hardcoded, so a future addition
         // or type change here fails these at the first place that would go stale.
-        check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
+        check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days', 'update.channel' => 'channel'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
         $usage = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/USAGE.md');
         check(preg_match('/^\| set \|.*\|$/m', $usage, $m) === 1, 'USAGE.md must have a `set` row');
         foreach (array_keys(Config::SETTABLE) as $key) {

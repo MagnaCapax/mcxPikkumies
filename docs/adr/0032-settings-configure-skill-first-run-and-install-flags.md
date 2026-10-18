@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted
+- Status: Accepted. ADR-0057 adds one settable key, `update.channel`, and the install flag `--channel=`.
 
 ## Context
 The operator's requests of 2026-10-16:

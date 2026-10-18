@@ -57,3 +57,48 @@ function cliLines($out)
         return json_decode($l, true);
     }, array_values(array_filter(explode("\n", $out), 'strlen')));
 }
+
+/* Release-channel fixtures (tests/UpdateChannel*Test.php, ADR-0057): a bare origin, a working repository "dev" that pushes to it, clones as installs. */
+
+/** git in $dir with a fixed identity; throws on failure; trimmed output. */
+function chanGit($dir, $args)
+{
+    exec('git -C ' . escapeshellarg($dir) . ' -c user.name=t -c user.email=t@t ' . $args . ' 2>&1', $o, $c);
+    check($c === 0, "git $args: " . implode(' ', $o));
+    return trim(implode("\n", $o));
+}
+
+/** A bare origin and a working repository "dev" with $commits commits on main, pushed. Returns the temp dir. */
+function chanFixture($prefix, $commits)
+{
+    $tmp = testTempDir($prefix);
+    chanGit($tmp, 'init -q --bare -b main origin.git');
+    chanGit($tmp, 'clone -q file://' . "$tmp/origin.git dev");
+    chanGit("$tmp/dev", 'symbolic-ref HEAD refs/heads/main');
+    for ($i = 1; $i <= $commits; $i++) {
+        chanCommit("$tmp/dev", "c$i");
+    }
+    return $tmp;
+}
+
+function chanCommit($dir, $msg)
+{
+    file_put_contents("$dir/f.txt", "$msg\n");
+    chanGit($dir, 'add f.txt');
+    chanGit($dir, "commit -q -m $msg");
+    chanGit($dir, 'push -q origin main --tags');
+    return chanGit($dir, 'rev-parse HEAD');
+}
+
+/** Run $fn with Update::$root pointing at $co, always restored; the temp tree is removed afterwards. */
+function chanIn($tmp, $co, callable $fn)
+{
+    $saved = Update::$root;
+    Update::$root = $co;
+    try {
+        return $fn();
+    } finally {
+        Update::$root = $saved;
+        testRmTree($tmp);
+    }
+}

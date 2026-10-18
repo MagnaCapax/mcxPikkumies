@@ -27,11 +27,11 @@ The first install builds the agent runtime in the background, so `doctor` may sa
 Pikkumies updates itself once a day from your crontab (the line tagged `# pikkumies-update`). To update now, run either of these:
 
 ```sh
-pikkumies update          # fetch the newest Pikkumies and regenerate its skills
+pikkumies update          # move to the newest Pikkumies release and regenerate its skills
 bash install-pikkumies.sh # the installer again: it updates an existing install
 ```
 
-The agent runtime (Hermes) is updated separately, when you choose: `/update` inside a session, or `pikkumies run update` with no session open. To stop the daily update, set `autoUpdate.disabled` in `~/pikkumies/local/config.php`. An update never touches your settings, lessons or sessions; if you edited a shipped file, it stops and names the file. Details in [docs/install.md](docs/install.md), section Update.
+The agent runtime (Hermes) is updated separately, when you choose: `/update` inside a session, or `pikkumies run update` with no session open. Updates follow releases; to follow every change on `main` instead, install with `--channel=git/main` or run `pikkumies configure` ([docs/install.md](docs/install.md)). To stop the daily update, set `autoUpdate.disabled` in `~/pikkumies/local/config.php`. An update never touches your settings, lessons or sessions; if you edited a shipped file, it stops and names the file. Details in [docs/install.md](docs/install.md), section Update.
 
 **Experimental:** Pikkumies is early software. Keep backups of anything that matters. It asks before deleting data, but it can still be wrong, so read what it proposes before you say yes.
 

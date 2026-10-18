@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. The "local skill with the same name" override is superseded by ADR-0007; where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by ADR-0033; `packs/` in the layout by ADR-0015 (tool units under `pikkumies/tools/<category>/<tool>/`).
+- Status: Accepted. The "local skill with the same name" override is superseded by ADR-0007; where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by ADR-0033; `packs/` in the layout by ADR-0015 (tool units under `pikkumies/tools/<category>/<tool>/`); "Release tags and channels come later" by ADR-0057 (update and a first install follow the newest release by default, a git branch when asked).
 
 ## Context
 Pikkumies runs on the machine it manages, as the user. It must be quick to install and easy to update from git. Updates must never overwrite what the user or the agent changed locally. The repository also holds developer material (docs, tests, CI) that the runtime does not need.
