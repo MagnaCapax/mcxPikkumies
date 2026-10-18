@@ -11,7 +11,7 @@ umask(0077);
 $repo = dirname(__DIR__, 3);
 $here = __DIR__;
 require_once "$repo/pikkumies/lib/Provider.php";
-foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report'] as $lib) {
+foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report', 'CrontabGuard'] as $lib) {
     require_once "$here/lib/$lib.php";
 }
 $o = ['targets' => (string) getenv('PIKKUMIES_QA_TARGETS'), 'target' => '', 'only' => '', 'tag' => '', 'regrade' => '', 'token-budget' => null, 'max-tokens' => null,
@@ -71,6 +71,7 @@ if (!ctype_digit($o['timeout']) || ($o['max-turns'] !== '' && !ctype_digit($o['m
 }
 $uid = posix_geteuid();
 $realHome = posix_getpwuid($uid)['dir'];
+$account = posix_getpwuid($uid)['name'];
 if ($uid === 0 || !is_file("$realHome/.pikkumies-qa-user")) {
     fail("refusing to ask: the agent's terminal runs as this account and a throwaway HOME does not confine it. Run as a dedicated\n"
         . "user that holds no fleet or SSH keys, and create $realHome/.pikkumies-qa-user there (never as root). See README.md.");
@@ -83,8 +84,8 @@ usort($questions, function ($a, $b) {
 });
 $out = $o['out'] !== '' ? $o['out'] : sys_get_temp_dir() . '/pikkumies-questions-out-' . gmdate('Ymd-His');
 $report = new Report($out, $t['keys']);
-exec('crontab -l 2>&1', $tabBefore, $tabCode);
-$tabBefore = "$tabCode\n" . implode("\n", $tabBefore);
+$guard = new CrontabGuard($out, $report, $realHome, $account);
+$tabBefore = $guard->prev;
 file_put_contents("$out/crontab-before.txt", $tabBefore . "\n");
 $box = $o['install'] !== '' ? Sandbox::reuse($o['install']) : Sandbox::create($repo);
 $commit = trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' rev-parse --short HEAD'))
@@ -97,9 +98,21 @@ try {
         if (($problem = $box->install()) !== '') {
             throw new Exception($problem);
         }
+        if ($guard->check('install')) {
+            throw new Exception("the real crontab changed during install; see $out/crontab-after-install.txt");
+        }
     }
     $box->snapshot(); // the base every reset goes back to; the documentation each family downloads is added below
     $snapped = true;
+    // Before any token is spent: a login shell in the sandbox must resolve crontab to the fake, or every terminal
+    // command Hermes runs risks the account's real crontab (2026-10-18 RCA: a login bash re-reads /etc/profile).
+    list($checkCode) = Asker::run($box, ['bash', '-lc', 'command -v crontab'], '', $box->root . '/crontab-check.out', $box->root . '/crontab-check.err', 10);
+    $resolved = trim((string) @file_get_contents($box->root . '/crontab-check.out'));
+    $wantResolved = $box->home . '/.qa-bin/crontab';
+    if ($checkCode !== 0 || $resolved !== $wantResolved) {
+        throw new Exception("refusing to ask: a login shell in the sandbox resolves crontab to '$resolved', not '$wantResolved'; "
+            . 'fix the sandbox login PATH (Sandbox::ensureBashProfile) before spending tokens');
+    }
     $meta = ['hermes_version' => Asker::hermesVersion($box), 'pikkumies_commit' => $commit];
     $refreshed = [];
     foreach ($targets as $name => $s) {
@@ -114,6 +127,9 @@ try {
                 $box->reset();
                 list($code) = Asker::refresh($box, $overlay);
                 echo $code === 0 ? '' : "documentation refresh for family '$family' exited $code (see {$box->root}/refresh.out); asking anyway\n";
+                if ($guard->check("refresh:$family", $name)) {
+                    break 2;
+                }
                 $box->snapshot();
                 $refreshed[$family] = true;
             }
@@ -137,6 +153,9 @@ try {
             $report->transcript($name, $q['id'], "{$box->root}/raw.jsonl");
             $report->add($row);
             echo $report->line($row);
+            if ($guard->check($q['id'], $name)) {
+                break 2;
+            }
         }
     }
 } catch (Exception $x) {
@@ -150,9 +169,11 @@ try {
     }
     $o['keep'] || $o['install'] !== '' ? print("sandbox kept: {$box->root}\n") : $box->remove();
     echo Report::scorecard($report->rows) . "results: $out/results.jsonl, tokens used: $used\n";
-    exec('crontab -l 2>&1', $tabAfter, $tabCode);
-    if ("$tabCode\n" . implode("\n", $tabAfter) !== $tabBefore) {
-        fail("!!! THE ACCOUNT'S REAL CRONTAB CHANGED DURING THIS RUN. Compare it with the copy in $out/crontab-before.txt and repair it. !!!", 3);
+    $tabFinal = CrontabGuard::realTab();
+    file_put_contents("$out/crontab-after.txt", $guard->mask($tabFinal) . "\n");
+    if ($tabFinal !== $tabBefore || $guard->changedBy) {
+        fail("!!! THE ACCOUNT'S REAL CRONTAB CHANGED DURING THIS RUN (during: " . implode(', ', $guard->changedBy ?: ['(after the last check)'])
+            . "). Compare it with the copy in $out/crontab-before.txt and repair it. !!!", 3);
     }
 }
 exit($exit);

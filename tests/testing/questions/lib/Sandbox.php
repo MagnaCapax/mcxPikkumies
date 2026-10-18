@@ -12,10 +12,13 @@ class Sandbox
         'checkout/pikkumies/local/hermes/memories', 'checkout/pikkumies/local/hermes/logs', 'checkout/pikkumies/local/hermes/cron', 'checkout/pikkumies/local/docs-cache'];
     /** The settings file: a question that changes a setting (telemetry, the agent's name) must not hand it to the next. */
     const CONFIG = 'checkout/pikkumies/local/config.php';
+    /** The fake crontab's saved tab: a question that edits it must not hand its line to the next question. */
+    const TAB = 'home/.qa-bin/tab';
     public $root;
     public $home;
     private $snapshot = [];
     private $config = null;
+    private $tab = null;
 
     public function __construct($root)
     {
@@ -47,6 +50,7 @@ class Sandbox
             . "if [ \"\$1\" = -l ]; then [ -f $tab ] && exec cat $tab; echo 'no crontab for qa' >&2; exit 1; fi\n"
             . "if [ \"\$1\" = -r ]; then rm -f $tab; exit 0; fi\ncat \"\${1:--}\" > $tab\n");
         chmod("$root/home/.qa-bin/crontab", 0700);
+        self::ensureBashProfile($root);
         return new self($root);
     }
 
@@ -60,7 +64,24 @@ class Sandbox
             || !is_file("$real/" . self::MARKER) || !is_file("$real/checkout/pikkumies/bin/pikkumies") || !is_file("$real/home/.qa-bin/crontab")) {
             throw new Exception("--install $dir is not a private sandbox this runner made under " . $tmp);
         }
+        self::ensureBashProfile($real);
         return new self($real);
+    }
+
+    /**
+     * Write $root/home/.bash_profile if it is missing: a login bash (as Hermes' terminal snapshots one, ADR-0039
+     * root-cause 2026-10-18) re-reads /etc/profile and loses the fake crontab's position on PATH that Targets::env
+     * set up; this file is sourced after ~/.profile and restores it. Pikkumies only manages .bashrc and .profile
+     * (PathInstall.php), so this file never collides with anything it writes.
+     */
+    private static function ensureBashProfile($root)
+    {
+        $path = "$root/home/.bash_profile";
+        if (!is_file($path)) {
+            file_put_contents($path, "[ -r ~/.profile ] && . ~/.profile\n"
+                . 'PATH="' . $root . '/home/.qa-bin:$PATH"' . "\nexport PATH\n");
+            chmod($path, 0700);
+        }
     }
 
     /**
@@ -99,6 +120,8 @@ class Sandbox
     {
         $cfg = $this->root . '/' . self::CONFIG;
         $this->config = is_file($cfg) && !is_link($cfg) ? (string) file_get_contents($cfg) : null;
+        $tab = $this->root . '/' . self::TAB;
+        $this->tab = is_file($tab) && !is_link($tab) ? (string) file_get_contents($tab) : null;
         $this->snapshot = [];
         foreach (self::TRACES as $t) {
             foreach (self::walk($this->root . "/$t") as $p) {
@@ -125,6 +148,16 @@ class Sandbox
             if ($this->config !== null) {
                 file_put_contents($cfg, $this->config);
                 chmod($cfg, 0600);
+            }
+        }
+        // The fake crontab's tab file already exists (install schedules the auto-update) before the first snapshot,
+        // so the generic new-file sweep below never touches it; a question's edit to its content must be put back.
+        $tab = $this->root . '/' . self::TAB;
+        if ($this->tab === null || is_link($tab) || !is_file($tab) || file_get_contents($tab) !== $this->tab) {
+            @unlink($tab);
+            if ($this->tab !== null) {
+                file_put_contents($tab, $this->tab);
+                chmod($tab, 0600);
             }
         }
         $root = realpath($this->root) . '/';
