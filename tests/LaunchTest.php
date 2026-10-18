@@ -138,7 +138,10 @@ return [
         check(Launch::askTerms($feed(["no\n"]), $write) === false, 'no refuses');
         check(Launch::askTerms($feed([]), $write) === false, 'end of input refuses');
         $note = Launch::settingsNote(Config::defaults());
-        check(strpos($note, 'performance telemetry on') !== false && strpos($note, 'kept forever') !== false && strpos($note, 'nothing is sent') !== false, 'settings note: ' . $note);
+        check(strpos($note, 'performance telemetry on (a setting only: nothing is sent)') !== false && strpos($note, 'kept forever') !== false, 'settings note: ' . $note);
+        // shown before the terms are accepted: it must say what performance logging keeps, never that nothing is logged (ADR-0041)
+        check(strpos($note, 'performance logging on (when on, it keeps on this machine only, never sent: the words of memory searches, result counts and lesson saves') !== false
+            && stripos($note, 'logged') === false, 'settings note must say what is kept: ' . $note);
         $off = Launch::settingsNote(Config::merge(Config::defaults(), ['privacy' => ['telemetry' => false], 'sessions' => ['retentionDays' => 30]]));
         check(strpos($off, 'telemetry off') !== false && strpos($off, '30 days') !== false, 'settings note follows the config: ' . $off);
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');

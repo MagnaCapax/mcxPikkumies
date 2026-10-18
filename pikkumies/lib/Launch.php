@@ -195,8 +195,9 @@ class Launch
             return $v ? 'on' : 'off';
         };
         $days = (int) $config['sessions']['retentionDays'];
-        return 'Settings: performance telemetry ' . $onOff(!empty($config['privacy']['telemetry'])) . ', performance logging ' . $onOff(!empty($config['privacy']['perfLogging']))
-            . ' (both settings only: nothing is sent or logged yet), session history kept ' . ($days > 0 ? "$days days" : 'forever')
+        return 'Settings: performance telemetry ' . $onOff(!empty($config['privacy']['telemetry'])) . ' (a setting only: nothing is sent), performance logging ' . $onOff(!empty($config['privacy']['perfLogging']))
+            . ' (when on, it keeps on this machine only, never sent: the words of memory searches, result counts and lesson saves)'
+            . ', session history kept ' . ($days > 0 ? "$days days" : 'forever')
             . ". Change them with the pikkumies-configure skill (ask your agent) or `pikkumies install --telemetry=off` and the other flags.\n";
     }
 
