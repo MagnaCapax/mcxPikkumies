@@ -67,7 +67,7 @@ function startDocsFill()
     $docsLog = Config::localDir() . '/docs-fill.log';
     exec('nohup flock -n ' . escapeshellarg(Config::localDir() . '/docs-fill.lock') . ' ' . escapeshellarg(PHP_BINARY) . ' '
         . escapeshellarg(__FILE__) . ' docs-fill > ' . escapeshellarg($docsLog) . ' 2>&1 &');
-    return 'filling in the background (log: local/docs-fill.log)';
+    return 'filling in the background (log: ' . Config::shown(Config::localDir() . '/docs-fill.log') . ')';
 }
 
 /** The hermes command of a complete install in pikkumies/hermes, '' when there is none (ADR-0033). */
@@ -154,7 +154,7 @@ switch ($cmd) {
         } catch (Exception $x) {
             out('  path: not set up: ' . $x->getMessage());
         }
-        out('Next: a platform key in ~/.virsilipasKey is used as it is; for your own provider put endpoint= and key= in ~/.pikkumiesKey (local/config.php can set the endpoint and model, never the key). Then `pikkumies doctor`.');
+        out('Next: a platform key in ~/.virsilipasKey is used as it is; for your own provider put endpoint= and key= in ~/.pikkumiesKey (' . Config::shown(Config::localDir() . '/config.php') . ' can set the endpoint and model, never the key). Then `pikkumies doctor`.');
         out('Then open a new shell (or `hash -r`) and type `pikkumies`.');
         break;
 
@@ -210,7 +210,7 @@ switch ($cmd) {
         $prov = Provider::resolve($config);
         list($ok, $http) = Provider::check($prov);
         if (Config::overlayPath() !== '') {
-            out('overlay:  ' . Config::overlayPath() . ' (PIKKUMIES_CONFIG, merged over local/config.php)');
+            out('overlay:  ' . Config::overlayPath() . ' (PIKKUMIES_CONFIG, merged over ' . Config::shown(Config::localDir() . '/config.php') . ')');
         } elseif ((string) getenv('PIKKUMIES_CONFIG') !== '') {
             out('overlay:  ' . getenv('PIKKUMIES_CONFIG') . ' NOT USED: missing, unreadable, not yours, or writable by others');
         }
@@ -222,7 +222,7 @@ switch ($cmd) {
         if ($credits !== null) {
             out('credits:  ' . number_format($credits, 0, '.', ' ') . ' left on this key');
         }
-        out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in local/config.php)'));
+        out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in ' . Config::shown(Config::localDir() . '/config.php') . ')'));
         if (HermesInstall::isComplete()) {
             $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());
             $py = 'python ' . ($pyPin !== '' ? $pyPin : '?') . ' managed by Hermes (pm/lock.json)';
@@ -235,7 +235,7 @@ switch ($cmd) {
             $leaks = HermesInstall::pathLaunchers((string) getenv('HOME'));
             out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no launchers in ~/.local/bin (cli.expose_on_path: false)'));
         } else {
-            out('hermes:   not installed' . (HermesInstall::building() ? ' (building, see local/install.log)' : (file_exists(HermesInstall::treeDir()) ? ' (incomplete build, see local/install.log; `pikkumies install` builds again)' : '')));
+            out('hermes:   not installed' . (HermesInstall::building() ? ' (building, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . ')' : (file_exists(HermesInstall::treeDir()) ? ' (incomplete build, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . '; `pikkumies install` builds again)' : '')));
         }
         $units = Units::all();
         $bad = array_filter($units, function ($u) {
@@ -243,7 +243,7 @@ switch ($cmd) {
         });
         out('tools:    ' . count($units) . ' units' . ($bad ? ', ' . count($bad) . ' with problems (run `pikkumies generate`)' : '') . '; off: ' . (implode(', ', Generate::disabledCategories($config)) ?: 'none'));
         if (!empty($config['packs']['disabled'])) {
-            out('note:     packs.disabled in local/config.php is no longer read; use tools.disabled with category names (ADR-0015)');
+            out('note:     packs.disabled in ' . Config::shown(Config::localDir() . '/config.php') . ' is no longer read; use tools.disabled with category names (ADR-0015)');
         }
         // One line per Hermes feature pikkumies turns on at generate time (ADR-0024), read back
         // from the actual generated config.yaml rather than assumed, so a write failure shows here too.
@@ -275,7 +275,7 @@ switch ($cmd) {
             }
         }
         out('docs:     ' . count($docNames) . ' sources for this host, ' . $docPages . ' pages downloaded, '
-            . round(DocSite::dirBytes(DocSources::cacheRoot()) / 1048576, 1) . ' MB in local/docs-cache'
+            . round(DocSite::dirBytes(DocSources::cacheRoot()) / 1048576, 1) . ' MB in ' . Config::shown(DocSources::cacheRoot())
             . ($docErrors ? '; last fetch failed: ' . implode(', ', $docErrors) . ' (see `pikkumies.php sources`)' : ''));
         require_once dirname(__DIR__) . '/tools/memory/pikkumies/MemoryStats.php';
         out(MemoryStats::doctorLine()); // lessons on disk, and the last 30 days of searches when perfLogging kept them (ADR-0041)

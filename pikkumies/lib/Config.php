@@ -155,6 +155,13 @@ class Config
         return self::root() . '/local';
     }
 
+    /** A path as the user can type it from any directory: absolute, with the home directory written as ~ (GH #6). */
+    public static function shown($path)
+    {
+        $home = rtrim((string) getenv('HOME'), '/');
+        return $home !== '' && strpos($path, $home . '/') === 0 ? '~' . substr($path, strlen($home)) : $path;
+    }
+
     public static function load()
     {
         $file = self::localDir() . '/config.php';

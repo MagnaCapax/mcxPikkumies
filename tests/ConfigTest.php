@@ -169,4 +169,16 @@ return [
         check(preg_match('/"sessions": \{.*?"auto_prune": True,.*?"retention_days": \d+,/s', $py) === 1, 'Hermes sessions.auto_prune / retention_days moved');
         check(preg_match('/"shared_metrics": \{\s*"enabled": False,.*?"send": False,/s', $py) === 1, 'Hermes telemetry defaults changed');
     },
+    'settings: paths shown to the user are absolute with the home written as ~, never a bare local/ fragment (GH #6)' => function () {
+        $old = getenv('HOME');
+        putenv('HOME=/home/fixtureuser');
+        check(Config::shown('/home/fixtureuser/.mcxPikkumies/pikkumies/local/install.log') === '~/.mcxPikkumies/pikkumies/local/install.log', 'home not written as ~');
+        check(Config::shown('/home/someoneelse/x') === '/home/someoneelse/x', 'a sibling home must stay absolute');
+        check(Config::shown('/opt/pikkumies/local/update.log') === '/opt/pikkumies/local/update.log', 'outside home must stay absolute');
+        putenv('HOME=');
+        check(Config::shown('/home/fixtureuser/x') === '/home/fixtureuser/x', 'no HOME must leave the path as it is');
+        putenv($old === false ? 'HOME' : "HOME=$old");
+        $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Update.php') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php');
+        check(preg_match('#[\'"][^\'"\n]*\(?(see|log:|in) local/[a-z]#', $src) === 0, 'a user-facing message still prints a bare local/ path');
+    },
 ];

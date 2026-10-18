@@ -183,7 +183,7 @@ return [
         try {
             hermesTIn($w, function () use ($w) {
                 $msg = HermesInstall::ensure();
-                check($msg === 'building v0.10.0 in the background (log: local/install.log)', 'ensure: ' . $msg);
+                check($msg === 'building v0.10.0 in the background (log: ' . Config::shown($w['root'] . '/local/install.log') . ')', 'ensure: ' . $msg);
                 hermesTWaitReady($w);
                 $tree = $w['root'] . '/hermes';
                 $home = $w['root'] . '/local/hermes';
@@ -309,7 +309,7 @@ return [
                 $aside = glob($w['root'] . '/hermes.broken-*');
                 check(count($aside) === 1 && preg_match('/^hermes\.broken-\d{8}T\d{6}Z$/', basename($aside[0])) === 1, 'aside: ' . json_encode($aside));
                 check(file_get_contents($aside[0] . '/mine.patch') === "user work\n", 'the moved tree lost the user file');
-                check($msg === 'moved the incomplete tree to ' . basename($aside[0]) . ' (remove it when it is not needed); building v0.10.0 in the background (log: local/install.log)', 'ensure: ' . $msg);
+                check($msg === 'moved the incomplete tree to ' . basename($aside[0]) . ' (remove it when it is not needed); building v0.10.0 in the background (log: ' . Config::shown($w['root'] . '/local/install.log') . ')', 'ensure: ' . $msg);
                 hermesTWaitReady($w);
                 check(HermesInstall::isComplete() && !is_file("$tree/mine.patch"), 'the new build must be a fresh clone');
             });
@@ -327,7 +327,7 @@ return [
                 hermesTIn($w, function () use ($w) {
                     check(HermesInstall::building(), 'a held build lock must read as building');
                     $msg = HermesInstall::ensure();
-                    check($msg === 'building in the background (log: local/install.log)', 'ensure: ' . $msg);
+                    check($msg === 'building in the background (log: ' . Config::shown($w['root'] . '/local/install.log') . ')', 'ensure: ' . $msg);
                     usleep(300000);
                     check(!file_exists($w['root'] . '/hermes') && !is_file($w['log']), 'a second build was started');
                 });

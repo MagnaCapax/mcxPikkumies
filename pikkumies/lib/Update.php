@@ -97,7 +97,7 @@ class Update
     {
         $off = !empty($config['autoUpdate']['disabled']);
         return self::installTaggedLine(self::CRON_TAG, $off ? '' : self::cronLine($uid),
-            'daily, from your crontab (log: local/update.log)', 'off (autoUpdate.disabled)');
+            'daily, from your crontab (log: ' . Config::shown(Config::localDir() . '/update.log') . ')', 'off (autoUpdate.disabled)');
     }
 
     /**
@@ -123,10 +123,10 @@ class Update
         $off = !empty($config['cron']['disabled']);
         if (!$off && CronTick::refuses($rootAvailable)) {
             CronTick::logRefusalOnce($logFile !== null ? $logFile : Config::localDir() . '/update.log');
-            return 'not installed (root available, no setpriv; see local/update.log)';
+            return 'not installed (root available, no setpriv; see ' . Config::shown(Config::localDir() . '/update.log') . ')';
         }
         return self::installTaggedLine(self::CRON_TICK_TAG, $off ? '' : self::cronTickLine(),
-            'every minute, from your crontab (log: local/update.log)', 'off (cron.disabled)');
+            'every minute, from your crontab (log: ' . Config::shown(Config::localDir() . '/update.log') . ')', 'off (cron.disabled)');
     }
 
     /**

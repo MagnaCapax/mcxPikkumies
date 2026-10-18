@@ -395,12 +395,12 @@ class HermesInstall
             return 'skipped (PIKKUMIES_SKIP_HERMES=1)';
         }
         if (self::building()) {
-            return 'building in the background (log: local/install.log)';
+            return 'building in the background (log: ' . Config::shown(self::localDir() . '/install.log') . ')';
         }
         $tree = self::treeDir();
         $exists = file_exists($tree) || is_link($tree);
         if ($exists && $unattended) {
-            return 'not complete: pikkumies/hermes is left from a build that failed or stopped (see local/install.log); run `pikkumies install` to move it aside and build again';
+            return 'not complete: pikkumies/hermes is left from a build that failed or stopped (see ' . Config::shown(self::localDir() . '/install.log') . '); run `pikkumies install` to move it aside and build again';
         }
         if (self::target() === '') {
             return 'not installed: Hermes has no build for this machine (' . php_uname('s') . ' ' . php_uname('m') . ')';
@@ -444,7 +444,7 @@ class HermesInstall
         $argv = array_merge(['flock', '-n', $lock], CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], $unattended ? CronTick::lowPriority($build) : $build);
         // flock -n: if a build already runs, this one exits at once and leaves it alone.
         exec('nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
-        return $note . 'building ' . $tag . ' in the background (log: local/install.log)';
+        return $note . 'building ' . $tag . ' in the background (log: ' . Config::shown(self::localDir() . '/install.log') . ')';
     }
 
     /**
