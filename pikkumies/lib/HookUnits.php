@@ -9,8 +9,11 @@ require_once __DIR__ . '/Config.php';
 
 class HookUnits
 {
-    /** The events the orchestrator knows how to merge (pre_tool_call as hermes_cli/plugins.py, pre_llm_call as agent/turn_context.py). */
-    const EVENTS = ['pre_tool_call', 'pre_llm_call'];
+    /**
+     * The events the orchestrator runs: pre_tool_call and pre_llm_call are merged (hermes_cli/plugins.py,
+     * agent/turn_context.py); post_tool_call is an observer whose answer Hermes ignores (model_tools.py, ADR-0044).
+     */
+    const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call'];
     const FIELDS = ['name', 'event', 'description', 'failClosed', 'timeout'];
     const MAX_TIMEOUT = 60;
 
