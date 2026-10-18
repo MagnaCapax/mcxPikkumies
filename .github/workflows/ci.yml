@@ -19,7 +19,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: curl, posix, json
+          extensions: curl, posix, json, sodium
           coverage: none
       - name: PHP syntax lint
         run: |

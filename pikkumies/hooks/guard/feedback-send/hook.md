@@ -1,0 +1,8 @@
+---
+name: feedback-send
+event: pre_tool_call
+description: Asks the user in Hermes' approval prompt before /feedback is sent, showing what goes out; the forms of a feedback send it can see other than the plain one are blocked.
+failClosed: true
+timeout: 3
+---
+Reads `tool_name` and `tool_input`. A terminal command that is exactly `php <this Pikkumies' feedback.php> send <id>`, the path absolute (or `~/`, expanded with HOME) and canonical, gets `approve`: the message names where it goes, that it is linked to the account through the key, the draft's size, the session attached, what else it carries (version numbers; the session's model, provider and working directory), the file holding all of it, and last, on one line, the start of the text; `rule_key` is `pikkumies-send:<id>`, the draft's own sha256 prefix (32 hex digits), so one answer covers one payload. Blocked, in a terminal command, `execute_code` code, `process_manage` input, `write_file` or `patch` content and `cronjob_manage` input: a feedback path followed by `send` (only the word right after the path counts, so a draft whose text says "send" runs), `FeedbackSend` or `FeedbackDraft` with the word send, and a feedback path with shell expansion (`$ * ? [` or a backtick) and the word send. Also blocked: a draft that is missing, changed since it was made, or already sent (ADR-0056). A safety prompt that catches the agent's own and casual sends, not a security boundary: an agent steered by text it reads can still run the sender some other way, as it could run curl (AGENTS.md). The payload is sealed to Pulsed Media either way.

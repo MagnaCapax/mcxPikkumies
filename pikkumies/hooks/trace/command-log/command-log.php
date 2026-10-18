@@ -9,20 +9,15 @@
  */
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
+require_once dirname(__DIR__, 3) . '/lib/Redact.php';
 
 const COMMAND_LOG_TOOLS = ['terminal'];
 const COMMAND_LOG_MAX = 4000;
 
-/** The command with the secrets a shell line carries removed. */
+/** The command with the secrets a shell line carries removed (lib/Redact.php, shared with /feedback). */
 function commandLogRedact($command)
 {
-    $s = Cli::cleanString((string) $command);
-    return (string) preg_replace([
-        '/(--?(?:password|passwd|pass|token|api[-_]?key|secret|auth)(?:=|\s+))(\'[^\']*\'|"[^"]*"|\S+)/i',
-        '/((?:authorization|x-api-key|cookie)\s*:\s*(?:bearer\s+|basic\s+)?)(\'[^\']*\'|"[^"]*"|[^\s\'"]+)/i',
-        '/\b([A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|PASS)[A-Za-z0-9_]*=)(\'[^\']*\'|"[^"]*"|\S+)/i',
-        '/(\bmysql\S*\s+(?:\S+\s+)*?-p)(\S+)/',
-    ], ['$1REDACTED', '$1REDACTED', '$1REDACTED', '$1REDACTED'], $s);
+    return Redact::secrets($command);
 }
 
 /** The log line for a post_tool_call payload, or null when it is not a shell command. */

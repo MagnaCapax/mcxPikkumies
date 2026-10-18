@@ -42,7 +42,7 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 - The generated skill adds the verbs table, the command line and the path of USAGE.md; do not repeat them in the body.
 - Name exact steps: what to read before changing anything, which verb to use, how to verify it worked.
 
-**USAGE.md**: the first table with the header `| verb | arguments | changes | what it does |` lists every verb. The contract test checks that it matches the verbs the tool answers to, in both directions. Write a literal `|` inside a cell as `\|`. In `changes` write `no` for read-only verbs, `yes` for changes, and `deletes` for verbs that remove data. Examples follow the table.
+**USAGE.md**: the first table with the header `| verb | arguments | changes | what it does |` lists every verb. The contract test checks that it matches the verbs the tool answers to, in both directions. Write a literal `|` inside a cell as `\|`. In `changes` write `no` for read-only verbs, `yes` for changes, `deletes` for verbs that remove data, `loads` for verbs that put load on the shared server (the guard asks first), and `sends` for verbs whose data leaves the machine (a hook asks first: feedback-send for /feedback, ADR-0056; the mail guard for email, ADR-0053). Examples follow the table.
 
 **The tool**: one PHP script (PHP 7.3, no Composer, no Python) that ends with `Cli::run($argv, ['verb' => function ($args, $opt) { ... }], $usage)`.
 
