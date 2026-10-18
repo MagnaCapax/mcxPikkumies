@@ -133,10 +133,10 @@ return [
         }
     },
     "HomePath::inside(): a string-PREFIX of \$home's own name is never mistaken for containment (classic path-prefix bug)" => function () {
-        check(HomePath::inside('/home/bobby', '/home/bob') === false, '/home/bobby must not be "inside" /home/bob');
-        check(HomePath::inside('/home/bobby/x', '/home/bob') === false, '/home/bobby/x must not be "inside" /home/bob');
-        check(HomePath::inside('/home/bob/x', '/home/bob') === true, '/home/bob/x must be inside /home/bob');
-        check(HomePath::inside('/home/bob', '/home/bob') === true, '/home/bob must be inside itself');
+        check(HomePath::inside('/home/fixtureuserx', '/home/fixtureuser') === false, '/home/fixtureuserx must not be "inside" /home/fixtureuser');
+        check(HomePath::inside('/home/fixtureuserx/x', '/home/fixtureuser') === false, '/home/fixtureuserx/x must not be "inside" /home/fixtureuser');
+        check(HomePath::inside('/home/fixtureuser/x', '/home/fixtureuser') === true, '/home/fixtureuser/x must be inside /home/fixtureuser');
+        check(HomePath::inside('/home/fixtureuser', '/home/fixtureuser') === true, '/home/fixtureuser must be inside itself');
     },
     'HomePath::dir(): a bare relative path is refused even with $explicit=true, never resolved against the process cwd' => function () {
         $home = heHome();
