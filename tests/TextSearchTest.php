@@ -147,4 +147,17 @@ return [
             testRmTree($tmpNoLink);
         }
     },
+    'textsearch: rank()\'s link boost also follows an absolute link target, the form a memory search prints and USAGE.md tells the agent to link' => function () {
+        $dir = testTempDir('pk-ts-abslink');
+        try {
+            $real = realpath($dir);
+            file_put_contents("$dir/A.md", "# Lighthouse notes\n\nlighthouse keeper story continues. [see B]($real/B.md)\n");
+            file_put_contents("$dir/B.md", "# B page\n\nlighthouse mention here only once in this short page.\n");
+            file_put_contents("$dir/M.md", "# M\n\nlighthouse appears briefly somewhere here now.\n");
+            $r = TextSearch::rank(TextSearch::readDirs([$real]), 'lighthouse', 10);
+            check(array_search("$real/B.md", $r, true) < array_search("$real/M.md", $r, true), 'an absolute link must boost B ahead of M: ' . json_encode($r));
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];

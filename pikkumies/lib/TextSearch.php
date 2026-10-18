@@ -109,7 +109,8 @@ class TextSearch
         foreach ($scores as $f => $s) {
             if (preg_match_all('/\]\(([^)]+\.md)\)/', $files[$f], $m)) {
                 foreach ($m[1] as $target) {
-                    $abs = realpath(dirname($f) . '/' . $target);
+                    // An absolute target (the path a memory search prints, as USAGE.md tells the agent to link) as is.
+                    $abs = realpath($target[0] === '/' ? $target : dirname($f) . '/' . $target);
                     if ($abs !== false && isset($scores[$abs])) {
                         $scores[$abs] += 0.25 * $s;
                     }
