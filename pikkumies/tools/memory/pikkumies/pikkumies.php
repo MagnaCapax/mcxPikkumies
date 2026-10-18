@@ -14,8 +14,10 @@ require_once "$lib/DocSources.php";
 require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
 require_once __DIR__ . '/Lessons.php';
+require_once __DIR__ . '/MemoryStats.php';
 
 const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing else, ask the user; then save what you learn with `save`';
+const SAVE_NEXT = 'no lesson matched: when the task is done, save what you learned, or what you searched and why it did not settle it: ';
 const PEER_NEXT = 'only other providers\' documentation (tier 3) matched: it may not apply here, so check it on this machine; if it does not answer, tier 4 is deep research (the deep-research skill); for the provider\'s own policies give the support link in the notes; then save what you learn with `save`';
 
 Cli::run($argv, [
@@ -26,6 +28,7 @@ Cli::run($argv, [
         }
         $limit = isset($opt['limit']) ? max(1, (int) $opt['limit']) : 5; // per tier (ADR-0031)
         $offline = !empty($opt['offline']);
+        $start = microtime(true);
         list($hits, $notes, $tiers) = DocSources::search($query, $limit, $offline);
         $mode = 'keywords';
         if (!$hits) {
@@ -57,17 +60,29 @@ Cli::run($argv, [
             $notes[] = 'nothing in tiers 1-2: other providers\' documentation is now downloaded by the background fill (at most '
                 . DocSources::PEER_FILL_REQUESTS . ' pages a source a day) and searched as tier 3 once it is on disk';
         }
-        DocSources::recordSearch($tiers, $perTier);
+        $ms = (int) round((microtime(true) - $start) * 1000);
+        DocSources::recordSearch($tiers, $perTier, ['words' => substr($query, 0, 500), 'mode' => $mode,
+            'paths' => array_slice(array_column($records, 'path'), 0, 3), 'ms' => $ms]); // metrics only with privacy.perfLogging on (ADR-0041)
         $status = ['matched' => $mode, 'tiers_searched' => $tiers, 'hits_per_tier' => $perTier, 'notes' => $notes];
-        if (!$hits) {
-            $status['next'] = NEXT_STEP;
-        } elseif ($perTier[1] + $perTier[2] === 0) {
-            $status['next'] = PEER_NEXT;
+        $next = !$hits ? NEXT_STEP : ($perTier[1] + $perTier[2] === 0 ? PEER_NEXT : '');
+        if ($perTier[1] === 0) { // no lesson settles it: the search ends with a saved lesson, resolved or not (ADR-0041)
+            $next = ltrim($next . ' ' . SAVE_NEXT . MemoryMetrics::saveCommand());
+        }
+        if ($next !== '') {
+            $status['next'] = $next;
         }
         return ['records' => $records, 'status' => $status];
     },
     'save' => function ($args, $opt) {
         return Lessons::save($opt, Lessons::body($opt));
+    },
+    'stats' => function ($args, $opt) {
+        $stats = MemoryStats::compute(isset($opt['days']) ? (int) $opt['days'] : 30);
+        if (!empty($opt['human'])) {
+            echo MemoryStats::human($stats);
+            exit(0);
+        }
+        return ['records' => [$stats], 'status' => []];
     },
     'append' => function ($args, $opt) {
         return Lessons::append(isset($opt['path']) ? (string) $opt['path'] : '', Lessons::body($opt));
@@ -102,4 +117,4 @@ Cli::run($argv, [
         }
         return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },
-], "usage: pikkumies.php search|save|append|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path']);
+], "usage: pikkumies.php search|save|append|stats|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path', 'days']);

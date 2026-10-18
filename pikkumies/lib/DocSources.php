@@ -650,18 +650,54 @@ class DocSources
         return self::root() . '/local/state/search-first';
     }
 
-    /** Written by the memory search when it completes: the time, the tiers it searched and the hits per tier. */
-    public static function recordSearch(array $tiers, array $hitsPerTier)
+    /**
+     * Written by the memory search when it completes: the time, the tiers it searched and the hits per tier.
+     * $metric (the search words, mode, first paths and ms) is also appended to the memory metrics when
+     * privacy.perfLogging is on (ADR-0041); the memory search is the only caller that passes it.
+     */
+    public static function recordSearch(array $tiers, array $hitsPerTier, array $metric = [])
     {
         $dir = self::searchStateDir();
         @mkdir($dir, 0700, true);
-        $rec = json_encode(['time' => time(), 'tiers' => array_values(array_map('intval', $tiers)), 'hits' => $hitsPerTier]) . "\n";
+        $time = time();
+        $tiers = array_values(array_map('intval', $tiers));
+        $rec = json_encode(['time' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier]) . "\n";
         $tmp = $dir . '/.last-search.' . getmypid();
         if (@file_put_contents($tmp, $rec) === strlen($rec)) {
             @rename($tmp, $dir . '/last-search.json');
         } else {
             @unlink($tmp);
         }
+        if ($metric) {
+            self::appendMetric('searches', ['ts' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier] + $metric);
+        }
+    }
+
+    /** Memory metrics (ADR-0041): monthly JSON Lines files, kept on this machine only, never sent. */
+    public static function metricsDir()
+    {
+        return self::root() . '/local/state/memory-metrics';
+    }
+
+    /** Append one record to <kind>-YYYYMM.jsonl (UTC) when privacy.perfLogging is on; returns whether it was written. */
+    public static function appendMetric($kind, array $rec)
+    {
+        $config = Config::load();
+        if (empty($config['privacy']['perfLogging'])) {
+            return false;
+        }
+        $dir = self::metricsDir();
+        if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+            return false;
+        }
+        @chmod($dir, 0700);
+        $file = $dir . '/' . $kind . '-' . gmdate('Ym', isset($rec['ts']) ? (int) $rec['ts'] : time()) . '.jsonl';
+        if (!is_file($file)) {
+            @touch($file);
+            @chmod($file, 0600); // before the first line: the search words are the user's
+        }
+        $line = json_encode($rec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n";
+        return @file_put_contents($file, $line, FILE_APPEND | LOCK_EX) === strlen($line);
     }
 
     /**

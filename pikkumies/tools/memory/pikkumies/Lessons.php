@@ -4,7 +4,10 @@
  * pikkumies/memory/lessons/<topic>/YYYYMMDD-slug.md with frontmatter date, topic and sources.
  * A new lesson must link to at least one related memory file (or say why none is related), so the
  * lessons form a web that search can follow. Memory files are only ever appended to.
+ * With privacy.perfLogging on, each save is also counted in the memory metrics (ADR-0041).
  */
+require_once __DIR__ . '/MemoryMetrics.php';
+
 class Lessons
 {
     const EXCERPT = 1500; // bytes of the best paragraph returned with a search hit
@@ -60,6 +63,7 @@ class Lessons
         if (file_exists($path)) {
             throw new CliError("a lesson with this title already exists today: $path", 'add to it with: append --path ' . $path);
         }
+        $afterMiss = MemoryMetrics::recentMiss() !== null; // before writing: the newest search, under 2 hours old, had no lesson
         $duplicate = null;
         foreach ($related as $p) {
             if (substr(basename($p, '.md'), 9) === $slug) {
@@ -72,6 +76,7 @@ class Lessons
             throw new CliError("could not write $path", 'is the disk full?');
         }
         @chmod(self::root(), 0700); // git leaves the tracked memory/ directory 0755; lessons are private
+        DocSources::appendMetric('saves', ['ts' => time(), 'kind' => $kind, 'topic' => $topic, 'path' => $path, 'after_miss' => $afterMiss]);
         $status = ['verified' => is_file($path) && filesize($path) === strlen($text)];
         if ($duplicate !== null) {
             $status['warning'] = "a lesson with the same title exists: $duplicate (append to it next time)";

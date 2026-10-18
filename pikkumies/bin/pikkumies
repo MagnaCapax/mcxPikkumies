@@ -272,6 +272,8 @@ switch ($cmd) {
         out('docs:     ' . count($docNames) . ' sources for this host, ' . $docPages . ' pages downloaded, '
             . round(DocSite::dirBytes(DocSources::cacheRoot()) / 1048576, 1) . ' MB in local/docs-cache'
             . ($docErrors ? '; last fetch failed: ' . implode(', ', $docErrors) . ' (see `pikkumies.php sources`)' : ''));
+        require_once dirname(__DIR__) . '/tools/memory/pikkumies/MemoryStats.php';
+        out(MemoryStats::doctorLine()); // lessons on disk, and the last 30 days of searches when perfLogging kept them (ADR-0041)
         // The ticker mode mirrors Update::scheduleCronTick's own decision (ADR-0025), without
         // writing anything: doctor only reads the crontab to report whether the line is actually there.
         $tickOff = !empty($config['cron']['disabled']);

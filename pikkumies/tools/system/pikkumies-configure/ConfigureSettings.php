@@ -9,7 +9,7 @@ class ConfigureSettings
     /** The user settings, in display order, with one line each for `review`. */
     const INFO = [
         'agent.name' => 'What the agent calls itself. Empty: not named yet, the agent is "Pikkumies".',
-        'privacy.perfLogging' => 'Whether Pikkumies may keep performance logs on this machine. A setting only: nothing is logged yet.',
+        'privacy.perfLogging' => 'Whether Pikkumies keeps performance logs on this machine: today the memory searches (the words searched and how many results each found) and lesson saves, kept on this machine only, never sent.',
         'privacy.telemetry' => 'Whether Pikkumies may send performance telemetry. A setting only: nothing is sent yet, no sender exists.',
         'sessions.retentionDays' => 'Days of ended Hermes sessions to keep; older ones are pruned at start. 0 keeps them forever.',
         'terms.accepted' => 'Whether the person accepted the terms of service and privacy policy. Only the person sets it.',

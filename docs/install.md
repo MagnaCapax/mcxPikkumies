@@ -33,7 +33,7 @@ On a terminal, the install and the first session ask what to call your agent, an
 ~/.mcxPikkumies/pikkumies/bin/pikkumies install --name=Helper --accept-terms --telemetry=on --perf-logging=on --retention-days=0
 ```
 
-`--retention-days=0` keeps session history forever (the default); a number of days lets Hermes prune older ended sessions. Telemetry and performance logging are settings only for now: nothing is sent or logged. Runs without a terminal (cron, scripts, piped one-shot prompts) never ask and are never blocked. The settings can be reviewed and changed later with the `pikkumies-configure` skill (ADR-0032).
+`--retention-days=0` keeps session history forever (the default); a number of days lets Hermes prune older ended sessions. Telemetry is a setting only for now: nothing is sent. Performance logging keeps, on this machine only and never sent, the words of each memory search and how many results it found, and each lesson saved (`local/state/memory-metrics/`, kept until you delete it, shown by the memory skill's `stats`); `--perf-logging=off` keeps none. Runs without a terminal (cron, scripts, piped one-shot prompts) never ask and are never blocked. The settings can be reviewed and changed later with the `pikkumies-configure` skill (ADR-0032).
 
 ## Update
 

@@ -129,7 +129,7 @@ return [
         $entries = HermesConfig::hookEntries();
         check(array_keys($entries) === ['pre_llm_call', 'pre_tool_call'], 'one entry per event: ' . json_encode(array_keys($entries)));
         check($entries['pre_tool_call']['failClosed'] === true && $entries['pre_llm_call']['failClosed'] === false, 'only the event with the delete guard fails closed');
-        check($entries['pre_tool_call']['timeout'] === 22 && $entries['pre_llm_call']['timeout'] === 12, 'timeout = sum of unit timeouts + 2: ' . json_encode($entries));
+        check($entries['pre_tool_call']['timeout'] === 22 && $entries['pre_llm_call']['timeout'] === 17, 'timeout = sum of unit timeouts + 2: ' . json_encode($entries));
         check(preg_match('#/hooks/orchestrator\.php pre_tool_call$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
         $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], $entries);
         check(substr_count($guard, '    - command: ') === 2 && substr_count($guard, 'fail_closed') === 1

@@ -28,7 +28,7 @@ class Config
             'hermes' => ['lazyInstalls' => false],
             // User settings (ADR-0032). name '' = not named yet; the agent calls itself Pikkumies.
             'agent' => ['name' => ''],
-            // perfLogging and telemetry are settings only: nothing is logged or sent yet (no logger or sender exists).
+            // perfLogging: memory-search and lesson-save metrics kept on this machine only (ADR-0041). telemetry: a setting only, no sender exists.
             'privacy' => ['perfLogging' => true, 'telemetry' => true],
             'sessions' => ['retentionDays' => 0],   // Hermes session history; 0 = keep forever
             'terms' => ['accepted' => false],        // set only by the person: the first interactive run or install --accept-terms
