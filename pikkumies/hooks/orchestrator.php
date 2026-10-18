@@ -11,6 +11,9 @@
  *   shallow-merged in order; anything else is no opinion.
  * - pre_llm_call (agent/turn_context.py _collect_pre_llm_call_context): contexts joined by a blank
  *   line, capped at 9000 characters (Hermes spills a hook's context to disk above 10000).
+ * - pre_verify (agent/turn_stop_gates.py _pre_verify_nudge, hermes_cli/plugins.py
+ *   get_pre_verify_continue_message): the first unit answering {"action":"continue","message":"..."}
+ *   wins; the message is what Hermes appends as the next-turn nudge (ADR-0047).
  * A failClosed unit that crashes, times out, exits non-zero without an answer or prints something that
  * is not a JSON object makes the answer a block. A fail-open unit's failure is ignored. On pre_tool_call
  * a broken unit (bad or missing hook.md) blocks whatever it declares, and so does a fatal error of the
@@ -65,6 +68,15 @@ function hookParse($event, $stdout)
     $get = function ($k) use ($data) {
         return property_exists($data, $k) ? $data->$k : null;
     };
+    if ($event === 'pre_verify') {
+        // agent/shell_hooks.py _parse_pre_verify: "continue" (Hermes) or "block" (Claude-Code Stop)
+        // both mean keep going; no message is a no-op.
+        $action = hookTruthy($get('action')) ? $get('action') : $get('decision');
+        $message = hookTruthy($get('message')) ? $get('message') : $get('reason');
+        $action = strtolower(trim((string) $action));
+        return in_array($action, ['continue', 'block'], true) && is_string($message) && trim($message) !== ''
+            ? ['action' => 'continue', 'message' => trim($message)] : null;
+    }
     if ($event !== 'pre_tool_call') {
         $context = $get('context');
         return is_string($context) && trim($context) !== '' ? ['context' => $context] : null;
@@ -264,6 +276,17 @@ function hookMergePreToolCall(array $results)
     return $modified === null ? null : ['action' => 'modify', 'args' => (object) $modified];
 }
 
+/** hermes_cli/plugins.py get_pre_verify_continue_message: the first unit's continue answer wins; the rest are ignored. */
+function hookMergePreVerify(array $results)
+{
+    foreach ($results as $result) {
+        if (is_array($result) && isset($result['action']) && $result['action'] === 'continue') {
+            return $result;
+        }
+    }
+    return null;
+}
+
 /** agent/turn_context.py: contexts joined by a blank line; capped at HOOK_CONTEXT_MAX characters. */
 function hookMergeContext(array $results)
 {
@@ -322,7 +345,13 @@ foreach ($units as $u) {
     $results[] = $directive;
     hookLog($hookEvent, "{$u['category']}/{$u['name']}", (int) round((microtime(true) - $start) * 1000), $outcome);
 }
-$answer = $hookEvent === 'pre_tool_call' ? hookMergePreToolCall($results) : hookMergeContext($results);
+if ($hookEvent === 'pre_tool_call') {
+    $answer = hookMergePreToolCall($results);
+} elseif ($hookEvent === 'pre_verify') {
+    $answer = hookMergePreVerify($results);
+} else {
+    $answer = hookMergeContext($results);
+}
 if ($answer !== null) {
     $json = json_encode($answer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     if ($json === false && $answer['action'] === 'block') {

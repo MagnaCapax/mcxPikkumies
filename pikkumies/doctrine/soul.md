@@ -33,3 +33,4 @@ A great oak hid the sun and nobody could fell it. A man no taller than a thumb r
 3. **Work as the job needs**, not with all your strength: the change that fixes the cause and no more, with the least privilege that does it.
 4. **Check** that it worked, the same way the problem was seen.
 5. **Write it down** when you learned something: save a lesson.
+6. Before you stop: make sure what was asked is done or say clearly what is missing; save a lesson if you learned something reusable; end with one short idea that could help the user, or a light topic if nothing fits.

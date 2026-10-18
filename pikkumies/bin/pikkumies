@@ -397,6 +397,13 @@ switch ($cmd) {
                 out($creditsBanner);
             }
         }
+        // A seeded prompt answered-and-exited (not a TTY on stdin or stdout, Hermes' own behaviour,
+        // ADR-0022): pre_verify may never fire for this turn (it only fires after a file edit), so
+        // the halt guard judges it itself once Hermes exits (ADR-0047). Interactive runs skip this
+        // entirely and keep today's plain passthru.
+        if (isset($passArgs[0]) && $passArgs[0] === 'chat' && (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT)) && empty(Config::load()['halt']['disabled'])) {
+            exit(HaltRun::run(hermesBin(), $passArgs));
+        }
         $args = array_map('escapeshellarg', $passArgs);
         passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
         exit($code);

@@ -11,9 +11,11 @@ class HookUnits
 {
     /**
      * The events the orchestrator runs: pre_tool_call and pre_llm_call are merged (hermes_cli/plugins.py,
-     * agent/turn_context.py); post_tool_call is an observer whose answer Hermes ignores (model_tools.py, ADR-0044).
+     * agent/turn_context.py); post_tool_call is an observer whose answer Hermes ignores (model_tools.py, ADR-0044);
+     * pre_verify's first continue answer is the one Hermes keeps the turn going on (agent/turn_stop_gates.py,
+     * agent/verify_hooks.py, ADR-0047).
      */
-    const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call'];
+    const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call', 'pre_verify'];
     const FIELDS = ['name', 'event', 'description', 'failClosed', 'timeout'];
     const MAX_TIMEOUT = 60;
 
