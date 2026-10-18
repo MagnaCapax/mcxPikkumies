@@ -60,6 +60,7 @@ It is not only for server work: it answers general questions and investigates to
 - [Commands](docs/commands.md): every command, several sessions at once, tmux
 - [Design](docs/design.md): what it is meant to be, and the directory layout
 - [The name](docs/name.md): the little man from the sea in the Kalevala
+- [Claude Code](integrations/remote/claude/README.md): a skill that asks Pikkumies on a server over SSH
 - [Halt guard](docs/halt-guard.md): a light check on whether a turn actually finished, and `/goal` for a judged loop
 - [Decisions](docs/adr/0000-template.md): one ADR per decision in `docs/adr/`
 - [Contributing](AGENTS.md)
