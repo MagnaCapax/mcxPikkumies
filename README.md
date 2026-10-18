@@ -34,6 +34,8 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 
 **Experimental:** Pikkumies is early software. Keep backups of anything that matters. It asks before deleting data, but it can still be wrong, so read what it proposes before you say yes.
 
+**Compatibility:** we aim never to break existing installs, but Pikkumies is changing fast right now. We cannot promise when it will settle, or that an update will never break something that worked before.
+
 ## What it can do
 
 - Disk space, quota and rclone cloud or SFTP remotes: [storage](pikkumies/tools/storage/README.md)
