@@ -152,6 +152,7 @@ return [
             "cd \$(id)&& php $tool search x",
             "php $tool search 'unterminated",
             'php /tmp/evil/tools/memory/pikkumies/pikkumies.php search x',
+            "php\x0B$tool\x0Bsearch\x0Bx",
         ];
         foreach ($notOpening as $i => $cmd) {
             hookSearchGateBlocks($tree, "chain$i", 'terminal', $cmd);

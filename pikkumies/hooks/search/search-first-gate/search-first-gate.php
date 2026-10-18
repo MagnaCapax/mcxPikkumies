@@ -73,7 +73,7 @@ function searchFirstPlainCall($command, $path, $verbs)
         return false; // unterminated quote
     }
     $bare = preg_replace('#^\s*cd\s+[^\s;&|<>]+\s*&&\s*#', '', $bare, 1);
-    if (preg_match('#[;&|<>\r\n]#', $bare)) {
+    if (preg_match('#[;&|<>\r\n\x0B\x0C]#', $bare)) { // vertical tab and form feed: \s below would read them as spaces, the shell does not
         return false;
     }
     $dirs = '\./|(~|\$HOME|/home/[^/\s]+)/pikkumies/|' . preg_quote(Config::root() . '/', '#');
