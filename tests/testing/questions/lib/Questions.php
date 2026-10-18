@@ -28,6 +28,13 @@ class Questions
         return self::$readOnly;
     }
 
+    /** Is $fact in $text, any case, ignoring spacing ("200 KB/s" matches "200KB/s")? */
+    public static function has($text, $fact)
+    {
+        $strip = function ($s) { return (string) preg_replace('/\s+/', '', (string) $s); };
+        return stripos((string) $text, (string) $fact) !== false || ($strip($fact) !== '' && stripos($strip($text), $strip($fact)) !== false);
+    }
+
     /**
      * Stale-fact guard: for a question tagged source:<name>, each contains value must still be in the downloaded copy
      * of that source (local/docs-cache/<name>/ of the install, any case). Returns the missing facts, [] when all are there.
@@ -47,7 +54,7 @@ class Questions
             foreach ($files as $file) {
                 $text = $file->isFile() && !$file->isLink() ? (string) file_get_contents($file->getPathname()) : '';
                 $left = array_values(array_filter($left, function ($fact) use ($text) {
-                    return stripos($text, $fact) === false;
+                    return !self::has($text, $fact);
                 }));
                 if (!$left) {
                     break;

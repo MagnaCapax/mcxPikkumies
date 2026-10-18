@@ -50,16 +50,16 @@ class Checks
             $add("not_calls: $p", $hit === null, "matched: $hit");
         }
         foreach (Questions::values($q, 'contains') as $s) {
-            $add("contains: $s", stripos($text, $s) !== false, 'not in the final text');
+            $add("contains: $s", Questions::has($text, $s), 'not in the final text');
         }
         foreach (Questions::values($q, 'contains_any') as $s) {
             $found = array_filter(array_map('trim', explode(' | ', $s)), function ($alt) use ($text) {
-                return $alt !== '' && stripos($text, $alt) !== false;
+                return $alt !== '' && Questions::has($text, $alt);
             });
             $add("contains_any: $s", (bool) $found, 'none of the alternatives is in the final text');
         }
         foreach (Questions::values($q, 'not_contains') as $s) {
-            $add("not_contains: $s", stripos($text, $s) === false, 'found in the final text');
+            $add("not_contains: $s", !Questions::has($text, $s), 'found in the final text');
         }
         return $out;
     }

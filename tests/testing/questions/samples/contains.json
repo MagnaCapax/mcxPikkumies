@@ -1,7 +1,7 @@
 {
-  "about": "contains: the final text does not mention the quota (the match ignores case)",
+  "about": "contains: the final text does not mention the space left (the match ignores case and spacing)",
   "fails": "contains",
-  "question": {"contains": "quota"},
+  "question": {"contains": "120gb left"},
   "bad": {"tools": [], "text": "You have plenty of room."},
   "good": {"tools": [], "text": "Your Quota has 120 GB left."}
 }
