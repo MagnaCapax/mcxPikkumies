@@ -34,8 +34,9 @@ $field = $tool === 'terminal' ? 'command' : ($tool === 'execute_code' ? 'code' :
 if ($tool === 'process_manage' && isset($input['action']) && in_array($input['action'], ['write', 'submit'], true)) {
     $field = 'data';
 }
-// Hermes' file tools reach the same files without a command: only the path (and a search pattern) is checked, and only
-// against the stored-password and AI-key rules below, so an ordinary file whose name looks like a command is not asked.
+// Hermes' file tools reach the same files without a command: only the path (and a search pattern), and each file a V4A
+// patch names, are checked, and only against the stored-password and AI-key rules below, so an ordinary file whose name
+// looks like a command is not asked.
 $fileTool = in_array($tool, ['read_file', 'write_file', 'patch', 'search_files'], true);
 // A scheduled job with a script runs that script every time it is due, with no guard and nobody to ask.
 $scheduleTool = $tool === 'cronjob_manage';
@@ -51,8 +52,12 @@ if ($fileTool) {
 }
 // The shell joins r"m", 'r'm and r\m into rm: every pattern also reads the command without quotes and backslashes,
 // and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
-$bare = str_replace(['"', "'", '\\'], '', $command);
-$texts = array_unique([$command, $bare, preg_replace('#/(\./)*/*#', '/', $bare)]);
+function guardTexts($command)
+{
+    $bare = str_replace(['"', "'", '\\'], '', $command);
+    return array_unique([$command, $bare, preg_replace('#/(\./)*/*#', '/', $bare)]);
+}
+$texts = guardTexts($command);
 
 /** preg_match over every form of the command: 1 on a hit, false on a regex engine error, else 0. */
 function guardMatch($re, array $texts)
@@ -79,10 +84,19 @@ $secretPatterns = [
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
 ];
 if ($fileTool) {
-    foreach ($secretPatterns as $re => $why) {
-        if (guardMatch($re, $texts) !== 0) {
-            echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run."]) . "\n";
-            exit(0);
+    // A V4A patch has no path: each file its headers name, both sides of a Move, is checked like a path (ADR-0020).
+    require_once dirname(__DIR__, 3) . '/lib/PatchPaths.php';
+    $named = isset($input['patch']) && is_scalar($input['patch']) ? PatchPaths::v4a((string) $input['patch']) : [];
+    if ($named === null) {
+        echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a patch too long or complex to check. Not run.']) . "\n";
+        exit(0);
+    }
+    foreach (array_merge([$command], $named) as $target) {
+        foreach ($secretPatterns as $re => $why) {
+            if (guardMatch($re, guardTexts($target)) !== 0) { // a regex engine error (false) blocks too
+                echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run."]) . "\n";
+                exit(0);
+            }
         }
     }
     exit(0);

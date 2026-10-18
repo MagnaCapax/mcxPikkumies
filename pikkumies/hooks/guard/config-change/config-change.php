@@ -70,16 +70,10 @@ $guarded = '#(^|/)(local/config\.php$|pikkumies/(hooks/|lib/|tools/system/pikkum
 $guardedWhy = 'writes Pikkumies\' settings file, or a file that decides which settings the agent may change, past pikkumies-configure, so nothing in it is checked';
 
 if ($tool === 'write_file' || $tool === 'patch') {
-    // A patch in the V4A form names its files in headers, with no path field (Hermes tools/file_tools.py, patch_parser.py).
-    // Hermes reads them with Python's Unicode \s and strip(): (*UCP) makes \s Unicode here too, so an NBSP hides nothing.
-    $paths = [isset($input['path']) ? (string) $input['path'] : ''];
-    $v4a = isset($input['patch']) && is_scalar($input['patch']) ? (string) $input['patch'] : '';
-    if ($must(preg_match_all('/(*UCP)^\*\*\*\s*(?:Update|Add|Delete)\s+File:\s*(.+)$/mu', $v4a, $m))) {
-        $paths = array_merge($paths, $m[1]);
-    }
-    if ($must(preg_match_all('/(*UCP)^\*\*\*\s*Move\s+File:\s*(.+?)\s*->\s*(.+)$/mu', $v4a, $m))) {
-        $paths = array_merge($paths, $m[1], $m[2]);
-    }
+    // A patch in the V4A form names its files in headers, with no path field: PatchPaths reads them as Hermes does.
+    require_once "$root/lib/PatchPaths.php";
+    $v4a = isset($input['patch']) && is_scalar($input['patch']) ? PatchPaths::v4a((string) $input['patch']) : [];
+    $paths = array_merge([isset($input['path']) ? (string) $input['path'] : ''], $must($v4a));
     foreach ($paths as $path) {
         foreach (configChangePathForms($must(preg_replace('/(*UCP)^\s+|\s+$/u', '', $path))) as $form) {
             if ($must(preg_match($guarded, $form)) === 1) {

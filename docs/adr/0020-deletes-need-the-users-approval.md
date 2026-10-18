@@ -85,3 +85,6 @@ Consequences: this is a safety prompt, not security, aimed at the spelling an ag
 
 ## Amendment 2026-10-18: settings changes (ADR-0059)
 A second hook unit, `config-change`, uses the same approval prompt for settings changes that loosen something, cost credits or delete history, with `rule_key` `pikkumies-config:` + a hash of the key, the old and the new value (one change per answer), and for edits of `local/config.php` past the configure tool (a hash of the command). In an agent at depth 2 or more its questions are blocks, as here. Hermes' approval mode itself stays pinned to manual and is not a setting the agent can change.
+
+## Amendment 2026-10-19: V4A patches in the file-tool rules
+The stored-password and AI-key rules for Hermes' file tools also check every file a V4A `patch` names in its `Update`/`Add`/`Delete File:` and `Move File: a -> b` headers (both sides), the same way as `path`, read by `lib/PatchPaths.php` as Hermes reads them; a regex engine error while reading them blocks (`tests/HookGuardPatchTest.php`, `tests/PatchPathsTest.php`).

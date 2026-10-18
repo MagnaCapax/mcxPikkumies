@@ -66,3 +66,6 @@ What was found:
 
 ## References
 - ADR-0004 (privilege from the OS), ADR-0007 (local skills and `skills.disabled`), ADR-0015, ADR-0020 (approval prompt, `rule_key`, nested agents), ADR-0022 and ADR-0052 (routing), ADR-0029 (SOUL.md), ADR-0030 (hook units), ADR-0032 (settings), ADR-0038 (overlay), ADR-0047, ADR-0050 (model list and rates), ADR-0057 (`update.channel`)
+
+## Amendment 2026-10-19: the V4A header reading is shared
+The hook's V4A header reading moved to `lib/PatchPaths.php`, which guard-destructive now also uses (the gap named under Consequences is closed, ADR-0020 amendment 2026-10-19); it also counts U+001C to U+001F as whitespace, as Python does, and an empty `*** Update File:` line no longer swallows the next line's header, so those two forms are now asked.
