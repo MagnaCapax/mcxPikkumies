@@ -11,7 +11,7 @@ class Targets
      * pikkumies reads (endpoint= and key=); ~/ is the account's real home. With $keys, also 'keys' => [name => key]
      * for the targets in use ($only, or all) and the judge; a missing key stops here, before anything is asked.
      */
-    public static function targets($file, $keys, $only = '')
+    public static function load($file, $keys, $only = '')
     {
         $st = $file !== '' ? @stat($file) : false;
         if (!$st || $st['uid'] !== posix_geteuid() || ($st['mode'] & 0022)) {

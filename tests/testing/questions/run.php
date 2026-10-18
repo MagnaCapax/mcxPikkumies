@@ -43,7 +43,7 @@ if ($o['list']) {
         $n = array_sum(array_map('count', array_intersect_key($q['meta'], array_flip(Questions::CHECKS))));
         printf("%-44s %-30s %2d checks %s\n", $q['id'], implode(',', $q['tags']), $n, implode('', Questions::values($q, 'family')));
     }
-    echo $o['targets'] !== '' ? 'targets: ' . implode(', ', array_keys(Targets::targets($o['targets'], false)['targets'])) . "\n" : '';
+    echo $o['targets'] !== '' ? 'targets: ' . implode(', ', array_keys(Targets::load($o['targets'], false)['targets'])) . "\n" : '';
     exit(0);
 }
 if ($o['regrade'] !== '') {
@@ -67,7 +67,7 @@ if ($o['max-tokens'] === null || !ctype_digit((string) $o['max-tokens'])) {
 if (!ctype_digit($o['timeout']) || ($o['max-turns'] !== '' && !ctype_digit($o['max-turns']))) {
     fail('--timeout and --max-turns take a whole number', 2);
 }
-$t = Targets::targets($o['targets'], true, $o['target']);
+$t = Targets::load($o['targets'], true, $o['target']);
 $targets = $t['targets'];
 $questions || fail('nothing to ask: no question selected');
 usort($questions, function ($a, $b) {

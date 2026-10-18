@@ -174,6 +174,7 @@ class Config
     public static function overlayPath()
     {
         $path = (string) getenv('PIKKUMIES_CONFIG');
+        clearstatcache(true, $path); // a mode changed earlier in this process must not read as before (PHP caches stat)
         $st = $path !== '' && is_file($path) && is_readable($path) ? @stat($path) : false;
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         return $st && $st['uid'] === $uid && ($st['mode'] & 0022) === 0 ? $path : '';
