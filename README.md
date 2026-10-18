@@ -8,7 +8,7 @@ A small helper agent that lives on the server it looks after. Ask it in plain wo
 curl -fsSLo install-pikkumies.sh https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh && bash install-pikkumies.sh
 ```
 
-No curl? `wget -qO install-pikkumies.sh https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh && bash install-pikkumies.sh`. The [installer](install.sh) is a dozen lines: it clones this repository into `~/.mcxPikkumies` and runs `pikkumies install`, in your own account, with no root. It needs git and PHP 7.3 or newer. Run it again to update.
+No curl? `wget -qO install-pikkumies.sh https://raw.githubusercontent.com/MagnaCapax/mcxPikkumies/main/install.sh && bash install-pikkumies.sh`. The [installer](install.sh) is a dozen lines: it clones this repository into `~/.mcxPikkumies` and runs `pikkumies install`, in your own account, with no root. It needs git, PHP 7.3 or newer with the curl extension, and libatomic (Debian and Ubuntu: `apt install git php-cli php-curl libatomic1`); a Pulsed Media seedbox has all of them. Run it again to update.
 
 Then:
 
