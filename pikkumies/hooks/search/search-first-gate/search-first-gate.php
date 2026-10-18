@@ -40,9 +40,29 @@ if (is_file($marker) && (!is_file($armed) || filemtime($marker) >= filemtime($ar
 }
 $command = $tool === 'terminal' && isset($payload['tool_input']['command']) ? (string) $payload['tool_input']['command'] : '';
 
+/**
+ * True when $command is one plain call of the tool at $path with one of $verbs (ADR-0038): an optional
+ * `cd <dir> &&` in front, then optional `php`, the script, flags and the verb. Anything chained after it
+ * (; && || | a redirect, a newline) or a command substitution, even inside double quotes, makes it no match,
+ * so `echo <search command>; rm -rf x` neither opens the gate nor passes as a read. Single-quoted words are
+ * literal to the shell and may hold anything.
+ */
+function searchFirstPlainCall($command, $path, $verbs)
+{
+    $c = preg_replace('#^\s*cd\s+("[^"]*"|\'[^\']*\'|[^\s;&|]+)\s*&&\s*#', '', $command, 1);
+    if (preg_match('#"[^"]*(\$\(|`|\$\{)[^"]*"#', $c)) {
+        return false;
+    }
+    $bare = preg_replace('#"[^"]*"|\'[^\']*\'#', "''", $c);
+    if (preg_match('#[;&|`<>\r\n]|\$\(#', $bare)) {
+        return false;
+    }
+    return (bool) preg_match('#^\s*(php\s+)?["\']?[^\s"\']*' . $path . '["\']?(\s+--?[a-z][a-z-]*)*\s+(' . $verbs . ')(\s|$)#', $bare);
+}
+
 // The memory unit's script, optionally followed by flags, then the verb (ADR-0018).
-const SEARCH_FIRST_TOOL = '#tools/memory/pikkumies/pikkumies\.php["\']?(\s+--?[a-z][a-z-]*)*\s+';
-if (preg_match(SEARCH_FIRST_TOOL . 'search\b#', $command)) {
+const SEARCH_FIRST_TOOL = 'tools/memory/pikkumies/pikkumies\.php';
+if (searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'search')) {
     @mkdir($dir, 0700, true);
     touch($marker);
     foreach ((array) glob($dir . '/*') as $old) {
@@ -53,8 +73,8 @@ if (preg_match(SEARCH_FIRST_TOOL . 'search\b#', $command)) {
     exit(0);
 }
 // The wiki and kb units only read the downloaded copies (ADR-0037): allowed, but they do not open the gate (no lessons searched).
-const SEARCH_FIRST_DOCS_TOOL = '#tools/documentation/(wiki|kb)/\\1\.php["\']?(\s+--?[a-z][a-z-]*)*\s+(search|list)\b#';
-if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || preg_match(SEARCH_FIRST_TOOL . '(list|sources)\b#', $command) || preg_match(SEARCH_FIRST_DOCS_TOOL, $command)) {
+if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources')
+    || searchFirstPlainCall($command, 'tools/documentation/wiki/wiki\.php', 'search|list') || searchFirstPlainCall($command, 'tools/documentation/kb/kb\.php', 'search|list')) {
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';

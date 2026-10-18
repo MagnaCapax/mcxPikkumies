@@ -32,6 +32,24 @@ return [
         check($d['agent']['name'] === '' && $d['privacy']['perfLogging'] === true && $d['privacy']['telemetry'] === true, 'agent/privacy defaults');
         check($d['sessions']['retentionDays'] === 0 && $d['terms']['accepted'] === false, 'sessions/terms defaults');
     },
+    'settings: PIKKUMIES_CONFIG overlays local settings for one run; unset or missing changes nothing (ADR-0038)' => function () {
+        $dir = sys_get_temp_dir() . '/pk-overlay-' . getmypid();
+        @mkdir($dir, 0700, true);
+        file_put_contents("$dir/run.php", "<?php\nreturn ['provider' => ['model' => 'forced-model'], 'host' => ['family' => 'pmss'], 'hooks' => ['model' => 'light']];\n");
+        $plain = Config::load();
+        $forced = testWithEnv(['PIKKUMIES_CONFIG' => "$dir/run.php"], function () {
+            return [Config::load(), Config::overlayPath()];
+        });
+        check($forced[0]['provider']['model'] === 'forced-model' && $forced[0]['host']['family'] === 'pmss' && $forced[0]['hooks']['model'] === 'light', 'overlay not applied');
+        check($forced[1] === "$dir/run.php", 'overlayPath');
+        check($forced[0]['provider']['keyFile'] === $plain['provider']['keyFile'], 'overlay must keep the keys it does not set');
+        $missing = testWithEnv(['PIKKUMIES_CONFIG' => "$dir/nope.php"], function () {
+            return [Config::load(), Config::overlayPath()];
+        });
+        check($missing[0] == $plain && $missing[1] === '', 'a missing overlay changed the settings');
+        check(Detect::applyOverride(['family' => 'generic', 'stack' => 'none'], $forced[0])['family'] === 'pmss', 'host family not forced through the overlay');
+        exec('rm -rf ' . escapeshellarg($dir));
+    },
     'settings: Config::set writes only known keys of the right type, atomically, keeping other overrides' => function () {
         $file = settingsFile('set');
         file_put_contents($file, "<?php\nreturn ['provider' => ['endpoint' => 'https://e/v1']];\n");

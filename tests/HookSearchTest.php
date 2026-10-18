@@ -131,6 +131,32 @@ return [
         check(!hookSearchGateBlocks($tree, 's4', 'write_file'), 'a follow-up closed the gate');
         exec('rm -rf ' . escapeshellarg($tree));
     },
+    'search-first gate: only a plain search command opens it; a mention, a chain or a substitution does not (ADR-0038)' => function () use ($hookPages) {
+        $tree = hookSearchTree($hookPages);
+        $tool = '~/pikkumies/tools/memory/pikkumies/pikkumies.php';
+        $notOpening = [
+            "echo $tool search x; rm -rf /tmp/x",
+            "php $tool search x; rm -rf /tmp/x",
+            "php $tool search x && rm -rf /tmp/x",
+            "php $tool search x || true",
+            "php $tool search x | sh",
+            "php $tool search x > /tmp/out",
+            "php $tool search \"\$(rm -rf /tmp/x)\"",
+            "php $tool search `id`",
+            "php $tool search x\nrm -rf /tmp/x",
+            "rm -rf /tmp/x # $tool search x",
+        ];
+        foreach ($notOpening as $i => $cmd) {
+            hookSearchGateBlocks($tree, "chain$i", 'terminal', $cmd);
+            check(hookSearchGateBlocks($tree, "chain$i", 'write_file'), 'opened the gate: ' . $cmd);
+        }
+        foreach (["php $tool search \"disk full\"", "cd ~ && php $tool --human search disk full", "php $tool search 'a > b; c'"] as $i => $cmd) {
+            check(!hookSearchGateBlocks($tree, "plain$i", 'terminal', $cmd) && !hookSearchGateBlocks($tree, "plain$i", 'write_file'), 'a plain search did not open the gate: ' . $cmd);
+        }
+        check(hookSearchGateBlocks($tree, 'ro', 'terminal', "php $tool list; rm -rf /tmp/x"), 'a chained list passed as a read');
+        check(!hookSearchGateBlocks($tree, 'ro2', 'terminal', "php $tool sources"), 'a plain sources call was blocked');
+        exec('rm -rf ' . escapeshellarg($tree));
+    },
     'search-first hook: titles are one clean line of at most 120 characters; output stays within 1500 bytes' => function () {
         // Five matching pages with long titles (one with control characters) among 30 unrelated ones.
         $pages = ['evil' => ["Disk\x1b[31m full\x07\t\xe2\x80\xa8 trick " . str_repeat('long ', 60), 'disk full rtorrent stops']];

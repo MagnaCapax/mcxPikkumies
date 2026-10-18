@@ -156,7 +156,22 @@ class Config
     {
         $file = self::localDir() . '/config.php';
         $local = is_file($file) ? require $file : [];
-        return self::merge(self::defaults(), is_array($local) ? $local : []);
+        $config = self::merge(self::defaults(), is_array($local) ? $local : []);
+        // PIKKUMIES_CONFIG names an overlay merged last, for one run (ADR-0038): automation and the question
+        // suite force the model, the light model, the host family or any other key without editing local/config.php.
+        $overlay = self::overlayPath();
+        if ($overlay !== '') {
+            $over = require $overlay;
+            $config = is_array($over) ? self::merge($config, $over) : $config;
+        }
+        return $config;
+    }
+
+    /** The PIKKUMIES_CONFIG overlay file, or '' when it is unset or not a readable file. */
+    public static function overlayPath()
+    {
+        $path = (string) getenv('PIKKUMIES_CONFIG');
+        return $path !== '' && is_file($path) && is_readable($path) ? $path : '';
     }
 
     /** Recursive merge where local scalars and lists replace defaults. */

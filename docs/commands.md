@@ -25,4 +25,28 @@ alias pm2='pikkumies tmux 2'   # ... up to pm9
 
 `pm2` attaches to the `pikkumies` tmux session at window `pm2`, starting a new agent session there if that window is not open yet; detach with `Ctrl-b d` and the sessions keep running.
 
+## Forcing settings for one run
+
+Three environment variables override the settings for one command, without editing `local/config.php` (ADR-0038):
+
+| Variable | What it forces |
+|---|---|
+| `PIKKUMIES_ENDPOINT` | The provider endpoint (an OpenAI-compatible base URL) |
+| `PIKKUMIES_KEY` | The provider key |
+| `PIKKUMIES_CONFIG` | A PHP file that returns a settings array, merged over `local/config.php`; any key works |
+
+```sh
+cat > /tmp/run.php <<'EOF'
+<?php
+return [
+    'provider' => ['model' => 'MODEL-ID'],   // the model for this run
+    'hooks' => ['model' => 'LIGHT-MODEL-ID'], // the model the hooks use
+    'host' => ['family' => 'pmss'],           // which provider's documentation is "this host"
+];
+EOF
+PIKKUMIES_CONFIG=/tmp/run.php pikkumies doctor
+```
+
+`pikkumies doctor` names the overlay file when one is in use. The overlay is plain configuration: anything it can set, `local/config.php` can set too. Use it when automation would guess wrong (the model list's first entry, the detected host family) and in the question suite under `tests/testing/`.
+
 [Back to the README](../README.md)
