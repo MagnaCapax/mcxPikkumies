@@ -1,0 +1,9 @@
+# config-change
+
+The approval prompt for Pikkumies' own settings (ADR-0059). The agent changes a setting with the `pikkumies-configure` tool. Changes that tighten something, or that are harmless either way (the agent's name, turning a safety hook back on), go through without a question. Changes that loosen something, cost credits, stop scheduled jobs or delete history (another model, turning off a tool category and its rules, hiding the low-credits notice, the scheduled-job ticker either way, turning search rewording off, a shorter session history, following unreleased code) get Hermes' approval prompt first, naming the setting, its old and new value and what the change does. The model cannot answer that prompt; in cron and other unattended runs Hermes refuses it, so nothing changes. Turning a safety layer off is the person's own: the tool and `Config::set` refuse it and say how the person does it.
+
+An "always" answer covers that one change (the same setting from the same old value to the same new one) each time it comes again, never another.
+
+Changes past the plain tool command are asked about with the whole command, because nothing in them is checked: a command or code that names a setting with an asked direction next to `set` or `apply`, `Config`, `ConfigureChange` or `ConfigureSettings` called directly, a `PIKKUMIES_CONFIG` overlay, and edits of `local/config.php` and of the files that decide what the agent may change (the configure tool, `lib/`, the hooks), by the file tools (a V4A patch's file headers and a symlinked directory too), the shell or code. `pikkumies configure undo` is blocked: it is the person's own shell command, which asks them on their terminal.
+
+It is a safety prompt, not a security boundary: the agent runs as the same user and could edit the file some way this hook does not see; the person owns the file and can change anything in it.

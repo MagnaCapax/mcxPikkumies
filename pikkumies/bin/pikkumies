@@ -321,6 +321,10 @@ switch ($cmd) {
         break;
 
     case 'configure': // the settings review; on a terminal, a session with the configure skill (ADR-0052)
+        if ($passArgs === ['undo']) { // the person's own undo of the last settings change, asked on a terminal, no session (ADR-0059)
+            require_once dirname(__DIR__) . '/tools/system/pikkumies-configure/ConfigureUndo.php';
+            exit(ConfigureUndo::run(Launch::isTty(STDIN) && Launch::isTty(STDOUT), 'promptRead', 'promptWrite'));
+        }
         if (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT)) {
             // Nobody to answer: a one-shot session would spend credits (and halt-guard resumes) on a fixed review.
             passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/pikkumies-configure/pikkumies-configure.php') . ' review --human', $code);
@@ -525,6 +529,7 @@ switch ($cmd) {
         out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
         out('       pikkumies -m <model> [free text]           a session with that model (also --model, and --reasoning <level>)');
         out('       pikkumies configure                        review your settings and change them with the agent');
+        out('       pikkumies configure undo                   show the last settings change and set it back after you answer y');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }

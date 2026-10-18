@@ -128,7 +128,7 @@ return [
             unlink($fx['config']);
             list($code, $l, $out) = arrRun($fx, ['stats']);
             check($code === 1 && strpos($out, 'not installed') !== false
-                && strpos($out, "'bazarr' => ['config'") !== false, 'not installed: ' . $out);
+                && strpos($out, 'set arr.bazarr.config') !== false, 'not installed: ' . $out);
         } finally {
             arrP2Done($fx);
         }

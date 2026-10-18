@@ -67,8 +67,8 @@ return [
         check($local['agent']['name'] === 'Little Helper' && $local['privacy']['telemetry'] === false && $local['sessions']['retentionDays'] === 90, 'values not written: ' . json_encode($local));
         check((fileperms($file) & 0777) === 0600, 'config.php must be 0600');
         check(!glob($file . '.tmp-*'), 'temporary file left behind');
-        $bad = [['terms.accepted', true], ['hooks.reword', false], ['provider.endpoint', 'x'], ['privacy.telemetry', 'off'], ['sessions.retentionDays', -1],
-            ['sessions.retentionDays', '30'], ['agent.name', "a\nb"], ['agent.name', str_repeat('x', 33)], ['agent.name', 'Bob' . "\n"], ['root.disabled', true]];
+        $bad = [['terms.accepted', true], ['host.family', 'pmss'], ['provider.endpoint', 'x'], ['provider.model', 'has space'], ['tools.disabled', 'email'], ['tools.disabled', ['Email']], ['skills.disabled', ['a', 'a']], ['arr.sonarr.config', 'relative/path'], ['privacy.telemetry', 'off'], ['sessions.retentionDays', -1],
+            ['sessions.retentionDays', '30'], ['agent.name', "a\nb"], ['agent.name', str_repeat('x', 33)], ['agent.name', 'Bob' . "\n"], ['root.disabled', 'yes']];
         foreach ($bad as $b) {
             $threw = false;
             try {
@@ -79,6 +79,34 @@ return [
             check($threw, 'Config::set accepted ' . json_encode($b));
         }
         check((require $file) === $local, 'a refused set changed the file');
+    },
+    'settings: Config::set itself refuses the person\'s directions, judged against the file\'s value, for every caller (ADR-0059)' => function () {
+        $file = settingsFile('tiered');
+        file_put_contents($file, "<?php\nreturn ['root' => ['disabled' => true]];\n");
+        $calls = [
+            function () use ($file) {
+                Config::set('root.disabled', false, $file); // root's tools back on: the person's
+            },
+            function () use ($file) {
+                call_user_func('Config::set', 'halt.disabled', true, $file);
+            },
+            function () use ($file) {
+                call_user_func(['Config', 'set'], 'autoUpdate.disabled', true, $file);
+            },
+        ];
+        foreach ($calls as $i => $call) {
+            $threw = '';
+            try {
+                $call();
+            } catch (InvalidArgumentException $x) {
+                $threw = $x->getMessage();
+            }
+            check(strpos($threw, "the person's to do") !== false, "call $i was written: " . $threw);
+        }
+        check((require $file) === ['root' => ['disabled' => true]], 'a refused set changed the file: ' . json_encode(require $file));
+        check(Config::set('halt.disabled', false, $file) === false && Config::set('root.disabled', true, $file) === true, 'the free direction is written');
+        Config::acceptTerms($file);
+        check((require $file)['terms']['accepted'] === true, 'acceptTerms is the person\'s own path and is not judged');
     },
     'settings: terms are accepted only through acceptTerms, never Config::set' => function () {
         $file = settingsFile('terms');
@@ -101,26 +129,33 @@ return [
             check($threw, 'parse accepted ' . json_encode($b));
         }
     },
-    'configure: set is limited to name, perf logging, telemetry, retention and update channel; every other key is refused' => function () {
-        $allowed = ['agent.name', 'privacy.perfLogging', 'privacy.telemetry', 'sessions.retentionDays', 'update.channel'];
-        check(array_keys(Config::SETTABLE) === $allowed, 'the settable list changed: ' . json_encode(array_keys(Config::SETTABLE)));
+    'configure: set refuses the person\'s keys and directions with how they change them; every other default key is settable (ADR-0059)' => function () {
         $file = settingsFile('tool');
-        $refuse = array_merge(['terms.accepted', 'hooks.reword', 'hooks.llm.disabled', 'searchFirst.disabled', 'root.disabled', 'provider.endpoint', 'provider.keyFile',
-            'tools.disabled', 'skills.disabled', 'cron.disabled', 'autoUpdate.disabled', 'hermes.lazyInstalls', 'nonsense'], array_diff(configLeaves(Config::defaults()), $allowed));
-        foreach (array_unique($refuse) as $key) {
+        // Each of these is the person's: the key itself, or the loosening direction of a safety switch.
+        $refuse = [['terms.accepted', 'yes'], ['provider.endpoint', 'https://x/v1'], ['provider.keyFile', '/x'], ['provider.virsilipasKeyFile', '/x'],
+            ['host.family', 'pmss'], ['root.disabled', 'off'], ['searchFirst.disabled', 'on'], ['halt.disabled', 'on'],
+            ['fileopsCheck.disabled', 'on'], ['hooks.llm.disabled', 'on'], ['autoUpdate.disabled', 'on'], ['hermes.lazyInstalls', 'on'], ['nonsense', 'on']];
+        $config = Config::defaults();
+        $config['root']['disabled'] = true; // so that off is a change: root's tools back on
+        foreach ($refuse as $r) {
             $threw = false;
             try {
-                ConfigureSettings::set($key, 'on', $file);
+                ConfigureSettings::set($r[0], $r[1], $file, $config);
             } catch (CliError $x) {
-                $threw = $x->hint !== '';
+                $threw = $x->hint !== '' && ($r[0] === 'nonsense' || strpos($x->getMessage(), 'yours to change') !== false);
             }
-            check($threw, "configure set accepted $key (or refused it without saying how the person changes it)");
+            check($threw, "configure set accepted $r[0] = $r[1] (or refused it without saying how the person changes it)");
         }
         check(!is_file($file), 'a refused set wrote the config');
         try {
-            ConfigureSettings::set('terms.accepted', 'yes', $file);
+            ConfigureSettings::set('terms.accepted', 'yes', $file, Config::defaults());
         } catch (CliError $x) {
             check(strpos($x->hint, '--accept-terms') !== false, 'terms refusal must name the human way');
+        }
+        // Every default key the person does not own outright is one Config::set writes.
+        foreach (configLeaves(Config::defaults()) as $key) {
+            $person = ConfigureTiers::rule($key) === ['any', 'person'];
+            check($person === (Config::type($key) === null), "$key: settable exactly when it is not the person's outright");
         }
     },
     'configure: set, get, show and review round-trip; review warns about sessions kept forever' => function () {
@@ -131,7 +166,7 @@ return [
         $config = Config::merge(Config::defaults(), require $file);
         check(ConfigureSettings::get($config, 'agent.name')['value'] === 'Helper', 'get after set');
         $show = array_column(ConfigureSettings::show($config), 'value', 'key');
-        check($show['privacy.telemetry'] === false && $show['sessions.retentionDays'] === 0 && count($show) === 6, 'show: ' . json_encode($show));
+        check($show['privacy.telemetry'] === false && $show['sessions.retentionDays'] === 0 && count($show) === count(ConfigureSettings::INFO), 'show: ' . json_encode($show));
         $review = [];
         foreach (ConfigureSettings::review($config) as $row) {
             check($row['means'] !== '', $row['key'] . ' has no explanation');

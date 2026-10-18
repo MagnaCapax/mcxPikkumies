@@ -1,0 +1,68 @@
+# ADR-0059: Every setting has a tier: the agent's, asked, or the person's own
+
+## Metadata
+- Author: Aleksi Ursin / MCX (with Väinämöinen)
+- Date: 2026-10-18
+- Status: Accepted. Supersedes ADR-0032's list of settable keys and its refusal of every other key; amends ADR-0020 (a new question class, `rule_key` `pikkumies-config:`), ADR-0022 and ADR-0052 (`pikkumies configure undo` is a subcommand).
+
+## Context
+The request of 2026-10-18: "further pikkumies configure should be prompts tools etc and the agent should configure itself as far as possible, as an agent".
+
+What was found:
+- `pikkumies-configure set` wrote five keys (ADR-0032, ADR-0057) and refused the other eighteen keys of `Config::defaults()` with "edit local/config.php". The agent could not switch a hook back on, pick a model or hide a skill it had copied; the update skill told it to add a name to `skills.disabled` in `local/config.php` while the configure skill told it never to edit that file.
+- Two keys are read but are not in the defaults: `host.*`, merged over what detection found (`Detect::applyOverride`), and `arr.<app>.config`, where an *arr tool finds its app's config (`tools/arr/lib/Arr.php`, the Autobrr, Bazarr and Jackett runners).
+- Turning a tool category off drops its `DOCTRINE.md` from SOUL.md with its skills (`Units::doctrines`): `tools.disabled` can take rules out of the agent's instructions.
+- A model the endpoint does not serve breaks the next start; a light model that answers badly turns the hooks' judges off without a word (ADR-0047, ADR-0050).
+- `sessions.retentionDays` 0 keeps sessions forever, so going from 0 to a number deletes history, and so does a smaller number.
+- Hermes' approval prompt (ADR-0020) is already there: a hook answers `approve`, the person answers, the model cannot, and cron and one-shot runs refuse. "always" answers are remembered by `rule_key`.
+
+## Options Considered
+- **Keep five settable keys.** Does not do what was asked. Rejected.
+- **Let the agent set everything.** It could then turn off its own safety hooks, the root switch, the provider or the terms (the reason ADR-0032 limited the list). Rejected.
+- **A separate approval system** (a pending-change file the person confirms). A second mechanism next to Hermes' prompt, and one the agent can write. Rejected: reuse the prompt.
+- **`rule_key` per key.** One "always" for `provider.model` would approve every later model. Rejected: the key names the exact change.
+- **Check the model id in the hook.** The hook has seconds; a model list request can take ten. Rejected: the tool checks it after the question.
+- **An agent-facing `undo` that replays the change log.** The log is a file the agent can write, and the tool would read it after the question was asked. Rejected: the agent sets the old value like any other change; only the person's shell undo reads the log, and it asks them.
+- **One tier per change, decided by one function used by both the tool and the hook.** Chosen.
+
+## Decision
+- **Three tiers** (`lib/ConfigureTiers.php`): *free*, the agent makes the change when the user asks; *approve*, Hermes asks the person first; *person*, the tool refuses, saying what that change does and how the person makes it (by hand in `local/config.php`, the terms by the first-start question or `--accept-terms`). The tier depends on the direction of the change:
+
+| key | free | asked | the person's |
+|---|---|---|---|
+| `provider.endpoint`, `provider.keyFile`, `provider.virsilipasKeyFile` | | | any change |
+| `provider.model`, `hooks.model` | | any change, the id checked against the endpoint's list | |
+| `root.disabled` | true | | false (root's tools back on) |
+| `hooks.reword` | true | false (a question with no local hit is searched with the words as typed) | |
+| `skills.disabled` | adding or removing a shipped name | | |
+| `tools.disabled` | removing a category | adding one; the question names the category rules that leave SOUL.md | |
+| `searchFirst.disabled`, `halt.disabled`, `fileopsCheck.disabled`, `hooks.llm.disabled` | false | | true (turns a safety layer off) |
+| `autoUpdate.disabled` | false | | true (stops security and bug-fix updates) |
+| `hermes.lazyInstalls` | false | | true (downloads and runs packages at runtime) |
+| `lowBalance.disabled` | false | true (hides the low-credits notice) | |
+| `cron.disabled` | | true (the scheduled jobs the user set up stop running) and false (Hermes' jobs run unattended every minute), each with its own reason | |
+| `update.channel` | `release` | `git/<branch>` (code that has not been through a release) | |
+| `agent.name`, `privacy.perfLogging`, `privacy.telemetry` | any change | | |
+| `sessions.retentionDays` | longer, or a number to 0 (0 is forever, the longest) | shorter, 0 to a number included | |
+| `arr.<app>.config` (`<app>` a shipped *arr tool) | a file this account owns | | |
+| `host.*`, `terms.accepted` | | | any change |
+
+  Hermes' approval mode is not a Pikkumies setting: it stays pinned to manual (`HermesConfig`, ADR-0020). Every key of `Config::defaults()` has a rule; a test fails when a new default key has none. No change at all is free; a key without a rule is the person's.
+- **`Config::SETTABLE`** grows to every key with a free or asked direction, with the types `model` (an id as an endpoint lists it, or empty for the default), `names` (a list of lowercase names, for categories and skills) and `path` (`arr.<app>.config`, by pattern). `Config::set` writes keys of any depth. It never writes the provider endpoint and key files, `host.*` or the terms, and it refuses every person-tier change itself, judged with `ConfigureTiers` against the file's value under its lock, so a caller that skips the tool (`call_user_func('Config::set', …)`) is refused the same way. `Config::fileConfig()` is the defaults and `local/config.php` without the overlay: what a change is judged against.
+- **The tool** (`ConfigureChange`): `plan` decides the tier and checks a list or path against what is shipped (tool categories, skill names, *arr tools; an `arr.<app>.config` path must be a file this account owns, because that is what makes it free); `apply` refuses the person's changes, refuses a key a `PIKKUMIES_CONFIG` overlay forces (the change would not show while the overlay is in effect; every other change is judged against `Config::fileConfig()` by the tool and the hook alike, so an overlay such as the question suite's, provider and host only, stops nothing else), checks a new model id against `GET {endpoint}/models` (no endpoint, no key, no answer or no such id refuses the change: fail closed), writes, and prints the old value and, for a model, the `credits_per_million_tokens` the endpoint sends (ADR-0050). To go back the agent sets the old value; it has no undo verb. New verb: `skills disable|enable <name>`. `review` shows every setting with `changes`, the rule in words ("turning it off (true)" for the `*.disabled` keys). Every refusal of the person's change says that a set rewrites `local/config.php` from its values, so comments in it are not kept.
+- **The hook** (`hooks/guard/config-change`, `pre_tool_call`, fails closed): the plain terminal command `php <this Pikkumies' pikkumies-configure.php> set <key> <value>` is judged by the same `ConfigureChange::plan` against `Config::fileConfig()`; an asked change gets `approve` with the key, old and new value and what that direction does, and `rule_key` `pikkumies-config:` + the first 32 hex digits of sha256 of the key, old and new value. An "always" answer therefore covers that key/old/new triple each time it recurs; where the way back is free (re-enabling a category, the low-credits notice back on), that is a standing permission for that one change, never for another value. Free and person changes get no opinion. Asked with the whole command (its hash as `rule_key`): `pikkumies-configure` followed by `set` in any other form; any terminal command, code or process input that names a key with an asked direction (from `ConfigureTiers::RULES`) next to the word `set` or `apply` (`php "$C" set sessions.retentionDays 1`, `$c::set('hooks.reword', false)`); `Config::set`/`acceptTerms` and `ConfigureChange`/`ConfigureSettings` `apply`/`set`/`skills` as a call, a callable string or an array; setting `PIKKUMIES_CONFIG`; and writes to `local/config.php`, the configure tool's PHP, anything under `lib/` (the hook's own `NestedAgent` and `Cli` included) or any hook: by the file tools, matched on the path as written and on its real path (the nearest existing directory's, for a new file), by `path` or by the `Update`/`Add`/`Delete File:` and `Move File: a -> b` headers of a V4A patch (Hermes' other patch form, which has no `path`; read with Unicode whitespace as Hermes reads it), or by a terminal or code write naming one of them (redirect, `tee`, `sed -i`, `cp`, `file_put_contents`, …). A regex engine error is a block. `pikkumies configure undo` is blocked: it is the person's command. In an agent started by an agent every question is a block, as in guard-destructive.
+- **Change log and the person's undo.** Every change appends `{at, key, old, new}` to `local/state/configure-changes.jsonl`. The agent can write that file too, so nothing trusts it. `pikkumies configure undo` (exactly those words, `ConfigureUndo`) is the person's own shell command: it reads the last line, plans it like any change, prints `key old -> new (tier)` with the reason, and on a terminal changes it only after the person answers y; without a terminal it makes only a free change and refuses an asked one. It refuses the person's own changes (as `Config::set` would), a run from inside an agent (`PIKKUMIES_DEPTH` 1 or more), a run under an overlay, a key that no longer holds the logged new value, and a line whose key is not a plain setting name with a rule, which it never prints (a forged key could carry terminal control sequences). A second undo undoes the first. `pikkumies configure <other words>` stays a prompt, and `pikkumies -- configure undo` is the prompt "configure undo".
+- **Docs that told the agent to edit `local/config.php`** (the update skill, the skill SOP, the *arr not-installed hints) point at the configure skill.
+
+## Consequences
+- The agent can do most of its own configuration; what turns a safety layer off, puts root's tools back, stops updates or downloads code at runtime still needs the person, and what costs credits, stops scheduled jobs or deletes history needs their answer. With nobody to answer (cron, one-shot), nothing in the asked tier changes.
+- This is a safety prompt, not security (AGENTS.md). Out of its sight: a key or command built at run time (`'sessions' . '.retentionDays'`), an edit of `local/config.php` spelled some other way (a path built in a variable, a bare `config.php` from inside `local/`, a shell write through a symlinked directory, a script that writes it), and the person's own edits. The person owns the file. `Config::set` refusing the person's changes narrows the code route, but code can still write the file directly.
+- False matches only ask: a command that names `local/config.php` or a hook file and also redirects output (`cat local/config.php > /tmp/x`), or that names an asked setting next to the word `set` (`grep 'set sessions.retentionDays' USAGE.md`), gets a question.
+- When the config-change question and another guard's question meet on one command, the orchestrator keeps the first approve by unit name (config-change sorts first), so the other unit's reason is not shown; the whole command still is. Merging the messages is an orchestrator change, left for later.
+- guard-destructive's file-tool rules (stored passwords, the AI key) read only `path` and `pattern`, not a V4A patch's headers; that gap is left to its own change.
+- `review` grows from six settings to twenty-three. `settable` keeps its meaning (whether `set` writes the key at all); `changes` says which direction is whose.
+- `Config.php` grows past 300 lines with the types; it was not split, because tests and runtime copy it alone into scratch trees (it loads `ConfigureTiers.php` only when a setting is written).
+- Tests: `tests/ConfigureTiersTest.php` (every default key has a rule, each row's directions, the reasons per direction), `tests/ConfigureChangeTest.php` (apply, refusals and their text, an overlay-forced key, the question suite's overlay stopping nothing else, owned *arr path, model check, log, skills), `tests/ConfigureUndoTest.php` (forged log lines and keys, terminal and no terminal, inside an agent, overlay), `tests/ConfigChangeHookTest.php` (the hook in a throwaway tree, V4A and replace patches, Unicode headers, symlinked directories, `Config` and `Configure*` spellings, asked keys next to set or apply, a regex engine failure), `tests/ConfigTest.php` (`Config::set` refuses the person's changes for every caller), `tests/ConfigSettingsTest.php`, `tests/ConfigureToolTest.php`, `tests/LaunchTest.php` (`configure undo`).
+
+## References
+- ADR-0004 (privilege from the OS), ADR-0007 (local skills and `skills.disabled`), ADR-0015, ADR-0020 (approval prompt, `rule_key`, nested agents), ADR-0022 and ADR-0052 (routing), ADR-0029 (SOUL.md), ADR-0030 (hook units), ADR-0032 (settings), ADR-0038 (overlay), ADR-0047, ADR-0050 (model list and rates), ADR-0057 (`update.channel`)

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted. ADR-0057 adds one settable key, `update.channel`, and the install flag `--channel=`.
+- Status: Accepted. ADR-0057 adds one settable key, `update.channel`, and the install flag `--channel=`. ADR-0059 supersedes the list of settable keys and the refusal of every other key: every setting now has a tier (the agent's, asked, or the person's own).
 
 ## Context
 The operator's requests of 2026-10-16:

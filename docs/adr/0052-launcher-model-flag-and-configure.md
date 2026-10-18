@@ -43,3 +43,6 @@ What was found:
 
 ## Amendment 2026-10-18
 ADR-0020 (amendment 2026-10-18): `pikkumies run chat …` stays the full passthrough for the user; started from inside an agent (`PIKKUMIES_DEPTH` 1 or more) it refuses the flags listed under "Never passed by the launcher", and `-z`, a top-level `--oneshot`, `--profile`/`-p`, `profile use` and `config set approvals.…`.
+
+## Amendment 2026-10-18 (ADR-0059)
+`pikkumies configure undo`, exactly those words, is the person's own shell command: it shows the last configure change and, on a terminal, sets it back after they answer y, without a session; `pikkumies configure <other words>` stays a prompt. "What the agent may change through `configure` is unchanged" no longer holds: ADR-0059 gives every setting a tier.

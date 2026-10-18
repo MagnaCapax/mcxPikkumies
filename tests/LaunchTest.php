@@ -1,5 +1,6 @@
 <?php
 /** lib/Launch.php: argv routing for bin/pikkumies (ADR-0022). */
+require_once dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/ConfigureSettings.php';
 return [
     'launch: no args is a plain interactive session, same as `run`' => function () {
         list($cmd, $args) = Launch::route(['pikkumies']);
@@ -153,11 +154,44 @@ return [
         list($cmd, $args) = Launch::route(['pikkumies', 'configure', 'my', 'plex']);
         check($cmd === 'run' && $args === ['chat', '--query=configure my plex'], 'configure with words must stay a prompt: ' . json_encode([$cmd, $args]));
     },
+    'launch: `configure undo` is the undo subcommand; other words after configure, or `--` first, stay a prompt (ADR-0059)' => function () {
+        check(Launch::route(['pikkumies', 'configure', 'undo']) === ['configure', ['undo']], 'configure undo');
+        check(Launch::route(['pikkumies', 'configure', 'undo', 'it']) === ['run', ['chat', '--query=configure undo it']], 'more words: a prompt');
+        check(Launch::route(['pikkumies', '--', 'configure', 'undo']) === ['run', ['chat', '--query=configure undo']], '-- first: a prompt');
+        check(Launch::route(['pikkumies', 'undo']) === ['run', ['chat', '--query=undo']], 'undo alone is a prompt');
+    },
+    'launch: `pikkumies configure undo` from a shell with no terminal makes a free change, refuses an asked one, and starts no session (a throwaway tree)' => function () {
+        $tmp = realpath(testTempDir('pk-launch-undo'));
+        try {
+            @mkdir("$tmp/pikkumies/local/state", 0700, true);
+            foreach (['bin', 'lib', 'tools'] as $d) {
+                exec('cp -R ' . escapeshellarg(dirname(__DIR__) . "/pikkumies/$d") . ' ' . escapeshellarg("$tmp/pikkumies/$d"));
+            }
+            file_put_contents("$tmp/pikkumies/local/config.php", '<?php return ' . var_export(['lowBalance' => ['disabled' => true]], true) . ";\n");
+            file_put_contents("$tmp/pikkumies/local/state/configure-changes.jsonl", json_encode(['key' => 'lowBalance.disabled', 'old' => false, 'new' => true]) . "\n");
+            // PATH without git: should the routing ever regress into a session, it cannot start building Hermes in the background.
+            $undo = function () use ($tmp) {
+                return testWithEnv(['PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null, 'PATH' => dirname(PHP_BINARY)], function () use ($tmp) {
+                    return runPhp("$tmp/pikkumies/bin/pikkumies", ['configure', 'undo']);
+                });
+            };
+            list($code, $out) = $undo();
+            $local = require "$tmp/pikkumies/local/config.php";
+            check($code === 0 && $local['lowBalance']['disabled'] === false && strpos($out, 'lowBalance.disabled true -> false (free)') !== false, "undo: $code $out " . json_encode($local));
+            // A forged asked change (a one-day history) needs the person's answer: without a terminal it is refused.
+            file_put_contents("$tmp/pikkumies/local/state/configure-changes.jsonl", json_encode(['key' => 'sessions.retentionDays', 'old' => 1, 'new' => 0]) . "\n");
+            list($code, $out) = $undo();
+            check($code === 1 && strpos($out, 'no terminal') !== false && !isset((require "$tmp/pikkumies/local/config.php")['sessions']), "asked, no terminal: $code $out");
+            check(!is_dir("$tmp/pikkumies/local/hermes"), 'undo must start no session and generate nothing');
+        } finally {
+            testRmTree($tmp);
+        }
+    },
     'launch: configure without a terminal prints the settings review and starts nothing; on one it runs a session with the configure skill' => function () {
         list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/bin/pikkumies', ['configure']);
         check($code === 0 && strpos($out, 'sessions.retentionDays') !== false && strpos($out, 'terms.accepted') !== false, 'no TTY: the review must print, exit 0: ' . $code . ' ' . $out);
         check(strpos($out, 'Not starting') === false && strpos($out, 'runtime is not ready') === false && strpos($out, 'restored in your crontab') === false
-            && preg_match('/\nok, 6 shown\n$/', $out) === 1, 'no TTY: only the review, nothing may start: ' . $out);
+            && preg_match('/\nok, ' . count(ConfigureSettings::INFO) . ' shown\n$/', $out) === 1, 'no TTY: only the review, every setting, nothing may start: ' . $out);
         check(Launch::CONFIGURE_ARGS[0] === 'chat' && array_slice(Launch::CONFIGURE_ARGS, 1, 2) === ['-s', 'pikkumies-configure'] && Launch::isSession(Launch::CONFIGURE_ARGS), 'configure args: ' . json_encode(Launch::CONFIGURE_ARGS));
         check(strpos((string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/skill.md'), "\nname: pikkumies-configure\n") !== false, 'the preloaded skill name must be the unit\'s');
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');

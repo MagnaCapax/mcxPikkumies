@@ -48,3 +48,5 @@ For PATH:
 
 ## Amendment 2026-10-18
 ADR-0020 (amendment 2026-10-18): started from inside an agent (`PIKKUMIES_DEPTH` 1 or more), `pikkumies run` refuses the Hermes flags and commands that turn approvals, hooks or rules off or pick another config; for the user it stays the full passthrough.
+
+ADR-0059 (2026-10-18): `pikkumies configure undo`, exactly those words, is a subcommand (the person's own: it shows the last settings change and asks before setting it back, without a session); `pikkumies configure` followed by any other words stays a prompt.

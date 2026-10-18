@@ -109,6 +109,6 @@ class BazarrConfig
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'key' => $c['key'], 'apiBase' => $c['urlBase'] . '/api/'];
         }
         throw new CliError('Bazarr is not installed for this user (no config.yaml in ' . implode(', ', $tried) . ")$skipped",
-            "name its config.yaml in pikkumies/local/config.php: 'arr' => ['bazarr' => ['config' => '/path/config/config.yaml']]");
+            'name its config.yaml with the pikkumies-configure skill: set arr.bazarr.config /path/config/config.yaml');
     }
 }

@@ -20,7 +20,7 @@ The first line, `channel: …`, says what the update followed: `release <tag>` (
 - **"cannot fast-forward"**: the checkout's history differs from upstream. Report it to the user. Do not try to repair the git history yourself.
 - **"fetch failed"**: usually no network or no access to the repository; on a `git/<branch>` channel also a branch that does not exist ("couldn't find remote ref"). Report the error text.
 
-Never edit files under `~/pikkumies` that git tracks. To change how a shipped skill behaves, make a local copy under a new name (for example `seedbox-apps-local`) in `~/pikkumies/local/hermes/skills/`, set `name:` in the copy's SKILL.md to that new name, then turn the shipped one off by adding its name to `skills.disabled` in `~/pikkumies/local/config.php` (the Hermes config is regenerated from it). Do not reuse the shipped name: Hermes refuses to load a skill name that exists twice (ADR-0007).
+Never edit files under `~/pikkumies` that git tracks. To change how a shipped skill behaves, make a local copy under a new name (for example `seedbox-apps-local`) in `~/pikkumies/local/hermes/skills/`, set `name:` in the copy's SKILL.md to that new name, then turn the shipped one off with the `pikkumies-configure` skill (`skills disable <shipped-name>`; the Hermes config is regenerated from it). Do not reuse the shipped name: Hermes refuses to load a skill name that exists twice (ADR-0007).
 
 ## Updating Hermes
 

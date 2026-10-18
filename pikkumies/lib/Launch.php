@@ -11,7 +11,8 @@
  * prompt instead of starting a self-update. `pikkumies -- <text>` always forces a prompt.
  * `pikkumies tmux [N]` opens window pmN of the tmux session "pikkumies" (ADR-0032).
  * Leading `-m <model>` / `--reasoning <level>` pairs pick the model or reasoning for one session (RunFlags, ADR-0052);
- * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052).
+ * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052). `pikkumies configure undo`, the
+ * person's own, shows the last settings change and sets it back after they answer y (ADR-0059).
  *
  * First start (ADR-0032): on a terminal, `install` and the first interactive `run` ask for the
  * agent's name, and an interactive `run` asks the person to accept the terms and privacy policy.
@@ -59,6 +60,10 @@ class Launch
         // `tmux` or `tmux <number>`; "tmux kill my session" is a prompt.
         if ($argv[1] === 'tmux') {
             return $rest === [] || (count($rest) === 1 && ctype_digit($rest[0])) ? ['tmux', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+        }
+        // `configure undo`: the person's own undo of the last settings change, no session (ADR-0059); other words after configure are a prompt.
+        if ($argv[1] === 'configure' && $rest === ['undo']) {
+            return ['configure', $rest];
         }
         // `run [hermes args]` is a documented passthrough (README, ADR-0033) and keeps every word.
         if ($argv[1] === 'run' || (in_array($argv[1], self::SUBCOMMANDS, true) && self::allFlags($rest))) {

@@ -39,14 +39,37 @@ class Config
         ];
     }
 
-    /** Settings Config::set writes, with their type; the configure tool may set exactly these (ADR-0032). */
+    /**
+     * Settings Config::set writes, with their type (ADR-0032, ADR-0059). Which change of them the configure tool makes
+     * freely, asks about or leaves to the person is ConfigureTiers' decision; the provider endpoint and key files, host.*
+     * and the terms are never written here (the terms only by acceptTerms).
+     */
     const SETTABLE = [
         'agent.name' => 'name',
         'privacy.perfLogging' => 'bool',
         'privacy.telemetry' => 'bool',
         'sessions.retentionDays' => 'days',
         'update.channel' => 'channel',
+        'provider.model' => 'model',
+        'hooks.model' => 'model',
+        'tools.disabled' => 'names',
+        'skills.disabled' => 'names',
+        'root.disabled' => 'bool',
+        'searchFirst.disabled' => 'bool',
+        'halt.disabled' => 'bool',
+        'lowBalance.disabled' => 'bool',
+        'fileopsCheck.disabled' => 'bool',
+        'hooks.reword' => 'bool',
+        'hooks.llm.disabled' => 'bool',
+        'autoUpdate.disabled' => 'bool',
+        'cron.disabled' => 'bool',
+        'hermes.lazyInstalls' => 'bool',
     ];
+    /** Settable keys by pattern: an *arr app's config file (tools/arr/README.md), an absolute path or '' for none. */
+    const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path'];
+    /** A model id as an endpoint lists it; a list entry (a tool category path or a skill name). */
+    const MODEL_RE = '#^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}\z#';
+    const NAMES_RE = '#^[a-z0-9][a-z0-9._/-]{0,99}\z#';
     const NAME_MAX = 32;
     const DAYS_MAX = 36500;
 
@@ -71,17 +94,33 @@ class Config
             && !preg_match('#(/|\.|\.lock)\z#', $channel) && strpos($channel, '/.') === false;
     }
 
+    /** The type of a settable key (SETTABLE, then SETTABLE_PATTERNS), or null when Config::set never writes it. */
+    public static function type($key)
+    {
+        if (isset(self::SETTABLE[$key])) {
+            return self::SETTABLE[$key];
+        }
+        foreach (self::SETTABLE_PATTERNS as $re => $type) {
+            if (is_string($key) && preg_match($re, $key) === 1) {
+                return $type;
+            }
+        }
+        return null;
+    }
+
     /**
      * Text from a command line or a prompt -> the typed value for $key, or throws with a message
-     * the person can act on. on/off, yes/no, true/false and 1/0 are booleans.
+     * the person can act on. on/off, yes/no, true/false and 1/0 are booleans; a list is names
+     * separated by commas or spaces ('' or none: empty).
      */
     public static function parse($key, $text)
     {
-        if (!isset(self::SETTABLE[$key])) {
+        $type = self::type($key);
+        if ($type === null) {
             throw new InvalidArgumentException("$key is not a setting that can be changed here");
         }
         $text = trim((string) $text);
-        switch (self::SETTABLE[$key]) {
+        switch ($type) {
             case 'bool':
                 $map = ['on' => true, 'yes' => true, 'true' => true, '1' => true, 'off' => false, 'no' => false, 'false' => false, '0' => false];
                 if (!isset($map[strtolower($text)])) {
@@ -93,38 +132,69 @@ class Config
                     throw new InvalidArgumentException("$key takes a whole number of days, 0 to " . self::DAYS_MAX . ' (0 = keep forever)');
                 }
                 return (int) $text;
-            case 'channel':
-                if (!self::validChannel($text)) {
-                    throw new InvalidArgumentException("$key takes release or git/<branch> (for example git/main)");
+            case 'names':
+                $names = $text === '' || strtolower($text) === 'none' ? [] : array_values(array_unique(preg_split('/[\s,]+/', $text, -1, PREG_SPLIT_NO_EMPTY)));
+                if (!self::valid('names', $names)) {
+                    throw new InvalidArgumentException("$key takes names separated by commas (lowercase letters, digits and . _ / -), or none");
                 }
-                return $text;
+                return $names;
             default:
-                if ($text !== '' && !self::validName($text)) {
-                    throw new InvalidArgumentException("$key: 1-" . self::NAME_MAX . ' letters, digits, spaces, dots, dashes or underscores, starting with a letter or digit');
+                if (!self::valid($type, $text)) {
+                    $what = ['channel' => 'release or git/<branch> (for example git/main)', 'model' => 'a model id as the endpoint lists it, or empty for the default',
+                        'path' => 'an absolute path, or empty for none',
+                        'name' => '1-' . self::NAME_MAX . ' letters, digits, spaces, dots, dashes or underscores, starting with a letter or digit'];
+                    throw new InvalidArgumentException("$key takes " . $what[$type]);
                 }
                 return $text;
         }
     }
 
+    /** True when $value is of $type (SETTABLE's types). */
+    public static function valid($type, $value)
+    {
+        switch ($type) {
+            case 'bool':
+                return is_bool($value);
+            case 'days':
+                return is_int($value) && $value >= 0 && $value <= self::DAYS_MAX;
+            case 'name':
+                return is_string($value) && ($value === '' || self::validName($value));
+            case 'channel':
+                return self::validChannel($value);
+            case 'model':
+                return is_string($value) && ($value === '' || preg_match(self::MODEL_RE, $value) === 1);
+            case 'path':
+                return is_string($value) && ($value === '' || (strlen($value) <= 4096 && $value[0] === '/' && !preg_match('/[\x00-\x1f\x7f]/', $value)));
+            case 'names':
+                if (!is_array($value) || !self::isList($value) || count(array_unique($value, SORT_REGULAR)) !== count($value)) {
+                    return false;
+                }
+                foreach ($value as $n) {
+                    if (!is_string($n) || preg_match(self::NAMES_RE, $n) !== 1) {
+                        return false;
+                    }
+                }
+                return true;
+        }
+        return false;
+    }
+
     /**
-     * Write one setting to local/config.php (or $file): only keys in SETTABLE, only values of their
-     * type. The file is rewritten from its values (comments are not kept), under a lock, through a
-     * temporary file and a rename. Returns the value written.
+     * Write one setting to local/config.php (or $file): only settable keys (type()), only values of
+     * their type, and never a change that is the person's own (ConfigureTiers, judged against the file's
+     * value under the lock, so every caller gets the same refusal, ADR-0059). The file is rewritten from its
+     * values (comments are not kept), under a lock, through a temporary file and a rename. Returns the value written.
      */
     public static function set($key, $value, $file = null)
     {
-        if (!isset(self::SETTABLE[$key])) {
+        $type = self::type($key);
+        if ($type === null) {
             throw new InvalidArgumentException("$key is not a setting that can be changed here");
         }
-        $type = self::SETTABLE[$key];
-        $ok = ($type === 'bool' && is_bool($value))
-            || ($type === 'days' && is_int($value) && $value >= 0 && $value <= self::DAYS_MAX)
-            || ($type === 'name' && is_string($value) && ($value === '' || self::validName($value)))
-            || ($type === 'channel' && self::validChannel($value));
-        if (!$ok) {
+        if (!self::valid($type, $value)) {
             throw new InvalidArgumentException("$key: wrong value " . var_export($value, true));
         }
-        return self::write($key, $value, $file);
+        return self::write($key, $value, $file, true);
     }
 
     /** The person accepted the terms of service and privacy policy: only the TTY prompt and install --accept-terms call this. */
@@ -133,8 +203,8 @@ class Config
         return self::write('terms.accepted', true, $file);
     }
 
-    /** Set a dotted key in the local overrides file atomically, under a lock. */
-    private static function write($key, $value, $file)
+    /** Set a dotted key (any depth: hooks.llm.disabled, arr.sonarr.config) in the local overrides file atomically, under a lock. */
+    private static function write($key, $value, $file, $tiered = false)
     {
         $file = $file ?: self::localDir() . '/config.php';
         $dir = dirname($file);
@@ -146,11 +216,24 @@ class Config
         try {
             $local = is_file($file) ? require $file : [];
             $local = is_array($local) ? $local : [];
-            list($section, $name) = explode('.', $key, 2);
-            if (!isset($local[$section]) || !is_array($local[$section])) {
-                $local[$section] = [];
+            if ($tiered) {
+                require_once __DIR__ . '/ConfigureTiers.php'; // loaded only here: scratch copies of this file that never set need not carry it
+                $old = self::dotted(self::merge(self::defaults(), $local), $key);
+                if (ConfigureTiers::classify($key, $old, $value) === ConfigureTiers::PERSON) {
+                    throw new InvalidArgumentException("$key: changing it from " . json_encode($old) . ' to ' . json_encode($value) . " is the person's to do, by hand in " . self::shown($file));
+                }
             }
-            $local[$section][$name] = $value;
+            $parts = explode('.', $key);
+            $last = array_pop($parts);
+            $at = &$local;
+            foreach ($parts as $part) {
+                if (!isset($at[$part]) || !is_array($at[$part])) {
+                    $at[$part] = [];
+                }
+                $at = &$at[$part];
+            }
+            $at[$last] = $value;
+            unset($at);
             $body = "<?php\n// Local overrides. Updates never touch this file; `pikkumies` settings are written here too (ADR-0032).\nreturn " . var_export($local, true) . ";\n";
             $tmp = $file . '.tmp-' . getmypid();
             if (@file_put_contents($tmp, $body) !== strlen($body) || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
@@ -185,19 +268,39 @@ class Config
         return $home !== '' && strpos($path, $home . '/') === 0 ? '~' . substr($path, strlen($home)) : $path;
     }
 
-    public static function load()
+    /** The value of a dotted key (hooks.llm.disabled) in $config, null when it is not set. */
+    public static function dotted(array $config, $key)
     {
-        $file = self::localDir() . '/config.php';
-        $local = is_file($file) ? require $file : [];
-        $config = self::merge(self::defaults(), is_array($local) ? $local : []);
-        // PIKKUMIES_CONFIG names an overlay merged last, for one run (ADR-0038): automation and the question
-        // suite force the model, the light model, the host family or any other key without editing local/config.php.
-        $overlay = self::overlayPath();
-        if ($overlay !== '') {
-            $over = require $overlay;
-            $config = is_array($over) ? self::merge($config, $over) : $config;
+        foreach (explode('.', (string) $key) as $part) {
+            if (!is_array($config) || !array_key_exists($part, $config)) {
+                return null;
+            }
+            $config = $config[$part];
         }
         return $config;
+    }
+
+    /** The defaults and local/config.php (or $file), without the PIKKUMIES_CONFIG overlay: what Config::set changes. */
+    public static function fileConfig($file = null)
+    {
+        $file = $file ?: self::localDir() . '/config.php';
+        $local = is_file($file) ? require $file : [];
+        return self::merge(self::defaults(), is_array($local) ? $local : []);
+    }
+
+    public static function load()
+    {
+        // PIKKUMIES_CONFIG names an overlay merged last, for one run (ADR-0038): automation and the question
+        // suite force the model, the light model, the host family or any other key without editing local/config.php.
+        return self::merge(self::fileConfig(), self::overlay());
+    }
+
+    /** The PIKKUMIES_CONFIG overlay's settings, [] when there is none (overlayPath) or it returns no array. */
+    public static function overlay()
+    {
+        $path = self::overlayPath();
+        $over = $path !== '' ? require $path : [];
+        return is_array($over) ? $over : [];
     }
 
     /**

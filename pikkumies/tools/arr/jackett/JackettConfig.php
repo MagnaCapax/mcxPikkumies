@@ -77,6 +77,6 @@ class JackettConfig
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'key' => $c['key'], 'apiBase' => $c['urlBase'] . '/'];
         }
         throw new CliError('Jackett is not installed for this user (no ServerConfig.json in ' . implode(', ', $tried) . ")$skipped",
-            "name its ServerConfig.json in pikkumies/local/config.php: 'arr' => ['jackett' => ['config' => '/path/ServerConfig.json']]");
+            'name its ServerConfig.json with the pikkumies-configure skill: set arr.jackett.config /path/ServerConfig.json');
     }
 }

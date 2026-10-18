@@ -22,26 +22,26 @@ return [
         unset($missing['sessions']);
         check(ConfigureSettings::get($missing, 'sessions.retentionDays')['value'] === null, 'get() on a missing section must return null, not notice/crash');
         $showMissing = array_column(ConfigureSettings::show($missing), 'value', 'key');
-        check($showMissing['sessions.retentionDays'] === null && count($showMissing) === 6, 'show() on a missing section: ' . json_encode($showMissing));
+        check($showMissing['sessions.retentionDays'] === null && count($showMissing) === count(ConfigureSettings::INFO), 'show() on a missing section: ' . json_encode($showMissing));
     },
     'configure: get() on a real-but-unexposed key throws, listing the actual setting names verbatim' => function () {
         // #31 distinguishes "not a setting at all" (this) from "a setting but refused for writing"
         // (ConfigTest.php's existing refusal coverage).
         $threw = false;
         try {
-            ConfigureSettings::get(Config::defaults(), 'provider.endpoint');
+            ConfigureSettings::get(Config::defaults(), 'host.family');
         } catch (CliError $x) {
             $threw = true;
             check($x->hint === 'settings: ' . implode(', ', array_keys(ConfigureSettings::INFO)), 'hint must list the real setting names verbatim: ' . $x->hint);
         }
         check($threw, 'get() on an unexposed key must throw');
     },
-    "configure: refusal() for a non-terms key states the reason plus the full settable-key list" => function () {
-        // #33 the existing ConfigTest.php only checks hint!==''; this pins the wording, since a wording
-        // regression that drops the key list leaves a person with no self-serve path.
-        $why = ConfigureSettings::refusal('provider.endpoint');
-        check(strpos($why, "this setting is the person's to change") !== false, 'refusal() must explain it is the person\'s to change: ' . $why);
-        check(strpos($why, implode(', ', array_keys(Config::SETTABLE))) !== false, 'refusal() must list the real settable keys: ' . $why);
+    "configure: how() for a key or direction the person owns names where they change it (ADR-0059)" => function () {
+        // #33 pins the wording, since a wording regression that drops the place leaves a person with no self-serve path.
+        foreach (['provider.endpoint', 'host.family', 'root.disabled', 'halt.disabled'] as $key) {
+            check(strpos(ConfigureChange::how($key), '~/pikkumies/local/config.php') !== false, "how($key) must name local/config.php: " . ConfigureChange::how($key));
+        }
+        check(strpos(ConfigureChange::how('terms.accepted'), '--accept-terms') !== false, 'the terms: the first-start question or --accept-terms');
     },
     'configure: review() warnings — the name-set boundary, strict terms typing, and the retention state.db size' => function () {
         // #34 boundary: a 32-char (NAME_MAX) name must read as "named", same as any shorter valid name.
@@ -107,6 +107,23 @@ return [
         } finally {
             testRmTree($dir);
         }
+    },
+    'docs: the update skill, the skill SOP and the *arr not-installed hints point at the configure tool, not at editing local/config.php (ADR-0059)' => function () {
+        $p = dirname(__DIR__) . '/pikkumies';
+        foreach (["$p/tools/system/pikkumies-update/skill.md", "$p/doctrine/SOP/make-a-skill-tool-hook-or-pack.md"] as $f) {
+            $t = (string) file_get_contents($f);
+            check(strpos($t, 'skills disable <shipped-name>') !== false && strpos($t, '`skills.disabled` in `~/pikkumies/local/config.php`') === false, "$f must point at skills disable");
+        }
+        foreach (['arr/lib/ArrLocate.php' => 'set arr.', 'arr/bazarr/BazarrConfig.php' => 'set arr.bazarr.config', 'arr/jackett/JackettConfig.php' => 'set arr.jackett.config',
+            'arr/autobrr/AutobrrConfig.php' => 'set arr.autobrr.config', 'arr/bazarr/skill.md' => 'set arr.bazarr.config'] as $f => $want) {
+            $t = (string) file_get_contents("$p/tools/$f");
+            check(strpos($t, $want) !== false && strpos($t, "in pikkumies/local/config.php: 'arr'") === false && strpos($t, 'config.yaml in `pikkumies/local/config.php`') === false, "$f must name $want");
+        }
+    },
+    'configure: review says which direction of a switch is whose, and for a *.disabled key that true turns it off (ADR-0059)' => function () {
+        check(ConfigureSettings::changes('halt.disabled') === 'turning it off (true): only the person; back on (false): the agent may', 'halt: ' . ConfigureSettings::changes('halt.disabled'));
+        check(ConfigureSettings::changes('hooks.reword') === 'on (true): the agent may; off (false): the person is asked', 'reword: ' . ConfigureSettings::changes('hooks.reword'));
+        check(ConfigureSettings::changes('cron.disabled') === 'turning it off (true): the person is asked; back on (false): the person is asked', 'cron: ' . ConfigureSettings::changes('cron.disabled'));
     },
     "CLI: 'get' with no arguments is a usage error at exit 1, distinct from an unrecognized verb at exit 2" => function () {
         // #39, #40: wrong-arg-count is deliberately exit 1 ("error", CliError); an unknown VERB is exit 2

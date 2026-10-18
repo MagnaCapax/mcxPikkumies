@@ -57,8 +57,7 @@ class ArrLocate
         $installer = $family === 'pmss' && (!isset($app['installer']) || $app['installer']);
         throw new CliError("{$app['name']} is not installed for this user (no config.xml in $looked)$skipped", $installer
             ? 'the user installs it with `bash ~/install-media-stack.sh`'
-            : 'install it the way the provider documents, or name its config.xml in pikkumies/local/config.php:'
-                . " 'arr' => ['$id' => ['config' => '/path/config.xml']]");
+            : 'install it the way the provider documents, or name its config.xml with the pikkumies-configure skill: set arr.' . $id . '.config /path/config.xml');
     }
 
     /** '; <folder> holds <file>, but ...' when a Docker folder has a config while Docker is not this user's own daemon. */

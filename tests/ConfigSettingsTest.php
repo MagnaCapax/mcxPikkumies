@@ -4,6 +4,7 @@
  * boundaries, write()'s two distinct failure branches, writeDefaultsIfMissing() (previously untested),
  * and load()'s degrade-on-garbage path (ADR-0032).
  */
+require_once dirname(__DIR__) . '/pikkumies/lib/ConfigureTiers.php';
 
 if (!function_exists('cfgScratchCopy')) {
     /**
@@ -17,6 +18,7 @@ if (!function_exists('cfgScratchCopy')) {
         @mkdir("$tmp/pikkumies/lib", 0700, true);
         $copy = "$tmp/pikkumies/lib/Config.php";
         copy(dirname(__DIR__) . '/pikkumies/lib/Config.php', $copy);
+        copy(dirname(__DIR__) . '/pikkumies/lib/ConfigureTiers.php', "$tmp/pikkumies/lib/ConfigureTiers.php"); // Config::set judges tiers with it (ADR-0059)
         if ($localBody !== null) {
             @mkdir("$tmp/pikkumies/local", 0700, true);
             file_put_contents("$tmp/pikkumies/local/config.php", $localBody);
@@ -228,21 +230,19 @@ echo "ok";
             testRmTree($dir);
         }
     },
-    "config: SETTABLE's contract matches the configure tool's USAGE.md row and ADR-0032's stated limits" => function () {
+    "config: SETTABLE's contract matches the configure tool's USAGE.md and ADR-0032's stated limits" => function () {
         // #7, #20, #21 docs/code drift guards. SETTABLE is read live, not hardcoded, so a future addition
         // or type change here fails these at the first place that would go stale.
-        check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days', 'update.channel' => 'channel'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
+        check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days', 'update.channel' => 'channel',
+            'provider.model' => 'model', 'hooks.model' => 'model', 'tools.disabled' => 'names', 'skills.disabled' => 'names', 'root.disabled' => 'bool', 'searchFirst.disabled' => 'bool',
+            'halt.disabled' => 'bool', 'lowBalance.disabled' => 'bool', 'fileopsCheck.disabled' => 'bool', 'hooks.reword' => 'bool', 'hooks.llm.disabled' => 'bool',
+            'autoUpdate.disabled' => 'bool', 'cron.disabled' => 'bool', 'hermes.lazyInstalls' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
+        // USAGE.md's tier table names every key with a rule (ADR-0059), so the person reading it sees every setting.
         $usage = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/USAGE.md');
-        check(preg_match('/^\| set \|.*\|$/m', $usage, $m) === 1, 'USAGE.md must have a `set` row');
-        foreach (array_keys(Config::SETTABLE) as $key) {
-            check(strpos($m[0], $key) !== false, "USAGE.md's set row is missing $key");
+        check(preg_match('/^\| set \|.*\|$/m', $usage) === 1, 'USAGE.md must have a `set` row');
+        foreach (array_merge(array_keys(Config::SETTABLE), array_keys(ConfigureTiers::RULES), ['arr.<app>.config', 'host.*']) as $key) {
+            check(strpos($usage, "`$key`") !== false, "USAGE.md is missing $key");
         }
-        preg_match_all('/\b[a-z]+\.[a-zA-Z]+\b/', $m[0], $keys);
-        $found = $keys[0];
-        sort($found);
-        $expected = array_keys(Config::SETTABLE);
-        sort($expected);
-        check($found === $expected, "USAGE.md's set row names a settable-looking key SETTABLE does not have, or is missing one: " . json_encode($keys[0]));
         $adr = (string) file_get_contents(dirname(__DIR__) . '/docs/adr/0032-settings-configure-skill-first-run-and-install-flags.md');
         check(strpos($adr, '1-' . Config::NAME_MAX) !== false, 'ADR-0032 must state the name limit as 1-' . Config::NAME_MAX);
         check(strpos($adr, '0-' . Config::DAYS_MAX) !== false, 'ADR-0032 must state the days limit as 0-' . Config::DAYS_MAX);

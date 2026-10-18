@@ -124,7 +124,6 @@ class AutobrrConfig
         $why = 'autobrr is not installed for this user (no config.toml in ' . implode(', ', $tried) . ")$skipped";
         throw new CliError($why, $family === 'pmss'
             ? 'the user installs it with `bash ~/install-media-stack.sh`'
-            : 'install it the way the provider documents, or name its config.toml in pikkumies/local/config.php:'
-                . " 'arr' => ['autobrr' => ['config' => '/path/config.toml']]");
+            : 'install it the way the provider documents, or name its config.toml with the pikkumies-configure skill: set arr.autobrr.config /path/config.toml');
     }
 }

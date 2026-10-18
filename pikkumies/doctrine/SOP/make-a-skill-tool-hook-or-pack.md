@@ -53,7 +53,7 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 - Write verbs read the state back and report `"verified"` in the status line.
 - Tools of one category use the same verb names and record fields, listed in `tools/<category>/README.md`.
 
-**Changing a shipped skill**: copy the generated `~/pikkumies/local/generated/skills/<category>/<tool>/SKILL.md` to `~/pikkumies/local/hermes/skills/<new-name>/SKILL.md`, set `name: <new-name>` in the copy, edit it, and add the shipped name to `skills.disabled` in `~/pikkumies/local/config.php`. Never reuse the shipped name. A whole category can be left out with `tools.disabled` (category paths: `email` also leaves out `email/imap`, and `media` does not touch `media-servers`).
+**Changing a shipped skill**: copy the generated `~/pikkumies/local/generated/skills/<category>/<tool>/SKILL.md` to `~/pikkumies/local/hermes/skills/<new-name>/SKILL.md`, set `name: <new-name>` in the copy, edit it, and hide the shipped one with `pikkumies-configure skills disable <shipped-name>`. Never reuse the shipped name. A whole category can be left out with `tools.disabled` (`pikkumies-configure set tools.disabled ...`, which asks the user first) (category paths: `email` also leaves out `email/imap`, and `media` does not touch `media-servers`).
 
 ## Hook
 
