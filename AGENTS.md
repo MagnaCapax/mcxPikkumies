@@ -4,6 +4,12 @@
 
 A lightweight helper agent that runs on the server it manages: as the user by default, with root as an optional capability layer. The runtime is `pikkumies/`, every capability is a tool unit under `pikkumies/tools/<category>/<tool>/`, decisions are in `docs/adr/`.
 
+Start with [`development/`](development/README.md): the [engineering principles](development/engineering-principles.md) explain every rule below with its reason and the mistake that taught it, and list the sibling repositories' docs and decisions.
+
+## Principles
+
+KISS, DRY, YAGNI. Delete first: question the requirement, delete the part, simplify, then speed up, then automate (a needed but broken part is debugged, not deleted). Pit of success: safe defaults, risky paths explicit and loud. Never break old users. Tests that can fail. Files around 150 lines (a target, not a hard limit). Accepted ADRs are binding: follow them or supersede them with a new ADR, never work around them. Before committing, review the change with `pikkumies/tools/development/code-review` against these rules and the ADRs.
+
 ## Rules
 
 - **License:** Apache-2.0. New files carry no per-file headers; LICENSE and NOTICE cover the project.
