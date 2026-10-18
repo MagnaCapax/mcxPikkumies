@@ -167,11 +167,16 @@ class Config
         return $config;
     }
 
-    /** The PIKKUMIES_CONFIG overlay file, or '' when it is unset or not a readable file. */
+    /**
+     * The PIKKUMIES_CONFIG overlay file, or '' when it is unset, not a readable file, not owned by this
+     * account or writable by others: it is loaded with require, so it runs as PHP (ADR-0038).
+     */
     public static function overlayPath()
     {
         $path = (string) getenv('PIKKUMIES_CONFIG');
-        return $path !== '' && is_file($path) && is_readable($path) ? $path : '';
+        $st = $path !== '' && is_file($path) && is_readable($path) ? @stat($path) : false;
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        return $st && $st['uid'] === $uid && ($st['mode'] & 0022) === 0 ? $path : '';
     }
 
     /** Recursive merge where local scalars and lists replace defaults. */

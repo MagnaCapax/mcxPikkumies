@@ -206,6 +206,8 @@ switch ($cmd) {
         list($ok, $http) = Provider::check($prov);
         if (Config::overlayPath() !== '') {
             out('overlay:  ' . Config::overlayPath() . ' (PIKKUMIES_CONFIG, merged over local/config.php)');
+        } elseif ((string) getenv('PIKKUMIES_CONFIG') !== '') {
+            out('overlay:  ' . getenv('PIKKUMIES_CONFIG') . ' NOT USED: missing, unreadable, not yours, or writable by others');
         }
         out('endpoint: ' .($prov['endpoint'] ? preg_replace('#^([a-z][a-z0-9+.-]*://)[^/@]*@#i', '$1', $prov['endpoint']) : '(not set)')); // never a user:password@ part
         $keyFrom = getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : Provider::keyFile($config['provider'])['path'];

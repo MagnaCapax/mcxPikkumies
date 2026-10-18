@@ -145,6 +145,13 @@ return [
             "php $tool search `id`",
             "php $tool search x\nrm -rf /tmp/x",
             "rm -rf /tmp/x # $tool search x",
+            "php $tool search \\' ; rm -rf /tmp/x ; echo \\'",
+            "php $tool search \\\" ; rm -rf /tmp/x ; echo \\\"",
+            "cd \"\$(id)\" && php $tool search x",
+            "cd `id`&& php $tool search x",
+            "cd \$(id)&& php $tool search x",
+            "php $tool search 'unterminated",
+            'php /tmp/evil/tools/memory/pikkumies/pikkumies.php search x',
         ];
         foreach ($notOpening as $i => $cmd) {
             hookSearchGateBlocks($tree, "chain$i", 'terminal', $cmd);
@@ -155,6 +162,7 @@ return [
         }
         check(hookSearchGateBlocks($tree, 'ro', 'terminal', "php $tool list; rm -rf /tmp/x"), 'a chained list passed as a read');
         check(!hookSearchGateBlocks($tree, 'ro2', 'terminal', "php $tool sources"), 'a plain sources call was blocked');
+        check(hookSearchGateBlocks($tree, 'ro3', 'terminal', 'php /tmp/evil/tools/documentation/kb/kb.php search x'), 'a kb.php from another directory passed as a read');
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'search-first hook: titles are one clean line of at most 120 characters; output stays within 1500 bytes' => function () {

@@ -47,6 +47,12 @@ return [
             return [Config::load(), Config::overlayPath()];
         });
         check($missing[0] == $plain && $missing[1] === '', 'a missing overlay changed the settings');
+        chmod("$dir/run.php", 0666); // loaded as PHP: a file others can write must not be used
+        $shared = testWithEnv(['PIKKUMIES_CONFIG' => "$dir/run.php"], function () {
+            return [Config::load(), Config::overlayPath()];
+        });
+        check($shared[0] == $plain && $shared[1] === '', 'an overlay writable by others was used');
+        chmod("$dir/run.php", 0600);
         check(Detect::applyOverride(['family' => 'generic', 'stack' => 'none'], $forced[0])['family'] === 'pmss', 'host family not forced through the overlay');
         exec('rm -rf ' . escapeshellarg($dir));
     },

@@ -42,22 +42,42 @@ $command = $tool === 'terminal' && isset($payload['tool_input']['command']) ? (s
 
 /**
  * True when $command is one plain call of the tool at $path with one of $verbs (ADR-0038): an optional
- * `cd <dir> &&` in front, then optional `php`, the script, flags and the verb. Anything chained after it
- * (; && || | a redirect, a newline) or a command substitution, even inside double quotes, makes it no match,
- * so `echo <search command>; rm -rf x` neither opens the gate nor passes as a read. Single-quoted words are
- * literal to the shell and may hold anything.
+ * `cd <dir> &&` in front, then optional `php`, the script, flags and the verb. The command is read the way
+ * the shell quotes it: single-quoted text is literal and may hold anything; outside it a backslash or a
+ * command substitution ($( ` ${) anywhere, the cd argument and double quotes included, is no match, and so
+ * is anything chained after the call (; & | a redirect, a newline). So `echo <search command>; rm -rf x`
+ * neither opens the gate nor passes as a read. The script path may start with ./, ~/pikkumies/,
+ * $HOME/pikkumies/, /home/<name>/pikkumies/ or this install's directory, not any other directory.
  */
 function searchFirstPlainCall($command, $path, $verbs)
 {
-    $c = preg_replace('#^\s*cd\s+("[^"]*"|\'[^\']*\'|[^\s;&|]+)\s*&&\s*#', '', $command, 1);
-    if (preg_match('#"[^"]*(\$\(|`|\$\{)[^"]*"#', $c)) {
+    $bare = '';
+    $quote = '';
+    for ($i = 0, $n = strlen($command); $i < $n; $i++) {
+        $ch = $command[$i];
+        if ($quote === "'") {
+            $quote = $ch === "'" ? '' : $quote;
+            $bare .= $ch === "'" ? "'" : '';
+            continue;
+        }
+        if ($ch === '\\' || $ch === '`' || ($ch === '$' && in_array(substr($command, $i + 1, 1), ['(', '{'], true))) {
+            return false;
+        }
+        if ($quote === '"' && $ch !== '"') {
+            continue;
+        }
+        $quote = $quote === '"' ? '' : ($ch === "'" || $ch === '"' ? $ch : '');
+        $bare .= $ch;
+    }
+    if ($quote !== '') {
+        return false; // unterminated quote
+    }
+    $bare = preg_replace('#^\s*cd\s+[^\s;&|<>]+\s*&&\s*#', '', $bare, 1);
+    if (preg_match('#[;&|<>\r\n]#', $bare)) {
         return false;
     }
-    $bare = preg_replace('#"[^"]*"|\'[^\']*\'#', "''", $c);
-    if (preg_match('#[;&|`<>\r\n]|\$\(#', $bare)) {
-        return false;
-    }
-    return (bool) preg_match('#^\s*(php\s+)?["\']?[^\s"\']*' . $path . '["\']?(\s+--?[a-z][a-z-]*)*\s+(' . $verbs . ')(\s|$)#', $bare);
+    $dirs = '\./|(~|\$HOME|/home/[^/\s]+)/pikkumies/|' . preg_quote(Config::root() . '/', '#');
+    return (bool) preg_match('#^\s*(php\s+)?(' . $dirs . ')?' . $path . '(\s+--?[a-z][a-z-]*)*\s+(' . $verbs . ')(\s|$)#', $bare);
 }
 
 // The memory unit's script, optionally followed by flags, then the verb (ADR-0018).
