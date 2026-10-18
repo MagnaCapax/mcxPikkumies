@@ -1,0 +1,7 @@
+{
+  "about": "stale: a question tagged source:<name> whose contains fact is no longer in the downloaded copy of that source is not asked (docs: the fake docs-cache under samples/)",
+  "fails": "stale",
+  "docs": "docs-cache",
+  "bad": {"tags": "memory, source:fake-wiki", "contains": ["port 4444", "the old limit of 7 days"]},
+  "good": {"tags": "source:fake-wiki", "contains": ["Port 4444", "keeps finished torrents for 30 days"]}
+}

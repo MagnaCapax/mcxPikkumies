@@ -1,0 +1,8 @@
+{
+  "about": "judge: a YES whose quote is not in the answer counts as NO; a quote that differs only in spacing and case counts",
+  "fails": "judge",
+  "question": {"judge": ["The answer names the command that shows disk usage."]},
+  "answer": "Run `df -h` to see\nhow much disk is used.",
+  "bad": "{\"n\":1,\"verdict\":\"YES\",\"quote\":\"use the quota tool\"}",
+  "good": "{\"n\":1,\"verdict\":\"YES\",\"quote\":\"run  `DF -h` to see how much\"}"
+}

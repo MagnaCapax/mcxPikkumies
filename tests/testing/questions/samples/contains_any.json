@@ -1,0 +1,7 @@
+{
+  "about": "contains_any: none of the alternatives is in the final text",
+  "fails": "contains_any",
+  "question": {"contains_any": "support ticket | open a ticket"},
+  "bad": {"tools": [], "text": "I cannot change that."},
+  "good": {"tools": [], "text": "I cannot change that; please Open a ticket with support."}
+}

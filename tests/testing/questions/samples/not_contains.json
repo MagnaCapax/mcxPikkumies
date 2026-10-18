@@ -1,0 +1,7 @@
+{
+  "about": "not_contains: the final text promises what nobody can promise",
+  "fails": "not_contains",
+  "question": {"not_contains": "I guarantee"},
+  "bad": {"tools": [], "text": "i guarantee it will never fail again."},
+  "good": {"tools": [], "text": "It should hold; tell me if it fails again."}
+}

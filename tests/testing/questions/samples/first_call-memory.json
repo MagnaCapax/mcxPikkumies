@@ -1,0 +1,7 @@
+{
+  "about": "first_call: Hermes' memory tool is on the search-first gate's read-only list, so a memory call before the search is skipped like read_file",
+  "fails": "first_call",
+  "question": {"first_call": "terminal.*pikkumies\\.php.*\\bsearch\\b"},
+  "bad": {"tools": [{"name": "memory", "input": {"action": "read"}}, {"name": "terminal", "input": {"command": "df -h"}}], "text": ""},
+  "good": {"tools": [{"name": "memory", "input": {"action": "read"}}, {"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search disk"}}], "text": ""}
+}

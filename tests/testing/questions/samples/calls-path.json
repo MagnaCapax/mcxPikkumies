@@ -1,0 +1,7 @@
+{
+  "about": "calls with a path: the input is JSON with unescaped slashes, so tools/system/credits matches a terminal command as written",
+  "fails": "calls",
+  "question": {"calls": "terminal.*tools/system/credits"},
+  "bad": {"tools": [{"name": "terminal", "input": {"command": "php ~/pikkumies/tools/system/quota/quota.php show"}}], "text": ""},
+  "good": {"tools": [{"name": "terminal", "input": {"command": "php ~/pikkumies/tools/system/credits/credits.php balance"}}], "text": ""}
+}

@@ -1,0 +1,7 @@
+{
+  "about": "first_call: the first tool that does something was not the memory search (read-only tools before it are skipped)",
+  "fails": "first_call",
+  "question": {"first_call": "terminal.*pikkumies\\.php.*\\bsearch\\b"},
+  "bad": {"tools": [{"name": "read_file", "input": {"path": "README.md"}}, {"name": "terminal", "input": {"command": "df -h"}}, {"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search disk"}}], "text": ""},
+  "good": {"tools": [{"name": "read_file", "input": {"path": "README.md"}}, {"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search disk"}}, {"name": "terminal", "input": {"command": "df -h"}}], "text": ""}
+}
