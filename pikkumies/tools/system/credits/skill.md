@@ -1,6 +1,6 @@
 ---
 name: credits
-description: AI credits left on this account's key (balance, limits, last minute's use); use it for every "how many credits / AI credits / tokens left / balance / out of credit" question and never read key files.
+description: AI credits left on this account's key (balance, limits, last minute's use), where they went (usage) and which models there are at what rates (models); use it for every "how many credits / AI credits / tokens left / balance / out of credit / where did my credits go / which model" question and never read key files.
 ---
 
 # AI credits
@@ -14,3 +14,5 @@ Run the `balance` verb and answer from its record. This tool is the only way to 
 - The API counts credits, not tokens. `tokens_min` is a floor from the model's rates (everything at its highest rate): say "at least"; mostly-input or cached work gets more. `line` prints nothing when the provider does not report usage; then answer from `balance`.
 - On an error, give the user its hint: where a key comes from (the Pulsed Media client area page "Virsilipas AI key" under "AI credits", or their own provider's account page). Do not go looking for the key.
 - Never promise more credits or name prices.
+- When the user asks where the credits went, run `usage` (`--days N` for another window than 30 days) and answer from its per-model and per-day records; `cache_share` is the share of input tokens served from cache (billed at the `cached_input` rate `models` shows, when it shows one).
+- To choose a model for a task, run `models` and choose from its records: the ids, rates and descriptions come from the server. Never name a model from memory; a model that is not listed is not offered by this endpoint. Without rates, say the endpoint does not report them.

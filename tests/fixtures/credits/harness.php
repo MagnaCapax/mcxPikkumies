@@ -62,6 +62,12 @@ readfile(is_file(__DIR__ . "/$prefix-$route.json") ? __DIR__ . "/$prefix-$route.
 /** Runs `credits.php line ...` with a fixture HOME holding $key ('' = no key), state dir $dir/state, LANG=$lang. Returns [code, stdout, stderr]. */
 function creditsLineRun($dir, $endpoint, array $args, $lang = 'C.UTF-8', $model = '', $key = CREDITS_LINE_KEY)
 {
+    return creditsToolRun($dir, $endpoint, array_merge(['line'], $args), $lang, $model, $key);
+}
+
+/** Runs `credits.php <args>` (the verb first) the way creditsLineRun does. Returns [code, stdout, stderr]. */
+function creditsToolRun($dir, $endpoint, array $args, $lang = 'C.UTF-8', $model = '', $key = CREDITS_LINE_KEY)
+{
     $home = "$dir/home";
     @mkdir($home, 0700, true);
     @unlink("$home/.virsilipasKey");
@@ -77,7 +83,7 @@ function creditsLineRun($dir, $endpoint, array $args, $lang = 'C.UTF-8', $model 
     $code .= '$creditsConfig = ' . var_export($config, true) . ";\n\$creditsStateDir = " . var_export("$dir/state", true) . ";\n";
     $code .= 'require ' . var_export(dirname(__DIR__, 3) . '/pikkumies/tools/system/credits/credits.php', true) . ";\n";
     file_put_contents("$dir/run.php", $code);
-    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$dir/run.php") . ' line';
+    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$dir/run.php");
     foreach ($args as $a) {
         $cmd .= ' ' . escapeshellarg($a);
     }

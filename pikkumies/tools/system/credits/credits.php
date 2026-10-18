@@ -1,6 +1,7 @@
 <?php
 /**
- * credits: the AI credits left on this account's provider key, from GET {endpoint}/balance (ADR-0015 tool unit).
+ * credits: the AI credits left on this account's provider key, from GET {endpoint}/balance (ADR-0015 tool unit); where they
+ * went and which models there are, from GET /usage and GET /models (ADR-0050); the credits line (ADR-0040).
  * The tool reads the key so the agent never has to: the key goes only into the request's Authorization header and is
  * never printed, not even masked; key_from names where it came from. Origin: in a live test the agent, with no tool
  * for "how many credits do I have left?", searched the home for its own key and called the balance route itself.
@@ -10,7 +11,7 @@ require_once "$lib/Config.php";
 require_once "$lib/Provider.php";
 require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
-require_once __DIR__ . "/CreditsLine.php";
+require_once __DIR__ . "/CreditsUsage.php";
 
 // Test seam: a test may set this before including the file, so the checkout's real local/config.php is never read.
 $creditsConfig = isset($creditsConfig) ? $creditsConfig : Config::load();
@@ -21,8 +22,11 @@ $creditsKeyHint = 'a key comes from ~/.virsilipasKey (the Pulsed Media AI key; a
     . ' "Virsilipas AI key" under "AI credits") or from ~/.pikkumiesKey for your own provider. Never read or print the key itself';
 
 $usage = <<<'U'
-usage: php credits.php balance [--human] | line [--tmux] [--ascii] [--jsonl]
+usage: php credits.php balance [--human] | usage [--days N] [--human] | models [--human] | line [--tmux] [--ascii] [--jsonl]
   balance  credits left on this account's AI key, what is reserved and running, the key's limits, the last minute's use
+  usage    where the credits went: the balance, totals, then per model (most credits first) and per day, for the last
+           --days days (1 to 400, default 30); more rows with --offset N or --limit
+  models   the models the endpoint offers, with the rates and descriptions it sends, for choosing a model
   line     one line: credits left, a bar of what is left of the newest grant, the least number of tokens it buys, today's use;
            --jsonl prints the record instead, --tmux the tmux status form. Prints nothing when credits cannot be read
 U;
@@ -30,28 +34,7 @@ U;
 Cli::run($argv, [
     'balance' => function () use ($creditsConfig, $creditsKeyHint) {
         $prov = Provider::resolve($creditsConfig);
-        if ($prov['key'] === '') {
-            throw new CliError('no AI key found for this account; no request was made', $creditsKeyHint);
-        }
-        if ($prov['endpoint'] === '') {
-            throw new CliError('the AI key has no endpoint; no request was made', 'the key file needs an endpoint= line, or set provider.endpoint in ~/pikkumies/local/config.php');
-        }
-        $host = (string) parse_url($prov['endpoint'], PHP_URL_HOST);
-        $r = Provider::balanceAnswer($prov);
-        // The answer's body is never quoted in an error: a server could echo the Authorization header back.
-        if ($r['code'] === 404) {
-            throw new CliError("the AI endpoint ($host) has no balance route, so it cannot report credits", 'only the Pulsed Media AI key reports credits here; ' . $creditsKeyHint . '. With your own provider, its own account page shows the balance');
-        }
-        if ($r['code'] === 401 || $r['code'] === 403) {
-            throw new CliError("the AI endpoint ($host) refused the key (HTTP {$r['code']}): it may have been replaced or removed", $creditsKeyHint);
-        }
-        if ($r['code'] === 0) {
-            throw new CliError("could not reach the AI endpoint ($host): " . $r['error'], 'try again in a minute; if it persists, the provider or this server\'s network is down');
-        }
-        $data = json_decode($r['body'], true);
-        if ($r['code'] !== 200 || !is_array($data) || !isset($data['balance']) || !is_int($data['balance'])) {
-            throw new CliError("the AI endpoint ($host) gave no balance (HTTP {$r['code']})", 'try again in a minute');
-        }
+        $data = CreditsUsage::get($prov, '/balance', 'balance', $creditsKeyHint);
         $int = function ($a, $k) {
             return is_array($a) && isset($a[$k]) && is_int($a[$k]) ? $a[$k] : null;
         };
@@ -69,8 +52,18 @@ Cli::run($argv, [
             // The API calls this `window`; it is the last 60 seconds only, never a day or a month.
             'last_minute' => ['requests' => $int($window, 'requests'), 'credits' => $int($window, 'credits')],
             'key_from'    => getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : Provider::keyFile($creditsConfig['provider'])['path'],
-            'endpoint_host' => $host,
+            'endpoint_host' => (string) parse_url($prov['endpoint'], PHP_URL_HOST),
         ]];
+    },
+    // Where the credits went (ADR-0050): GET /usage for the last --days days, by model and by day.
+    'usage' => function ($args, $opt) use ($creditsConfig, $creditsKeyHint) {
+        $days = CreditsUsage::days($opt);
+        $prov = Provider::resolve($creditsConfig);
+        return CreditsUsage::usageRecords(CreditsUsage::get($prov, "/usage?days=$days", 'usage', $creditsKeyHint, 1048576), $days);
+    },
+    // The models the endpoint offers, with its own rates and descriptions, for choosing one (ADR-0050).
+    'models' => function () use ($creditsConfig, $creditsKeyHint) {
+        return CreditsUsage::modelRecords(CreditsUsage::get(Provider::resolve($creditsConfig), '/models', 'models', $creditsKeyHint, 1048576));
     },
     // Prints its own output and exits 0 always: the tmux status line and the start banner show nothing rather than an error.
     'line' => function ($args, $opt) use ($creditsConfig, $creditsStateDir) {
@@ -86,4 +79,4 @@ Cli::run($argv, [
         }
         exit(0);
     },
-], $usage, ['tmux', 'ascii']);
+], $usage, ['tmux', 'ascii'], ['days']);

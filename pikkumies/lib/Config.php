@@ -19,6 +19,7 @@ class Config
             'tools' => ['disabled' => []],         // tool categories to leave out, e.g. ['seedbox'] (ADR-0015)
             'searchFirst' => ['disabled' => false], // first-turn search hint + search-first gate (ADR-0011)
             'halt' => ['disabled' => false],        // halt-snapshot/halt-guard hooks + the one-shot judging loop (ADR-0047)
+            'lowBalance' => ['disabled' => false],  // the once-per-session low-credits notice before a turn (hooks/system/low-balance, ADR-0050)
             // reword: a question with no local hit is turned into search terms by the model once (hooks/search/search-first/search-first.php).
             // llm.disabled: no hook ever calls the model. model: the hooks' model; '' = the light model decided at generate (local/llm.json).
             'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => ''],

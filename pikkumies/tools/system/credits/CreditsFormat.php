@@ -10,6 +10,10 @@
 class CreditsFormat
 {
     const CELLS = 10;
+    /** Under this percent of the newest grant credits are low: the tmux bar turns red and the low-balance hook speaks (ADR-0050). */
+    const LOW_PCT = 10;
+    /** Fewer tokens than this at the highest rate is low too: a long session can send tens of thousands of tokens a turn (ADR-0050). */
+    const LOW_TOKENS = 200000;
 
     /**
      * The record from GET /usage (days=N, grants=10) and the model rates [['id', 'input', 'output'], ...] (first =
@@ -72,6 +76,23 @@ class CreditsFormat
         return [$balance + $spent, $sinceDay !== null && strcmp($day, $sinceDay) < 0];
     }
 
+    /** The one test of "credits are low" for a record: pct_left under LOW_PCT or tokens_min under LOW_TOKENS; a missing figure never counts. */
+    public static function isLow(array $r)
+    {
+        return (isset($r['pct_left']) && is_numeric($r['pct_left']) && $r['pct_left'] < self::LOW_PCT)
+            || (isset($r['tokens_min']) && is_int($r['tokens_min']) && $r['tokens_min'] < self::LOW_TOKENS);
+    }
+
+    /** A GET /models entry's rates ['input', 'output'] (credits per million tokens, plus 'cached_input' when sent), or null when it has none usable. */
+    public static function rate($m)
+    {
+        $c = is_array($m) && isset($m['credits_per_million_tokens']) ? $m['credits_per_million_tokens'] : null;
+        if (!isset($c['input'], $c['output']) || !is_int($c['input']) || !is_int($c['output'])) {
+            return null;
+        }
+        return ['input' => $c['input'], 'output' => $c['output']] + (isset($c['cached_input']) && is_int($c['cached_input']) ? ['cached_input' => $c['cached_input']] : []);
+    }
+
     /** Percent left, one decimal rounded down; 0 at a zero or negative balance; null when there is no pot. */
     public static function pct($balance, $pot)
     {
@@ -123,7 +144,7 @@ class CreditsFormat
             $n = self::cells($r['pct_left']);
             $bar = $u ? str_repeat('▰', $n) . str_repeat('▱', self::CELLS - $n) : '[' . str_repeat('#', $n) . str_repeat('-', self::CELLS - $n) . ']';
             if ($mode === 'tmux') {
-                $colour = $r['pct_left'] > 25 ? 'green' : ($r['pct_left'] >= 10 ? 'yellow' : 'red');
+                $colour = $r['pct_left'] > 25 ? 'green' : ($r['pct_left'] >= self::LOW_PCT ? 'yellow' : 'red');
                 $bar = "#[fg=$colour,bg=black]$bar#[default]"; // black behind the bar: tmux's default status bar is green
             }
             $approx = !empty($r['approx']['pot']) ? '~' : '';

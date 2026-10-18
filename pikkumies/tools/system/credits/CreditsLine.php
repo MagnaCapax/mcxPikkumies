@@ -45,9 +45,9 @@ class CreditsLine
         if ($prov['key'] === '' || $prov['endpoint'] === '') {
             return null;
         }
-        $line = self::read("$dir/line.json");
-        if (self::fresh($line, $prov, self::LINE_TTL, $now) && isset($line['model'], $line['record']) && $line['model'] === $prov['model']) {
-            return $line['record'];
+        $cached = self::cached($prov, $dir, self::LINE_TTL, $now);
+        if ($cached !== null) {
+            return $cached;
         }
         $failed = self::read("$dir/usage-failed.json");
         if (self::fresh($failed, $prov, isset($failed['code']) && $failed['code'] === 404 ? self::NO_ROUTE_TTL : self::FAIL_TTL, $now)) {
@@ -68,6 +68,18 @@ class CreditsLine
         return $record;
     }
 
+    /**
+     * The cached record when line.json is for this endpoint, key and model and younger than $maxAge seconds, else null.
+     * Never makes a request: the low-balance hook reads the line's cache with it (ADR-0050).
+     */
+    public static function cached(array $prov, $dir, $maxAge, $now = null)
+    {
+        $now = $now === null ? time() : (int) $now;
+        $line = self::read("$dir/line.json");
+        return self::fresh($line, $prov, $maxAge, $now) && isset($line['model'], $line['record']) && $line['model'] === $prov['model']
+            && is_array($line['record']) ? $line['record'] : null;
+    }
+
     /** [['id', 'input', 'output'], ...] in the endpoint's order, cached a day; [] when the rates cannot be had (no token figure then), cached 10 minutes. */
     public static function rates(array $prov, $dir, $now)
     {
@@ -79,9 +91,9 @@ class CreditsLine
         $data = $r !== null && $r['code'] === 200 ? json_decode($r['body'], true) : null;
         $rates = [];
         foreach (isset($data['data']) && is_array($data['data']) ? $data['data'] : [] as $m) {
-            $c = isset($m['credits_per_million_tokens']) ? $m['credits_per_million_tokens'] : null;
-            if (isset($m['id'], $c['input'], $c['output']) && is_string($m['id']) && is_int($c['input']) && is_int($c['output'])) {
-                $rates[] = ['id' => $m['id'], 'input' => $c['input'], 'output' => $c['output']];
+            $rate = CreditsFormat::rate($m);
+            if ($rate !== null && isset($m['id']) && is_string($m['id'])) {
+                $rates[] = ['id' => $m['id'], 'input' => $rate['input'], 'output' => $rate['output']];
             }
         }
         self::write($dir, 'rates.json', self::stamp($prov, $now) + ['rates' => $rates]);
