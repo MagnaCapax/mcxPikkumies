@@ -3,7 +3,7 @@
  * lib/HaltRun.php, the one-shot halt-guard loop (ADR-0047): bounded continues/wrap-up, no double
  * judging once the live hook already judged, and the bin/pikkumies TTY gate that only ever calls it
  * for a seeded prompt without a terminal on stdin or stdout. HaltRun::run() itself runs against a
- * fake "hermes" (writes --usage-file, prints a scripted answer) and a fake light-model endpoint
+ * fake "hermes" (rejects --usage-file after chat, prints a scripted answer and a stream-json result event) and a fake light-model endpoint
  * (php -S), in a throwaway pikkumies/lib copy so nothing here touches this checkout's real local/.
  * A real TTY cannot be allocated in this harness, so "never loops when interactive" is checked the
  * way tests/LaunchTest.php already checks other TTY-only behaviour: against the bin/pikkumies source.
@@ -25,7 +25,7 @@ if (!function_exists('haltRunTree')) {
         return $tmp;
     }
 
-    /** A fixture "hermes": writes --usage-file from plan.json[call index] (last entry repeats), prints its "output", exits its "code". Every call is logged to calls.jsonl. */
+    /** A fixture "hermes": refuses --usage-file after chat (exit 2, as Hermes v0.22.2 does), prints plan.json[call index] "output" (last entry repeats) plus a stream-json result event with its "session_id", exits its "code". Every call is logged to calls.jsonl. */
     function haltRunFakeHermes($tree)
     {
         $path = "$tree/fake-hermes";
@@ -37,14 +37,16 @@ if (!function_exists('haltRunTree')) {
             . '$plan = is_array($plan) ? $plan : [];' . "\n"
             . '$step = isset($plan[$n]) ? $plan[$n] : ($plan ? end($plan) : ["output" => "", "code" => 0, "session_id" => "fakesess"]);' . "\n"
             . 'file_put_contents($callsFile, json_encode(["argv" => array_slice($argv, 1)]) . "\n", FILE_APPEND);' . "\n"
-            . '$usageFile = "";' . "\n"
-            . 'foreach ($argv as $a) {' . "\n"
-            . '    if (strpos($a, "--usage-file=") === 0) { $usageFile = substr($a, strlen("--usage-file=")); }' . "\n"
-            . '}' . "\n"
-            . 'if ($usageFile !== "") {' . "\n"
-            . '    file_put_contents($usageFile, json_encode(["session_id" => $step["session_id"], "completed" => true]));' . "\n"
+            // Like Hermes v0.22.2: after the `chat` subcommand an option chat does not define is an argparse error.
+            . '$chatAt = array_search("chat", $argv, true);' . "\n"
+            . 'if ($chatAt !== false) {' . "\n"
+            . '    foreach (array_slice($argv, $chatAt + 1) as $a) {' . "\n"
+            . '        if (strpos($a, "--usage-file") === 0) { fwrite(STDERR, "hermes: error: unrecognized arguments: $a\n"); exit(2); }' . "\n"
+            . '    }' . "\n"
             . '}' . "\n"
             . 'echo isset($step["output"]) ? $step["output"] : "";' . "\n"
+            // A stream-json run ends with a result event that carries the session id.
+            . 'if (!empty($step["session_id"])) { echo "\n" . json_encode(["type" => "result", "session_id" => $step["session_id"], "exit_code" => 0]) . "\n"; }' . "\n"
             . 'exit(isset($step["code"]) ? (int) $step["code"] : 0);' . "\n";
         file_put_contents($path, $body);
         chmod($path, 0755);

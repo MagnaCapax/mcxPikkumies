@@ -23,7 +23,7 @@ class HaltRun
     {
         list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs);
         if ($sessionId === '') {
-            return $code; // no usable usage file: nothing to judge against
+            return $code; // no session id in the output (plain text answer): nothing to judge against
         }
         $continuesLeft = self::MAX_CONTINUES;
         $wrappedUp = false;
@@ -54,18 +54,16 @@ class HaltRun
 
     /**
      * One Hermes run: streams stdout to the user as it arrives (unchanged from today) while also
-     * keeping the last CAPTURE_MAX bytes of it, and reads --usage-file for the session id afterwards.
-     * Returns [exit code, captured output, session id ('' when it could not be read or validated)].
+     * keeping the last CAPTURE_MAX bytes of it. The arguments go to Hermes unchanged: Hermes'
+     * --usage-file is a top-level, one-shot-only flag, and after `chat` it is an unrecognised argument
+     * that stops the run (Hermes v0.22.2 hermes_cli/_parser.py). The session id comes from the
+     * stream-json `init`/`result` event when the caller asked for `--format=stream-json`.
+     * Returns [exit code, captured output, session id ('' when none was printed or it is not valid)].
      */
     private static function exec($hermesBin, array $argv)
     {
-        $usageFile = self::usageFilePath();
-        @mkdir(dirname($usageFile), 0700, true);
-        @touch($usageFile);
-        @chmod($usageFile, 0600);
-        $full = array_merge($argv, ['--usage-file=' . $usageFile]);
         $cmd = 'exec ' . escapeshellarg($hermesBin);
-        foreach ($full as $a) {
+        foreach ($argv as $a) {
             $cmd .= ' ' . escapeshellarg($a);
         }
         $p = @proc_open($cmd, [0 => STDIN, 1 => ['pipe', 'w'], 2 => STDERR], $pipes);
@@ -90,15 +88,24 @@ class HaltRun
             $code = proc_close($p);
         }
         $output = strlen($output) > self::CAPTURE_MAX ? substr($output, -self::CAPTURE_MAX) : $output;
-        $usage = json_decode((string) @file_get_contents($usageFile), true);
-        @unlink($usageFile);
-        $sessionId = is_array($usage) && isset($usage['session_id']) && is_string($usage['session_id'])
-            && preg_match('/^[A-Za-z0-9._-]{1,128}$/', $usage['session_id']) ? $usage['session_id'] : '';
-        return [$code, $output, $sessionId];
+        return [$code, $output, self::streamSessionId($output)];
     }
 
-    private static function usageFilePath()
+    /** The session id from the last stream-json event that carries one; '' for plain text output. */
+    public static function streamSessionId($output)
     {
-        return Config::localDir() . '/tmp/halt-usage-' . getmypid() . '-' . mt_rand() . '.json';
+        $lines = preg_split('/\r?\n/', (string) $output);
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = trim($lines[$i]);
+            if ($line === '' || $line[0] !== '{') {
+                continue;
+            }
+            $event = json_decode($line, true);
+            if (is_array($event) && isset($event['session_id']) && is_string($event['session_id'])
+                && preg_match('/^[A-Za-z0-9._-]{1,128}$/', $event['session_id'])) {
+                return $event['session_id'];
+            }
+        }
+        return '';
     }
 }
