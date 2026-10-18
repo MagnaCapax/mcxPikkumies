@@ -49,6 +49,32 @@ return [
         check(strpos((string) file_get_contents("$tmp/tools/INDEX.md"), 'rtorrent') === false, 'removed unit left in the index');
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'generate: a nested unit is generated under its path; disabled or removed, its skill and empty dirs go (ADR-0055)' => function () {
+        $tmp = generateFixture();
+        try {
+            foreach (['email/imap/fetch', 'media/ffmpeg', 'media-servers/plex'] as $path) {
+                $name = basename($path);
+                mkdir("$tmp/tools/$path", 0700, true);
+                file_put_contents("$tmp/tools/$path/skill.md", "---\nname: $name\ndescription: Fixture $name.\n---\nBody.\n");
+                file_put_contents("$tmp/tools/$path/USAGE.md", "# $name\n\nNo verbs.\n");
+                file_put_contents("$tmp/tools/$path/README.md", "# $name\n");
+            }
+            $r = Generate::run([], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            check($r['skills'] === 5 && is_file("$tmp/out/email/imap/fetch/SKILL.md"), 'nested skill not generated: ' . json_encode($r));
+            check(strpos((string) file_get_contents("$tmp/tools/INDEX.md"), "\n## email/imap\n- **fetch**") !== false, 'nested index heading');
+            $r = Generate::run(['media'], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            check($r['removed'] === 1 && !is_file("$tmp/out/media/ffmpeg/SKILL.md") && !is_dir("$tmp/out/media") && is_file("$tmp/out/media-servers/plex/SKILL.md"), 'media off must keep media-servers: ' . json_encode($r));
+            $r = Generate::run(['media', 'email'], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            check($r['removed'] === 1 && !is_dir("$tmp/out/email"), 'a disabled parent left a nested skill or its directories: ' . json_encode($r));
+            Generate::run(['media'], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            touch("$tmp/out/email/imap/fetch/.tmp-SKILL.md-1");
+            exec('rm -rf ' . escapeshellarg("$tmp/tools/email"));
+            $r = Generate::run(['media'], "$tmp/tools", "$tmp/out", "$tmp/tools/INDEX.md");
+            check($r['removed'] === 2 && !is_dir("$tmp/out/email") && is_dir("$tmp/out"), 'a removed nested unit left a stale skill, a temporary or a directory: ' . json_encode($r));
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tmp));
+        }
+    },
     'units: frontmatter and verbs table parsing' => function () {
         list($meta, $body) = Units::frontmatter("---\nname: a\ndescription: \"b: c\"\n---\nbody\n");
         check($meta === ['name' => 'a', 'description' => 'b: c'] && $body === "body\n", 'frontmatter parse');

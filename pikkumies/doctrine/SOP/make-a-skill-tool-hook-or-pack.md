@@ -26,6 +26,8 @@ pikkumies/tools/torrent-clients/rtorrent/
   rtorrent.php   the tool: php rtorrent.php <verb> [arguments] [--human]
 ```
 
+**Categories can nest** (ADR-0055). A category may be split into subcategories, such as `tools/email/imap/<tool>/`; any directory below `tools/<category>/` that has no `skill.md` is a category, named by its path (`email/imap`). A category's `README.md` and `DOCTRINE.md` (rules for the agent, loaded into SOUL.md under that path while one of its units is on) sit in its own directory. `lib/` holds shared code and is never read for units, and a unit never holds another unit. The skill name is still unique across the whole tree.
+
 **skill.md**: frontmatter with exactly `name` (equal to the directory) and `description`, then plain steps.
 
 ```markdown
@@ -51,7 +53,7 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 - Write verbs read the state back and report `"verified"` in the status line.
 - Tools of one category use the same verb names and record fields, listed in `tools/<category>/README.md`.
 
-**Changing a shipped skill**: copy the generated `~/pikkumies/local/generated/skills/<category>/<tool>/SKILL.md` to `~/pikkumies/local/hermes/skills/<new-name>/SKILL.md`, set `name: <new-name>` in the copy, edit it, and add the shipped name to `skills.disabled` in `~/pikkumies/local/config.php`. Never reuse the shipped name. A whole category can be left out with `tools.disabled` (category names).
+**Changing a shipped skill**: copy the generated `~/pikkumies/local/generated/skills/<category>/<tool>/SKILL.md` to `~/pikkumies/local/hermes/skills/<new-name>/SKILL.md`, set `name: <new-name>` in the copy, edit it, and add the shipped name to `skills.disabled` in `~/pikkumies/local/config.php`. Never reuse the shipped name. A whole category can be left out with `tools.disabled` (category paths: `email` also leaves out `email/imap`, and `media` does not touch `media-servers`).
 
 ## Hook
 
@@ -63,6 +65,8 @@ pikkumies/hooks/guard/guard-destructive/
   README.md              for people: what it checks and what it answers
   guard-destructive.php  the hook: JSON on stdin, one JSON answer on stdout
 ```
+
+Hooks nest the same way (`hooks/<category>/<sub>/<hook>/`). `hooks/<category>/` is always a category. Below it, a directory with `hook.md` or `<hook>.php`, or with no subdirectory, is a unit: a unit that lost its `hook.md` shows up as broken and blocks every tool call, so the mistake is seen at once.
 
 **hook.md**: frontmatter with exactly `name` (equal to the directory), `event`, `description`, `failClosed` and `timeout`, then a short note.
 

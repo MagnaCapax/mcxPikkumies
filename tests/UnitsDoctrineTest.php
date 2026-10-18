@@ -2,7 +2,7 @@
 /**
  * lib/Units.php edges not covered by ContractTest/GenerateTest: frontmatter parsing quirks, the
  * verbs-table parser's boundaries, Units::all()'s individual error branches, Units::doctrines()'
- * one-level-only category rule, and renderSkill()/renderIndex() rendering details. Reviewed against
+ * nested category rule (ADR-0055), and renderSkill()/renderIndex() rendering details. Reviewed against
  * the current source this session (see build brief); the "script-less unit with no verbs table is
  * not an error" row from the original 50-row table is dropped here because tests/GenerateTest.php's
  * generateFixture() already proves it: its server-admin unit has no script and no verbs table, and
@@ -87,20 +87,24 @@ return [
         // defect this catches: a doc author who deletes the example rows but leaves the header+separator
         // behind must still be caught, not silently accepted as "has a verbs table".
     },
-    'units doctrines(): a category nested one level too deep is never picked up' => function () {
+    'units doctrines(): a nested category\'s DOCTRINE.md is read under its path; one with no unit below it is not' => function () {
         $dir = testTempDir('pk-doctrine-nested');
         try {
-            mkdir("$dir/flat", 0700, true);
+            foreach (['flat/u1', 'outer/nested/u2'] as $u) {
+                mkdir("$dir/$u", 0700, true);
+                file_put_contents("$dir/$u/skill.md", "---\nname: " . basename($u) . "\ndescription: d\n---\n");
+            }
             file_put_contents("$dir/flat/DOCTRINE.md", "- flat rule\n");
-            mkdir("$dir/outer/nested", 0700, true);
             file_put_contents("$dir/outer/nested/DOCTRINE.md", "- nested rule\n");
+            mkdir("$dir/lonely/empty", 0700, true);
+            file_put_contents("$dir/lonely/DOCTRINE.md", "- lonely rule\n");
             $d = Units::doctrines([], $dir);
-            check($d === ['flat' => '- flat rule'], 'a one-level-too-deep DOCTRINE.md was picked up: ' . json_encode($d));
+            check($d === ['flat' => '- flat rule', 'outer/nested' => '- nested rule'], 'nested doctrine: ' . json_encode($d));
         } finally {
             testRmTree($dir);
         }
-        // defect this catches: ADR-0029 places DOCTRINE.md at category level only; the glob pattern
-        // ('*/DOCTRINE.md', not '*/*/DOCTRINE.md') is the sole enforcement of that placement rule.
+        // defect this catches: ADR-0055 reads DOCTRINE.md in every category directory at any depth, keyed by its
+        // path; rules of a category with no unit below it would sit in SOUL.md for nothing.
     },
     'units render: renderSkill() for a unit with verbs but no script omits the "Run:" line' => function () {
         $u = ['category' => 'cat', 'name' => 'noscript', 'dir' => '/t/cat/noscript', 'meta' => ['description' => 'd'], 'body' => "Body.\n",

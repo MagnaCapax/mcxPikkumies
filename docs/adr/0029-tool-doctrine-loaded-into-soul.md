@@ -45,3 +45,9 @@ Fitting text to the chosen numbers cost real rules: a load-bearing steer was dro
 - `HermesConfig::DOCTRINE_MAX` = 16 384 bytes per DOCTRINE.md.
 - A rule that does not fit is a reason to look at the limit, not to shorten the rule. Before cutting text to fit any size check, find what the check protects and measure it.
 - Load-bearing sentences are pinned by tests (the built-in memory steer, the accuracy rule), so a later edit fails loudly instead of losing them.
+
+## Amendment 2026-10-18: DOCTRINE.md in any category directory (ADR-0055)
+
+- `DOCTRINE.md` may sit in any category directory, also a nested one (`tools/email/imap/DOCTRINE.md`). It goes into SOUL.md under `### <category path>`.
+- It is shown only while at least one enabled unit lies below it, so rules whose units are all switched off leave SOUL.md with them.
+- `Units::doctrines()` returns `[category path => text]`. A `DOCTRINE.md` inside a tool unit is still not read.

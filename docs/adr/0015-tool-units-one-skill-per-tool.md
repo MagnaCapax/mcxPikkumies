@@ -43,3 +43,10 @@ Facts this rests on, checked 2026-10-14 against Hermes v2026.9.24:
 
 ## References
 - ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0007; ADR-0016, ADR-0017, ADR-0018
+
+## Amendment 2026-10-18: units at any depth (ADR-0055)
+
+- A tool unit may sit below a nested category, such as `tools/email/imap/<tool>/`. Its category is the path (`email/imap`), and its skill is generated at `local/generated/skills/email/imap/<tool>/SKILL.md`. `tools/<category>/` itself is still always a category.
+- `tools.disabled` lists category paths. An entry covers the categories below it, by whole path segments (`media` does not cover `media-servers`).
+- Stale skills are found at any depth, so "Hermes never loads a stale skill" holds for nested units too.
+- The name checks (unique, not a Hermes name) also run in `Units::all()`, and the reserved list lives in `Units::RESERVED_NAMES`.

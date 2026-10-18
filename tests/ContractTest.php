@@ -8,16 +8,15 @@
  * (tools/skills_tool.py, "Ambiguous skill name").
  */
 
-// Names Hermes v0.21.5 (tag v2026.9.24) already uses: registered tools, toolsets and built-in slash
-// commands. A skill with one of these names competes with the built-in. Hermes now updates on its own
-// (ADR-0033): a new built-in name shows up as a collision in the installed-source test below.
-const HERMES_RESERVED_NAMES = 'a2a agents annotate_preview apply_layout approvals approve battery bg blueprint branch browser browser_cdp browser_dialog browser_exec browser_vault_enter_code browser_vault_fill browser_vault_list browser_vault_save_login browser_vault_unlock btw bundles busy clarify clear close_terminal code_execution codex-runtime commands compress computer_use config connections context context_engine copy cron cronjob cronjob_manage curator debug delegate_task delegation deny desktop_preview desktop_project diff drive_preview egress execute_code export fast feishu_doc_read file focus focus_pane footer goal gui_tour handoff hatch heartbeat help history homeassistant image image_gen image_generate import indicator init insights journey kanban learn login loop manage_catalog manage_connections meet memory moa model new palette paste patch pause personality pet plan platform platforms plugins process_manage profile prompt queue quit react_to_message read_file read_terminal read_window_below reasoning redraw refine relay reload reload-mcp reload-skills restart resume retry review rollback save search_files sessions session_search sethome show_tip skill_manage skills skills_list skill_view skin snapshot spotify start status statusbar steer stop stt subgoal subscription suggestions terminal text_to_speech timestamps title todo todo_list tools toolsets topic topup tts undo update usage verbose version video video_analyze video_gen video_generate vision vision_analyze voice wake web web_extract web_search whoami worktree write_file x_search yolo yuanbao';
+// The names Hermes already uses (tools, toolsets, slash commands) are Units::RESERVED_NAMES in lib; Units::all() reports
+// a unit with one of them, or with a name another unit has, as an error at runtime too (ADR-0055).
 
-/** Every shipped skill source: the skill.md of each tool unit. */
+/** Every shipped skill source: the skill.md of each tool unit, at any depth (Units::all, ADR-0055). */
 function shippedSkillFiles()
 {
-    $root = dirname(__DIR__);
-    return (array) glob($root . '/pikkumies/tools/*/*/skill.md');
+    return array_map(function ($u) {
+        return $u['dir'] . '/skill.md';
+    }, Units::all());
 }
 
 /** [name, description] from a SKILL.md, or a string describing what is wrong. */
@@ -64,7 +63,7 @@ return [
         }
     },
     'skills: names are unique and do not shadow a Hermes built-in' => function () {
-        $tools = explode(' ', HERMES_RESERVED_NAMES);
+        $tools = explode(' ', Units::RESERVED_NAMES);
         $seen = [];
         foreach (shippedSkillFiles() as $file) {
             $name = basename(dirname($file));
@@ -79,6 +78,27 @@ return [
         foreach ($units as $u) {
             check(!$u['errors'], "{$u['category']}/{$u['name']}: " . implode('; ', $u['errors']));
         }
+    },
+    'hooks: every shipped hook unit is complete (a broken one would block every tool call, ADR-0030)' => function () {
+        $units = HookUnits::all();
+        check(count($units) >= 5, 'hook units missing: ' . count($units));
+        foreach ($units as $u) {
+            check($u['errors'] === [], "hooks/{$u['category']}/{$u['name']}: " . implode('; ', $u['errors']));
+        }
+    },
+    'units: a plain recursive count of skill.md and hook.md files matches what the walker found (a dropped unit fails here)' => function () {
+        // Independent of lib/Tree.php: the tests above take their unit lists from the walker, so one unit it drops would vanish from them too.
+        $count = function ($root, $marker) {
+            $n = 0;
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $f) {
+                if ($f->getFilename() === $marker && !preg_match('#(^|/)(lib|\.[^/]*)/#', substr($f->getPathname(), strlen($root) + 1))) {
+                    $n++;
+                }
+            }
+            return $n;
+        };
+        check(count(Units::all()) === $count(Units::toolsDir(), 'skill.md'), 'tool units: ' . count(Units::all()) . ', skill.md files: ' . $count(Units::toolsDir(), 'skill.md'));
+        check(count(HookUnits::all()) === $count(HookUnits::hooksDir(), 'hook.md'), 'hook units: ' . count(HookUnits::all()) . ', hook.md files: ' . $count(HookUnits::hooksDir(), 'hook.md'));
     },
     'units: the verbs in USAGE.md are exactly the verbs the tool answers to' => function () {
         foreach (Units::all() as $u) {
@@ -115,13 +135,14 @@ return [
         }
     },
     'units: every tool of a category has the verbs its category README lists (ADR-0015)' => function () {
-        foreach ((array) glob(dirname(__DIR__) . '/pikkumies/tools/*/README.md') as $readme) {
-            $shared = array_column(Units::verbs((string) file_get_contents($readme)), 'verb');
+        foreach (Tree::scan(Units::toolsDir(), 'skill.md')['categories'] as $category => $dir) {
+            $readme = "$dir/README.md";
+            $shared = is_file($readme) ? array_column(Units::verbs((string) file_get_contents($readme)), 'verb') : [];
             if (!$shared) {
                 continue;
             }
             foreach (Units::all() as $u) {
-                if ($u['category'] === basename(dirname($readme))) {
+                if ($u['category'] === $category) {
                     $missing = array_diff($shared, array_column($u['verbs'], 'verb'));
                     check(!$missing, $u['name'] . ' lacks the category verbs: ' . implode(', ', $missing));
                 }
@@ -130,7 +151,14 @@ return [
     },
     'units: removed commands are not mentioned in units, doctrine or docs' => function () {
         $root = dirname(__DIR__);
-        $files = array_merge((array) glob("$root/pikkumies/tools/*/*/*.md"), (array) glob("$root/pikkumies/doctrine/*.md"), (array) glob("$root/pikkumies/doctrine/SOP/*.md"), (array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/skills/*/SKILL.md"), (array) glob("$root/pikkumies/hooks/*/*/*.php"), ["$root/README.md", "$root/AGENTS.md"], (array) glob("$root/docs/*.md"));
+        $unitFiles = [];
+        foreach (Units::all() as $u) {
+            $unitFiles = array_merge($unitFiles, (array) glob($u['dir'] . '/*.md'));
+        }
+        foreach (HookUnits::all() as $u) {
+            $unitFiles = array_merge($unitFiles, (array) glob($u['dir'] . '/*.php'));
+        }
+        $files = array_merge($unitFiles, (array) glob("$root/pikkumies/doctrine/*.md"), (array) glob("$root/pikkumies/doctrine/SOP/*.md"), (array) glob("$root/pikkumies/lib/*.php"), (array) glob("$root/pikkumies/skills/*/SKILL.md"), ["$root/README.md", "$root/AGENTS.md"], (array) glob("$root/docs/*.md"));
         foreach ($files as $f) {
             $text = (string) @file_get_contents($f);
             check(!preg_match('#\bpacks/|pikkumies packs\b|tools/system/status\.php#', $text), basename(dirname($f)) . '/' . basename($f) . ' still mentions packs or a moved tool path');

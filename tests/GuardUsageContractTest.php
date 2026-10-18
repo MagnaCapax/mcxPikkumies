@@ -41,7 +41,11 @@ return [
         $guard = dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php';
         $checked = 0;
         $bad = [];
-        foreach ((array) glob(dirname(__DIR__) . '/pikkumies/tools/*/*/USAGE.md') as $file) {
+        foreach (Units::all() as $u) { // every unit at any depth (ADR-0055)
+            $file = $u['dir'] . '/USAGE.md';
+            if (!is_file($file)) {
+                continue;
+            }
             $usage = (string) file_get_contents($file);
             $changes = [];
             foreach (Units::verbs($usage) as $v) {
@@ -50,7 +54,7 @@ return [
             if (!$changes) {
                 continue; // no verbs table with a changes column
             }
-            $unit = basename(dirname(dirname($file))) . '/' . basename(dirname($file));
+            $unit = $u['category'] . '/' . $u['name'];
             foreach (guardUsageExamples($usage) as $ex) {
                 list($verb, $cmd) = $ex;
                 if (!isset($changes[$verb]) || !in_array($changes[$verb], ['deletes', 'loads', 'no'], true)) {

@@ -32,7 +32,7 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - **The orchestrator** reads stdin once and runs the units of the event in name order, each as its own `php` process with the same stdin and its own timeout:
   - Each unit's output is read as `_evaluate_result` reads a shell hook.
   - One addition: a fail-closed unit that exits non-zero with no answer also blocks. With PHP's `display_errors` off, a fatal error leaves stdout empty and exits 255, which Hermes would let through.
-  - Every `hooks/<category>/<hook>/` directory is a unit, even with a missing or unreadable `hook.md` (amended 2026-10-16). For `pre_tool_call` any broken unit blocks the call, whatever event or `failClosed` it claims; for `pre_llm_call` a broken unit is skipped.
+  - Every `hooks/<category>/<hook>/` directory is a unit, even with a missing or unreadable `hook.md` (amended 2026-10-16; amended 2026-10-18, ADR-0055: a directory there with subdirectories but no `hook.md` and no `<hook>.php` is a nested category, see the amendment below). For `pre_tool_call` any broken unit blocks the call, whatever event or `failClosed` it claims; for `pre_llm_call` a broken unit is skipped.
   - All units run even after a block, as Hermes runs all hooks, so their side effects (the search-first markers) stay as before.
   - The orchestrator itself blocks on a fatal error of its own for `pre_tool_call`: its crash handler is registered before it loads `lib/`, and the requires are wrapped so a broken library file blocks too.
 - **Merging** follows Hermes:
@@ -53,3 +53,10 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 ## References
 - ADR-0003, ADR-0011, ADR-0015, ADR-0020, ADR-0028
 - Hermes v2026.9.24: `agent/shell_hooks.py`, `hermes_cli/plugins.py`, `agent/turn_context.py`, `tools/hook_output_spill.py`
+
+## Amendment 2026-10-18: hook units at any depth (ADR-0055)
+
+- A hook unit may sit below a nested category, such as `hooks/tools/<tool>/<hook>/`. `hooks/<category>/` itself is always a category, so a category holding only a README is never a unit.
+- Below that, a directory is a unit when it holds `hook.md` or `<hook>.php`, or has no subdirectory. A unit whose `hook.md` is missing is still a broken unit, also when it has subdirectories such as `fixtures/`, and it still blocks every `pre_tool_call`. The walk never goes into a unit.
+- A symlinked directory, a directory that cannot be read, or a category deeper than 8 levels that still has subdirectories, is a broken unit. A `lib/` directory is skipped.
+- A contract test checks that every shipped hook unit has no errors, so a shipped broken unit cannot block every call by accident.

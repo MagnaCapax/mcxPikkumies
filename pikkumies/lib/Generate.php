@@ -21,7 +21,7 @@ class Generate
     /**
      * Categories left out: what the user switched off (tools.disabled, plus server-admin when root.disabled) and
      * what this machine cannot use (unavailableCategories). The one list for skills, the tool index and the SOUL.md
-     * tool doctrine.
+     * tool doctrine. Each entry is a category path and also covers the categories below it (Units::isDisabled, ADR-0055).
      */
     public static function disabledCategories(array $config)
     {
@@ -62,7 +62,7 @@ class Generate
         $want = [];
         $listed = [];
         foreach (Units::all($toolsDir) as $u) {
-            if (in_array($u['category'], $disabled, true)) {
+            if (Units::isDisabled($u['category'], $disabled)) {
                 continue;
             }
             if ($u['errors']) {
@@ -84,8 +84,9 @@ class Generate
         foreach (self::generatedFiles($outDir) as $rel) {
             if (!isset($want[$rel]) && @unlink("$outDir/$rel")) {
                 $result['removed']++;
-                @rmdir(dirname("$outDir/$rel"));
-                @rmdir(dirname(dirname("$outDir/$rel")));
+                for ($d = dirname("$outDir/$rel"); $d !== $outDir && strpos($d, "$outDir/") === 0 && @rmdir($d); $d = dirname($d)) {
+                    // empty directories go, up to the generated dir itself
+                }
             }
         }
         if ($result['error'] === '' && self::writeIfChanged($indexFile, Units::renderIndex($listed)) === null) {
@@ -128,12 +129,27 @@ class Generate
         return true;
     }
 
-    /** SKILL.md files (and stale temporaries) below the generated dir, as relative paths. */
-    private static function generatedFiles($outDir)
+    /** SKILL.md files (and stale temporaries) at any depth below the generated dir, as relative paths. */
+    private static function generatedFiles($outDir, $rel = '')
     {
         $out = [];
-        foreach (array_merge((array) glob("$outDir/*/*/SKILL.md"), (array) glob("$outDir/*/*/.tmp-*")) as $f) {
-            $out[] = substr($f, strlen($outDir) + 1);
+        $entries = @scandir($rel === '' ? $outDir : "$outDir/$rel");
+        if ($entries === false) {
+            // Not there yet, or unreadable: nothing to list here (a write into it reports its own error).
+            return [];
+        }
+        foreach ($entries as $entry) {
+            $r = $rel === '' ? $entry : "$rel/$entry";
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (is_dir("$outDir/$r")) {
+                if ($entry[0] !== '.' && !is_link("$outDir/$r") && substr_count($r, '/') < Tree::MAX_DEPTH) {
+                    $out = array_merge($out, self::generatedFiles($outDir, $r));
+                }
+            } elseif ($entry === 'SKILL.md' || strpos($entry, '.tmp-') === 0) {
+                $out[] = $r;
+            }
         }
         return $out;
     }

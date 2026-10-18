@@ -1,5 +1,5 @@
 <?php
-/** tools/<category>/DOCTRINE.md in SOUL.md, and the SOUL.md budgets for every profile (ADR-0029). */
+/** DOCTRINE.md of a tool category (at any depth, ADR-0055) in SOUL.md, and the SOUL.md budgets for every profile (ADR-0029). */
 
 /** The profiles renderSoul is given in practice: PMSS with root, PMSS shared without root, generic without root, and shared variants. */
 function soulProfiles()
@@ -15,21 +15,30 @@ function soulProfiles()
 
 return [
     'doctrine: each shipped DOCTRINE.md is a category file of at most HermesConfig::DOCTRINE_MAX bytes' => function () {
-        $files = (array) glob(Units::toolsDir() . '/*/DOCTRINE.md');
+        $units = Units::all();
+        $files = [];
+        foreach (Tree::scan(Units::toolsDir(), 'skill.md')['categories'] as $cat => $dir) {
+            if (is_file("$dir/DOCTRINE.md")) {
+                $files[$cat] = "$dir/DOCTRINE.md";
+            }
+        }
         check(count($files) >= 2, 'expected seeded DOCTRINE.md files');
-        $categories = array_unique(array_column(Units::all(), 'category'));
-        foreach ($files as $f) {
-            $cat = basename(dirname($f));
-            check(in_array($cat, $categories, true), "$cat/DOCTRINE.md is not in a tool category");
+        foreach ($files as $cat => $f) {
+            check((bool) array_filter($units, function ($u) use ($cat) {
+                return Tree::within($u['category'], $cat);
+            }), "$cat/DOCTRINE.md has no tool unit below it");
             check(filesize($f) <= HermesConfig::DOCTRINE_MAX, "$cat/DOCTRINE.md is " . filesize($f) . ' bytes; the cap is ' . HermesConfig::DOCTRINE_MAX);
             check(trim((string) file_get_contents($f)) !== '', "$cat/DOCTRINE.md is empty");
         }
-        check(!glob(Units::toolsDir() . '/*/*/DOCTRINE.md'), 'DOCTRINE.md belongs at category level, not in a tool unit');
+        foreach ($units as $u) {
+            check(!is_file($u['dir'] . '/DOCTRINE.md'), "{$u['category']}/{$u['name']}/DOCTRINE.md: a unit's own DOCTRINE.md is not read yet; put it at category level (ADR-0055)");
+        }
     },
     'doctrine: Units::doctrines skips disabled categories and empty files, sorted by category' => function () {
         $dir = sys_get_temp_dir() . '/pk-doctrine-' . getmypid();
         foreach (['zeta', 'alpha', 'empty', 'off'] as $c) {
-            @mkdir("$dir/$c", 0700, true);
+            @mkdir("$dir/$c/u$c", 0700, true); // a category's rules show only while a unit below it is on (ADR-0055)
+            file_put_contents("$dir/$c/u$c/skill.md", "---\nname: u$c\ndescription: d\n---\n");
         }
         file_put_contents("$dir/zeta/DOCTRINE.md", "- z rule\n");
         file_put_contents("$dir/alpha/DOCTRINE.md", "\n- a rule\n");
@@ -37,11 +46,7 @@ return [
         file_put_contents("$dir/off/DOCTRINE.md", "- off rule\n");
         $d = Units::doctrines(['off'], $dir);
         check($d === ['alpha' => '- a rule', 'zeta' => '- z rule'], 'got ' . json_encode($d));
-        foreach (['zeta', 'alpha', 'empty', 'off'] as $c) {
-            unlink("$dir/$c/DOCTRINE.md");
-            rmdir("$dir/$c");
-        }
-        rmdir($dir);
+        testRmTree($dir);
     },
     'doctrine: SOUL.md is capabilities, the static doctrine, then the tool doctrine of enabled categories' => function () {
         $p = soulProfiles()['pmss+root'];
