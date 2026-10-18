@@ -34,9 +34,9 @@ if (!function_exists('hookSearchTree')) {
         return ['hook_event_name' => 'pre_llm_call', 'session_id' => $session, 'extra' => ['is_first_turn' => $first, 'user_message' => $message]];
     }
 
-    function hookSearchGateBlocks($tree, $session, $tool, $cmd = null)
+    function hookSearchGateBlocks($tree, $session, $tool, $cmd = null, $path = 'x')
     {
-        $p = ['hook_event_name' => 'pre_tool_call', 'session_id' => $session, 'tool_name' => $tool, 'tool_input' => $cmd === null ? ['path' => 'x'] : ['command' => $cmd]];
+        $p = ['hook_event_name' => 'pre_tool_call', 'session_id' => $session, 'tool_name' => $tool, 'tool_input' => $cmd === null ? ['path' => $path] : ['command' => $cmd]];
         list(, $out) = runPhp("$tree/pikkumies/hooks/search/search-first-gate/search-first-gate.php", [], json_encode($p));
         $d = json_decode($out, true);
         return is_array($d) && isset($d['action']) && $d['action'] === 'block';
@@ -164,6 +164,16 @@ return [
         check(hookSearchGateBlocks($tree, 'ro', 'terminal', "php $tool list; rm -rf /tmp/x"), 'a chained list passed as a read');
         check(!hookSearchGateBlocks($tree, 'ro2', 'terminal', "php $tool sources"), 'a plain sources call was blocked');
         check(hookSearchGateBlocks($tree, 'ro3', 'terminal', 'php /tmp/evil/tools/documentation/kb/kb.php search x'), 'a kb.php from another directory passed as a read');
+        // Lessons before documentation (ADR-0043): the downloaded copies and the wiki and kb units wait for the memory search.
+        foreach ([['read_file', '/home/u/pikkumies/local/docs-cache/borg-docs/prune.md'], ['search_files', 'local/docs-cache'], ['read_file', 'docs-cache/pm-wiki/x.md']] as $i => $c) {
+            check(hookSearchGateBlocks($tree, "docs$i", $c[0], null, $c[1]), "documentation read before the search: {$c[0]} {$c[1]}");
+        }
+        check(hookSearchGateBlocks($tree, 'docs3', 'terminal', 'php ~/pikkumies/tools/documentation/wiki/wiki.php search quota'), 'wiki search before the memory search');
+        check(hookSearchGateBlocks($tree, 'docs4', 'terminal', 'php ~/pikkumies/tools/documentation/kb/kb.php list'), 'kb list before the memory search');
+        check(!hookSearchGateBlocks($tree, 'docs5', 'read_file', null, '/home/u/notes/docs-cache-old.txt'), 'a file merely named like the cache was blocked');
+        hookSearchGateBlocks($tree, 'docs6', 'terminal', "php $tool search prune");
+        check(!hookSearchGateBlocks($tree, 'docs6', 'read_file', null, 'local/docs-cache/borg-docs/prune.md')
+            && !hookSearchGateBlocks($tree, 'docs6', 'terminal', 'php ~/pikkumies/tools/documentation/kb/kb.php search x'), 'documentation still blocked after the search');
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'search-first hook: titles are one clean line of at most 120 characters; output stays within 1500 bytes' => function () {

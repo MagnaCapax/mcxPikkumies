@@ -31,3 +31,5 @@ Other providers' wikis and knowledge bases are documentation sites (`type: site`
 
 ## References
 - ADR-0011, ADR-0015, ADR-0018, ADR-0031
+
+- Amended by ADR-0043 (2026-10-18): the wiki and kb units' search and list now wait for the memory search, like reads of the downloaded copies.

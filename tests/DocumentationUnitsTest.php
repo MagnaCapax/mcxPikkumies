@@ -108,17 +108,19 @@ return [
         check($code === 0 && strpos($out, '"name":"c-site-wiki","trust":"official","type":"site","kind":"wiki"') !== false, 'sources has no kind: ' . $out);
         exec('rm -rf ' . escapeshellarg($tree));
     },
-    'documentation: the gate lets wiki and kb search and list through before the memory search, without opening it' => function () {
+    'documentation: wiki and kb search and list wait for the memory search (ADR-0043), and do not open the gate' => function () {
         $tree = docuTree();
         $gate = "$tree/pikkumies/hooks/search/search-first-gate/search-first-gate.php";
         $call = function ($command) use ($gate) {
             list(, $out) = runPhp($gate, [], json_encode(['tool_name' => 'terminal', 'session_id' => 'docu', 'tool_input' => ['command' => $command]]));
             return trim($out);
         };
-        check($call("php $tree/pikkumies/tools/documentation/wiki/wiki.php search jellyfin") === '', 'wiki search blocked');
-        check($call("php $tree/pikkumies/tools/documentation/kb/kb.php --human list") === '', 'kb list blocked');
+        check(strpos($call("php $tree/pikkumies/tools/documentation/wiki/wiki.php search jellyfin"), 'lessons before documentation') !== false, 'wiki search ran before the memory search');
+        check(strpos($call("php $tree/pikkumies/tools/documentation/kb/kb.php --human list"), 'lessons before documentation') !== false, 'kb list ran before the memory search');
         check(strpos($call('rm -f /tmp/x'), 'block') !== false, 'wiki search opened the gate');
         check(strpos($call("php $tree/pikkumies/tools/documentation/wiki/kb.php search x"), 'block') !== false, 'a mismatched path passed');
+        $call("php $tree/pikkumies/tools/memory/pikkumies/pikkumies.php search jellyfin");
+        check($call("php $tree/pikkumies/tools/documentation/wiki/wiki.php search jellyfin") === '', 'wiki search blocked after the memory search');
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'documentation: TextSearch::excerpt is the memory excerpt (same paragraph, same cut)' => function () {

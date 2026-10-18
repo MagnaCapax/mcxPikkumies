@@ -2,8 +2,9 @@
 /**
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): search first. Until the agent has run the memory search
  * (`tools/memory/pikkumies/pikkumies.php search`, lessons and documentation together), tool calls
- * that act are blocked with the command to run. Reading, asking the user and the search tools
- * themselves (the memory unit, and the wiki and kb units' search and list) are allowed. Partner of hooks/search/search-first/.
+ * that act are blocked with the command to run, and so is reading or searching the downloaded documentation
+ * (local/docs-cache, the wiki and kb units; ADR-0043: lessons first). Other reading, asking the user and the memory unit
+ * are allowed. Partner of hooks/search/search-first/.
  *
  * State: one marker file per session under local/state/search-first/, touched by the search; the
  * pre_llm_call hook touches <marker>.armed when a later turn asks something new, and the gate stays
@@ -92,11 +93,15 @@ if (searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'search')) {
     }
     exit(0);
 }
-// The wiki and kb units only read the downloaded copies (ADR-0037): allowed, but they do not open the gate (no lessons searched).
-if (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources')
-    || searchFirstPlainCall($command, 'tools/documentation/wiki/wiki\.php', 'search|list') || searchFirstPlainCall($command, 'tools/documentation/kb/kb\.php', 'search|list')) {
+// Lessons before documentation (ADR-0043): reading the downloaded copies, or searching them with the wiki and kb
+// units, waits for the memory search, which searches the lessons and the documentation together.
+$path = isset($payload['tool_input']['path']) ? str_replace('\\', '/', (string) $payload['tool_input']['path']) : '';
+$docs = (in_array($tool, ['read_file', 'search_files'], true) && preg_match('#(^|/)docs-cache(/|$)#', $path))
+    || searchFirstPlainCall($command, 'tools/documentation/wiki/wiki\.php', 'search|list') || searchFirstPlainCall($command, 'tools/documentation/kb/kb\.php', 'search|list');
+if (!$docs && (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources'))) {
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';
-echo json_encode(['action' => 'block', 'message' => "Pikkumies search first: before acting, search the lessons and documentation for this task:\n"
-    . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading files and asking the user are allowed meanwhile.)"]) . "\n";
+echo json_encode(['action' => 'block', 'message' => "Pikkumies search first: " . ($docs ? 'lessons before documentation' : 'before acting')
+    . ", search the lessons and documentation for this task:\n"
+    . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading other files and asking the user are allowed meanwhile.)"]) . "\n";

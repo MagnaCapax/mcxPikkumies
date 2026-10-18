@@ -40,3 +40,5 @@ Facts this rests on, checked 2026-10-08:
 ## References
 - ADR-0001 (local state, update stops on edited files), ADR-0003 and ADR-0005 (Hermes shell hooks), ADR-0006 (packs).
 - Hermes v2026.9.24: `website/docs/user-guide/features/hooks.md`, `agent/shell_hooks.py`, `website/docs/user-guide/features/tools.md`.
+
+- Amended by ADR-0043 (2026-10-18): reading the downloaded documentation now waits for the memory search; other reading stays allowed.
