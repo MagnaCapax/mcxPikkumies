@@ -179,8 +179,10 @@ return [
         $n = count(file(dirname(__DIR__) . '/pikkumies/lib/Cli.php'));
         check($n <= 216 + 80, "Cli.php has grown to $n lines, past the 216+80 soft ceiling measured this session");
     },
-    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php and rtorrent/Scgi.php' => function () {
-        $allowed = [dirname(__DIR__) . '/pikkumies/lib/Http.php', dirname(__DIR__) . '/pikkumies/tools/torrent-clients/rtorrent/Scgi.php'];
+    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php, rtorrent/Scgi.php and email/lib/MailTransport.php' => function () {
+        // MailTransport is the one mail connection (ADR-0053): imaps, pop3s and smtp(s) over TLS, which Http (http/https only) does not speak.
+        $allowed = [dirname(__DIR__) . '/pikkumies/lib/Http.php', dirname(__DIR__) . '/pikkumies/tools/torrent-clients/rtorrent/Scgi.php',
+            dirname(__DIR__) . '/pikkumies/tools/email/lib/MailTransport.php'];
         foreach (actTrackedPhp() as $f) {
             if (in_array($f, $allowed, true)) {
                 continue;

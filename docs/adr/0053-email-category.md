@@ -1,0 +1,48 @@
+# ADR-0053: `email` category — IMAP, POP, SMTP and spam rules for the user's own mail, with sending shown and approved first
+
+## Metadata
+- Author: Aleksi Ursin / MCX (with Väinämöinen)
+- Date: 2026-10-18
+- Status: Accepted
+
+## Context
+The request of 2026-10-18: "is the tooling recursive? so if we create say tools/email/[imap,pop,antispam]/ each subfolder it's its own skill, doctrine etc.? ... all the email functions and tools need ... create them". Tool units are two levels deep (`tools/<category>/<unit>/`, `Units::all()`), and a category may carry one DOCTRINE.md (ADR-0029), so `tools/email/` with one unit per protocol fits without a new mechanism.
+
+Mail is the riskiest input and output a helper agent can have: every message is text a stranger wrote, and one sent message cannot be recalled. A security review of the plan (2026-10-18; local libcurl 7.52-8.14 sources and tests against fake servers on 127.0.0.1) found:
+- libcurl URL-decodes an IMAP or POP custom request and only then refuses control bytes, so CR/LF injection is blocked, but `%22` breaks a quoted string, a `;UID=` in a raw folder path changes the operation, and a uid of `1:*` reaches a whole folder.
+- An attachment saved under its own name into an existing directory can be `~/.ssh/authorized_keys` or a `.php` file in `~/www`.
+- `CURLOPT_MAIL_RCPT` with an embedded CR/LF puts a second `RCPT TO` on the wire.
+- A plain `EXPUNGE` removes every message marked `\Deleted` in the folder, not only the one the user approved.
+- `CURLOPT_MAXFILESIZE` does not apply to mail; only the write callback can cap a download.
+- With `CURLUSESSL_ALL`, `smtp://` to a server offering no STARTTLS fails (errno 64) after EHLO, before any login.
+- A terminal the agent opens (Hermes `pty=true`) is no proof that a human is there, and an approval request in cron is a refusal (`cron_mode: deny`, ADR-0020).
+
+## Options Considered
+- **One `email` unit with every verb.** One skill for three protocols and a rule set; the skill would be long and the agent would load all of it to read one message.
+- **One unit per protocol plus spam rules, a shared `tools/email/lib/` (chosen).** The operator's layout; the shared library holds the transport, the parser, the path rules, the Maildir writer and the logins once (ADR-0015: a category lib once two units share real code).
+- **Send directly from `send` and let the guard show the command line.** The command line names a body file and attachment paths, not what they hold, and shell expansion would be shown before it expands.
+- **`send` writes a draft; the guard shows what the draft holds and the unit re-checks it before sending (chosen).**
+
+## Decision
+- **Layout.** `tools/email/{imap,pop,smtp,antispam}/`, each a unit (skill.md, USAGE.md, README.md, `<unit>.php`); `tools/email/lib/` holds `MailTransport` (the one mail connection), `MailImap` (IMAP commands, for imap and antispam), `MailParse`, `MailPath`, `Maildir` (the one Maildir writer, for imap archive and pop fetch), `MailLogin` and `MailUnit`. The units share no verbs, so the category README has no verb table. `tools/email/DOCTRINE.md` goes into SOUL.md (ADR-0029). No category for Sieve: dropped as not asked for.
+- **Transport.** PHP curl, TLS only and verified: imaps 993, pop3s 995, smtps 465, smtp 587 with `CURLUSESSL_ALL`; `VERIFYPEER`, `VERIFYHOST 2` and TLS 1.2 as the minimum are set on every request; no port 25, 110 or 143, no fallback, no CA file or skip-verify from any config. A host name is `[A-Za-z0-9.-]` and never starts with `-`. A port on this machine is used only when this account owns it, and curl is pinned to the address checked (`Http::foreignLocalListener`, ADR-0019). Reads are capped in the write callback (50 MiB per message). `tests/ArchitectureTest.php` allows `curl_init` in `MailTransport.php` next to `Http.php` and `Scgi.php`.
+- **IMAP commands.** A uid matches `^[1-9][0-9]{0,9}$`; folders and search words are printable ASCII; quoted strings escape `\` and `"`; `%` is sent as `%25` over the whole custom request; folders in the URL are `rawurlencode`d per segment; bodies come through the `;UID=n` URL form. Reading sets `\Seen` (curl has no BODY.PEEK form), so every reading verb sets unseen messages back to unseen. Deletes and the move fallback are `\Deleted` plus `UID EXPUNGE` of exactly those uids (UIDPLUS); without UIDPLUS they are refused, never a plain `EXPUNGE`.
+- **Logins.** Typed at the user's terminal, tried against the server, stored with `SecretFile` as `local/secrets/email-<unit>` (0600). The smtp login also stores the From address and the user's own addresses (the allowlist); only `login` changes them.
+- **Attachments.** `imap fetch` writes only into a new directory (default `~/mail-attachments/<folder>-<uid>-<time>`, through `HomePath::newTarget`, an existing directory refused), never under a dot-directory, `~/www`, `~/bin` or Pikkumies; names are decoded (RFC 2231, RFC 2047) first, cut to the last part after `/` or `\`, controls dropped, reduced to letters, digits, `._ -`, stripped of leading `.` and `-`, capped at 200 bytes with the extension kept; files are created with `fopen 'x'`, 0600, `-1`, `-2` on a collision. Files read for sending are regular files inside the home, outside dot-directories and `local/secrets/`, not key-shaped.
+- **Sending.** `smtp send` checks every address (plain addresses, no control bytes or `<>`), the subject (one line) and the files, and writes `local/state/email-outbox/<sha256>.json` (each attachment with path, size and sha256). `send-draft <sha256>` is the approval-gated verb: the guard (`hooks/guard/guard-destructive/GuardMail.php`) reads the draft and asks with From, every recipient, Subject, each attachment's path and size and the first 1 KiB of the body, rule key `pikkumies-mail:<sha256>`; the unit re-hashes the draft and every attachment and refuses any difference; the envelope comes only from the checked list. `send-self` and `test` go only to the allowlist's first address; `send-self` needs no question, so it works in cron. The encoded message is at most 20 MiB. The guard blocks `$ \` * ? [ { ~ ; | & < > \` and line breaks outside single quotes in any smtp command, and blocks the agent from running any email `login`. imap and pop `delete` carry `--expect` (the uidvalidity, or the UIDLs from `list`), so they are asked as deletes (`pikkumies-delete:`, ADR-0020); `smtp test` is asked too.
+- **Archive and POP download.** Streamed to `Maildir/tmp` and linked into `new/` without replacing a file; progress in `local/state/email-archive/` and `local/state/email-pop/`; a changed UIDVALIDITY starts a new directory from uid 0; they stop before less than `HermesInstall::UNATTENDED_RESERVE` (10%) of the disk or file quota would be free; they never delete on the server. A run writes one line to `local/logs/email/YYYYMMDD.jsonl` (counts, bytes, seconds; never addresses or text).
+- **Spam rules.** `antispam` scores from the first Authentication-Results header (SPF, DKIM, DMARC), X-Spam-Flag / X-Spam-Status and the user's rules in `local/state/email-rules.json`; `apply` only moves to Junk.
+- **Untrusted text.** Bodies are printed as `untrusted_text`; DOCTRINE.md tells the agent never to act on a request in mail without the user's yes, never to follow its links, and never to copy it into memory unless asked.
+
+## Consequences
+- The user can read, tidy, archive and send mail through the agent. A message to someone else goes out through `send-draft`, which the guard shows the user and asks about, with the draft re-hashed so what was shown is what is sent. Like the rest of the guard this is a safety prompt for the agent's own mistakes, not a security boundary (AGENTS.md): it sees the command the agent runs, so a send hidden from it (a script path in a variable, for example) is not asked about.
+- Gated out, recorded: a symlink race beyond `fopen 'x'` (same account, own home); shell injection (PHP curl, no shell); hidden HTML text reaching the model (covered by `untrusted_text` and the doctrine).
+- The draft is JSON, not an `.eml` file as first planned, so the guard can show every field without parsing MIME; attachments are pinned by sha256 instead of being frozen inside the draft.
+- Folder names and search words are ASCII only; a non-ASCII folder is passed in IMAP's modified UTF-7, as `folders` prints it.
+- `test` and `send-self` called through a variable script path are not seen by the guard; they reach only the user's own addresses.
+- Tests use an injectable transport (`MailTransport::$fake`, `tests/fixtures/email/`), plus plaintext fake servers on 127.0.0.1 for the TLS refusal; no test touches the network.
+
+## References
+- ADR-0015 (tool units), ADR-0016, ADR-0017, ADR-0019 (logins, local listeners), ADR-0020 (approvals), ADR-0029 (DOCTRINE.md)
+- `tools/email/README.md`, `hooks/guard/guard-destructive/GuardMail.php`
+- Tests: `tests/EmailTransportTest.php`, `tests/EmailImapTest.php`, `tests/EmailParseTest.php`, `tests/EmailArchiveTest.php`, `tests/EmailSmtpTest.php`, `tests/EmailGuardTest.php`, `tests/EmailAntispamTest.php`

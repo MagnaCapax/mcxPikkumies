@@ -44,6 +44,7 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - Sonarr, Radarr, Prowlarr and the other *arr apps: [arr](pikkumies/tools/arr/README.md)
 - Plex, Jellyfin and Emby: [media servers](pikkumies/tools/media-servers/README.md)
 - Converting or probing one of your own media files, and speech-to-text transcription (cloud or local): [media](pikkumies/tools/media/README.md)
+- Your own mail over IMAP, POP and SMTP (read, archive, send after you approve, spam rules): [email](pikkumies/tools/email/README.md)
 - Rootless Docker containers: [containers](pikkumies/tools/containers/README.md)
 - Backups with restic and borg: [backup](pikkumies/tools/backup/README.md)
 - Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)

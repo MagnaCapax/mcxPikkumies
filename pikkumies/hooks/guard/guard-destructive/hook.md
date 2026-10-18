@@ -1,7 +1,7 @@
 ---
 name: guard-destructive
 event: pre_tool_call
-description: Blocks obviously destructive shell commands and reads of stored passwords, and sends data deletes, exposure, container-daemon stops, load tests and scheduled scripts the user may want to Hermes' human-approval prompt.
+description: Blocks obviously destructive shell commands and reads of stored passwords, and sends data deletes, exposure, container-daemon stops, load tests, scheduled scripts and outgoing mail the user may want to Hermes' human-approval prompt.
 failClosed: true
 timeout: 10
 ---

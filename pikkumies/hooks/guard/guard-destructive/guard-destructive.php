@@ -119,6 +119,14 @@ foreach ($patterns as $re => $why) {
     }
 }
 
+// Email (ADR-0053): logins blocked, smtp commands without shell expansion, send-draft and test asked with what they send.
+require __DIR__ . '/GuardMail.php';
+$mail = guardMail($command, $texts);
+if ($mail !== null) {
+    echo json_encode($mail) . "\n";
+    exit(0);
+}
+
 // Other accounts' resource files and connections are not the agent's business (AGENTS.md, privacy).
 // The message stays generic on purpose and names no path.
 $privacyMessage = "Pikkumies privacy: reads only this account's own files and connections. Not run. Use performance check.";
@@ -183,6 +191,8 @@ $approve = [
     '/^(?!\s*(which|type|command\s+-v|man)\s)(?=.*(^|[\s;&|(`\/"\',\[])(fio|iperf3?|speedtest(-cli)?|yabs(\.sh)?|stress(-ng)?|sysbench|bonnie\+\+)(?=[\s"\',\])]|$)(?!\s+(--version|--help|-v|-V|-h)\s*($|[;&|])))/s'
         => ['load', 'a benchmark or load test'],
     '/\bdd\b(?=[^;&|\n]*\bof=(?!\/dev\/null\b))(?=[^;&|\n]*\b(bs|count)=)/' => ['load', 'a large test write with dd'],
+    // imap and pop delete exact messages on the server (ADR-0053); their --expect is also caught below.
+    "/\\b(imap|pop)\\.php\\b.*{$v}delete\\b/s" => ['delete', 'deletes mail on the server'],
     "/\\brclone\\b.*$v(sync|bisync|move|moveto|purge|delete|deletefile|rmdirs?|cleanup|dedupe)\\b/s" => ['delete', 'rclone can delete or overwrite files'],
     "/\\brestic\\b.*$v(forget|prune)\\b/s"                                                  => ['delete', 'restic removes backup snapshots'],
     "/\\bborg\\b.*$v(prune|delete|compact|recreate)\\b/s"                                    => ['delete', 'borg removes backup archives'],
