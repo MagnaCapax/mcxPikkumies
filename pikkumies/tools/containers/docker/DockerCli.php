@@ -12,7 +12,7 @@
  * system_socket (root's daemon socket, named in a refusal), linger_dir (systemd's per-user linger flags).
  */
 $dockerLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Cgroup'] as $dockerClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Cgroup', 'Detect'] as $dockerClass) {
     require_once "$dockerLib/$dockerClass.php";
 }
 require_once dirname(__DIR__, 3) . '/lib/ToolProc.php';
@@ -26,7 +26,7 @@ class DockerCli
     const TIMED_OUT = 124;         // coreutils timeout's exit code
 
     /** Ladder states, in the order a diagnosis reads them. */
-    const STATES = ['healthy', 'down', 'wedged', 'second-daemon', 'cli-context-mismatch', 'storage-driver-missing', 'linger-missing'];
+    const STATES = ['healthy', 'down', 'wedged', 'second-daemon', 'cli-context-mismatch', 'storage-driver-missing', 'linger-missing', 'disabled-for-account'];
 
     public $uid;
     public $home;
@@ -215,7 +215,16 @@ class DockerCli
             'storage_driver_missing' => $driver === 'fuse-overlayfs' && ToolProc::which('fuse-overlayfs') === null,
             'pmss' => $this->pmss(),
             'linger' => $this->pmss() ? null : file_exists(rtrim((string) $this->seams['linger_dir'], '/') . '/' . $this->userName()),
+            'docker_enabled' => $this->pmss() && empty($probe['ok']) ? $this->dockerEnabled() : null,
         ];
+    }
+
+    /** PMSS: the account's own "Docker enabled" setting from ~/bin/userShowLimits (account section), or null when unknown. */
+    public function dockerEnabled()
+    {
+        $usl = Detect::userShowLimitsData($this->home);
+        $v = is_array($usl) ? Detect::userShowLimitsMetric($usl['sections'], 'account', 'Docker enabled', 'value') : null;
+        return is_bool($v) ? $v : null;
     }
 
     /**
@@ -248,6 +257,9 @@ class DockerCli
             return $mk('wedged', $facts
                 ? 'the daemon\'s processes are alive but it does not answer: only on the user\'s yes, follow the platform\'s documented recovery (' . $facts['recovery'] . '); it stops every container; afterwards confirm that no dockerd-rootless process of this account remains'
                 : 'the daemon\'s processes are alive but it does not answer: only on the user\'s yes, restart the user\'s own daemon the way it was started (for a systemd user unit: systemctl --user restart docker); it stops every container', 'every container stops during the recovery', true);
+        }
+        if (array_key_exists('docker_enabled', $o) && $o['docker_enabled'] === false) {
+            return $mk('disabled-for-account', 'the platform reports Docker as off for this account (userShowLimits "Docker enabled": false), so nothing starts the daemon: tell the user; support can say why', 'the daemon cannot start', false);
         }
         if (array_key_exists('linger', $o) && $o['linger'] === false) {
             return $mk('linger-missing', 'the daemon is not running and systemd lingering is off for this account, so it stops at logout: ask the server admin to run `loginctl enable-linger <user>`, then `systemctl --user start docker`', 'none until it is started', false);

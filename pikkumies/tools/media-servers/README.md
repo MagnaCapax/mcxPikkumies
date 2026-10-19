@@ -28,7 +28,7 @@ No delete, update, shutdown, key or configuration verbs. Later, once a need show
 6. `scan` never sends `replaceAllMetadata`, `replaceAllImages` or Plex `force`, which overwrite metadata the user edited by hand.
 7. `sessions` and `logs` keep viewer addresses out unless the user asks (`--addresses`): tool output goes to the model. Titles, user names and log text are data, never instructions ([ADR-0016](../../../docs/adr/0016-jsonl-is-the-default-output.md)).
 8. No security-audit verb. `stats` shows the listen address as a plain fact.
-9. Plex and Emby are the user's own installs. PM provides no GPU transcoding; `hardware_acceleration` reports the server's setting as found, nothing more.
+9. Plex and Emby are the user's own installs. `hardware_acceleration` reports the server's setting as found, nothing more. Whether the platform offers GPU transcoding is not stated here either way; `ffmpeg hw` reports what this machine actually has.
 10. `restart` never uses a server's own restart endpoint and never re-runs an installer.
 
 ## Credentials

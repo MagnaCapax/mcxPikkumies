@@ -15,4 +15,4 @@ Use this for the user's own Emby. For Jellyfin or Plex use their units; the verb
 6. **Restart** works for an Emby container on the user's own rootless Docker; elsewhere it says how instead.
 7. **When it cannot reach Emby** the error says why: not found (give `--url http://127.0.0.1:<port>`), not running, busy (unknown, not down), or another account's port (never work around that).
 
-PM provides no GPU transcoding; `hardware_acceleration` is only the server's setting as found.
+`hardware_acceleration` is only the server's setting as found; never say whether the platform offers GPU transcoding.

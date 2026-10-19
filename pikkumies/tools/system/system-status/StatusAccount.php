@@ -49,6 +49,7 @@ class StatusAccount
             'value' => ['account', 'bonus', 'value'],
             'unit' => ['account', 'bonus', 'unit'],
         ],
+        'docker' => ['enabled' => ['account', 'Docker enabled', 'value']],
     ];
 
     /** Used against limit: [group, used key, limit key, left key or null]. */

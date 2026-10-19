@@ -24,7 +24,7 @@ Manages the user's own Docker daemon and its containers: engine facts and space 
 
 ## The daemon ladder
 
-`diagnose` (and every verb that finds the daemon not answering) names one state, decided from the probe and from what can be read without the daemon: this account's own processes in `/proc`, the socket file, the CLI context the user's own `docker` would use, the storage driver in `~/.config/docker/daemon.json`, and (not on PMSS) the systemd linger file.
+`diagnose` (and every verb that finds the daemon not answering) names one state, decided from the probe and from what can be read without the daemon: this account's own processes in `/proc`, the socket file, the CLI context the user's own `docker` would use, the storage driver in `~/.config/docker/daemon.json`, (on PMSS) the account's own `Docker enabled` setting from `~/bin/userShowLimits`, and (not on PMSS) the systemd linger file.
 
 | state | when | next step |
 |---|---|---|
@@ -33,6 +33,7 @@ Manages the user's own Docker daemon and its containers: engine facts and space 
 | second-daemon | two `dockerd` of this account | tell the user and support; stop neither |
 | storage-driver-missing | the probe fails and `daemon.json` names `fuse-overlayfs`, which is not installed | support (PMSS reinstalls it on update) |
 | wedged | the probe fails or times out while daemon processes of this account are alive | only on the user's yes, the provider's documented recovery (it stops every container), then check that no daemon process is left |
+| disabled-for-account | down, PMSS, and the account's own `userShowLimits` reports `Docker enabled: false` (read only when the probe fails) | tell the user; support can say why (no self-service switch is claimed) |
 | linger-missing | down, not PMSS, and lingering is off for the account | the admin enables lingering |
 | down | no daemon processes | PMSS: wait 5 minutes, then `systemctl --user start docker.service`, then support; elsewhere start the user's daemon |
 

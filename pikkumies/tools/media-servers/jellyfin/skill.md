@@ -15,4 +15,4 @@ Use this for the user's own Jellyfin. For Emby or Plex use their units; the verb
 6. **Credentials.** On Pulsed Media the tool logs in with the user's own `~/.media-stack-credentials.txt`. Elsewhere, or after a refusal, the user runs `login` in their own terminal with an API key from the dashboard; never ask for the key in the chat. A refused credential is not retried until then.
 7. **When it cannot reach Jellyfin** the error says why: not found, not running, busy or starting (state unknown, not down), or a port of another account (never work around that).
 
-PM provides no GPU transcoding; `hardware_acceleration` is only the server's setting as found.
+`hardware_acceleration` is only the server's setting as found; never say whether the platform offers GPU transcoding.
