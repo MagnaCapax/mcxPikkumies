@@ -18,10 +18,10 @@ require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
 require_once dirname(__DIR__, 3) . '/lib/FileopsClassify.php';
 require_once dirname(__DIR__, 3) . '/lib/FileopsList.php';
+require_once dirname(__DIR__, 3) . '/lib/HookUnits.php'; // HookUnits::approveShown: the one approve-message-fits-the-panel check (ADR-0054)
 
 const FILEOPS_SESSION_RE = '/^[A-Za-z0-9._-]{1,128}$/';
 const FILEOPS_PASS_SECONDS = 600;
-const FILEOPS_SHOW_MAX = 4000; // the user must see all of what they approve (as guard-destructive)
 const FILEOPS_ATTR_ENTRIES = 200;
 const FILEOPS_WHAT = ['chmod' => 'changes permissions', 'chown' => 'changes owners', 'chgrp' => 'changes groups',
     'setfacl' => 'changes access control lists', 'chattr' => 'changes file attributes (such as immutable or append-only)',
@@ -120,7 +120,7 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
             if ($hit) {
                 $asks[] = 'mv replaces ' . implode(', ', array_map(function ($p) use ($homeReal) {
                     return fileopsShow($p, $homeReal);
-                }, array_slice($hit, 0, 3))) . (count($hit) > 3 ? ' and ' . (count($hit) - 3) . ' more' : '') . ', whose contents cannot be brought back';
+                }, array_slice($hit, 0, 3))) . (count($hit) > 3 ? ' and ' . (count($hit) - 3) . ' more' : '') . ', unrecoverable';
                 $targets = array_merge($targets, $paths, $hit);
             }
             continue;
@@ -128,6 +128,8 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
         $tier = 'block';
         $verbs[] = $m['verb'] . ($m['recursive'] && strpos($m['verb'], 'find') !== 0 ? ' -R' : '');
         $targets = array_merge($targets, $paths);
+        $matchInside = []; // this match's recursive sensitive hits, merged into one ask below (a chmod -R on the
+        // home itself also reaches ~/.ssh underneath it, and each hit repeating the full warning overflows the panel)
         foreach ($paths as $p) {
             $r = realpath($p);
             foreach ($r === false ? [] : $sensitive as $s) {
@@ -136,9 +138,12 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
                 }
                 $inside[$s] = $s === $homeReal ? 'the home itself' : fileopsShow($s, $homeReal);
                 if ($m['recursive']) {
-                    $asks[] = end($verbs) . " changes {$inside[$s]} and everything in it, which can lock the account out of SSH or break Pikkumies";
+                    $matchInside[$s] = $inside[$s];
                 }
             }
+        }
+        if ($matchInside) {
+            $asks[] = end($verbs) . ' changes ' . implode(' and ', array_unique($matchInside)) . ', which can lock you out of SSH or break Pikkumies';
         }
     }
     if (!$asks && $tier === '') {
@@ -155,7 +160,8 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
     }
     $toolCallId = isset($payload['extra']['tool_call_id']) && is_scalar($payload['extra']['tool_call_id']) ? (string) $payload['extra']['tool_call_id'] : '';
     $sessionId = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
-    $file = $relative ? false : FileopsList::write("$localDir/logs/fileops", sha1($toolCallId !== '' ? $toolCallId : $sessionId . "\0" . $command . microtime()),
+    $logId = sha1($toolCallId !== '' ? $toolCallId : $sessionId . "\0" . $command . microtime());
+    $file = $relative ? false : FileopsList::write("$localDir/logs/fileops", $logId,
         ['ts' => gmdate('Y-m-d\TH:i:s\Z'), 'session_id' => $sessionId, 'tool_call_id' => $toolCallId, 'command' => Cli::cleanString($command),
             'targets' => $c['complex'] ? 'not captured' : array_values(array_unique($targets)), 'truncated' => $ctx['truncated']],
         $entries, isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0);
@@ -164,12 +170,16 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
     } elseif ($relative) {
         $about = 'A target is a relative path and the call has no workdir, so nothing was listed; use absolute paths.';
     } elseif (!$entries) {
-        $about = 'None of its targets is an existing path under the home, so nothing was listed.';
+        $about = 'Nothing under the home was listed.';
     } else {
-        $about = 'Its targets hold ' . ($ctx['truncated'] ? 'over ' . $ctx['cap'] : count($entries)) . ' entries; inside: '
-            . ($inside ? implode(', ', $inside) : 'none of the home itself, ~/.ssh or the pikkumies directory') . '.';
+        // "inside" is named only when something sensitive actually is inside; otherwise the sentence would say
+        // nothing and only cost characters (HookUnits::APPROVE_SHOWN is tight once the log id below is added).
+        $about = 'Targets hold ' . ($ctx['truncated'] ? 'over ' . $ctx['cap'] : count($entries)) . ' entries'
+            . ($inside ? '; inside: ' . implode(', ', $inside) : '') . '.';
     }
-    $about .= $file === false ? '' : ' The paths with their permissions, owners and sizes as they are now: ' . fileopsShow($file, $homeReal) . '.';
+    // A short id, not the log file's real 40-hex name: the user does not need the exact name to decide, only that
+    // the full list (permissions, owners, sizes) is on disk if they want it (`ls local/logs/fileops/<id>*`).
+    $about .= $file === false ? '' : ' Details: ~/pikkumies/local/logs/fileops/' . substr($logId, 0, 8) . '.jsonl.gz.';
     $id = substr(sha1($command), 0, 16);
     $marker = $asks ? 'ask' : fileopsMarker($localDir, $sessionId, $command); // the ask tier never reads the marker
     if ($marker === 'pass') {
@@ -182,11 +192,12 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
         }, $verbs));
         return ['action' => 'block', 'message' => 'Pikkumies fileops check: ' . implode('; ', $what) . ". Not run. $about Tell the user in one line what this command changes, or change the command. Running the identical command again within 10 minutes proceeds."];
     }
-    if (strlen($command) > FILEOPS_SHOW_MAX) {
+    $why = $asks ? implode('; ', array_unique($asks)) : "$verbText needs a check, and this session's check could not be recorded";
+    $approveMessage = "Pikkumies: $why. $about Command [$id]: $command";
+    if (!HookUnits::approveShown($approveMessage)) {
         return ['action' => 'block', 'message' => 'Pikkumies fileops check: a command that needs the user\'s approval, and it is too long to show the user in full. Not run. Split it into smaller commands.'];
     }
-    $why = $asks ? implode('; ', array_unique($asks)) : "$verbText needs a check, and this session's check could not be recorded";
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-fileops:' . $id, 'message' => "Pikkumies: $why. $about Command [$id]: $command"];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-fileops:' . $id, 'message' => $approveMessage];
 }
 
 if (realpath((string) $_SERVER['SCRIPT_FILENAME']) === __FILE__) {

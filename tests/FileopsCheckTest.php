@@ -110,6 +110,31 @@ return [
             testRmTree($tree);
         }
     },
+    // The source file's own name is the only thing in the message whose length is free to vary without changing
+    // what is asked about (the replaced destination, the entry count and the log id stay fixed), so padding it
+    // shifts the message by exactly one character per padding character.
+    'fileops: an mv-replace question is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked' => function () {
+        check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
+        $tree = fileopsTree();
+        try {
+            $home = "$tree/home";
+            $cmdFor = function ($pad) use ($home) {
+                $src = str_repeat('a', $pad);
+                file_put_contents("$home/data/$src", 'a');
+                return "mv $home/data/$src $home/data/b";
+            };
+            $base = fileopsAnswer($tree, fileopsPayload($cmdFor(1)));
+            check(is_array($base) && $base['action'] === 'approve', 'base mv-replace case not approved: ' . json_encode($base));
+            $need350 = 1 + (HookUnits::APPROVE_SHOWN - strlen($base['message']));
+            check($need350 >= 1, 'the base mv-replace message is already over the cap; shorten it');
+            $d = fileopsAnswer($tree, fileopsPayload($cmdFor($need350)));
+            check(is_array($d) && $d['action'] === 'approve' && strlen($d['message']) === HookUnits::APPROVE_SHOWN, '350 characters: expected approve: ' . json_encode($d));
+            $d = fileopsAnswer($tree, fileopsPayload($cmdFor($need350 + 1)));
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'too long to show the user in full') !== false, '351 characters: expected block: ' . json_encode($d));
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'fileops: mv to a new name or into a directory, mv -n, and a plain chmod of a file are silent' => function () {
         $tree = fileopsTree();
         try {

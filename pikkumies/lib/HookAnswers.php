@@ -173,8 +173,7 @@ class HookAnswers
         }
         sort($keys);
         $message = 'Pikkumies: ' . count($approves) . ' checks ask about this call. ' . implode(' ', $parts);
-        $chars = preg_match_all('/./su', $message);
-        if (($chars === false ? strlen($message) : $chars) > HookUnits::APPROVE_SHOWN) {
+        if (!HookUnits::approveShown($message)) {
             // Name the units: the cause may be two checks asking about one call, which splitting the call does not cure.
             return ['action' => 'block', 'message' => 'Pikkumies safety: ' . count($approves) . ' checks ask about this call (' . implode(', ', $units ?: ['unnamed'])
                 . '), and their questions together are too long to show the user in full. Not run. Tell the user which checks asked; split the call into smaller steps, or the user can change one of those checks.'];

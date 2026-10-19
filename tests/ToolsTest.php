@@ -83,7 +83,7 @@ return [
             $d = json_decode($out, true);
             check(is_array($d) && $d['action'] === 'approve', "execute_code delete not asked: $code");
         }
-        $long = str_repeat('echo ok; ', 40) . 'rclone purge remote:';
+        $long = str_repeat('echo ok; ', 15) . 'rclone purge remote:';
         $d = $ask($long);
         check($d['action'] === 'approve' && strpos($d['message'], 'rclone purge remote:') !== false, 'the user must see the whole command they approve');
         $d = $ask(str_repeat('echo ok; ', 500) . 'rclone purge remote:');
@@ -105,6 +105,33 @@ return [
             $out = $ask($cmd);
             check($out === null, "read-only command flagged: $cmd");
         }
+    },
+    // guard-destructive checks the exact message it is about to send against HookUnits::APPROVE_SHOWN (ADR-0020
+    // 2026-10-19 amendment), not a longer per-site literal: a merge-time-only check would miss the common case of
+    // one unit answering alone, which the orchestrator passes through unchecked (HookAnswers::mergePreToolCall).
+    'guard hook: an approve message is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked, counted in characters not bytes' => function () use ($guardOrchestrator) {
+        check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
+        $ask = function ($cmd) use ($guardOrchestrator) {
+            list(, $out) = runPhp($guardOrchestrator, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+            return json_decode($out, true);
+        };
+        $tail = ' rclone purge remote:'; // keeps the rclone-delete rule matching however much filler precedes it
+        $fixed = strlen('Pikkumies: rclone can delete or overwrite files, which cannot be undone. Command []: ') + 16 + strlen($tail);
+        foreach ([HookUnits::APPROVE_SHOWN => 'approve', HookUnits::APPROVE_SHOWN + 1 => 'block'] as $total => $want) {
+            $cmd = str_repeat('a', $total - $fixed) . $tail;
+            $d = $ask($cmd);
+            check(is_array($d) && $d['action'] === $want, "$total characters: expected $want: " . json_encode($d));
+            if ($want === 'approve') {
+                check(strlen($d['message']) === $total, 'length arithmetic off: ' . strlen($d['message']));
+            }
+        }
+        // Three-byte UTF-8 characters must be counted as one character each, not three: a command that only fits
+        // under the cap when measured in bytes must still be refused, and one that fits in characters must be asked.
+        $multi = str_repeat("\xE2\x82\xAC", HookUnits::APPROVE_SHOWN - $fixed) . $tail; // euro sign, 3 bytes, 1 character
+        $d = $ask($multi);
+        check(is_array($d) && $d['action'] === 'approve', 'a multibyte command at the character limit was blocked: ' . json_encode($d));
+        $d = $ask(str_repeat("\xE2\x82\xAC", HookUnits::APPROVE_SHOWN - $fixed + 1) . $tail);
+        check(is_array($d) && $d['action'] === 'block', 'a multibyte command one character over the limit was approved: ' . json_encode($d));
     },
     'guard hook ignores harmless and non-terminal calls' => function () use ($guardOrchestrator) {
         $hook = $guardOrchestrator;

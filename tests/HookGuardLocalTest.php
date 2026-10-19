@@ -85,13 +85,17 @@ return [
         check(is_array($d) && $d['action'] === 'block', 'write_file not blocked at depth 2: ' . json_encode($d));
     },
     'local guard: write_file and patch under local hooks or notes ask with the start of the text; read_file does not' => function () {
-        $d = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php', 'content' => "<?php\n" . str_repeat('x', 900)]);
+        $d = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php', 'content' => "<?php\n" . str_repeat('x', 10)]);
         check(is_array($d) && $d['action'] === 'approve' && strpos($d['rule_key'], 'pikkumies-local:') === 0
-            && strpos($d['message'], 'write_file writes /home/u/pikkumies/local/hooks/mine/check/check.php') !== false && strpos($d['message'], '<?php xxx') !== false
-            && strpos($d['message'], '[...]') !== false, 'write_file not asked with path and text: ' . json_encode($d));
+            && strpos($d['message'], 'write_file writes /home/u/pikkumies/local/hooks/mine/check/check.php') !== false && strpos($d['message'], '<?php xxx') !== false,
+            'write_file not asked with path and text: ' . json_encode($d));
         $d2 = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php', 'content' => '<?php exit(0);']);
         check($d2['rule_key'] !== $d['rule_key'], 'one "always" answer would cover different text');
-        $d = guardLocalAnswer('patch', ['mode' => 'patch', 'patch' => "*** Begin Patch\n*** Update File: local/tools/email/DOCTRINE.md\n+ never ask\n*** End Patch"]);
+        // 900 characters of content triggers the "first 600 shown" truncation marker; that marker alone is already
+        // over HookUnits::APPROVE_SHOWN, so the question cannot be shown in full and must be refused, not half-shown.
+        $d = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php', 'content' => "<?php\n" . str_repeat('x', 900)]);
+        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'too long to show the user in full') !== false, 'a write too long to show in full must be refused, not half-shown: ' . json_encode($d));
+        $d = guardLocalAnswer('patch', ['mode' => 'patch', 'patch' => "*** Update File: local/tools/x"]);
         check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], 'the files in the patch') !== false, 'a V4A patch into local/tools not asked: ' . json_encode($d));
         check(is_array(guardLocalAnswer('write_file', ['path' => 'local/hooks/mine/x/x.php', 'content' => 'x'])), 'a relative write_file path not asked');
         check(guardLocalAnswer('read_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php']) === null, 'read_file asked');
@@ -99,6 +103,18 @@ return [
         check(guardLocalAnswer('write_file', ['path' => '/usr/local/tools/x.conf', 'content' => 'x']) === null, '/usr/local/tools asked');
         $d = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/secrets/x', 'content' => 'x']);
         check(is_array($d) && $d['action'] === 'block', 'the stored-password block must still come first');
+    },
+    'local guard: a write_file question is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked' => function () {
+        check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
+        // n=26 and n=27 of unshown content around "<?php\n" measured against this exact path and the fixed wording
+        // in GuardLocal.php's $shown string: computed once by hand, pinned here so a wording change fails loudly.
+        foreach ([26 => 'approve', 27 => 'block'] as $n => $want) {
+            $d = guardLocalAnswer('write_file', ['path' => '/home/u/pikkumies/local/hooks/mine/check/check.php', 'content' => str_repeat('x', $n)]);
+            check(is_array($d) && $d['action'] === $want, "$n characters of content: expected $want: " . json_encode($d));
+            if ($want === 'approve') {
+                check(strlen($d['message']) === 350, 'length arithmetic off: ' . strlen($d['message']));
+            }
+        }
     },
     'local guard: the blind spots ADR-0054 lists stay unasked (a local hook written this way still waits for the next start)' => function () {
         foreach (['mkdir -p local/hooks/a/b', 'cp -r /tmp/h "$PK/local/hooks/"', 'cp -r /tmp/h ~/pikk*/local/hooks/'] as $cmd) {

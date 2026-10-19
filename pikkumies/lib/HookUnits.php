@@ -38,6 +38,29 @@ class HookUnits
      */
     const APPROVE_SHOWN = 350;
 
+    /**
+     * $message's character count: Unicode characters, or a byte count on invalid UTF-8. The one counting a unit
+     * uses both to decide whether a message fits self::APPROVE_SHOWN (approveShown(), below) and to state how much
+     * of something it had to cut, such as an excerpt's real length (ADR-0020 2026-10-19 amendments).
+     */
+    public static function charCount($message)
+    {
+        $message = (string) $message;
+        $chars = preg_match_all('/./su', $message);
+        return $chars === false ? strlen($message) : $chars;
+    }
+
+    /**
+     * Whether $message's character count fits self::APPROVE_SHOWN, the one limit every unit that builds its own
+     * approve message checks against (ADR-0054, ADR-0020 2026-10-19 amendment): the user must see everything they
+     * approve, so a unit checks the message it is about to send, not only the command inside it. Counted the way
+     * HookAnswers::mergeApproves counts a merged question (Unicode characters; a byte count on invalid UTF-8).
+     */
+    public static function approveShown($message)
+    {
+        return self::charCount($message) <= self::APPROVE_SHOWN;
+    }
+
     public static function hooksDir()
     {
         return Config::root() . '/hooks';

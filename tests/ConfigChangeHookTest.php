@@ -133,6 +133,28 @@ return [
             testRmTree($tree);
         }
     },
+    // The $ask closure checks the whole built message, not just $shown (the config-change.php $ask helper used to
+    // check strlen($shown) alone, missing $what in the count): pad only the command, which is the last thing in the
+    // message, so the length grows by exactly one character per padding character.
+    'config hook: an askWhole question is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked' => function () {
+        check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
+        $tree = cfgHookTree();
+        try {
+            $cmdFor = function ($pad) use ($tree) {
+                return cfgHookCmd($tree, 'set agent.name ' . str_repeat('a', $pad)) . '; ls';
+            };
+            $base = cfgHook($tree, 'terminal', ['command' => $cmdFor(0)]);
+            check(is_array($base) && $base['action'] === 'approve', 'base askWhole case not approved: ' . json_encode($base));
+            $need350 = HookUnits::APPROVE_SHOWN - strlen($base['message']);
+            check($need350 >= 0, 'the base askWhole message is already over the cap; shorten it before padding');
+            $d = cfgHook($tree, 'terminal', ['command' => $cmdFor($need350)]);
+            check(is_array($d) && $d['action'] === 'approve' && strlen($d['message']) === HookUnits::APPROVE_SHOWN, '350 characters: expected approve: ' . json_encode($d));
+            $d = cfgHook($tree, 'terminal', ['command' => $cmdFor($need350 + 1)]);
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'too long to show the user in full') !== false, '351 characters: expected block: ' . json_encode($d));
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'config hook: an asked key next to set or apply in any form it cannot parse is asked; Configure* called directly is asked (re-review N1)' => function () {
         $tree = cfgHookTree();
         try {

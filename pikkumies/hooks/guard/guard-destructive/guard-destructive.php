@@ -9,6 +9,7 @@
  * owns this file and Hermes' config. Real limits come from the OS (permissions, no sudo).
  */
 require_once dirname(__DIR__, 3) . '/lib/NestedAgent.php';
+require_once dirname(__DIR__, 3) . '/lib/HookUnits.php'; // HookUnits::approveShown: the one approve-message-fits-the-panel check (ADR-0054)
 
 /** Print the answer. An agent started by another agent blocks what it would ask: whoever answers there is an agent (ADR-0020). */
 function guardSay(array $answer)
@@ -109,12 +110,13 @@ if ($scheduleTool) {
     if (!$script) {
         exit(0);
     }
-    if (strlen($command) > 4000) {
+    $id = substr(sha1($command), 0, 16);
+    $approveMessage = "Pikkumies: schedules a script that then runs by itself whenever it is due, with nobody asked. Job [$id]: " . $command;
+    if (!HookUnits::approveShown($approveMessage)) {
         echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a scheduled script job too long to show the user in full. Not run.']) . "\n";
         exit(0);
     }
-    $id = substr(sha1($command), 0, 16);
-    guardSay(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => "Pikkumies: schedules a script that then runs by itself whenever it is due, with nobody asked. Job [$id]: " . $command]);
+    guardSay(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => $approveMessage]);
 }
 
 $patterns = $secretPatterns + [
@@ -310,14 +312,15 @@ foreach ($approve as $re => $rule) {
         list($kind, $why) = ['delete', 'a command too long or complex to check']; // fail toward asking the user, never allow
     }
     if ($hit !== 0) {
-        // The user must see everything they approve: a command too long to show in full is refused.
-        if (strlen($command) > 4000) {
+        $id = substr(sha1($command), 0, 16);
+        $key = ($kind === 'load' ? 'pikkumies-load:' : ($kind === 'send' ? 'pikkumies-send:' : 'pikkumies-delete:')) . $id;
+        $approveMessage = "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command;
+        // The user must see everything they approve: a message too long to show in full is refused.
+        if (!HookUnits::approveShown($approveMessage)) {
             echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why, and the command is too long to show the user in full. Not run. Split it into smaller commands."]) . "\n";
             exit(0);
         }
-        $id = substr(sha1($command), 0, 16);
-        $key = ($kind === 'load' ? 'pikkumies-load:' : ($kind === 'send' ? 'pikkumies-send:' : 'pikkumies-delete:')) . $id;
-        guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command]);
+        guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => $approveMessage]);
     }
 }
 // Writes to local hooks and notes (ADR-0054), when no rule above asked already.

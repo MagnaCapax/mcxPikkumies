@@ -46,3 +46,6 @@ Mail is the riskiest input and output a helper agent can have: every message is 
 - ADR-0015 (tool units), [ADR-0016](0016-jsonl-is-the-default-output.md), [ADR-0017](0017-human-output-option.md), ADR-0019 (logins, local listeners), ADR-0020 (approvals), ADR-0029 (DOCTRINE.md)
 - `tools/email/README.md`, `hooks/guard/guard-destructive/GuardMail.php`
 - Tests: `tests/EmailTransportTest.php`, `tests/EmailImapTest.php`, `tests/EmailParseTest.php`, `tests/EmailArchiveTest.php`, `tests/EmailSmtpTest.php`, `tests/EmailGuardTest.php`, `tests/EmailAntispamTest.php`
+
+## Amendment 2026-10-19: the body excerpt shrinks to what the approval panel can show
+The Sending bullet's "first 1 KiB of the body" assumed the panel always had room for it; against [ADR-0020](0020-deletes-need-the-users-approval.md)'s `HookUnits::APPROVE_SHOWN` (350 characters) it did not, and most real drafts were refused outright instead of asked. `send-draft` now asks with as much of the body as fits the approval panel, up to 1 KiB, with its total size — never a fixed 1 KiB regardless of what else the question must show.

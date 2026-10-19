@@ -117,7 +117,7 @@ return [
             ["$d launch --image nginx:alpine --name web --count 3 --port 80 --accept-shared-exposure", 'approve', 'exposure'],
             ["$d launch --image nginx:alpine --name web --port 80 --public", 'approve', 'exposure'],
             ["$d launch-plan --image nginx:alpine --name web --port 80 --public", 'none'],
-            ["$d launch-plan --image nginx:alpine --name web --port 80; $d launch --image nginx:alpine --name web --port 80 --public", 'approve', 'exposure'],
+            ["$d launch-plan --port 80; $d launch --port 80 --public", 'approve', 'exposure'],
             ["$d images --prune-plan", 'none'],
             ["$d prune --expect 4", 'approve', 'delete'],
             ["$d remove web-4 web-5 --expect 2", 'approve', 'delete'],

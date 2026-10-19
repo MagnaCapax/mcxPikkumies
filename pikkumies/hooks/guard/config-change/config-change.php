@@ -20,6 +20,7 @@
  */
 $root = dirname(__DIR__, 3);
 require_once "$root/lib/NestedAgent.php";
+require_once "$root/lib/HookUnits.php"; // HookUnits::approveShown: the one approve-message-fits-the-panel check (ADR-0054)
 require_once "$root/lib/ConfigureTiers.php";
 require_once __DIR__ . '/ConfigChangePaths.php';
 $say = function (array $answer) {
@@ -54,10 +55,11 @@ foreach ($fields[$tool] as $k) {
 $text = implode("\n", $parts);
 /** Asks the person; Hermes shows only the message, so what is approved must fit in it whole. */
 $ask = function ($what, $id, $shown) use ($say) {
-    if (strlen($shown) > 4000) {
+    $approveMessage = "Pikkumies: $what. Command [" . substr($id, 0, 16) . "]: $shown";
+    if (!HookUnits::approveShown($approveMessage)) {
         $say(['action' => 'block', 'message' => "Pikkumies safety: $what, and it is too long to show the user in full. Not run."]);
     }
-    $say(['action' => 'approve', 'rule_key' => 'pikkumies-config:' . $id, 'message' => "Pikkumies: $what. Command [" . substr($id, 0, 16) . "]: $shown"]);
+    $say(['action' => 'approve', 'rule_key' => 'pikkumies-config:' . $id, 'message' => $approveMessage]);
 };
 $askWhole = function ($what) use ($ask, $tool, $text) {
     $ask($what, substr(hash('sha256', $tool . "\n" . $text), 0, 32), $tool === 'write_file' || $tool === 'patch' ? "$tool " . trim($text) : trim($text));

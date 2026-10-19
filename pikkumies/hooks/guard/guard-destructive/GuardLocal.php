@@ -40,8 +40,11 @@ function guardLocal($kind, $tool, array $input, $command, array $texts)
         $head = strlen($text) > 600 ? (function_exists('mb_strcut') ? mb_strcut($text, 0, 600, 'UTF-8') : substr($text, 0, 600)) . ' [...]' : $text;
         $id = substr(sha1((string) json_encode($input, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR)), 0, 16);
         $where = isset($input['path']) ? (string) $input['path'] : 'the files in the patch';
-        return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id,
-            'message' => "Pikkumies: $tool writes $where, $shown. Text (" . strlen($text) . " characters, the first 600 shown) [$id]: $head"];
+        $approveMessage = "Pikkumies: $tool writes $where, $shown. Text (" . strlen($text) . " characters, the first 600 shown) [$id]: $head";
+        if (!HookUnits::approveShown($approveMessage)) {
+            return ['action' => 'block', 'message' => "Pikkumies safety: a write that can reach local hooks or notes, and the question is too long to show the user in full. Not run. Write less at once."];
+        }
+        return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage];
     }
     $write = '#(?<![0-9&])>(?!&)|\b(cp|mv|install|ln|tee|touch|mkdir|rsync|tar|unzip|cpio|patch|curl|wget|dd|truncate|chmod|chown|git)\b'
         . '|\b(sed|perl)\b[^;&|\n]*\s-[a-zA-Z]*i|\b(open|write_text|write_bytes|file_put_contents|fopen|copy|rename|symlink|makedirs|mkdir|move)\s*\(#';
@@ -61,11 +64,12 @@ function guardLocal($kind, $tool, array $input, $command, array $texts)
     if (!$hit) {
         return null;
     }
-    if (strlen($command) > 4000) {
+    $id = substr(sha1($command), 0, 16);
+    $approveMessage = "Pikkumies: a write $shown. Command [$id]: $command";
+    if (!HookUnits::approveShown($approveMessage)) {
         return ['action' => 'block', 'message' => 'Pikkumies safety: a write that can reach local hooks or notes, and the command is too long to show the user in full. Not run. Split it into smaller commands.'];
     }
-    $id = substr(sha1($command), 0, 16);
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => "Pikkumies: a write $shown. Command [$id]: $command"];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage];
 }
 
 /** $s with /./ and seg/../ folded away, so a path that steps out and back in reads as the path it reaches. */
