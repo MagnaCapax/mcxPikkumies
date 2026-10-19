@@ -247,7 +247,7 @@ class HermesConfig
         // rest of the profile stays local; the system-status skill reads it when needed.
         // On PMSS the host family is PMSS too; elsewhere the family says which host it is.
         return "# This machine\n\n- Root: " . $root
-            . (!empty($profile['pmss']) ? "\n- PMSS seedbox platform: yes" : '')
+            . (!empty($profile['pmss']) ? "\n- PMSS seedbox platform: yes; this account's disk, quota, memory, traffic and limits, live in one call: system-status account" : '')
             . (!empty($profile['pmss']) && isset($profile['family']) && $profile['family'] === 'pmss' ? '' : "\n- Host: " . (isset($profile['family']) ? $profile['family'] : 'generic'))
             // Without root the Root line already limits the agent to this user's own files.
             . (!empty($profile['tenancy']['shared'])

@@ -1,0 +1,7 @@
+{
+  "about": "max_calls: a basic account question took three tool calls (read-only ones count: each is a model round)",
+  "fails": "max_calls",
+  "question": {"max_calls": "2"},
+  "bad": {"tools": [{"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search disk"}}, {"name": "skill_view", "input": {"name": "system-status"}}, {"name": "terminal", "input": {"command": "php ~/pikkumies/tools/system/system-status/system-status.php account"}}], "text": ""},
+  "good": {"tools": [{"name": "skill_view", "input": {"name": "system-status"}}, {"name": "terminal", "input": {"command": "php ~/pikkumies/tools/system/system-status/system-status.php account"}}], "text": ""}
+}

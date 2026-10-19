@@ -91,6 +91,37 @@ return [
             && !hookSearchGateBlocks($tree, 'docs6', 'terminal', 'php ~/pikkumies/tools/documentation/kb/kb.php search x'), 'documentation still blocked after the search');
         exec('rm -rf ' . escapeshellarg($tree));
     },
+    'search-first gate: a plain system-status show or account call passes while armed and opens nothing; logs, a chain or a substitution waits (ADR-0058)' => function () use ($hookPages) {
+        $tree = hookSearchTree($hookPages);
+        $dir = "$tree/pikkumies/local/state/search-first";
+        @mkdir($dir, 0700, true);
+        touch("$dir/" . sha1('st1'), time() - 20); // searched on an earlier turn,
+        touch("$dir/" . sha1('st1') . '.armed', time() - 5); // then a new question re-armed the gate
+        $st = '~/pikkumies/tools/system/system-status/system-status.php';
+        foreach (["php $st account", "php $st show", "php $st --human account", "cd ~ && php $st account", "php $st account --human"] as $cmd) {
+            check(!hookSearchGateBlocks($tree, 'st1', 'terminal', $cmd), 'a plain status call was blocked while armed: ' . $cmd);
+            check(!hookSearchGateBlocks($tree, 'fresh', 'terminal', $cmd), 'a plain status call was blocked before any search: ' . $cmd);
+        }
+        check(hookSearchGateBlocks($tree, 'st1', 'write_file') && hookSearchGateBlocks($tree, 'fresh', 'terminal', 'df -h'), 'a status call opened the gate');
+        $blocked = [
+            "php $st account; rm x",
+            "php $st account && rm -rf /tmp/x",
+            "php $st account | sh",
+            "php $st account > /tmp/out",
+            "php $st account \"\$(rm -rf /tmp/x)\"",
+            "php \$($st) account",
+            "php $st `id` account",
+            "php $st logs",
+            "php $st logs --grep error",
+            "php $st account\nrm -rf /tmp/x",
+            'php /tmp/evil/tools/system/system-status/system-status.php account',
+            "echo $st account",
+        ];
+        foreach ($blocked as $cmd) {
+            check(hookSearchGateBlocks($tree, 'st1', 'terminal', $cmd), 'passed while armed: ' . $cmd);
+        }
+        exec('rm -rf ' . escapeshellarg($tree));
+    },
     'search-first hook: titles are one clean line of at most 120 characters; output stays within 1500 bytes' => function () {
         // Five matching pages with long titles (one with control characters) among 30 unrelated ones.
         $pages = ['evil' => ["Disk\x1b[31m full\x07\t\xe2\x80\xa8 trick " . str_repeat('long ', 60), 'disk full rtorrent stops']];

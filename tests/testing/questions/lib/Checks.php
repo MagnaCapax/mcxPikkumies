@@ -49,6 +49,10 @@ class Checks
             $hit = $any($p);
             $add("not_calls: $p", $hit === null, "matched: $hit");
         }
+        // Every tool call counts, read-only ones too: each is a model round, which is what the budget is about.
+        foreach (Questions::values($q, 'max_calls') as $n) {
+            $add("max_calls: $n", count($calls) <= (int) $n, count($calls) . ' tool calls: ' . implode(' | ', $calls));
+        }
         foreach (Questions::values($q, 'contains') as $s) {
             $add("contains: $s", Questions::has($text, $s), 'not in the final text');
         }

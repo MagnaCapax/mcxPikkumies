@@ -436,7 +436,8 @@ class Detect
         return ['generated_at' => isset($data['generated_at']) ? $data['generated_at'] : null, 'sections' => $sections];
     }
 
-    private static function userShowLimitsMetric(array $sections, $section, $metricName, $field)
+    /** One field of one metric, matched by the display name PMSS gives it; null when the section is unavailable or the metric is missing. */
+    public static function userShowLimitsMetric(array $sections, $section, $metricName, $field)
     {
         if (empty($sections[$section]['available']) || empty($sections[$section]['metrics'])) {
             return null;
@@ -534,11 +535,11 @@ class Detect
         return (string) getenv('USER');
     }
 
-    /** Apps running under OUR uid only (privacy: never inspect other users). */
-    public static function runningApps($uid)
+    /** Apps running under OUR uid only (privacy: never inspect other users). $proc is a test seam. */
+    public static function runningApps($uid, $proc = '/proc')
     {
         $names = [];
-        foreach ((array) glob('/proc/[0-9]*') as $dir) {
+        foreach ((array) glob($proc . '/[0-9]*') as $dir) {
             if (@fileowner($dir) !== $uid) {
                 continue;
             }

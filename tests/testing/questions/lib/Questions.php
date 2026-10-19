@@ -7,9 +7,9 @@
 class Questions
 {
     /** Every key a question file may use. source and note are for people only and are never checked. */
-    const KEYS = ['tags', 'family', 'setup', 'calls', 'first_call', 'not_calls', 'contains', 'contains_any', 'not_contains', 'judge', 'source', 'note'];
-    const SINGLE = ['family', 'setup', 'first_call'];
-    const CHECKS = ['calls', 'first_call', 'not_calls', 'contains', 'contains_any', 'not_contains', 'judge'];
+    const KEYS = ['tags', 'family', 'setup', 'calls', 'first_call', 'not_calls', 'max_calls', 'contains', 'contains_any', 'not_contains', 'judge', 'source', 'note'];
+    const SINGLE = ['family', 'setup', 'first_call', 'max_calls'];
+    const CHECKS = ['calls', 'first_call', 'not_calls', 'max_calls', 'contains', 'contains_any', 'not_contains', 'judge'];
     /** The search-first gate, whose list of read-only tools first_call uses as it is. */
     const GATE = '/pikkumies/hooks/search/search-first-gate/search-first-gate.php';
     private static $readOnly = null;
@@ -135,6 +135,8 @@ class Questions
                     $problems[] = "$key has no value";
                 } elseif (in_array($key, ['calls', 'first_call', 'not_calls'], true) && @preg_match(self::regex($v), '') === false) {
                     $problems[] = "$key is not a valid regular expression: $v";
+                } elseif ($key === 'max_calls' && !preg_match('/^[1-9][0-9]*$/', $v)) {
+                    $problems[] = "max_calls is not a whole number above 0: $v";
                 }
             }
             $checks += in_array($key, self::CHECKS, true) ? count($values) : 0;

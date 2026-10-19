@@ -3,8 +3,9 @@
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): search first. Until the agent has run the memory search
  * (`tools/memory/pikkumies/pikkumies.php search`, lessons and documentation together), tool calls
  * that act are blocked with the command to run, and so is reading or searching the downloaded documentation
- * (local/docs-cache, the wiki and kb units; ADR-0043: lessons first). Other reading, asking the user and the memory unit
- * are allowed. Partner of hooks/search/search-first/.
+ * (local/docs-cache, the wiki and kb units; ADR-0043: lessons first). Other reading, asking the user, the memory unit and a
+ * plain system-status show or account call (the live account figures, ADR-0058) are allowed.
+ * Partner of hooks/search/search-first/.
  *
  * State: one marker file per session under local/state/search-first/, touched by the search; the
  * pre_llm_call hook touches <marker>.armed when a later turn asks something new, and the gate stays
@@ -108,7 +109,11 @@ if (searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'search')) {
 $path = isset($payload['tool_input']['path']) ? str_replace('\\', '/', (string) $payload['tool_input']['path']) : '';
 $docs = (in_array($tool, ['read_file', 'search_files'], true) && preg_match('#(^|/)docs-cache(/|$)#', $path))
     || searchFirstPlainCall($command, 'tools/documentation/wiki/wiki\.php', 'search|list') || searchFirstPlainCall($command, 'tools/documentation/kb/kb\.php', 'search|list');
-if (!$docs && (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources'))) {
+// The account's own live figures (ADR-0058): a plain show or account call is the source a search would point at, so it
+// does not wait for one. Only these two read-only verbs, only as one plain call; logs and anything chained still wait.
+const SEARCH_FIRST_STATUS = 'tools/system/system-status/system-status\.php';
+if (!$docs && (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources')
+    || searchFirstPlainCall($command, SEARCH_FIRST_STATUS, 'show|account'))) {
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';

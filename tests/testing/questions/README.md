@@ -29,6 +29,7 @@ Copy `questions/example-memory-search-first.md` to `questions/<what-it-tests>.md
 | `calls` | a regular expression; some tool call must match it |
 | `first_call` | the first tool call that does something must match; the search-first gate's read-only tools (`read_file`, `memory`, …, read from the gate itself) are skipped |
 | `not_calls` | no tool call may match |
+| `max_calls` | at most this many tool calls in all, read-only ones included (each is a model round); a whole number |
 | `contains` / `not_contains` | text that must / must not be in the final answer (any case, spacing ignored: `200KB/s` matches `200 KB/s`) |
 | `contains_any` | alternatives split by ` \| `; one must be in the final answer |
 | `judge` | one YES/NO criterion per line, graded by the judge model |
