@@ -49,7 +49,7 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 **The tool**: one PHP script (PHP 7.3, no Composer, no Python) that ends with `Cli::run($argv, ['verb' => function ($args, $opt) { ... }], $usage)`.
 
 - Output is JSON Lines by default, the last line `{"ok":true}` or `{"ok":false,"error":...,"hint":...}`, with raw units ([ADR-0016](../../../docs/adr/0016-jsonl-is-the-default-output.md)); `--human` prints the same records for people ([ADR-0017](../../../docs/adr/0017-human-output-option.md)). Return records; never print secrets (Cli drops secret-named fields anyway).
-- Throw `CliError($what, $hint)` for a failure the user can act on.
+- Throw `CliError($what, $hint)` for a failure the user can act on; that refusal line also carries `stop` ([ADR-0065](../../../docs/adr/0065-a-tool-refusal-carries-a-stop-field.md)).
 - HTTP goes through `lib/Http.php`, which refuses a 127.0.0.1 port another account owns ([ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md)). Read credentials from the user's own app config; never weaken an app's login.
 - A verb that deletes data takes `--with-data`, or is named `prune`, `forget` or `purge`, so the delete guard asks the user first ([ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)).
 - Write verbs read the state back and report `"verified"` in the status line.

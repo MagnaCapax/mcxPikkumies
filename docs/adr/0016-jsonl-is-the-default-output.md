@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted
+- Status: Accepted. A tool's own refusal adds a `stop` key to the failure line ([ADR-0065](0065-a-tool-refusal-carries-a-stop-field.md)).
 
 ## Context
 The request of 2026-10-14: every tool "should have --human option to output pretty human output ... and default is --jsonl for the agent (also an ADR about that)". The agent reads tool output as text in its context, and every byte costs tokens on every turn that keeps it. The tools published so far print a mix: `status.php` prints pretty JSON, `docs.php` prints plain lines, and `memory.php` prints a path. There is no shared rule, so the agent cannot tell success from failure without reading prose.

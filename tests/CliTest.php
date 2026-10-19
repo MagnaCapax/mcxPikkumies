@@ -83,8 +83,17 @@ return [
         list($code, $out) = runPhp(cliFixtureTool(), ['fail']);
         $l = cliLines($out);
         check($code === 1 && $l[0]['ok'] === false && $l[0]['hint'] === 'start it from the panel', "bad error: $out");
+        check($l[0]['stop'] === Cli::STOP && strpos(Cli::STOP, "do not read this tool's code") !== false, 'a refusal without the stop field: ' . $out);
         list($code, $out) = runPhp(cliFixtureTool(), ['fail', '--human']);
         check($code === 1 && trim($out) === '', 'human error leaked to stdout');
+    },
+    'cli: the stop field is only on a tool\'s own refusal, never on a usage error or a bug (ADR-0065)' => function () {
+        foreach ([['nope'], ['list', '--bogus'], ['boom']] as $args) {
+            list($code, $out) = runPhp(cliFixtureTool(), $args);
+            $l = cliLines($out);
+            $last = end($l);
+            check($code !== 0 && $last['ok'] === false && !isset($last['stop']), implode(' ', $args) . ': stop on a usage error or a bug: ' . $out);
+        }
     },
     'cli: usage exits 2, --help exits 0, unknown verb exits 2' => function () {
         list($code) = runPhp(cliFixtureTool(), []);

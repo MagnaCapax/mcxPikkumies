@@ -29,6 +29,11 @@ class Cli
     /** On/off options every tool takes. --yes is the confirmation a person types by hand (ADR-0020). */
     const GLOBAL_FLAGS = ['human', 'jsonl', 'help', 'yes', 'verbs'];
     /** Field names (lower-cased) that are never printed: rpc_password, webUiPassword, x-api-key, Authorization... */
+    /**
+     * Added to the status line of a tool's own refusal (CliError), never to a usage error or a bug: the refusal is the
+     * answer. A habit prompt for the agent reading the line, not a control (ADR-0065).
+     */
+    const STOP = 'this refusal is the answer: tell the user the error and the hint, or do what the hint says; do not read this tool\'s code or work around it';
     const SECRET_KEY_RE = '/(pass|passwd|password|passkey|secret|token|apikey|api[-_]key|cookie|credentials?|authorization|private[-_]?key)$|^(sid|auth)$/';
 
     /**
@@ -111,7 +116,7 @@ class Cli
             self::emit($records, $opt, $human, $extra);
             exit(0);
         } catch (CliError $e) {
-            self::fail($e->getMessage(), $e->hint, $human);
+            self::fail($e->getMessage(), $e->hint, $human, true);
             exit(1);
         } catch (Throwable $e) {
             // A bug, not a user error: keep the status line, never print a stack trace (it can hold arguments).
@@ -167,7 +172,8 @@ class Cli
         echo self::json($status), "\n";
     }
 
-    public static function fail($error, $hint, $human)
+    /** The failure status line; $stop: a tool's own refusal, which carries STOP. */
+    public static function fail($error, $hint, $human, $stop = false)
     {
         $error = self::cleanString((string) $error);
         $hint = self::cleanString((string) $hint);
@@ -175,7 +181,7 @@ class Cli
             fwrite(STDERR, "error: $error\n" . ($hint !== '' ? "hint: $hint\n" : ''));
             return;
         }
-        echo self::json(['ok' => false, 'error' => $error, 'hint' => $hint]), "\n";
+        echo self::json(['ok' => false, 'error' => $error, 'hint' => $hint] + ($stop ? ['stop' => self::STOP] : [])), "\n";
     }
 
     public static function json(array $r)
