@@ -9,6 +9,8 @@ Encrypted archives of this account on another machine the user has an ssh login 
 3. One login runs a fixed `sh -s` script on the backup machine: it writes `~/.pikkumies-recv/recv.sh` and appends `restrict,command="sh ~/.pikkumies-recv/recv.sh <label> <keep-days>" ssh-ed25519 ...` to `~/.ssh/authorized_keys` (umask 077, existing lines untouched). `ssh-copy-id` is not used because it cannot add those options.
 4. The new key must log in and get the receiver's own answer to `df` (`avail_kib N`); a shell would run the system `df` instead, so that answer proves the forced command is in effect. Otherwise the key is deleted here and setup refuses: Pikkumies never keeps a key that opens a shell.
 
+A host on the SSH deny list (`ssh.deny` in `~/pikkumies/local/config.php`, [docs/ssh.md](../../../../docs/ssh.md)) is refused: by `setup` before anything runs, and by every connection of the other verbs, scheduled runs included, once it is on the list ([ADR-0068](../../../../docs/adr/0068-ssh-connections-need-a-stated-intent-and-the-persons-allow-and-deny-lists.md)).
+
 Every ssh call runs with `-F /dev/null` (the user's `~/.ssh/config` is not read) and `--` before the host; the host and the account name are checked against a strict pattern, so a value like `-oProxyCommand=...` is refused.
 
 ## The receiver

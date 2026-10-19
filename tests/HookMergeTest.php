@@ -117,4 +117,18 @@ return [
             check(HookPayload::read($p) === hookMergeOldInline($p), 'differs for ' . json_encode($p) . ': ' . json_encode(HookPayload::read($p)));
         }
     },
+    'hook merge: an unknown SSH host next to a delete is too long to ask together and names both checks; with the host allowed only the delete is asked (ADR-0068)' => function () {
+        $tree = orchestratorTree();
+        try {
+            $cmd = 'rsync -a --delete d/ unknown.example:d/ # intent: mirror the reports folder';
+            list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'guard/ssh-connect') !== false
+                && strpos($d['message'], 'guard/guard-destructive') !== false, 'both checks must be named: ' . $raw);
+            file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['ssh' => ['allow' => ['unknown.example']]], true) . ";\n");
+            list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
+            check(is_array($d) && $d['action'] === 'approve' && strpos($d['rule_key'], 'pikkumies-delete:') === 0, 'only the delete question: ' . $raw);
+        } finally {
+            testRmTree($tree);
+        }
+    },
 ];

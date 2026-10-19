@@ -197,4 +197,17 @@ return [
             testRmTree($tree);
         }
     },
+    'backup remote setup: a host on the person\'s SSH deny list is refused before any program runs (ADR-0068)' => function () {
+        $fx = brFixture();
+        try {
+            file_put_contents($fx['localdir'] . '/config.php', '<?php return ' . var_export(['ssh' => ['deny' => ['*.example.com']]], true) . ";\n");
+            list($code, $l, $out) = brSetup($fx);
+            check($code === 1 && strpos(end($l)['error'], 'SSH deny list') !== false, 'denied host: ' . $out);
+            check(stLog($fx) === [] && !is_file($fx['secrets'] . '/dest.json'), 'a program ran or a file was kept: ' . json_encode(stLog($fx)));
+            file_put_contents($fx['localdir'] . '/config.php', '<?php return ' . var_export(['ssh' => ['deny' => ['other.example.org']]], true) . ";\n");
+            check(brSetup($fx)[0] === 0, 'a deny list without this host stops nothing');
+        } finally {
+            stDone($fx);
+        }
+    },
 ];

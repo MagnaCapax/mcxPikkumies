@@ -131,12 +131,12 @@ return [
         check($entries['pre_tool_call']['failClosed'] === true && $entries['pre_llm_call']['failClosed'] === false
             && $entries['post_tool_call']['failClosed'] === false && $entries['pre_verify']['failClosed'] === false && $entries['post_api_request']['failClosed'] === false, 'only the event with the delete guard fails closed');
         check($entries['post_tool_call']['timeout'] === 9 && $entries['post_api_request']['timeout'] === 4, 'command log 5 s + session counters 2 s + 2; session context 2 s + 2: ' . json_encode($entries));
-        check($entries['pre_tool_call']['timeout'] === 33 && $entries['pre_llm_call']['timeout'] === 24 && $entries['pre_verify']['timeout'] === 32,
+        check($entries['pre_tool_call']['timeout'] === 38 && $entries['pre_llm_call']['timeout'] === 24 && $entries['pre_verify']['timeout'] === 32,
             'timeout = sum of unit timeouts + 2: ' . json_encode($entries));
-        check(preg_match('#/hooks/orchestrator\.php pre_tool_call 33$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
+        check(preg_match('#/hooks/orchestrator\.php pre_tool_call 38$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
         $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], $entries);
         check(substr_count($guard, '    - command: ') === 5 && substr_count($guard, 'fail_closed') === 1
-            && strpos($guard, "orchestrator.php pre_tool_call 33\"\n      timeout: 33\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
+            && strpos($guard, "orchestrator.php pre_tool_call 38\"\n      timeout: 38\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
         check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'no update check at session start: an unasked call to GitHub (AGENTS.md, ADR-0033)');
         check(strpos($noHooks, "cli:\n  expose_on_path: false\n") !== false, 'Hermes updates must not write launchers into ~/.local/bin (ADR-0033)');
         check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');

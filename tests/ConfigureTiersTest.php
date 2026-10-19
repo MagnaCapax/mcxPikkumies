@@ -50,11 +50,22 @@ return [
             ['update.channel', 'release', 'git/main', $a], ['update.channel', 'git/main', 'release', $f], ['update.channel', 'git/a', 'git/b', $a],
             ['terms.accepted', false, true, $p], ['terms.accepted', true, false, $p],
             ['host.family', null, 'pmss', $p], ['arr.sonarr.config', null, '/home/u/.config/Sonarr/config.xml', $f],
+            // ADR-0068: allowing a host asks, refusing one is free, un-refusing one is the person's; strict mode is free on, asked off.
+            ['ssh.allow', [], ['nas'], $a], ['ssh.allow', ['nas'], [], $f], ['ssh.deny', [], ['evil'], $f], ['ssh.deny', ['evil'], [], $p],
+            ['ssh.blockUnknown', false, true, $f], ['ssh.blockUnknown', true, false, $a],
         ];
         foreach ($rows as $r) {
             list($key, $old, $new, $want) = $r;
             $got = ConfigureTiers::classify($key, $old, $new);
             check($got === $want, "$key " . json_encode($old) . ' -> ' . json_encode($new) . ": $got, the ADR says $want");
+        }
+    },
+    'tiers: a list change that both adds and removes takes the stricter tier, so a deny entry cannot be swapped away freely' => function () {
+        $cases = [['ssh.deny', ['a'], ['b'], 'person'], ['ssh.deny', ['a'], ['a', 'b'], 'free'], ['ssh.allow', ['a'], ['b'], 'approve'],
+            ['tools.disabled', ['email'], ['backup'], 'approve'], ['skills.disabled', ['x'], ['y'], 'free'], ['ssh.deny', ['a', 'b'], ['b', 'a'], 'free']];
+        foreach ($cases as $c) {
+            $got = ConfigureTiers::classify($c[0], $c[1], $c[2]);
+            check($got === $c[3], "{$c[0]} " . json_encode($c[1]) . ' -> ' . json_encode($c[2]) . ": $got, want {$c[3]}");
         }
     },
     'tiers: retention 0 is forever, the longest; a longer one or N -> 0 is free, a shorter one or 0 -> N asks' => function () {

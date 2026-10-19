@@ -23,6 +23,7 @@ class RemoteSetup
         $d = ['host' => RemoteDest::host($args[0]), 'user' => RemoteDest::user($args[1]),
             'port' => RemoteDest::number($opt, 'port', 1, 65535, 22), 'keep_days' => RemoteDest::number($opt, 'keep-days', 1, 3650, 30),
             'label' => RemoteDest::label()];
+        $dest->refuseDenied($d['host']);
         $want = isset($opt['fingerprint']) ? (string) $opt['fingerprint'] : null;
         if ($want !== null && !preg_match('#^SHA256:[A-Za-z0-9+/]{43}$#', $want)) {
             throw new CliError('--fingerprint takes the SHA256:... form', 'the fingerprint of the host\'s ED25519, ECDSA (nistp256) or RSA key;'

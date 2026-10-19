@@ -27,6 +27,7 @@ class ConfigureChange
         'hooks.llm.disabled' => 'it stops every hook model call, which also turns off the halt guard\'s judging; the person sets it by hand in ~/pikkumies/local/config.php',
         'autoUpdate.disabled' => 'it stops the daily update, and with it security and bug fixes; the person sets it by hand in ~/pikkumies/local/config.php',
         'hermes.lazyInstalls' => 'it lets Hermes download and run packages and a browser from the internet while it runs; the person sets it by hand in ~/pikkumies/local/config.php',
+        'ssh.deny' => 'removing a host from the SSH deny list lets the agent connect there again; the person edits ssh.deny by hand in ~/pikkumies/local/config.php',
     ];
     /** Said after every HOW: a set rewrites the file, so the person knows their comments there go. */
     const REWRITES = ' (every set rewrites that file from its values, so comments in it are not kept)';

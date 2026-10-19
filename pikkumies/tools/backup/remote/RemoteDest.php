@@ -4,7 +4,8 @@
  * local/secrets/backup-remote/ (directory 0700, files 0600), inside the delete guard's secret fence, so the agent can
  * neither read the key and passphrase nor rewrite the destination or the pinned host key (dest.json, known_hosts):
  * key, key.pub, pass, dest.json, state.json, known_hosts. Every ssh call is an argv with -F /dev/null (no user ssh
- * config, no ProxyCommand from a file the agent could write), the dedicated known_hosts and `--` before the host.
+ * config, no ProxyCommand from a file the agent could write), the dedicated known_hosts and `--` before the host. A host on
+ * the person's SSH deny list (ssh.deny in local/config.php, ADR-0068) is refused before any connection, also by a scheduled run.
  */
 class RemoteDest
 {
@@ -12,10 +13,28 @@ class RemoteDest
     const RECV = 'sh ~/.pikkumies-recv/recv.sh';
 
     public $dir;
+    private $configFile;
 
     public function __construct($localDir)
     {
         $this->dir = rtrim($localDir, '/') . '/secrets/backup-remote';
+        $this->configFile = rtrim($localDir, '/') . '/config.php';
+    }
+
+    /** Refuse a host on the person's SSH deny list (ADR-0068); allow and unknown do not apply here (setup is asked, ADR-0049). */
+    public function refuseDenied($host)
+    {
+        $config = SshLists::config($this->configFile);
+        if (empty($config['ssh']['deny'])) {
+            return;
+        }
+        $name = SshLists::host($host);
+        if ($name === null) {
+            throw new CliError("$host cannot be checked against the SSH deny list (ssh.deny); nothing was sent", 'use the host name or a plain dotted IPv4 address');
+        }
+        if (SshLists::decide($config, [$name]) === SshLists::DENY) {
+            throw new CliError("$host is on the SSH deny list in local/config.php (ssh.deny); nothing was sent", 'only the person removes a host from that list, by hand');
+        }
     }
 
     public static function host($h)
@@ -114,6 +133,7 @@ class RemoteDest
     /** ssh to the destination with the restricted key: StrictHostKeyChecking=yes, key login only, no prompts. $new: setup's ".new" files. */
     public function ssh(array $d, array $words, $new = '')
     {
+        $this->refuseDenied($d['host']);
         return array_merge(self::base($d, $this->path('known_hosts' . $new), 'yes'), ['-i', $this->path('key' . $new), '-o', 'IdentitiesOnly=yes',
             '-o', 'BatchMode=yes', '-o', 'PreferredAuthentications=publickey', '--', $d['host']], $words);
     }

@@ -16,7 +16,7 @@ class ConfigureTiers
 
     /**
      * key => rule: ['any', tier]; ['bool', tier when set true, tier when set false]; ['list', tier when a name is added,
-     * tier when names are only removed]; ['retention'] (shorter asks: Hermes deletes the history; 0 = forever, the longest);
+     * tier when a name is removed; a change that does both takes the stricter]; ['retention'] (shorter asks: Hermes deletes the history; 0 = forever, the longest);
      * ['channel'] (release free, git/<branch> asks: unreleased code).
      */
     const RULES = [
@@ -43,6 +43,9 @@ class ConfigureTiers
         'privacy.telemetry' => ['any', 'free'],
         'sessions.retentionDays' => ['retention'],
         'terms.accepted' => ['any', 'person'],
+        'ssh.allow' => ['list', 'approve', 'free'],
+        'ssh.deny' => ['list', 'free', 'person'],
+        'ssh.blockUnknown' => ['bool', 'free', 'approve'],
     ];
     /** Keys by pattern: host.* overrides what detection found; arr.<app>.config only names where an app keeps its config. */
     const PATTERNS = ['/^host\./' => ['any', 'person'], '/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => ['any', 'free']];
@@ -57,6 +60,8 @@ class ConfigureTiers
         'hooks.reword' => [null, 'stops the model turning a question with no local hit into search terms, so such a question is searched with the words as typed'],
         'update.channel' => 'makes updates follow every change on that branch, code that has not been through a release',
         'sessions.retentionDays' => 'makes Hermes delete ended sessions older than that at its next start',
+        'ssh.allow' => 'lets the agent connect over SSH to these hosts without asking you each time (it still says why)',
+        'ssh.blockUnknown' => [null, 'lets the agent ask you about SSH hosts that are not on the allow list, instead of refusing them'],
     ];
 
     /** What changing $key to $new does, for the question; '' when there is nothing to add. */
@@ -103,7 +108,11 @@ class ConfigureTiers
             case 'bool':
                 return $new === true ? $rule[1] : $rule[2];
             case 'list':
-                return array_diff((array) $new, (array) $old) ? $rule[1] : $rule[2];
+                // Replacing [a] with [b] adds and removes: the stricter tier wins, or a deny entry could be swapped away freely.
+                $order = [self::FREE => 0, self::APPROVE => 1, self::PERSON => 2];
+                $added = array_diff((array) $new, (array) $old) ? $rule[1] : self::FREE;
+                $removed = array_diff((array) $old, (array) $new) ? $rule[2] : self::FREE;
+                return $order[$added] >= $order[$removed] ? $added : $removed;
             case 'retention':
                 // 0 keeps sessions forever: the longest a retention can be, so 0 -> N shortens it and N -> 0 lengthens it.
                 $forever = function ($days) {

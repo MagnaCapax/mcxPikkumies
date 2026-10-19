@@ -71,6 +71,21 @@ return [
             testRmTree($tree);
         }
     },
+    'config hook: allowing an SSH host and asking again about unknown hosts are asked; refusing hosts is free (ADR-0068)' => function () {
+        $tree = cfgHookTree(['ssh' => ['allow' => [], 'deny' => [], 'blockUnknown' => true]]);
+        try {
+            $d = cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set ssh.allow nas.example')]);
+            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === cfgHookKey('ssh.allow', [], ['nas.example'])
+                && strpos($d['message'], 'without asking you') !== false, 'ssh.allow: ' . json_encode($d));
+            $d = cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set ssh.blockUnknown off')]);
+            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === cfgHookKey('ssh.blockUnknown', true, false), 'blockUnknown off: ' . json_encode($d));
+            foreach (['set ssh.deny evil.example', 'set ssh.blockUnknown on', 'set ssh.allow none'] as $w) {
+                check(cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, $w)]) === null, "$w must get no opinion (free)");
+            }
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'config hook: `pikkumies configure undo` is the person\'s shell command: blocked from the agent in every form it can see' => function () {
         $tree = cfgHookTree(['lowBalance' => ['disabled' => false]]);
         try {

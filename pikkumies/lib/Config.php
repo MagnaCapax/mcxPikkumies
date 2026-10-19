@@ -36,6 +36,8 @@ class Config
             'privacy' => ['perfLogging' => true, 'telemetry' => true],
             'sessions' => ['retentionDays' => 0],   // Hermes session history; 0 = keep forever
             'terms' => ['accepted' => false],        // set only by the person: the first interactive run or install --accept-terms
+            // Where the agent may connect over SSH (ADR-0068): host patterns; deny wins; blockUnknown refuses a host on neither list.
+            'ssh' => ['allow' => [], 'deny' => [], 'blockUnknown' => false],
         ];
     }
 
@@ -64,12 +66,17 @@ class Config
         'autoUpdate.disabled' => 'bool',
         'cron.disabled' => 'bool',
         'hermes.lazyInstalls' => 'bool',
+        'ssh.allow' => 'hosts',
+        'ssh.deny' => 'hosts',
+        'ssh.blockUnknown' => 'bool',
     ];
     /** Settable keys by pattern: an *arr app's config file (tools/arr/README.md), an absolute path or '' for none. */
     const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path'];
     /** A model id as an endpoint lists it; a list entry (a tool category path or a skill name). */
     const MODEL_RE = '#^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}\z#';
     const NAMES_RE = '#^[a-z0-9][a-z0-9._/-]{0,99}\z#';
+    /** An SSH host or a pattern over one (ADR-0068): lowercase name or address characters, * and ?; no [ ], so no character classes. */
+    const HOSTS_RE = '#^[a-z0-9*?:][a-z0-9.*?:_-]{0,252}\z#';
     const NAME_MAX = 32;
     const DAYS_MAX = 36500;
 
@@ -133,9 +140,12 @@ class Config
                 }
                 return (int) $text;
             case 'names':
+            case 'hosts':
+                $text = $type === 'hosts' ? strtolower($text) : $text;
                 $names = $text === '' || strtolower($text) === 'none' ? [] : array_values(array_unique(preg_split('/[\s,]+/', $text, -1, PREG_SPLIT_NO_EMPTY)));
-                if (!self::valid('names', $names)) {
-                    throw new InvalidArgumentException("$key takes names separated by commas (lowercase letters, digits and . _ / -), or none");
+                if (!self::valid($type, $names)) {
+                    throw new InvalidArgumentException($type === 'hosts' ? "$key takes host names, addresses or patterns with * and ? separated by commas, or none"
+                        : "$key takes names separated by commas (lowercase letters, digits and . _ / -), or none");
                 }
                 return $names;
             default:
@@ -166,11 +176,12 @@ class Config
             case 'path':
                 return is_string($value) && ($value === '' || (strlen($value) <= 4096 && $value[0] === '/' && !preg_match('/[\x00-\x1f\x7f]/', $value)));
             case 'names':
+            case 'hosts':
                 if (!is_array($value) || !self::isList($value) || count(array_unique($value, SORT_REGULAR)) !== count($value)) {
                     return false;
                 }
                 foreach ($value as $n) {
-                    if (!is_string($n) || preg_match(self::NAMES_RE, $n) !== 1) {
+                    if (!is_string($n) || preg_match($type === 'hosts' ? self::HOSTS_RE : self::NAMES_RE, $n) !== 1) {
                         return false;
                     }
                 }

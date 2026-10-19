@@ -61,7 +61,7 @@ return [
             'rclone rc operations/purge fs=remote: remote=old', "curl -X POST 'http://127.0.0.1:5572/operations/deletefile?fs=remote:&remote=x'",
             'borgmatic', 'borgmatic prune', 'restic key remove abc', 'restic repair snapshots --forget', 'restic -r r restore latest --target ~',
             'borg check --repair ~/repo', 'borg extract ~/repo::a', 'kopia snapshot restore k1 ~/x', 'duplicacy restore -r 3 -overwrite',
-            'rsync -a' . ' --delete ~/a/ host:b/', "lftp -e 'mirror -R --Remove-source-files a b'", 'rclone serve http ~/data --addr :8080',
+            'rsync -a' . ' --delete ~/a/ ~/b/', // to another host the SSH check asks too (HookMergeTest, ADR-0068) "lftp -e 'mirror -R --Remove-source-files a b'", 'rclone serve http ~/data --addr :8080',
             'php $C copy ~/a remote:a --replace', 'php $R move ~/data/done gdrive:archive --expect 40', 'php $R sync ~/a b:c --expect=12',
             "curl -X DELETE 'https://host.example/public-u/jellyfin/Items/abc123?api_key=x'", 'curl --request DELETE http://127.0.0.1:8096/Items?ids=a,b',
             "curl -X DELETE http://127.0.0.1:32400/library/metadata/42", "requests.delete(f'{base}/Auth/Keys/{key}')",

@@ -69,3 +69,6 @@ What was found:
 
 ## Amendment 2026-10-19: the V4A header reading is shared
 The hook's V4A header reading moved to `lib/PatchPaths.php`, which guard-destructive now also uses (the gap named under Consequences is closed, ADR-0020 amendment 2026-10-19); it also counts U+001C to U+001F as whitespace, as Python does, and an empty `*** Update File:` line no longer swallows the next line's header, so those two forms are now asked.
+
+## Amendment 2026-10-19: SSH lists, and a list change that adds and removes ([ADR-0068](0068-ssh-connections-need-a-stated-intent-and-the-persons-allow-and-deny-lists.md))
+Three keys: `ssh.allow` (adding asks, removing is free), `ssh.deny` (adding is free, removing is the person's) and `ssh.blockUnknown` (true is free, false asks), with the type `hosts` for the two lists. A `list` change that both adds and removes now takes the stricter of its adding and removing tiers (free < asked < the person's); before, any addition decided the tier, so replacing `[a]` with `[b]` on a deny list would have been free. `tools.disabled` and `skills.disabled` classify as before.

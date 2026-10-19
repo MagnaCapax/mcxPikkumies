@@ -4,7 +4,7 @@
  * tar | pigz | gpg --symmetric | ssh to a receiver that a restricted key can reach and nothing else.
  */
 $remoteLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update'] as $remoteClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update', 'SshLists'] as $remoteClass) {
     require_once "$remoteLib/$remoteClass.php";
 }
 require_once dirname(__DIR__, 2) . '/storage/lib/ToolText.php';

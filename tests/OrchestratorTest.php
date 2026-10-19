@@ -67,12 +67,12 @@ return [
         $log = (string) @file_get_contents("$tree/pikkumies/local/logs/hooks/" . gmdate('Ymd') . '.jsonl');
         $lines = array_values(array_filter(explode("\n", $log)));
         // Units run in name order: guard/config-change and guard/feedback-send (no opinion on rm -rf), guard/fileops-check, guard/guard-destructive (the block),
-        // search/search-first-gate (ADR-0048, ADR-0059).
+        // search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068).
         $config = json_decode($lines[0], true);
         $send = json_decode($lines[1], true);
         $first = json_decode($lines[2], true);
         $guard = json_decode($lines[3], true);
-        check(count($lines) === 20 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
+        check(count($lines) === 24 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
             && $first['unit'] === 'guard/fileops-check' && $first['outcome'] === 'none'
             && $guard['event'] === 'pre_tool_call' && $guard['unit'] === 'guard/guard-destructive' && $guard['outcome'] === 'block'
             && is_int($guard['ms']) && isset($guard['ts']), 'one log line per unit run: ' . $log);

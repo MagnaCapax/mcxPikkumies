@@ -49,3 +49,6 @@ Facts this rests on:
 ## References
 - [ADR-0019](0019-hosts-and-credentials.md) (amended), [ADR-0020](0020-deletes-need-the-users-approval.md) (approvals), [ADR-0025](0025-scheduled-jobs-per-minute-tick-under-no-new-privs.md) (tagged crontab lines), [ADR-0044](0044-every-shell-command-is-logged.md) (command log), [ADR-0047](0047-halt-guard.md) (halt snapshot)
 - `tools/backup/remote/README.md`
+
+## Amendment 2026-10-19: the person's SSH deny list applies ([ADR-0068](0068-ssh-connections-need-a-stated-intent-and-the-persons-allow-and-deny-lists.md))
+`setup` refuses a host on `ssh.deny` (in `local/config.php`) before any program runs, and every connection of the other verbs (`RemoteDest::ssh`, so run, list, restore and the commit) refuses a recorded host that is on it now; `run` checks first, so a scheduled run refuses before any work and records the refusal as its last run. A host that cannot be read as a name or a dotted IPv4 address is refused while the deny list is not empty. The allow list does not apply here: setup is asked already and names the host.

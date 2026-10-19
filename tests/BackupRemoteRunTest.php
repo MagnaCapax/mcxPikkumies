@@ -250,4 +250,19 @@ return [
         });
         check(preg_match('/^[A-Za-z0-9._-]+$/', $noUser) === 1 && (!is_array($pw) || $noUser === $label), "without USER: $noUser");
     },
+    'backup remote run: a host denied after setup is refused before ssh starts, also for list; the failure is the last run (ADR-0068)' => function () {
+        $fx = brHome();
+        try {
+            file_put_contents($fx['localdir'] . '/config.php', '<?php return ' . var_export(['ssh' => ['deny' => [BR_HOST]]], true) . ";\n");
+            foreach ([['run', '--mode', 'meta'], ['list']] as $args) {
+                list($code, $l, $out) = brRun($fx, $args);
+                check($code === 1 && strpos(end($l)['error'], 'SSH deny list') !== false, implode(' ', $args) . ': ' . $out);
+            }
+            check(brSshCalls($fx) === [], 'ssh ran for a denied host: ' . json_encode(brSshCalls($fx)));
+            list(, $l) = brRun($fx, ['stats']);
+            check($l[0]['last_run']['ok'] === false && strpos($l[0]['last_run']['error'], 'SSH deny list') !== false, 'last_run: ' . json_encode($l));
+        } finally {
+            stDone($fx);
+        }
+    },
 ];

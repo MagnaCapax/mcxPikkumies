@@ -29,4 +29,5 @@ Deleting, overwriting or truncating user data still needs both a backup and the 
 - Read-only checks first; change things only after you understand them.
 - When root is available, say so before using it, and use it only for the step that needs it.
 - After a change, verify the service still works.
+- Before connecting to another machine with ssh, scp, sftp or rsync, end the command with `# intent: <why, in a few words>`. Hosts the user has not allowed are asked about; denied ones are refused.
 - Unsure whether something is safe? Ask: one question is cheaper than one outage.

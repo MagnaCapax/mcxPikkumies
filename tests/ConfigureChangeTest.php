@@ -237,4 +237,33 @@ return [
             testRmTree($dir);
         }
     },
+    'change: SSH lists (ADR-0068) take host names and * ? patterns, lowercased; a bad pattern is refused; removing a deny entry is the person\'s' => function () {
+        list($file, $log, $dir) = cfgChangeDir('ssh');
+        try {
+            check(ConfigureSettings::set('ssh.allow', 'NAS.example, *.home.example ::1', $file, null, $log)['value'] === ['nas.example', '*.home.example', '::1'], 'allow from text');
+            foreach (['bad host!', '[a-z]*', '-oProxyCommand=x', 'a/b', "n\u{202e}as"] as $bad) {
+                check(strpos(cfgRefusal(function () use ($file, $log, $bad) {
+                    ConfigureSettings::set('ssh.allow', $bad, $file, null, $log);
+                }), 'host names, addresses or patterns') !== false, "$bad must be refused");
+            }
+            check(ConfigureSettings::set('ssh.deny', 'evil.example', $file, null, $log)['value'] === ['evil.example'], 'adding a deny entry is free');
+            foreach (['other.example', 'none'] as $swap) {
+                $why = cfgRefusal(function () use ($file, $log, $swap) {
+                    ConfigureSettings::set('ssh.deny', $swap, $file, null, $log);
+                });
+                check(strpos($why, 'removing a host from the SSH deny list') !== false, "deny -> $swap must be the person's: $why");
+            }
+            check(ConfigureSettings::set('ssh.deny', 'evil.example,other.example', $file, null, $log)['value'] === ['evil.example', 'other.example'], 'adding keeps the old entry: free');
+            $threw = false;
+            try {
+                Config::set('ssh.deny', ['other.example'], $file);
+            } catch (InvalidArgumentException $x) {
+                $threw = strpos($x->getMessage(), "person's") !== false;
+            }
+            check($threw, 'Config::set must refuse a deny swap for every caller');
+            check(Config::fileConfig($file)['ssh']['deny'] === ['evil.example', 'other.example'], 'the deny list is unchanged');
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];

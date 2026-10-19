@@ -42,6 +42,7 @@ class RemoteRun
             throw new CliError('run needs --mode meta or --mode full', 'meta: settings and torrent state only, small enough to run often');
         }
         $d = $dest->load();
+        $dest->refuseDenied($d['host']); // before any work: a scheduled run no hook sees
         $lock = fopen($dest->path('run.lock'), 'c');
         if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
             throw new CliError('another backup run of this account is still going; nothing started', 'wait for it to finish');

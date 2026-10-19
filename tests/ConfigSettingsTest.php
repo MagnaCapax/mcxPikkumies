@@ -236,7 +236,8 @@ echo "ok";
         check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days', 'update.channel' => 'channel',
             'provider.model' => 'model', 'hooks.model' => 'model', 'tools.disabled' => 'names', 'skills.disabled' => 'names', 'root.disabled' => 'bool', 'searchFirst.disabled' => 'bool',
             'halt.disabled' => 'bool', 'lowBalance.disabled' => 'bool', 'fileopsCheck.disabled' => 'bool', 'hooks.reword' => 'bool', 'hooks.llm.disabled' => 'bool',
-            'autoUpdate.disabled' => 'bool', 'cron.disabled' => 'bool', 'hermes.lazyInstalls' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
+            'autoUpdate.disabled' => 'bool', 'cron.disabled' => 'bool', 'hermes.lazyInstalls' => 'bool', 'ssh.allow' => 'hosts', 'ssh.deny' => 'hosts',
+            'ssh.blockUnknown' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
         // USAGE.md's tier table names every key with a rule (ADR-0059), so the person reading it sees every setting.
         $usage = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/USAGE.md');
         check(preg_match('/^\| set \|.*\|$/m', $usage) === 1, 'USAGE.md must have a `set` row');
