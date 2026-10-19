@@ -4,7 +4,7 @@
  * -m/--model/--reasoning flags (lib/RunFlags.php), route()'s tmux
  * digit/force-prompt boundaries, the small pure helpers (allFlags/promptArgs/tmuxPlan) called
  * directly, and the Launch::SUBCOMMANDS <-> bin/pikkumies dispatch wiring contract. installFlags,
- * askName, askTerms, settingsNote and isTty belong to another builder's package and are not touched
+ * askTerms, settingsNote and isTty belong to another builder's package and are not touched
  * here.
  */
 return [

@@ -93,3 +93,11 @@ Decision:
 - A running dashboard holds the shared Hermes lock for its whole life, as any session does, so `pikkumies run update` refuses while it runs. The refusal now says so and names `pikkumies run dashboard --stop`.
 
 Consequences: the first dashboard start takes minutes and downloads the page's Node packages into the account. Its disk use was not measured, and the install's room check does not cover it. Not verified live in this change: the build through `--run-module` on an account, and its time and size. Test: `tests/HermesWebUiTest.php`.
+
+## Addendum 2026-10-19: the first session waits for the runtime
+The first addendum above had a session with no runtime start the build and exit, telling the person to run `pikkumies` again later. Under [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md) (no deferred work) that hand-back is a deferral, and a preinstalled PMSS account hits it on its very first `pikkumies`.
+- A session with no runtime still starts the build through `HermesInstall::ensure` (its quota check and normal priority unchanged), or finds it running, and then waits for it in the foreground (`lib/HermesWait.php`). On a terminal one line is redrawn every 2 s with the time so far and the last line of the build log, control characters removed; without a terminal a line is printed once a minute. When the runtime is ready it says so and the start goes on: the terms, generation and the session.
+- The wait is keyed on the build lock: it ends when the runtime is ready, or with the reason when the build stops without one (the log's last line, and that `pikkumies install` builds again), has not taken its lock within 20 s, or still holds it after 30 minutes (taken as hung; a build usually takes a few minutes). When nothing is building (no room, no network, a left-over tree, `PIKKUMIES_SKIP_HERMES=1`) there is nothing to wait for: the start stops at once with `ensure`'s reason.
+- Ctrl-C ends only the wait: the build runs on under `nohup`, and the next `pikkumies` waits for it again.
+- Not changed: a build the daily update started keeps its idle priority, so a first session that finds one running waits for that build, which can be slower on a busy disk. Not measured.
+- Tests: `tests/HermesWaitTest.php`, `tests/HermesInstallTest.php`.

@@ -18,7 +18,7 @@ pikkumies           # start a session
 pikkumies configure # review your settings and change them with the agent
 ```
 
-The first install builds the agent runtime in the background, so `doctor` may say "still building" for a few minutes. If `pikkumies` is not found, open a new shell.
+The first install builds the agent runtime in the background, a few minutes; a `pikkumies` started before it is done waits for it with a progress line. If `pikkumies` is not found, open a new shell.
 
 **Model key:** on a PMSS seedbox, your key goes in `~/.virsilipasKey`; with your own OpenAI-compatible provider, in `~/.pikkumiesKey`. Details in [docs/install.md](docs/install.md).
 

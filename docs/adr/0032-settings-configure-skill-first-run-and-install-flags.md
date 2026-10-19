@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted. [ADR-0057](0057-release-channel.md) adds one settable key, `update.channel`, and the install flag `--channel=`. [ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md) supersedes the list of settable keys and the refusal of every other key: every setting now has a tier (the agent's, asked, or the person's own).
+- Status: Accepted. [ADR-0057](0057-release-channel.md) adds one settable key, `update.channel`, and the install flag `--channel=`. [ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md) supersedes the list of settable keys and the refusal of every other key: every setting now has a tier (the agent's, asked, or the person's own). Amended 2026-10-19 (section at the end): the agent's name is no longer asked, at install or at the first session.
 
 ## Context
 The operator's requests of 2026-10-16:
@@ -47,3 +47,12 @@ No telemetry sender or performance logger exists in Pikkumies.
 - [ADR-0007](0007-customising-shipped-skills.md) (local config), [ADR-0010](0010-soul-and-voice.md) (soul), ADR-0015 (tool units), ADR-0022 (launcher routing), ADR-0024 (pinned Hermes features), ADR-0029 (SOUL.md budgets)
 - Tests: `tests/ConfigTest.php`, `tests/LaunchTest.php`, `tests/DoctrineTest.php`
 - Hermes Agent v2026.9.24: `hermes_cli/config_defaults.py` ("sessions" :2231-2255, "telemetry" :2297-2306)
+
+## Amendment 2026-10-19: the name is not asked
+The newer ruling in [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md) (no questions and no deferred work; Pikkumies is offered on every seedbox and asks near zero questions) supersedes this ADR's first-start name question. A name has a working default, so asking for it is a question that changes nothing for most people.
+- `install` without `--name=` and the first interactive `run` no longer ask for the name. `Launch::askName` and the launcher's `askNameIfMissing` are removed. `agent.name` stays `''`, and the agent is "Pikkumies" (`HermesConfig::agentName`), so SOUL.md is unchanged.
+- Renaming stays as before: the person tells the agent ("call yourself Kalle"), and the configure skill runs `set agent.name` (a free change, ADR-0059); or `pikkumies configure`, or `install --name=`.
+- `review` no longer warns "not named yet" for an unset name.
+- Kept: the terms question at the first interactive session (the agent cannot accept the terms for the person), and the one-time feedback question ([ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md) amendment 2026-10-19). The closing line after the terms is now a statement of what the agent does, not an invitation to configure it.
+- A preinstalled PMSS account runs `pikkumies install` without flags and without a terminal, so it was never asked; it needs no change. A person who runs the PMSS skeleton installer on a terminal is no longer asked either.
+- Tests: `tests/LaunchTest.php` (no name question at install or the first session, the closing line).

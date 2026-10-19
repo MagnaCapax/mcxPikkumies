@@ -104,25 +104,20 @@ return [
         check(preg_match("/\n    case 'run':(.*?)\n    case /s", $bin, $m) === 1 && strpos($m[1], 'if (Launch::isTty() && Launch::isSession($passArgs))') !== false, 'run must ask only on a TTY');
         check(strpos($m[1], 'Launch::isSession($passArgs) && ($noKey = Launch::missingKeyMessage(Provider::resolve(Config::load()))) !== \'\'') !== false
             && strpos($m[1], 'missingKeyMessage') < strpos($m[1], 'HermesInstall::lock('), 'run must stop a session without a key before Hermes starts');
-        check(preg_match("/\n    case 'install':(.*?)\n        break;/s", $bin, $m) === 1 && strpos($m[1], "!isset(\$installSettings['agent.name']) && Launch::isTty()") !== false, 'install must ask the name only on a TTY and without --name');
+        check(preg_match("/\n    case 'install':(.*?)\n        break;/s", $bin, $m) === 1 && strpos($m[1], 'askName') === false && strpos($m[1], 'promptRead') === false, 'install must never ask anything (ADR-0032 amendment 2026-10-19)');
         foreach (['cron-tick', 'docs-fill'] as $case) {
             check(preg_match("/\n    case '$case':(.*?)\n    case /s", $bin, $m) === 1 && strpos($m[1], 'askName') === false && strpos($m[1], 'askTerms') === false, "$case must never ask");
         }
     },
-    'launch: the name prompt loops until a valid name; Enter keeps Pikkumies; end of input asks nothing more' => function () {
-        $feed = function (array $lines) {
-            return function () use (&$lines) {
-                return $lines ? array_shift($lines) : false;
-            };
-        };
-        $said = '';
-        $write = function ($t) use (&$said) {
-            $said .= $t;
-        };
-        check(Launch::askName($feed(["\n"]), $write) === 'Pikkumies', 'Enter keeps Pikkumies');
-        check(Launch::askName($feed(["-bad\n", "Helper\n"]), $write) === 'Helper', 'invalid then valid');
-        check(Launch::askName($feed([]), $write) === null, 'end of input');
-        check(strpos($said, 'letters, digits') !== false, 'invalid name must be explained');
+    'launch: the agent\'s name is never asked, at install or the first session; unset it is Pikkumies, with no warning (ADR-0032 amendment 2026-10-19)' => function () {
+        check(!method_exists('Launch', 'askName'), 'Launch::askName must be gone');
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(strpos($bin, 'askName') === false && stripos($bin . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Launch.php'), 'name your') === false, 'no name question left in the launcher');
+        check(HermesConfig::agentName(Config::defaults()) === 'Pikkumies', 'unset name is Pikkumies');
+        $review = ConfigureSettings::review(Config::defaults());
+        foreach ($review as $row) {
+            check($row['key'] !== 'agent.name' || !isset($row['warning']), 'an unset name must not warn: ' . json_encode($row));
+        }
     },
     'launch: terms show both links and accept only yes; no or end of input refuses' => function () {
         $feed = function (array $lines) {
@@ -200,10 +195,13 @@ return [
         $tail = (string) strstr($m[1], '$passArgs = Launch::CONFIGURE_ARGS;');
         check($tail !== '' && strpos($tail, 'break;') === false && strpos($tail, 'exit(') === false, 'configure on a terminal must fall through into run, with its checks: ' . $tail);
     },
-    'launch: first start ends with the review warnings and one line on how to configure, never a session of its own' => function () {
+    'launch: first start ends with the review warnings and one line on what the agent does, never a session of its own' => function () {
         $hint = Launch::setupHint([['key' => 'agent.name', 'value' => 'K'], ['key' => 'sessions.retentionDays', 'value' => 0, 'warning' => 'kept forever']]);
-        check($hint === "  sessions.retentionDays: kept forever\nRun `pikkumies configure` or ask me to review your setup.\n", 'hint: ' . json_encode($hint));
-        check(Launch::setupHint([]) === "Run `pikkumies configure` or ask me to review your setup.\n", 'no warnings: just the line');
+        check($hint === "  sessions.retentionDays: kept forever\n" . Launch::READY, 'hint: ' . json_encode($hint));
+        check(Launch::setupHint([]) === Launch::READY, 'no warnings: just the line');
+        // A statement of what it does, never an invitation to configure or a question (ADR-0073).
+        check(strpos(Launch::READY, '?') === false && stripos(Launch::READY, 'configure') === false && stripos(Launch::READY, 'ask me') === false
+            && strpos(Launch::READY, 'Ready.') === 0 && substr(Launch::READY, -2) === ".\n", 'the last line: ' . Launch::READY);
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
         check(strpos($bin, "Config::acceptTerms();\n                    // What the settings review warns about") !== false && strpos($bin, 'promptWrite(Launch::setupHint(ConfigureSettings::review(') !== false, 'the hint must follow the accepted terms');
     },

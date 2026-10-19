@@ -12,11 +12,11 @@
  * `pikkumies tmux [N]` opens window pmN of the tmux session "pikkumies" (ADR-0032).
  * Leading `-m <model>` / `--reasoning <level>` / `--resume <id>` / `--prompt-file <file|->` pairs set them for one session (RunFlags, ADR-0052);
  * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052). `pikkumies configure undo`, the
- * person's own, shows the last settings change and sets it back after they answer y (ADR-0059).
+ * person's own, sets the last settings change back, asking y/N first only for a change in the asked tier (ADR-0059).
  *
- * First start (ADR-0032): on a terminal, `install` and the first interactive `run` ask for the
- * agent's name, and an interactive `run` asks the person to accept the terms and privacy policy.
- * Without a terminal nothing is asked and nothing is blocked; install flags answer every question.
+ * First start (ADR-0032): an interactive `run` on a terminal asks the person to accept the terms and privacy policy;
+ * nothing else is asked, the agent's name included (it is Pikkumies until renamed in chat or with configure). Without a
+ * terminal nothing is asked and nothing is blocked; install flags answer every question.
  */
 class Launch
 {
@@ -28,6 +28,8 @@ class Launch
     const TMUX_SESSION = 'pikkumies';
     const TERMS_URL = 'https://pulsedmedia.com/terms.php';
     const PRIVACY_URL = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy';
+    /** The first start's last line: what the agent does, as a statement. */
+    const READY = "Ready. Pikkumies works from plain words: it checks disk space, fixes stuck apps, adds torrents, looks after containers and backups, researches and explains, and changes its own settings, its name too, when told to.\n";
     /** install flag => the setting it writes (Config::SETTABLE); --accept-terms is separate. */
     const INSTALL_FLAGS = ['name' => 'agent.name', 'telemetry' => 'privacy.telemetry', 'perf-logging' => 'privacy.perfLogging', 'retention-days' => 'sessions.retentionDays', 'channel' => 'update.channel'];
 
@@ -188,29 +190,6 @@ class Launch
         return [$settings, $terms, $errors];
     }
 
-    /**
-     * Ask the agent's name until it is valid; an empty answer keeps "Pikkumies". Returns the name, or
-     * null when input ended. $read() returns a line or false; $write($text) prints.
-     */
-    public static function askName(callable $read, callable $write)
-    {
-        while (true) {
-            $write("Name your Pikkumies agent (Enter keeps \"Pikkumies\"): ");
-            $line = $read();
-            if ($line === false) {
-                return null;
-            }
-            $line = trim($line);
-            if ($line === '') {
-                return 'Pikkumies';
-            }
-            if (Config::validName($line)) {
-                return $line;
-            }
-            $write('1-' . Config::NAME_MAX . " letters, digits, spaces, dots, dashes or underscores, starting with a letter or digit.\n");
-        }
-    }
-
     /** The privacy settings as shown at the first interactive start (AGENTS.md privacy rule, ADR-0032). */
     public static function settingsNote(array $config)
     {
@@ -224,7 +203,7 @@ class Launch
             . ". Change them with the pikkumies-configure skill (ask your agent) or `pikkumies install --telemetry=off` and the other flags.\n";
     }
 
-    /** After the first start's questions: the settings review's warnings, if any, and where to change things (ADR-0052). */
+    /** After the terms are accepted: the settings review's warnings, if any, and what the agent does (ADR-0052); a statement, never an invitation. */
     public static function setupHint(array $review)
     {
         $text = '';
@@ -233,7 +212,7 @@ class Launch
                 $text .= '  ' . $r['key'] . ': ' . $r['warning'] . "\n";
             }
         }
-        return $text . "Run `pikkumies configure` or ask me to review your setup.\n";
+        return $text . self::READY;
     }
 
     /** Show the terms and privacy policy and ask until yes or no; true only for yes. End of input is a no. */

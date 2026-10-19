@@ -91,20 +91,6 @@ function promptWrite($text)
     fwrite(STDOUT, $text);
 }
 
-/** On a terminal with no name set yet: ask for one and save it (ADR-0032). Never called without a TTY. */
-function askNameIfMissing()
-{
-    $config = Config::load();
-    if (trim((string) $config['agent']['name']) !== '') {
-        return;
-    }
-    $name = Launch::askName('promptRead', 'promptWrite');
-    if ($name !== null) {
-        Config::set('agent.name', $name);
-        out('Your agent is called ' . $name . '. Change it any time with the pikkumies-configure skill.');
-    }
-}
-
 list($cmd, $passArgs) = Launch::route($argv);
 if ($cmd === 'error') { // a launcher flag without its value (ADR-0052): nothing is started
     out('Not starting: ' . $passArgs[0]);
@@ -143,9 +129,6 @@ switch ($cmd) {
             }
             if ($installTerms) {
                 Config::acceptTerms();
-            }
-            if (!isset($installSettings['agent.name']) && Launch::isTty()) {
-                askNameIfMissing();
             }
         } catch (Exception $x) {
             out('install stopped: ' . $x->getMessage());
@@ -340,7 +323,7 @@ switch ($cmd) {
         break;
 
     case 'configure': // the settings review; on a terminal, a session with the configure skill (ADR-0052)
-        if ($passArgs === ['undo']) { // the person's own undo of the last settings change, asked on a terminal, no session (ADR-0059)
+        if ($passArgs === ['undo']) { // the person's own undo of the last settings change, no session; asked only for a change in the asked tier (ADR-0059 amendment 2026-10-19)
             require_once dirname(__DIR__) . '/tools/system/pikkumies-configure/ConfigureUndo.php';
             exit(ConfigureUndo::run(Launch::isTty(STDIN) && Launch::isTty(STDOUT), 'promptRead', 'promptWrite'));
         }
@@ -358,10 +341,16 @@ switch ($cmd) {
             exit(2);
         }
         if (hermesBin() === '') {
-            // A preinstalled account (PMSS, ADR-0033 addendum) has no runtime until the daily update or this first run builds it.
-            out('The agent runtime is not ready yet: ' . HermesInstall::ensure(false, !empty(profile()['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
-            out('Run `pikkumies` again when it is ready (a few minutes); `pikkumies doctor` shows the progress.');
-            exit(1);
+            // A preinstalled account (PMSS) has no runtime until the daily update or this first run builds it: start the build, or
+            // find it running, and wait for it here with a progress line, then go on (ADR-0033 addenda 2026-10-17 and 2026-10-19).
+            $notReady = HermesWait::run(HermesInstall::ensure(false, !empty(profile()['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])),
+                function () {
+                    return hermesBin() !== '';
+                }, ['HermesInstall', 'building'], 'promptWrite', HermesInstall::localDir() . '/install.log', Launch::isTty(STDOUT));
+            if ($notReady !== '') {
+                out('Not starting: the agent runtime could not be set up: ' . $notReady);
+                exit(1);
+            }
         }
         // A moved account arrives without its crontab and nothing else restores the two lines (Update::ensureScheduled).
         if (Launch::isSession($passArgs)) {
@@ -405,11 +394,11 @@ switch ($cmd) {
                 : 'Hermes is being updated right now (`pikkumies run update`); start again when it has finished.');
             exit(1);
         }
-        // First interactive session: the agent's name, the terms until accepted (ADR-0032), then the one feedback question. Only on
+        // First interactive session: the terms until accepted (ADR-0032), then the one feedback question. The agent's name is never
+        // asked: it is Pikkumies until the person renames it in chat or with configure (ADR-0032 amendment 2026-10-19). Only on
         // a terminal: cron-tick, docs-fill and piped one-shot runs are never asked and never blocked.
         if (Launch::isTty() && Launch::isSession($passArgs)) {
             try {
-                askNameIfMissing();
                 $firstConfig = Config::load();
                 if (empty($firstConfig['terms']['accepted'])) {
                     promptWrite(Launch::settingsNote($firstConfig));
@@ -593,7 +582,7 @@ switch ($cmd) {
         out('       pikkumies --prompt-file FILE|-             the first prompt from a file, or from stdin with - (for long prompts)');
         out('       pikkumies --resume <session id> [text]     continue that session');
         out('       pikkumies configure                        review your settings and change them with the agent');
-        out('       pikkumies configure undo                   show the last settings change and set it back after you answer y');
+        out('       pikkumies configure undo                   set the last settings change back (asks y/N only for a change you would be asked about)');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }

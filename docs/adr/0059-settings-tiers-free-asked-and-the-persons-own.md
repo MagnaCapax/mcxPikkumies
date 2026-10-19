@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Supersedes [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)'s list of settable keys and its refusal of every other key; amends [ADR-0020](0020-deletes-need-the-users-approval.md) (a new question class, `rule_key` `pikkumies-config:`), [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md) and [ADR-0052](0052-launcher-model-flag-and-configure.md) (`pikkumies configure undo` is a subcommand).
+- Status: Accepted. Supersedes [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)'s list of settable keys and its refusal of every other key; amends [ADR-0020](0020-deletes-need-the-users-approval.md) (a new question class, `rule_key` `pikkumies-config:`), [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md) and [ADR-0052](0052-launcher-model-flag-and-configure.md) (`pikkumies configure undo` is a subcommand). Amended 2026-10-19 (sections at the end), including: the person's undo asks only before an asked change.
 
 ## Context
 The request of 2026-10-18: "further pikkumies configure should be prompts tools etc and the agent should configure itself as far as possible, as an agent".
@@ -72,3 +72,6 @@ The hook's V4A header reading moved to `lib/PatchPaths.php`, which guard-destruc
 
 ## Amendment 2026-10-19: SSH lists, and a list change that adds and removes ([ADR-0068](0068-ssh-connections-need-a-stated-intent-and-the-persons-allow-and-deny-lists.md))
 Three keys: `ssh.allow` (adding asks, removing is free), `ssh.deny` (adding is free, removing is the person's) and `ssh.blockUnknown` (true is free, false asks), with the type `hosts` for the two lists. A `list` change that both adds and removes now takes the stricter of its adding and removing tiers (free < asked < the person's); before, any addition decided the tier, so replacing `[a]` with `[b]` on a deny list would have been free. `tools.disabled` and `skills.disabled` classify as before.
+
+## Amendment 2026-10-19: the person's undo asks only before an asked change
+The undo asked y/N on a terminal for every change, because the change log can be written by the agent too. That reason covers only a change the agent could not make itself without the person: an asked change (it loosens a setting, costs credits or deletes history). A free change is one the agent may make on its own (`ConfigureTiers`), so a forged log line that leads to one gains nothing, and the question only stopped the person's own command ([ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md)). `pikkumies configure undo` now makes a free change without asking, on a terminal or not; an asked change is still shown and made only after the person answers y on a terminal, and refused without one; the person's own changes, a run from inside an agent or under an overlay, a key changed since and a forged key are refused as before. Test: `tests/ConfigureUndoTest.php`.

@@ -1,8 +1,8 @@
 <?php
 /**
  * ConfigureUndo (ADR-0059): `pikkumies configure undo`, the person's own shell command. The change log is the agent's
- * to write too, so a forged line must never become a change nobody saw: the command shows the change and asks y/N on a
- * terminal; without one it makes only a free change. The person's own changes, an undo from inside an agent and one
+ * to write too, so a forged line must never become an asked change nobody saw: the command shows the change and asks y/N on
+ * a terminal only for an asked change (refused without one); a free change is made without asking (amendment 2026-10-19). The person's own changes, an undo from inside an agent and one
  * under an overlay are refused. Everything is in a temp dir ($file, $log), never this checkout's local/.
  */
 require_once dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/ConfigureUndo.php';
@@ -96,6 +96,22 @@ return [
             } finally {
                 testRmTree($dir);
             }
+        }
+    },
+    'undo: a free change is made on a terminal without a question; an asked one still asks y/N (ADR-0059 amendment 2026-10-19)' => function () {
+        list($dir, $file, $log) = cfgUndoDir(['lowBalance' => ['disabled' => true]], ['key' => 'lowBalance.disabled', 'old' => false, 'new' => true]);
+        try {
+            list($code, $out) = cfgUndo(true, [], $file, $log);
+            check($code === 0 && (require $file)['lowBalance']['disabled'] === false && strpos($out, '(free)') !== false && strpos($out, '[y/N]') === false, "free on a terminal: $code $out");
+            file_put_contents($file, '<?php return ' . var_export(['feedback' => ['ask' => true]], true) . ";\n");
+            file_put_contents($log, json_encode(['key' => 'feedback.ask', 'old' => false, 'new' => true]) . "\n");
+            list($code, $out) = cfgUndo(true, [], $file, $log);
+            check($code === 0 && (require $file)['feedback']['ask'] === false && strpos($out, '[y/N]') === false, "turning a question off is free: $code $out");
+            file_put_contents($log, json_encode(['key' => 'feedback.ask', 'old' => true, 'new' => false]) . "\n");
+            list($code, $out) = cfgUndo(true, ["n\n"], $file, $log);
+            check($code === 1 && strpos($out, '(approve)') !== false && strpos($out, '[y/N]') !== false && (require $file)['feedback']['ask'] === false, "asked: still asked: $code $out");
+        } finally {
+            testRmTree($dir);
         }
     },
 ];
