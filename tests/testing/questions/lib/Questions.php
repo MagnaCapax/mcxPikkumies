@@ -103,12 +103,19 @@ class Questions
         return array_map([__CLASS__, 'parse'], $files);
     }
 
-    /** The questions --only and --tag pick; both empty = all. */
+    /** The questions --only (one id or a comma-separated list) and --tag pick; both empty = all. */
     public static function select(array $questions, $only, $tag)
     {
-        return array_values(array_filter($questions, function ($q) use ($only, $tag) {
-            return ($only === '' || $q['id'] === $only) && ($tag === '' || in_array($tag, $q['tags'], true));
+        $ids = self::onlyIds($only);
+        return array_values(array_filter($questions, function ($q) use ($ids, $tag) {
+            return ($ids === [] || in_array($q['id'], $ids, true)) && ($tag === '' || in_array($tag, $q['tags'], true));
         }));
+    }
+
+    /** The ids an --only value names: comma-separated, blanks dropped. */
+    public static function onlyIds($only)
+    {
+        return array_values(array_filter(array_map('trim', explode(',', (string) $only)), 'strlen'));
     }
 
     /** What is wrong with a question: parse problems, empty values, repeated single keys, no check, bad regex, missing setup. */

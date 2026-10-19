@@ -4,7 +4,7 @@
  * and said. Not part of tests/run.php or CI: it needs provider keys and spends tokens. Read README.md first.
  *
  *   php run.php --self-test | --list [--targets F] | --regrade DIR
- *   php run.php --targets F --token-budget N [--target NAME] [--only ID] [--tag T] [--max-turns N] [--timeout S]
+ *   php run.php --targets F --token-budget N [--target NAME] [--only ID[,ID...]] [--tag T] [--max-turns N] [--timeout S]
  *               [--out DIR] [--install DIR] [--keep]
  */
 umask(0077);
@@ -46,6 +46,10 @@ if ($o['self-test']) {
     exit($problems ? 1 : 0);
 }
 $questions = Questions::select(Questions::load("$here/questions"), $o['only'], $o['tag']);
+$unknown = array_diff(Questions::onlyIds($o['only']), array_column($questions, 'id'));
+if ($unknown !== [] && $o['tag'] === '') {
+    fail('--only names no such question: ' . implode(', ', $unknown));
+}
 if ($o['list']) {
     foreach ($questions as $q) {
         $n = array_sum(array_map('count', array_intersect_key($q['meta'], array_flip(Questions::CHECKS))));
