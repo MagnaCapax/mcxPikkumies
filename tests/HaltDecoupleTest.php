@@ -11,7 +11,7 @@ if (!function_exists('decoupleVerdicts')) {
     /** One verdict of each kind HaltJudge::decide returns, without D1. */
     function decoupleVerdicts()
     {
-        $a = ['Q1' => 'no', 'Q2' => 'yes', 'Q3' => 'yes', 'Q4' => 'no', 'Q5' => 'no', 'Q6' => 'no', 'Q7' => 'no', 'Q8' => 'no'];
+        $a = ['Q1' => 'no', 'Q2' => 'yes', 'Q3' => 'yes', 'Q4' => 'no', 'Q5' => 'no', 'Q6' => 'no', 'Q7' => 'no', 'Q8' => 'no', 'Q9' => 'no'];
         return [
             'chat' => HaltJudge::decide(array_merge($a, ['Q1' => 'yes', 'Q2' => 'no']), false),
             'waiting' => HaltJudge::decide(array_merge($a, ['Q7' => 'yes']), false),
@@ -65,7 +65,7 @@ return [
         try {
             file_put_contents("$dir/key", "key=test-key\n");
             file_put_contents("$dir/overlay.php", '<?php return ' . var_export(['provider' => ['endpoint' => "http://127.0.0.1:$port/v1", 'model' => 'acme/m', 'keyFile' => "$dir/key"], 'hooks' => ['model' => 'acme/m-mini']], true) . ";\n");
-            $answers = "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\n";
+            $answers = "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no\n";
             $run = function ($reply) use ($dir) {
                 file_put_contents("$dir/reply", $reply);
                 return testWithEnv(['PIKKUMIES_CONFIG' => "$dir/overlay.php"], function () {

@@ -52,5 +52,5 @@ What was found (Hermes v0.22.2):
 - Not verified live: how a real light model answers R1-R3 and Q9. A question-suite run should include a requested delete (it should run), an unrequested irreversible delete (it should ask), a hand-back answer (it should be continued), a how-to question about an undoable change in this account (it should be made with a backup, not offered) and a question about how something works (it should end after the answer).
 
 ## References
-- ADR-0020, ADR-0030, ADR-0047, ADR-0054, ADR-0056, ADR-0062
+- ADR-0020, [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md), ADR-0047, ADR-0054, ADR-0056, ADR-0062
 - Hermes v0.22.2: `agent/onboarding.py`, `hermes_cli/config_defaults.py`, `tools/approval.py`, `tools/approval_smart.py`, `tools/approval_detection.py`, `tools/clarify_tool.py`, `agent/turn_context.py`, `agent/shell_hooks.py` (`_payload_fields`: `platform` in `extra`, `parent_session_id` not passed), `hermes_cli/oneshot.py`, `tui_gateway/server.py`
