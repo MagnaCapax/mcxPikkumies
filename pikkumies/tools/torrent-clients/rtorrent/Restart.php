@@ -7,10 +7,19 @@
  * (scripts/lib/userTransfer/postSetup.php:87-139), then poll until rtorrent answers, up to 30 s
  * (postSetup.php:164-178). The script itself stops the user's own rtorrent and starts it again
  * (PMSS etc/skel/.rtorrentRestart.php:12-13, 106-140). Other providers: their own way, as a hint.
+ * An answer alone does not prove a restart: that script finds rTorrent by the exact name `rtorrent`, while a
+ * running rTorrent of some builds is named `rtorrent main` (PMSS issue #717), so the old process can keep
+ * answering. Success therefore also needs every rTorrent process from before (pid and start time) to be gone.
+ * This tool never stops rTorrent itself (ADR-0064).
  */
+require_once dirname(__DIR__, 3) . '/lib/Detect.php';
+require_once dirname(__DIR__, 3) . '/lib/OwnProcs.php';
+
 class RtorrentRestart
 {
     const WAIT = 30;
+    /** The /proc to read; a test seam. */
+    public static $proc = '/proc';
 
     /** What each provider documents (research notes §4; tools/torrent-clients/README.md). */
     const HINTS = [
@@ -37,6 +46,8 @@ class RtorrentRestart
         if (!is_file($script) || is_link($script) || !is_dir("$home/www") || is_link("$home/www") || is_link($marker) || (file_exists($marker) && !is_file($marker))) {
             throw new CliError('not restarted: the PMSS restart files are missing or unsafe (~/.rtorrentRestart.php, ~/www/.rtorrentRestart)', 'use the restart button in the panel');
         }
+        $names = Detect::KNOWN_APPS['rtorrent'];
+        $before = OwnProcs::identities($names, $c->uid, self::$proc);
         if (!@touch($marker)) {
             throw new CliError('not restarted: cannot create ~/www/.rtorrentRestart', 'check the free space and permissions of ~/www');
         }
@@ -47,16 +58,41 @@ class RtorrentRestart
         }
         proc_close($p); // the script waits for the old process to stop, then starts the new one in screen
         $deadline = time() + self::WAIT;
+        $answered = false;
+        $last = '';
         do {
             $c->forget();
             try {
                 $version = $c->call('system.client_version', [], 3);
-                return ['how' => 'PMSS: ~/www/.rtorrentRestart, then php ~/.rtorrentRestart.php (as PMSS userTransfer does)', 'answered' => true, 'version' => $version];
+                $answered = true;
+                break;
             } catch (CliError $e) {
                 $last = $e->getMessage();
             }
             sleep(1);
         } while (time() < $deadline);
-        throw new CliError('restart requested, but rtorrent did not answer within ' . self::WAIT . " s ($last)", 'check again with `stats` in a minute; the PMSS watchdog also starts rtorrent');
+        if (!$answered) {
+            throw new CliError('restart requested, but rtorrent did not answer within ' . self::WAIT . " s ($last)", 'check again with `stats` in a minute; the PMSS watchdog also starts rtorrent');
+        }
+        return self::proven($before, $names, $c->uid) + ['how' => 'PMSS: ~/www/.rtorrentRestart, then php ~/.rtorrentRestart.php (as PMSS userTransfer does)', 'answered' => true, 'version' => $version];
+    }
+
+    /**
+     * The restart counts only when no rTorrent process from before is still running (same pid and start time)
+     * and at most one runs now. Otherwise it is an error that says what is running, and nothing is stopped.
+     */
+    private static function proven(array $before, array $names, $uid)
+    {
+        $after = OwnProcs::identities($names, $uid, self::$proc);
+        $kept = array_intersect_assoc($before, $after);
+        if (count($after) > 1) {
+            throw new CliError('not restarted cleanly: ' . count($after) . ' rTorrent processes are running for this account and share one session',
+                'do not stop either by hand; the PMSS watchdog checks every 2 minutes and restarts rTorrent when more than one runs; check `stats` in a few minutes and open a support ticket if two still run');
+        }
+        if ($kept) {
+            throw new CliError('not restarted: the rTorrent process from before the restart is still running, so the platform restart did not take effect (a known platform issue, PMSS #717; the panel\'s restart button runs the same script)',
+                'do not stop rTorrent by hand; tell the user, and open a support ticket with this message');
+        }
+        return ['processes_before' => count($before), 'processes_after' => count($after)];
     }
 }

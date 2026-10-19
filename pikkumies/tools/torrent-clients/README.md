@@ -14,7 +14,7 @@ Tools for the user's own torrent clients: `rtorrent`, `qbittorrent` and `deluge`
 | resume | `<id>...` | yes | Resumes (qBittorrent 5: starts) torrents. |
 | stats | | no | Everything about the client: version, process (`pid`, `uptime`: `null` when unknown), port, torrent counts by state (`by_state`, only the states that have torrents), traffic, and the user's free space from the quota (`quota_free_bytes`; `fs_free_bytes` is the whole filesystem). |
 | traffic | | no | Current rates, totals since start, speed limits. |
-| restart | | yes | Restarts the client the way this provider does it, then checks it answers. |
+| restart | | yes | Restarts the client the way this provider does it, then checks it answers (rTorrent: and that the process from before is gone). |
 | recheck | `<id>...` | yes | Asks the client to hash-check the torrents' data again; the state is read right after the request (`read_back`), so the check may still run. Deletes nothing; data that is gone becomes missing and downloads again (`done_before` says what was there). |
 | reannounce | `<id>...` | yes | Asks the client to contact the torrents' trackers now (after a tracker error or outage); `message` is the tracker text the client has right after the request, `null` when none (`read_back`). |
 | limit | `[--down <rate>] [--up <rate>]` | yes | No option: the global speed limits (`down_limit`, `up_limit`, bytes/s, 0 = none, the same fields as `traffic`). With options: sets them and reads them back (`was`, `asked`, `verified`). A rate is bytes/s or `512KiB/s`, `10MiB/s`; `0` = no limit. |

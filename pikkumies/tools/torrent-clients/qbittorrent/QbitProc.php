@@ -7,6 +7,8 @@
  * The wait here is longer (up to 10 s) because qBittorrent saves its state on a graceful exit
  * (research torrent-clients.md §2.5).
  */
+require_once dirname(__DIR__, 3) . '/lib/OwnProcs.php';
+
 class QbitProc
 {
     const NAME = 'qbittorrent-nox'; // 15 characters, so /proc/<pid>/comm holds it untruncated
@@ -27,22 +29,16 @@ class QbitProc
     public function pids()
     {
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
-        $ns = @readlink($this->root . '/self/ns/mnt'); // same mount namespace only, as PMSS does (scriptsInc.php:1139, :1164)
         $out = [];
-        if ($ns === false) {
+        if (@readlink($this->root . '/self/ns/mnt') === false) { // same mount namespace only, as PMSS does (scriptsInc.php:1139, :1164)
             return $out;
         }
-        foreach ((array) glob($this->root . '/[0-9]*', GLOB_ONLYDIR) as $dir) {
-            if (@fileowner($dir) !== $uid || @readlink("$dir/ns/mnt") !== $ns || trim((string) @file_get_contents("$dir/comm")) !== self::NAME) {
-                continue;
+        foreach (OwnProcs::pids([self::NAME], $uid, $this->root) as $pid) {
+            $exe = @readlink($this->root . "/$pid/exe");
+            if (!is_string($exe) || basename(preg_replace('/ \(deleted\)$/', '', $exe)) === self::NAME) {
+                $out[] = $pid;
             }
-            $exe = @readlink("$dir/exe");
-            if (is_string($exe) && basename(preg_replace('/ \(deleted\)$/', '', $exe)) !== self::NAME) {
-                continue;
-            }
-            $out[] = (int) basename($dir);
         }
-        sort($out);
         return $out;
     }
 

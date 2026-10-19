@@ -8,6 +8,8 @@
  * does, so a Docker guest of the same name is left alone) and exact process name (pgrep -u, PMSS
  * scripts/lib/user/watchdog.php:44-47); never `pkill -f`. Other providers: refused with their instructions.
  */
+require_once dirname(__DIR__, 3) . '/lib/OwnProcs.php';
+
 class DelugeRestart
 {
     const NAMES = ['deluged', 'deluge-web'];
@@ -80,19 +82,7 @@ class DelugeRestart
     /** Pids of processes named exactly $name, owned by $uid, in this mount namespace. */
     public static function pids($name, $uid, $proc = '/proc')
     {
-        $ns = @readlink("$proc/self/ns/mnt");
-        $out = [];
-        foreach ((array) glob("$proc/[0-9]*", GLOB_ONLYDIR) as $dir) {
-            $pid = basename($dir);
-            if (!ctype_digit($pid) || @fileowner($dir) !== (int) $uid || ($ns !== false && @readlink("$dir/ns/mnt") !== $ns)) {
-                continue;
-            }
-            if (trim((string) @file_get_contents("$dir/comm")) === $name) {
-                $out[] = (int) $pid;
-            }
-        }
-        sort($out);
-        return $out;
+        return OwnProcs::pids([$name], $uid, $proc);
     }
 
     private static function alive(array $pids)
