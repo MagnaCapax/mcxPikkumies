@@ -1,8 +1,9 @@
 <?php
 /**
  * pikkumies-configure: show, explain and change Pikkumies' own settings (ADR-0032, ADR-0059). Every change is one of
- * three tiers (ConfigureTiers): the agent makes the free ones, Hermes' approval prompt asks the person about the others
- * (the config-change hook), and the person's own are refused here with how the person makes them. note-add, notes and
+ * three tiers (ConfigureTiers): the agent makes the free ones, the orchestrator's ask policy decides the others (the
+ * config-change hook): it runs when the user's own words already asked for it, and otherwise is blocked until the user
+ * says yes in the chat (ADR-0073); the person's own are refused here with how the person makes them. note-add, notes and
  * note-remove keep the user's own rules for one tool or category (ConfigureNotes, ADR-0076).
  */
 $lib = dirname(__DIR__, 3) . '/lib';

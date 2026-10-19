@@ -4,9 +4,10 @@
  * why, and the person's lists decide where. Blocks come first: a call it cannot read or a host it cannot read (SshCommand:
  * $VAR, $(...), globs, an unknown ssh option, a non-canonical address...); SSH from execute_code; then SshDecide: a name on
  * ssh.deny, a connection with no `# intent: <why>` in the command and none stated for that host earlier in this session,
- * and with ssh.blockUnknown a name not on ssh.allow or a route this check cannot follow. Then Hermes' approval prompt asks
- * the person (rule_key pikkumies-ssh:<sha1 of the command>) about those names and routes, and about writes to
- * ~/.ssh/config. Every name on ssh.allow: no opinion. A safety prompt, not security (AGENTS.md): the agent's user can edit
+ * and with ssh.blockUnknown a name not on ssh.allow or a route this check cannot follow. Then the orchestrator's ask
+ * policy (ADR-0073) decides those names and routes, and writes to ~/.ssh/config (rule_key pikkumies-ssh:<sha1 of the
+ * command>): runs when covered by the user's own words or when no yes can be checked, else blocks until their yes.
+ * Every name on ssh.allow: no opinion. A safety prompt, not security (AGENTS.md): the agent's user can edit
  * the lists, and a script that connects by itself is out of sight. Fails closed (hook.md).
  */
 $sshRoot = dirname(__DIR__, 3);

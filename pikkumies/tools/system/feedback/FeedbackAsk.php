@@ -4,7 +4,7 @@
  * Off unless the person turned on feedback.ask. due() decides from the pre_llm_call payload whether this turn's answer
  * ends with the question; claim() records the ask, and only a recorded ask is spoken, so a state directory that cannot
  * be written means silence, never a question on every turn. offerOnce() is the first start's one terminal question that
- * lets the person turn it on. Neither sends anything: sending is /feedback's, behind its own approval prompt.
+ * lets the person turn it on. Neither sends anything: sending is /feedback's, behind its own check for the user's yes.
  */
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/NestedAgent.php';

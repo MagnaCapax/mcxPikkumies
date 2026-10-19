@@ -222,13 +222,14 @@ if ($hit !== 0) {
     exit(0);
 }
 
-// Deletes the user can ask for, but must confirm (ADR-0020): Hermes asks the user in the chat and
-// the model cannot answer for them; cron and other unattended runs are refused (approvals.*_mode).
-// Each rule is [kind, why]; the kind picks the end of the question (delete, exposure, stop, load).
-// rule_key names this exact command: Hermes keys "session"/"always" answers by it and would
-// otherwise use the tool name, approving every later delete (hermes_cli/plugins.py).
-// Patterns read the whole command (.* and /s): a false match only asks the user, a missed one
-// deletes without asking, so nothing may stop at a quote, ";" or "&" inside an argument.
+// Deletes the user can ask for still carry a kind (ADR-0073): the orchestrator's ask policy runs the command when
+// the user's own words already asked for exactly this, and otherwise blocks it with a fixed message until the user
+// says yes in the chat; with no evidence of the user's words (cron, one-shot, a nested agent) the irreversible kinds
+// stay blocked. Hermes shows no approval prompt (approvals.mode "off").
+// Each rule is [kind, why]; the kind picks the end of the question (delete, exposure, stop, load, send).
+// rule_key names this exact command, used to merge two units' questions into one (ADR-0054).
+// Patterns read the whole command (.* and /s): a false match only sends it to the ask policy, a missed one
+// deletes without any check, so nothing may stop at a quote, ";" or "&" inside an argument.
 // Docker-compatible CLIs (ADR-0034): the binary, its global options (`docker --context x`), the subcommand.
 $dk = "\\b(?:docker|podman|nerdctl)\\b(?:$v-{1,2}[A-Za-z][A-Za-z0-9-]*(?:=[^\\s\"',\\])]+|$v(?!-)[^\\s\"',\\])]+)?)*$v";
 // A bind source that is the home itself (or /): `-v ~:/x`, `-v /home/me/:/x`, `--mount source=$HOME,...`.

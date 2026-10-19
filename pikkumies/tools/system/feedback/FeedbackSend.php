@@ -12,7 +12,7 @@ class FeedbackSend
      * directory of its own (mode 0700, inside the user's home, never a shared /tmp), read once, deleted, and
      * returned as exported: FeedbackDraft::create cuts it to size and runs Redact::secrets on it (Hermes' redaction misses
      * bare vsk- keys). The session comes from HERMES_SESSION_ID, which Hermes sets for every command it runs; a command
-     * can set it too, so the draft and the approval prompt show which session is attached.
+     * can set it too, so the draft and the message the guard checks show which session is attached.
      */
     public static function transcript($stateDir = null)
     {

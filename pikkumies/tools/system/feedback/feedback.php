@@ -2,7 +2,7 @@
 /**
  * feedback: the user's feedback to Pulsed Media, with the conversation that explains it (ADR-0056, ADR-0015 tool unit).
  * draft saves exactly what would be sent and shows it; send seals that draft to Pulsed Media's public key and posts it,
- * only after the user approves it in Hermes' approval prompt (hooks/guard/feedback-send). Nothing is sent by draft or
+ * only after the user says yes in the chat (hooks/guard/feedback-send, the orchestrator's ask policy, ADR-0073). Nothing is sent by draft or
  * list, and nothing is ever re-sent: a sent draft becomes <id>.sent.json.
  */
 $lib = dirname(__DIR__, 3) . '/lib';

@@ -4,8 +4,8 @@
  * (ADR-0073) about the settings changes that loosen something, cost credits, stop scheduled jobs or delete history (ADR-0059).
  * - `php <this Pikkumies' pikkumies-configure.php> set <key> <value>`, alone in the terminal, is judged by the configure
  *   tool's own ConfigureChange::plan against the defaults and local/config.php: an asked change gets approve with
- *   rule_key pikkumies-config:<sha256 of key, old and new>, so an "always" answer covers that change each time it
- *   recurs, never another; a free change or the person's own gets no opinion (the tool makes or refuses it, and
+ *   rule_key pikkumies-config:<sha256 of key, old and new>, used to merge this with another unit's question, never to
+ *   remember a past answer; a free change or the person's own gets no opinion (the tool makes or refuses it, and
  *   Config::set refuses the person's for every caller).
  * - Asked with the whole command shown: pikkumies-configure followed by set in any other form; any terminal command,
  *   code or process input that names a key with an asked direction (ConfigureTiers) next to the word set or apply;

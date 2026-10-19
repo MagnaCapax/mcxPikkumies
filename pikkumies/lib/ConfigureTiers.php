@@ -3,7 +3,10 @@
  * ConfigureTiers: who makes a settings change (ADR-0059). Every key of Config::defaults(), host.* and arr.<app>.config
  * has a rule, and the change from the current value to the new one is one of three tiers:
  * - free: the agent makes it when the user asks (the tightening direction, or harmless either way);
- * - approve: Hermes' approval prompt asks the person first (the config-change hook); no person, as in cron, is no change;
+ * - approve: the orchestrator's ask policy decides first (the config-change hook, ADR-0073): it runs when the user's
+ *   own words already asked for it, and otherwise is blocked until the user says yes in the chat; with no evidence of
+ *   the user's words (cron and other unattended runs) a setting that deletes history stays blocked, every other
+ *   setting in this tier runs;
  * - person: the configure tool refuses; the person edits local/config.php or uses an install flag.
  * The one decision the configure tool, the config-change hook and Config::set (which refuses the person's changes for
  * every caller) use. A safety prompt, not security: the agent's user can edit local/config.php anyway (AGENTS.md).

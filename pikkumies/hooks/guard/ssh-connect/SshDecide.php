@@ -1,11 +1,12 @@
 <?php
 /**
  * SshDecide: the ssh-connect hook's answer once the call is read (ADR-0068). The deny list, then the intent, then
- * ssh.blockUnknown block; a name not on the allow list, a route this check cannot follow or a write to ~/.ssh/config asks
- * the person in one question that names the hosts, the routes and the agent's reason before the command; every name on
- * the allow list is no opinion. The question must fit what Hermes' approval panel surely shows (HookUnits::APPROVE_SHOWN),
- * or it is a block: the person must see all of what they approve. The intent marker is written only for a call that is
- * allowed or asked, and it is read only to save the agent repeating its reason: it never allows, denies or asks.
+ * ssh.blockUnknown block; a name not on the allow list, a route this check cannot follow or a write to ~/.ssh/config is
+ * a question for the orchestrator's ask policy (ADR-0073), naming the hosts, the routes and the agent's reason before
+ * the command; every name on the allow list is no opinion. The question must fit what the ask review can show in full
+ * (HookUnits::APPROVE_SHOWN), or it is a block: the user must be able to see all of what they are asked to clear. The
+ * intent marker is written only for a call that is allowed or reaches the ask policy, and it is read only to save the
+ * agent repeating its reason: it never allows, denies or asks by itself.
  */
 class SshDecide
 {
