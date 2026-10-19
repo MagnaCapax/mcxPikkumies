@@ -15,10 +15,10 @@ Call Pikkumies as `~/pikkumies/bin/pikkumies`. That path exists on every install
 
 ## Ask a question
 
-Send the question on stdin, never inside the remote command, so quotes, `$(...)` or backticks in it are never run by the remote shell:
+Send the question on stdin, never inside the remote command, so quotes, `$(...)` or backticks in it are never run by the remote shell. `--query-file -` makes Pikkumies' agent read the question from stdin itself, so it never goes on a command line and a long question fits:
 
 ```sh
-ssh -o BatchMode=yes TARGET 'q=$(cat); ~/pikkumies/bin/pikkumies -- "$q" </dev/null' <<'PIKKUMIES_END'
+ssh -o BatchMode=yes TARGET '~/pikkumies/bin/pikkumies run chat --query-file -' <<'PIKKUMIES_END'
 Which of my torrents are stalled, and why?
 PIKKUMIES_END
 ```
@@ -30,13 +30,13 @@ Without a terminal Pikkumies answers once and exits. Its final answer is the las
 ## Follow up in the same session
 
 ```sh
-ssh -o BatchMode=yes TARGET 'read -r id; q=$(cat); ~/pikkumies/bin/pikkumies run chat --resume "$id" --query="$q" </dev/null' <<'PIKKUMIES_END'
+ssh -o BatchMode=yes TARGET 'read -r id; ~/pikkumies/bin/pikkumies run chat --resume "$id" --query-file -' <<'PIKKUMIES_END'
 SESSION_ID
 Which of those is the oldest?
 PIKKUMIES_END
 ```
 
-Read the id with `read -r`, not `head -1`: `head` on a pipe can swallow the question, and an empty query starts an interactive session that exits at once. `--query="$q"` is one word, so a question that starts with `-` is not read as a flag.
+Read the id with `read -r`, not `head -1`: `head` on a pipe can swallow the question, and an empty question stops the run with "--query-file - is empty" before any model call.
 
 ## Deletes and other risky steps
 

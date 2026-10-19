@@ -40,6 +40,14 @@ Facts checked 2026-10-18 on a generic (non-PMSS) host, Pikkumies at `667db40`, H
 ## Review 2026-10-18
 The facts above were checked with `~/.local/bin/pikkumies` and `-q "<text>"`. Review changed the skill to `~/pikkumies/bin/pikkumies` (`PathInstall::binDir()` links into `~/bin` when only that is on `PATH`) and to `--query="$q"`: the same launcher and the same Hermes option, not run again on a live host. It also changed the heredoc delimiter to `PIKKUMIES_END` and widened the never-read list to `~/pikkumies/local/`, because `HermesConfig` writes the key to `local/hermes/.env`.
 
+## Amendment 2026-10-19
+The question no longer goes back onto a command line. The skill now calls `~/pikkumies/bin/pikkumies run chat --query-file -`, and for a follow-up `read -r id; ~/pikkumies/bin/pikkumies run chat --resume "$id" --query-file -`; Hermes chat reads the question from stdin itself (`--query-file`, `-` for stdin, Hermes v0.22.2 `hermes_cli/main.py` `_read_query_file`). Replaces the second Decision bullet's `q=$(cat)` and `--query="$q"`.
+
+- Why: `q=$(cat); pikkumies -- "$q"` put the whole question into one argument of the Hermes command line, and the launcher starts Hermes through `sh -c` with the whole command as one string. Linux limits one argument string to 128 KiB (MAX_ARG_STRLEN), so a longer question could not start Hermes, and the one-shot path failed with exit 1 and no message.
+- Why `run chat --query-file -` and not a launcher flag: the skill is installed from main (`README.md` in this directory), while servers follow releases ([ADR-0057](0057-release-channel.md)). `run chat …` is the documented passthrough, so it works on every current release; a newer launcher flag would be prompt text on an older one.
+- An empty question now stops with Hermes' own "--query-file - is empty" (exit 2) before any model call. The halt guard's resumes pass their own `--query=` and never re-read stdin.
+- Not checked again on a live host. `tests/LaunchRoutingTest.php` routes the skill's two calls, read from `SKILL.md`, and checks they pass through unchanged and are not refused inside an agent.
+
 ## References
 - ADR-0020 (approvals for deletes), ADR-0022 (`pikkumies <text>` and the one-shot split), [ADR-0004](0004-provider-key-and-root-detection.md) (key files)
 - Claude Code skills: a directory under `~/.claude/skills/` with a `SKILL.md`

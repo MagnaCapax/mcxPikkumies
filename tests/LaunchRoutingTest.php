@@ -102,4 +102,13 @@ return [
         check(Launch::route(['pikkumies', '--reasoning', 'low', 'fix', 'it']) === ['run', ['chat', '--reasoning', 'low', '--query=fix it']],
             '--reasoning low + text, no -m: ' . json_encode(Launch::route(['pikkumies', '--reasoning', 'low', 'fix', 'it'])));
     },
+    "launch: 'run chat --query-file -' and its --resume form pass through unchanged (the remote skill's calls, ADR-0051)" => function () {
+        // integrations/remote/claude/SKILL.md sends the question on stdin this way; servers on older releases must read it the same.
+        check(Launch::route(['pikkumies', 'run', 'chat', '--query-file', '-']) === ['run', ['chat', '--query-file', '-']], 'ask: ' . json_encode(Launch::route(['pikkumies', 'run', 'chat', '--query-file', '-'])));
+        check(Launch::route(['pikkumies', 'run', 'chat', '--resume', 'S1', '--query-file', '-']) === ['run', ['chat', '--resume', 'S1', '--query-file', '-']], 'follow-up');
+        check(NestedAgent::refusal(['chat', '--resume', 'S1', '--query-file', '-'], '1') === '', 'inside an agent these words are not a safety-off flag');
+        $skill = (string) file_get_contents(dirname(__DIR__) . '/integrations/remote/claude/SKILL.md');
+        check(preg_match_all("#~/pikkumies/bin/pikkumies ([^'\n]*)'#", $skill, $m) === 2 && strpos($skill, 'q=$(cat)') === false, 'the skill must make exactly these two calls, the question never in argv: ' . json_encode($m[1]));
+        check(str_replace('"$id"', 'S1', $m[1]) === ['run chat --query-file -', 'run chat --resume S1 --query-file -'], 'the skill\'s calls: ' . json_encode($m[1]));
+    },
 ];
