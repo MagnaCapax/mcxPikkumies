@@ -147,8 +147,8 @@ executed):
   `--via-prowlarr`), never silently skipped.
 
 ## References
-- ADR-0015 (tool units), ADR-0019 (hosts and credentials, port-owner pinning, secrets never in a
+- [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units), [ADR-0019](0019-hosts-and-credentials.md) (hosts and credentials, port-owner pinning, secrets never in a
   URL/log — except Prowlarr's own apikey in its own proxy link, which this ADR pins rather than
   forbids, the same exception ADR-0019's Jackett addendum already makes for a different reason),
-  ADR-0020 (deletes need approval — `grab` adds data, so it is not gated the same way, but the
+  [ADR-0020](0020-deletes-need-the-users-approval.md) (deletes need approval — `grab` adds data, so it is not gated the same way, but the
   temp-file write/delete pattern follows the same "never leave a secret-bearing file behind" spirit).

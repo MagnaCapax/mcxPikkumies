@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Changes the guard hook from block-only to block or approve, and supersedes the ADR-0005 guard bullet "Escalation is not available to shell hooks in this version" (true of Hermes 0.19.0, not of the pinned v2026.9.24).
+- Status: Accepted. Changes the guard hook from block-only to block or approve, and supersedes the [ADR-0005](0005-hermes-wiring-verified-against-source.md) guard bullet "Escalation is not available to shell hooks in this version" (true of Hermes 0.19.0, not of the pinned v2026.9.24).
 
 ## Context
 The new tools can delete data the user cannot get back: a torrent's files, an rclone sync or move to a remote, a restic or borg prune. The agent reads text written by others (torrent names, *arr titles, media metadata, documentation), and such text can try to steer it. A `--yes` flag does not stop that, because the model would pass the flag itself.
@@ -36,7 +36,7 @@ Today `guard-destructive.php` only blocks, and the user has to run the command t
 - Many small deletes mean many approvals. The tools should offer one call for a batch, so the user approves once and sees the whole list.
 
 ## References
-- ADR-0005 (Hermes wiring), ADR-0015, ADR-0019
+- ADR-0005 (Hermes wiring), [ADR-0015](0015-tool-units-one-skill-per-tool.md), [ADR-0019](0019-hosts-and-credentials.md)
 
 ## Amendment 2026-10-14: the user's own files, stored passwords, and Hermes' smart mode
 Facts checked in the pinned Hermes v2026.9.24: the default `approvals.mode` is `smart` (`hermes_cli/config_defaults.py:1656`), where a second model decides whether a command on Hermes' dangerous list runs and is told to approve "safe file operations" (`tools/approval_smart.py:24-25`). Hermes' list catches `rm -r` and `rm /` but not a plain `rm <file>` (`tools/approval_detection.py:210-217`). The generated config set no `approvals` key, so deleting the user's files was decided by a model or not asked at all. Two reviews also found that the tool rule needed a literal `.php` before `--with-data`, so the form the USAGE files teach (`php $Q remove <id> --with-data`) was never asked.
@@ -48,7 +48,7 @@ Facts checked in the pinned Hermes v2026.9.24: the default `approvals.mode` is `
 - Media servers: a DELETE to `/Items` or `/Items/{id}` (Jellyfin 12.2 and Emby 4.1 specs: "deletes an item from the library and filesystem"), to Plex `/library/metadata/{id}`, or to `/Auth/Keys/{key}` is asked from any host, also through the public proxy path. The media units send no DELETE at all.
 - *arr queue: removing a queue item with `DELETE /api/vN/queue/{id}` deletes the downloaded files in the torrent client unless `removeFromClient=false` is sent, because that parameter defaults to true (Sonarr `QueueController` `RemoveAction` and `RemoveMany`, `removeFromClient = true`; Radarr and Lidarr alike). The guard already asks for any DELETE to an *arr `/api/vN/queue` path; the *arr units offer no queue removal in v1 and send every boolean parameter explicitly.
 
-## Amendment 2026-10-17: Docker deletes, exposure and stopping every container (ADR-0034)
+## Amendment 2026-10-17: Docker deletes, exposure and stopping every container ([ADR-0034](0034-containers-category.md))
 The guard already asks for one command that deletes nothing: `rclone serve` on a non-loopback address (amendment above), because it exposes the user's files. The containers category (ADR-0034) widens the scope of this ADR the same way, from "deletes" to "deletes, exposure, and stopping every container", and the guard's message says which of the three a question is about.
 - Deletes, asked: `docker|podman|nerdctl rmi`; `(image|container|volume|network|system|builder) prune`; `system reset`; `compose ... down` with `-v`, `--volumes` or `--rmi`; `(container|image|volume|network) rm|remove`; Engine API calls over `curl --unix-socket` with DELETE or `/prune`; the docker unit's `remove` and `prune` (they take `--expect`). Not asked: `run --rm`, a plain `compose down`, `images --prune-plan`.
 - Exposure, asked: publishing a port without a loopback address (`-p 8080:80` binds every interface), `-P`/`--publish-all`, `--net`/`--network host`, `--privileged`, `--cap-add`, `--device`, mounts naming a socket, `.ssh`, `pikkumies/local` or the home itself, and the docker unit's `--public` and `--accept-shared-exposure`. Not asked: publishing on `127.0.0.1:` or `[::1]:`.
@@ -75,7 +75,7 @@ Decision:
 - The launcher exports `PIKKUMIES_DEPTH` = its own depth + 1 to the Hermes it starts (`run` and `cron-tick`), so a command an agent runs sees 1 or more and the user's shell sees none (`lib/NestedAgent.php`). This part does not depend on how the launcher was spelled:
   - in an agent at depth 2 or more, every guard-destructive question (delete, exposure, schedule, mail) becomes a block, with yolo or without: the one answering would be the parent agent, or nobody under yolo or `approvals.mode: off`;
   - `pikkumies run` started at depth 1 or more refuses the same flags and Hermes commands, and says how the user, typing in their own terminal, can go ahead (`unset PIKKUMIES_DEPTH`).
-- **This amends ADR-0022 (Decision, "`argv[1]` is `run` → the Hermes passthrough, all words kept") and ADR-0052 (Decision, "`pikkumies run chat …` stays the full passthrough"):** `run` stays the full passthrough for the user, and inside an agent (depth 1 or more) it refuses the words above.
+- **This amends [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md) (Decision, "`argv[1]` is `run` → the Hermes passthrough, all words kept") and [ADR-0052](0052-launcher-model-flag-and-configure.md) (Decision, "`pikkumies run chat …` stays the full passthrough"):** `run` stays the full passthrough for the user, and inside an agent (depth 1 or more) it refuses the words above.
 - The user's own runs are untouched: `pikkumies run --yolo` typed in their shell starts as before (Consequences above), and in that session (depth 1) yolo still lets the guard's questions through, as before.
 
 Consequences: this is a safety prompt, not security, aimed at the spelling an agent reaches for (AGENTS.md: "Hooks are safety prompts, not security"). The second agent runs as the same account with the same files, so nothing crosses a trust boundary.
@@ -83,7 +83,7 @@ Consequences: this is a safety prompt, not security, aimed at the spelling an ag
 - False matches block a command that names a launcher together with one of these flags, such as prompt text containing ` -z ` or ` --yolo `, or a path ending in `/yolo` after a space.
 - The depth leaks into the user's own shells when an agent started them: a tmux or screen server, or Hermes' `!` shell, first started from inside an agent keeps `PIKKUMIES_DEPTH=1`. The user's later `pikkumies run --yolo` there is refused (the message says to `unset PIKKUMIES_DEPTH`), and a session started there runs at depth 2, where every question is a block.
 
-## Amendment 2026-10-18: settings changes (ADR-0059)
+## Amendment 2026-10-18: settings changes ([ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md))
 A second hook unit, `config-change`, uses the same approval prompt for settings changes that loosen something, cost credits or delete history, with `rule_key` `pikkumies-config:` + a hash of the key, the old and the new value (one change per answer), and for edits of `local/config.php` past the configure tool (a hash of the command). In an agent at depth 2 or more its questions are blocks, as here. Hermes' approval mode itself stays pinned to manual and is not a setting the agent can change.
 
 ## Amendment 2026-10-19: V4A patches in the file-tool rules

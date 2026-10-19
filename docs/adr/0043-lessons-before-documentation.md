@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Amends ADR-0011 (reading stays allowed before the search) and ADR-0037 (the wiki and kb units run before the search) for documentation only.
+- Status: Accepted. Amends [ADR-0011](0011-documentation-sources-and-search-first.md) (reading stays allowed before the search) and [ADR-0037](0037-wiki-and-kb-tool-units.md) (the wiki and kb units run before the search) for documentation only.
 
 ## Context
 The request of 2026-10-18, verbatim: "[investigate] that memory search and then the search from known sources is being enforced and it is fully functional".
@@ -34,4 +34,4 @@ What the question suite showed on a live run the same day (`tests/testing/questi
 - Tests: `tests/HookSearchTest.php` covers the blocked cases, a file merely named like the cache, and the documentation opening after the search. Mutation checked.
 
 ## References
-- ADR-0011 (documentation sources, the first-turn hint, the gate), ADR-0028 (search first on every question), ADR-0031 (search tiers), ADR-0037 (wiki and kb units), ADR-0038 (a plain search command opens the gate)
+- ADR-0011 (documentation sources, the first-turn hint, the gate), [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md) (search first on every question), [ADR-0031](0031-search-tiers.md) (search tiers), ADR-0037 (wiki and kb units), [ADR-0038](0038-plain-search-command-config-overlay-live-source-check.md) (a plain search command opens the gate)

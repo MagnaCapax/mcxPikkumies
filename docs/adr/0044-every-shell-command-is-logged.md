@@ -3,13 +3,13 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Adds the hook event `post_tool_call` to the hook units (ADR-0030).
+- Status: Accepted. Adds the hook event `post_tool_call` to the hook units ([ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md)).
 
 ## Context
 The request of 2026-10-18, verbatim: "make sure pikkumies logs every shell command it runs, on the sharded log directories, in case something needs to be traced".
 
 What was found:
-- Pikkumies logged no commands. Its hook log (`local/logs/hooks/YYYYMMDD.jsonl`, ADR-0030) records each hook unit run (event, unit, milliseconds, outcome) and never the payload. The memory metrics (ADR-0041) record searches and saves.
+- Pikkumies logged no commands. Its hook log (`local/logs/hooks/YYYYMMDD.jsonl`, ADR-0030) records each hook unit run (event, unit, milliseconds, outcome) and never the payload. The memory metrics ([ADR-0041](0041-memory-metrics-save-reminder-and-wide-search.md)) record searches and saves.
 - Hermes keeps each session's messages, tool calls included, in its session database (`messages.tool_calls`, `hermes_state_common.py` schema, Hermes v2026.9.24). That is a store to resume conversations from, not a log to trace with: one place per session, kept by the session history setting, and not readable line by line with standard tools.
 - Hermes fires `post_tool_call` after every tool call (`model_tools.py` `_emit_post_tool_call_hook`, Hermes v2026.9.24) with the tool's arguments, its result, the session and tool call ids, the duration and a status. Shell hooks may run on it (`agent/shell_hooks.py` `_TOOL_EVENTS`), and its answer is ignored. The `terminal` tool's result is JSON with `output`, `exit_code` and `error` (`tools/terminal_tool.py`).
 - `HookUnits::EVENTS` accepted only `pre_tool_call` and `pre_llm_call`, so a unit on `post_tool_call` was reported broken.
@@ -36,4 +36,4 @@ What was found:
 - Tests: `tests/CommandLogTest.php` (fields, redaction, never the output, 0700/0600, other tools ignored, plain-text results, orchestrator run with no answer, retention), mutation checked.
 
 ## References
-- ADR-0030 (hook units, the hook log), ADR-0032 (settings, session retention), ADR-0041 (memory metrics)
+- ADR-0030 (hook units, the hook log), [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) (settings, session retention), ADR-0041 (memory metrics)

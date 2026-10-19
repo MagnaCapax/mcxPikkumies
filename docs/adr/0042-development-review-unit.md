@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Adds the tool category `development` (ADR-0015 tool units).
+- Status: Accepted. Adds the tool category `development` ([ADR-0015](0015-tool-units-one-skill-per-tool.md) tool units).
 
 ## Context
 The request of 2026-10-18, verbatim: "[plan] the tools/development/ toolset, doctrine etc. for pikkumies, lightweight of ours here -- but we need atleast code review, liightweight adversarial review, review cwe, code quality review that code confroms to our ruels, ADRs, engineering principles."
@@ -35,9 +35,9 @@ What was found:
 ## Consequences
 - One skill covers all four asks, for users' code and for this repository's own changes.
 - The review is the agent's reading, guided by a checklist: it can miss what a dedicated scanner would find. The CWE list is short on purpose and is not a security audit.
-- The fallback principles exist only in a full checkout (the install is one, ADR-0001); without the file, `principles_found` is false and the skill has no fallback text.
+- The fallback principles exist only in a full checkout (the install is one, [ADR-0001](0001-layout-install-and-update.md)); without the file, `principles_found` is false and the skill has no fallback text.
 - The helper reuses `Update::exec` rather than adding another command runner.
 
 ## References
-- ADR-0001 (layout), ADR-0015 (tool units), ADR-0016 and ADR-0017 (output).
+- ADR-0001 (layout), ADR-0015 (tool units), [ADR-0016](0016-jsonl-is-the-default-output.md) and [ADR-0017](0017-human-output-option.md) (output).
 - `AGENTS.md`, `development/engineering-principles.md`, `pikkumies/doctrine/voice.md`, `pikkumies/tools/development/code-review/`, `tests/ReviewUnitTest.php`.

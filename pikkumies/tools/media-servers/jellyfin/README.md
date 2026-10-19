@@ -12,7 +12,7 @@ Controls the user's own Jellyfin media server: status, libraries and scans, who 
 3. **A container on the user's own rootless Docker**: only a socket the user owns: a `unix://` `DOCKER_HOST`, else `/run/user/<uid>/docker.sock` (PMSS `docs/docker-help.md:17`), the same rule as the *ARR units (`lib/Host.php` `dockerSocket`); `tcp://` and a root or other account's daemon are never used, a running container whose image is `jellyfin` (official `jellyfin/jellyfin`, or `lscr.io/linuxserver/jellyfin` as PMSS `docker-install-lsio` runs it, `scripts/lib/user/dockerInstallLsio.php:155, 229-234`), at the host port it publishes for 8096. No base path.
 4. **The default config directory** `~/.config/jellyfin` (`network.xml` there or in `config/`) [UNVERIFIED: Jellyfin's default layout and the Whatbox layout come from the research file, not read this session].
 
-Every request goes only to a listener this user's uid owns in `/proc/net/tcp(6)` (ADR-0019); another account's port is refused before anything is sent.
+Every request goes only to a listener this user's uid owns in `/proc/net/tcp(6)` ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md)); another account's port is refused before anything is sent.
 
 ## Credentials
 

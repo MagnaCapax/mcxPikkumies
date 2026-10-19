@@ -1,6 +1,6 @@
 # feedback-send
 
-The approval prompt for `/feedback` (ADR-0056). Before `feedback send <id>` runs, Hermes asks the user, showing where it goes, that it is linked to their account through the key, how big it is, which session is attached, what else it carries and how the text starts. The model cannot answer that prompt. Unattended runs (cron, single queries) are refused by Hermes, unless approvals are turned off.
+The approval prompt for `/feedback` ([ADR-0056](../../../../docs/adr/0056-feedback-what-pikkumies-sends-to-pulsed-media.md)). Before `feedback send <id>` runs, Hermes asks the user, showing where it goes, that it is linked to their account through the key, how big it is, which session is attached, what else it carries and how the text starts. The model cannot answer that prompt. Unattended runs (cron, single queries) are refused by Hermes, unless approvals are turned off.
 
 Only the plain command `php <path>/tools/system/feedback/feedback.php send <id>`, on its own, with the absolute (or `~/`) path of this Pikkumies' own tool, is asked about. The other forms it can see are blocked: a send chained with other commands, run from code or a background process, written into a file or a scheduled job, built with shell expansion, or of a draft that is missing, changed or already sent.
 

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Extends the credits tool unit; adds to the tmux session of ADR-0032.
+- Status: Accepted. Extends the credits tool unit; adds to the tmux session of [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md).
 
 ## Context
 The request of 2026-10-18: "the pikkumies status line shows how many tokens you have when using virsilipas, how much remaining. make sure the statusline is easy to read, pretty nice to look at, graphical for text interface."
@@ -16,7 +16,7 @@ What was found:
 - Hermes' `transform_llm_output` hook could append a footer to every answer, but Hermes stores and replays the transformed text (`tests/agent/test_transform_llm_output_persistence.py`), so the footer would be fed back to the model on every later turn.
 
 ## Options Considered
-- **A segment in Hermes' status bar.** Not possible without patching Hermes, which stays vanilla (ADR-0033). Rejected.
+- **A segment in Hermes' status bar.** Not possible without patching Hermes, which stays vanilla ([ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md)). Rejected.
 - **A widget through Hermes' wrapper-CLI hook.** Upstream supports it, but it needs a Python wrapper CLI, and this repository has no Python. Rejected for that reason.
 - **A footer through `transform_llm_output`.** It would pollute the stored conversation and cost tokens on every turn. Rejected.
 - **The balance in the session title.** It would overwrite the names people give their sessions. Rejected.
@@ -32,7 +32,7 @@ What was found:
   - `today` is the credits charged on the current UTC day, not the person's local day.
   - `--ascii`, or a locale whose first set variable of `LC_ALL`, `LC_CTYPE`, `LANG` does not name UTF-8: `cr` instead of the emoji, `[#########-]`, `|` and `>=`. `--tmux`: no emoji, and tmux colour codes around the bar (`#[fg=green]` over 25%, yellow from 10 to 25%, red under 10%, on a black background because tmux's default status bar is green), then `#[default]`.
 - **Cache** under `local/state/credits/` (directory 0700, files 0600). Each file is for one endpoint and one key: it holds the first 12 hex digits of the key's sha256, never the key. The record is kept 60 seconds, for one model. The model rates are kept a day. A 404 on `/usage` (no usage route: another provider) is kept a day. Any other failure is kept 10 minutes, so tmux does not ask every minute: another HTTP status, no answer at all, or an answer that cannot be read, on `/usage` or on `/models`. A cache dated in the future (the clock was set back) is not trusted.
-- **Timeouts.** curl gives each request 2 seconds (`CURLOPT_TIMEOUT`), connecting included. Before curl starts, `Http` resolves the endpoint's host name itself (`gethostbynamel` and an AAAA lookup, for its local-listener check, ADR-0019), under the system resolver's own timeouts, outside those 2 seconds. A line with nothing cached makes two requests.
+- **Timeouts.** curl gives each request 2 seconds (`CURLOPT_TIMEOUT`), connecting included. Before curl starts, `Http` resolves the endpoint's host name itself (`gethostbynamel` and an AAAA lookup, for its local-listener check, [ADR-0019](0019-hosts-and-credentials.md)), under the system resolver's own timeouts, outside those 2 seconds. A line with nothing cached makes two requests.
 - Any failure (no key, 404, timeout, a bad answer) prints nothing and exits 0. The key goes only into the Authorization header; it is never printed or written.
 - **Start banner.** `pikkumies` on a terminal, for an interactive session, prints the line once just before Hermes starts. It calls the unit's code as a library, not as a subprocess, and is silent on failure.
 - **tmux.** `pikkumies tmux` sets, on the `pikkumies` session only (`set-option -t =pikkumies:`, never `-g`), `status-right` to `#(<php> <credits.php> line --tmux) %H:%M`, `status-right-length` 90 (the default of 40 would cut the line) and `status-interval` 60. tmux expands `%` and `#` inside `#()` too, so they are doubled in the command and a path holding them still runs. The person's other tmux sessions keep their own status line.
@@ -43,5 +43,5 @@ What was found:
 - One extra request at most once a minute per account while a tmux session is open, two when the day-old rates expire; a failing endpoint is asked at most every 10 minutes.
 
 ## References
-- ADR-0015 (tool units), ADR-0019 (local listeners), ADR-0032 (`pikkumies tmux`), ADR-0033 (vanilla Hermes).
+- [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units), ADR-0019 (local listeners), ADR-0032 (`pikkumies tmux`), ADR-0033 (vanilla Hermes).
 - `pikkumies/tools/system/credits/` (`CreditsFormat.php`, `CreditsLine.php`), `pikkumies/lib/Http.php`, `tests/CreditsLineFormatTest.php`, `tests/CreditsLineTest.php`, `tests/CreditsLineCacheTest.php`, `tests/fixtures/credits/harness.php`.

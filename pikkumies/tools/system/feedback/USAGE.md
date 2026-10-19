@@ -1,6 +1,6 @@
 # feedback
 
-Feedback to Pulsed Media with the conversation that explains it (ADR-0056). `draft` saves exactly what would be sent under `~/pikkumies/local/state/feedback/<id>.json` and shows it; nothing leaves the machine. `send` locks the draft with Pulsed Media's public key (`config/feedback-public-key.txt`, a libsodium sealed box) and posts it to `https://pikkumies.mcx.fi/v1/feedback` with the Pulsed Media AI key from `~/.virsilipasKey`, which links it to the account, only after the user approves it in Pikkumies' approval prompt (hook `guard/feedback-send`).
+Feedback to Pulsed Media with the conversation that explains it ([ADR-0056](../../../../docs/adr/0056-feedback-what-pikkumies-sends-to-pulsed-media.md)). `draft` saves exactly what would be sent under `~/pikkumies/local/state/feedback/<id>.json` and shows it; nothing leaves the machine. `send` locks the draft with Pulsed Media's public key (`config/feedback-public-key.txt`, a libsodium sealed box) and posts it to `https://pikkumies.mcx.fi/v1/feedback` with the Pulsed Media AI key from `~/.virsilipasKey`, which links it to the account, only after the user approves it in Pikkumies' approval prompt (hook `guard/feedback-send`).
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

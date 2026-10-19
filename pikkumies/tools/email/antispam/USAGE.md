@@ -1,6 +1,6 @@
 # antispam
 
-The user's own spam rules over their IMAP mailbox, with the `imap` login (ADR-0053). Shared rules: `tools/email/README.md`.
+The user's own spam rules over their IMAP mailbox, with the `imap` login ([ADR-0053](../../../../docs/adr/0053-email-category.md)). Shared rules: `tools/email/README.md`.
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

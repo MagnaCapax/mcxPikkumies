@@ -1,6 +1,6 @@
 # imap
 
-Reads and tidies the user's own IMAP mailbox over TLS (port 993), and archives it into local Maildirs (ADR-0053). It works with any mail provider; nothing is detected on the machine. The user types the server at `login`.
+Reads and tidies the user's own IMAP mailbox over TLS (port 993), and archives it into local Maildirs ([ADR-0053](../../../../docs/adr/0053-email-category.md)). It works with any mail provider; nothing is detected on the machine. The user types the server at `login`.
 
 ## How it talks to the server
 

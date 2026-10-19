@@ -117,7 +117,7 @@ return [
             }
         }
     },
-    'architecture: every relative link in tracked markdown resolves to a file or directory, relative to its own file (ADR-0036, ADR-0060)' => function () {
+    'architecture: every relative link in tracked markdown resolves to a file or directory, relative to its own file, and every mention of a local ADR is linked (ADR-0036, ADR-0060)' => function () {
         $root = dirname(__DIR__);
         $pages = [];
         exec('cd ' . escapeshellarg($root) . ' && git ls-files "*.md" 2>/dev/null', $pages, $code);
@@ -126,8 +126,30 @@ return [
         }
         check(count($pages) >= 200, 'expected every tracked .md file from git ls-files; found ' . count($pages));
         $checked = array_fill_keys(array_merge(['README.md'], array_map('basename', (array) glob("$root/docs/*.md"))), 0);
+        $adrs = [];
+        foreach ((array) glob("$root/docs/adr/[0-9][0-9][0-9][0-9]-*.md") as $f) {
+            $adrs[substr(basename($f), 0, 4)] = $f;
+        }
+        $mentions = 0;
         foreach ($pages as $name) {
-            foreach (Links::targets((string) file_get_contents("$root/$name")) as $link) { // code, front matter, web links skipped
+            $text = (string) file_get_contents("$root/$name");
+            // A mention of a local ADR outside a link (another project's ADR is a link to it) needs a link to that ADR's file
+            // somewhere in the file, except in the ADR itself and in the core doctrine, which is copied into SOUL.md.
+            $linked = array_map(function ($t) {
+                return substr(basename($t), 0, 5);
+            }, Links::targets($text));
+            $prose = preg_match('#^pikkumies/doctrine/(soul|voice|doctrine|safety)\.md$#', $name) ? '' : preg_replace('/\[[^\]\n]*\]\([^)\n]*\)/', '', Links::prose($text));
+            preg_match_all('/\bADR-(\d{4})\b/', $prose, $adr);
+            foreach (array_unique($adr[1]) as $num) {
+                $mentions += isset($adrs[$num]) ? 1 : 0; // a number with no local file (planned, or another project's) is not checked
+                check(!isset($adrs[$num]) || strpos($name, "docs/adr/$num-") === 0 || in_array("$num-", $linked, true),
+                    "$name mentions ADR-$num without a link to it; link its first mention: [ADR-$num](" . (isset($adrs[$num]) ? Links::relative("$root/$name", $adrs[$num]) : '') . ')');
+            }
+            preg_match_all('/\[ADR-(\d{4})\]\((?![A-Za-z][A-Za-z0-9+.-]*:)([^)\s#]+)/', Links::prose($text), $adrLinks, PREG_SET_ORDER);
+            foreach ($adrLinks as $al) { // a link written [ADR-NNNN] must lead to ADR NNNN's own file
+                check(strpos(basename($al[2]), "$al[1]-") === 0, "$name links [ADR-$al[1]] to '$al[2]', which is not that ADR's file");
+            }
+            foreach (Links::targets($text) as $link) { // code, front matter, web links skipped
                 $key = $name === 'README.md' ? $name : (dirname($name) === 'docs' ? basename($name) : 'rest');
                 $checked[$key] = (isset($checked[$key]) ? $checked[$key] : 0) + 1;
                 check($link[0] !== '/' && Links::resolve($link, "$root/$name") !== false, "$name links to '$link', which is absolute or does not exist");
@@ -136,7 +158,7 @@ return [
         foreach ($checked as $key => $n) {
             check($n >= 1, "no relative links were found to check in $key (it may have changed shape)"); // the README and every docs/ page link
         }
-        check(count($checked) >= 6 && array_sum($checked) >= 48, 'only ' . array_sum($checked) . ' links were checked; this check may have become vacuous');
+        check(count($checked) >= 6 && array_sum($checked) >= 48 && $mentions >= 150, 'only ' . array_sum($checked) . " links and $mentions ADR mentions were checked; this check may have become vacuous");
     },
     'architecture: the README\'s first code block is the one-line install (ADR-0036)' => function () {
         $root = dirname(__DIR__);

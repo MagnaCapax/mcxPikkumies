@@ -3,10 +3,10 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Corrects the ADR-0011 context line "Hermes' own web_search and web_extract need a paid gateway or API keys".
+- Status: Accepted. Corrects the [ADR-0011](0011-documentation-sources-and-search-first.md) context line "Hermes' own web_search and web_extract need a paid gateway or API keys".
 
 ## Context
-The request of 2026-10-14 asks whether Hermes comes with deep research tooling, and to decide whether Pikkumies needs its own (a later stage of the tool-unit work, ADR-0015).
+The request of 2026-10-14 asks whether Hermes comes with deep research tooling, and to decide whether Pikkumies needs its own (a later stage of the tool-unit work, [ADR-0015](0015-tool-units-one-skill-per-tool.md)).
 
 Facts checked 2026-10-14 in the pinned Hermes v2026.9.24:
 - With no web backend configured, `web_search` and `web_extract` send the model's queries and the pages it fetches to the free tiers of outside search services. `web.keyless_fallback` defaults to true (`hermes_cli/config_defaults.py`, `agent/web_search_registry.py`).
@@ -28,7 +28,7 @@ AGENTS.md: "It never sends anything off the machine that the user did not ask it
 Hermes v2026.9.24 has no deep-research loop. It has the parts: `web_search` and `web_extract`, browser tools (a local Chromium driven by a Node command-line tool), subagents (`delegate_task`), cron, and the bundled `grounded-citations` skill, a ledger of numbered sources with quote verification. The only built-in "research engine" is a paid outside service reached through an optional skill.
 - Pikkumies adds the procedure unit `tools/research/deep-research`: its skill runs the loop on those parts. It searches memory first, then plans, searches, extracts, keeps the ledger with `grounded-citations`, sends wide sub-questions to subagents that return paths and quotes, verifies, answers with sources, and saves the result with `pikkumies save --kind research`. No new fetching code.
 - A provider may later offer its own search and extract service to its customers under their key. Hermes already takes such services as a backend URL, so nothing about how it works lives in this repository.
-- `security.allow_lazy_installs` is false in the generated config. Otherwise Hermes installs optional Python packages from PyPI (unpinned) and downloads a browser of about 170 MB at runtime (`tools/lazy_deps.py`). That undoes the pinned build of ADR-0009, repeats after every update because the venv is rebuilt, and costs every account on a shared server the download. A user who wants those features sets `hermes.lazyInstalls` to true in `local/config.php`.
+- `security.allow_lazy_installs` is false in the generated config. Otherwise Hermes installs optional Python packages from PyPI (unpinned) and downloads a browser of about 170 MB at runtime (`tools/lazy_deps.py`). That undoes the pinned build of [ADR-0009](0009-hermes-from-a-pinned-release-tarball.md), repeats after every update because the venv is rebuilt, and costs every account on a shared server the download. A user who wants those features sets `hermes.lazyInstalls` to true in `local/config.php`.
 
 ## Consequences
 - Nothing the agent searches for leaves the machine unless the user set that up.
@@ -36,4 +36,4 @@ Hermes v2026.9.24 has no deep-research loop. It has the parts: `web_search` and 
 - Out of the box there is no browser rendering; the research skill says so and names the switch.
 
 ## References
-- ADR-0011, ADR-0015, ADR-0018, ADR-0019
+- ADR-0011, ADR-0015, [ADR-0018](0018-memory-tool-unit.md), [ADR-0019](0019-hosts-and-credentials.md)

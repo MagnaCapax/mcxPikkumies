@@ -3,14 +3,14 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. Supersedes the "local skill with the same name" override in ADR-0001 and ADR-0003.
+- Status: Accepted. Supersedes the "local skill with the same name" override in [ADR-0001](0001-layout-install-and-update.md) and [ADR-0003](0003-hermes-integration.md).
 
 ## Context
 ADR-0001 and ADR-0003 said a user overrides a shipped skill by creating a local skill with the same name, because local skills take precedence over `skills.external_dirs`. That came from the Hermes documentation. The installed Hermes 0.19.0 code does not work that way:
 - The skills index and `skills_list` prefer the local copy, but `skill_view` collects every skill with the name and refuses with "Ambiguous skill name ... Refusing to guess" (`tools/skills_tool.py`). Hermes's own sync code says such a copy creates "a name collision the loader refuses to resolve" (`tools/skills_sync.py`).
 - `skill_manage create` refuses a name that already exists anywhere.
 
-So following our own advice produced a skill the model could see but not load. This is the fourth integration fact taken from the Hermes docs that the code contradicts (three are in ADR-0005).
+So following our own advice produced a skill the model could see but not load. This is the fourth integration fact taken from the Hermes docs that the code contradicts (three are in [ADR-0005](0005-hermes-wiring-verified-against-source.md)).
 
 Separately, the first live run showed the model saving a lesson with Hermes's built-in `memory` tool instead of our `memory` skill. The skill had the same name as the tool, and the tool's own description lists "lessons" among the things it stores. The built-in memory is about 2,200 characters, goes into every turn and cannot be searched (`hermes_cli/config.py`, `tools/memory_tool.py`), so it cannot replace lesson files.
 
@@ -28,7 +28,7 @@ Separately, the first live run showed the model saving a lesson with Hermes's bu
 ## Consequences
 - The README and the shipped `update` skill now give advice that works.
 - Checked live on 2026-10-04 after the rename (one run, same kind of request that failed before): the lesson was saved as a file in `pikkumies/memory/` and the built-in memory was not touched.
-- The tool-name list in the test is tied to Hermes 0.19.0 and is re-checked when the pin moves (ADR-0008).
+- The tool-name list in the test is tied to Hermes 0.19.0 and is re-checked when the pin moves ([ADR-0008](0008-hermes-version-pinned.md)).
 
 ## References
 - ADR-0001, ADR-0003, ADR-0005

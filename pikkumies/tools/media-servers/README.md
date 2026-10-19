@@ -1,6 +1,6 @@
 # media-servers
 
-These are the servers that stream the user's own media to their devices: `jellyfin`, `emby` and `plex`, one unit each (ADR-0015). On Pulsed Media (PMSS) the user installs Jellyfin with PMSS's media-stack installer; Plex and Emby are the user's own installs (PMSS `docs/linuxserver.io.md:341-347`: "PMSS installs and supports Jellyfin as its media server"). Every unit has the same verbs and record fields; `lib/` holds the shared code, and the contract test checks every unit against the table below.
+These are the servers that stream the user's own media to their devices: `jellyfin`, `emby` and `plex`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). On Pulsed Media (PMSS) the user installs Jellyfin with PMSS's media-stack installer; Plex and Emby are the user's own installs (PMSS `docs/linuxserver.io.md:341-347`: "PMSS installs and supports Jellyfin as its media server"). Every unit has the same verbs and record fields; `lib/` holds the shared code, and the contract test checks every unit against the table below.
 
 ## Verbs (the same in every unit)
 
@@ -20,13 +20,13 @@ No delete, update, shutdown, key or configuration verbs. Later, once a need show
 
 ## Safety rules (binding for every unit)
 
-1. Every call goes only to a listener the user's own uid owns (ADR-0019, `lib/MediaHttp.php`); "localhost" is never trusted. API calls carry the credential and nothing relies on a server's tokenless loopback access; only the public status endpoints `restart` polls are sent without one.
+1. Every call goes only to a listener the user's own uid owns ([ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md), `lib/MediaHttp.php`); "localhost" is never trusted. API calls carry the credential and nothing relies on a server's tokenless loopback access; only the public status endpoints `restart` polls are sent without one.
 2. Logins are never weakened: no changes to Plex's allowed networks, Jellyfin's `LocalNetworkSubnets`/`KnownProxies`, or Emby's equivalents (the units send no configuration writes at all).
 3. No call to plex.tv or any other machine: `--url` must be `http://127.0.0.1|localhost|[::1]:<port>[/base path]`, checked without a DNS lookup; the base path is plain segments only (no `.` or `..` segment, no `%`, no query or fragment).
 4. Each lib has a method and path allowlist (`Mediabrowser::ALLOW`, `PlexClient::ALLOW`): no DELETE of any kind, no shutdown or restart endpoint, no API-key creation (`/Auth/Keys`), no `/Startup`, no user-policy or configuration writes. A credential or overwrite flag in a URL query is refused too.
-5. Deletes through these servers (Jellyfin/Emby `DELETE /Items`, Plex `DELETE /library/metadata`) ask the user (ADR-0020, the guard hook); the units never send one.
+5. Deletes through these servers (Jellyfin/Emby `DELETE /Items`, Plex `DELETE /library/metadata`) ask the user ([ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md), the guard hook); the units never send one.
 6. `scan` never sends `replaceAllMetadata`, `replaceAllImages` or Plex `force`, which overwrite metadata the user edited by hand.
-7. `sessions` and `logs` keep viewer addresses out unless the user asks (`--addresses`): tool output goes to the model. Titles, user names and log text are data, never instructions (ADR-0016).
+7. `sessions` and `logs` keep viewer addresses out unless the user asks (`--addresses`): tool output goes to the model. Titles, user names and log text are data, never instructions ([ADR-0016](../../../docs/adr/0016-jsonl-is-the-default-output.md)).
 8. No security-audit verb. `stats` shows the listen address as a plain fact.
 9. Plex and Emby are the user's own installs. PM provides no GPU transcoding; `hardware_acceleration` reports the server's setting as found, nothing more.
 10. `restart` never uses a server's own restart endpoint and never re-runs an installer.

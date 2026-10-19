@@ -6,7 +6,7 @@
 - Status: Accepted
 
 ## Context
-The request of 2026-10-14: "all of the tools should have --human option to output pretty human output (all tools needs this, make pikkumies ADR about that)". The default output is JSON Lines for the agent (ADR-0016). Users run the same tools from their shell, and the agent sometimes shows a result to the user.
+The request of 2026-10-14: "all of the tools should have --human option to output pretty human output (all tools needs this, make pikkumies ADR about that)". The default output is JSON Lines for the agent ([ADR-0016](0016-jsonl-is-the-default-output.md)). Users run the same tools from their shell, and the agent sometimes shows a result to the user.
 
 ## Options Considered
 - **A separate human tool per verb.** Twice the commands to keep in step.
@@ -26,4 +26,4 @@ The request of 2026-10-14: "all of the tools should have --human option to outpu
 - A tool that needs a special view, such as a progress bar, has to justify it against the shared renderer.
 
 ## References
-- ADR-0016 (JSON Lines default), ADR-0015 (tool units)
+- ADR-0016 (JSON Lines default), [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units)

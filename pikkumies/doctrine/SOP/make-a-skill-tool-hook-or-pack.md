@@ -1,6 +1,6 @@
 # Make a tool unit, a hook or a documentation source
 
-One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 (ADR-0005 to ADR-0009, ADR-0015 to ADR-0021); Hermes now follows upstream releases (ADR-0033), so re-check names against a new release. `php tests/run.php` enforces the unit rules.
+One page for contributors and for the agent itself. Checked against Hermes Agent v0.21.5, tag v2026.9.24 ([ADR-0005](../../../docs/adr/0005-hermes-wiring-verified-against-source.md) to [ADR-0009](../../../docs/adr/0009-hermes-from-a-pinned-release-tarball.md), [ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md) to [ADR-0021](../../../docs/adr/0021-web-access-off-unless-configured.md)); Hermes now follows upstream releases ([ADR-0033](../../../docs/adr/0033-vanilla-hermes-git-checkout-updated-separately.md)), so re-check names against a new release. `php tests/run.php` enforces the unit rules.
 
 ## Where things go
 
@@ -26,7 +26,7 @@ pikkumies/tools/torrent-clients/rtorrent/
   rtorrent.php   the tool: php rtorrent.php <verb> [arguments] [--human]
 ```
 
-**Categories can nest** (ADR-0055). A category may be split into subcategories, such as `tools/email/imap/<tool>/`; any directory below `tools/<category>/` that has no `skill.md` is a category, named by its path (`email/imap`). A category's `README.md` and `DOCTRINE.md` (rules for the agent, loaded into SOUL.md under that path while one of its units is on) sit in its own directory. `lib/` holds shared code and is never read for units, and a unit never holds another unit. The skill name is still unique across the whole tree.
+**Categories can nest** ([ADR-0055](../../../docs/adr/0055-recursive-discovery.md)). A category may be split into subcategories, such as `tools/email/imap/<tool>/`; any directory below `tools/<category>/` that has no `skill.md` is a category, named by its path (`email/imap`). A category's `README.md` and `DOCTRINE.md` (rules for the agent, loaded into SOUL.md under that path while one of its units is on) sit in its own directory. `lib/` holds shared code and is never read for units, and a unit never holds another unit. The skill name is still unique across the whole tree.
 
 **skill.md**: frontmatter with exactly `name` (equal to the directory) and `description`, then plain steps.
 
@@ -42,14 +42,14 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 - The generated skill adds the verbs table, the command line and the path of USAGE.md; do not repeat them in the body.
 - Name exact steps: what to read before changing anything, which verb to use, how to verify it worked.
 
-**USAGE.md**: the first table with the header `| verb | arguments | changes | what it does |` lists every verb. The contract test checks that it matches the verbs the tool answers to, in both directions. Write a literal `|` inside a cell as `\|`. In `changes` write `no` for read-only verbs, `yes` for changes, `deletes` for verbs that remove data, `loads` for verbs that put load on the shared server (the guard asks first), and `sends` for verbs whose data leaves the machine (a hook asks first: feedback-send for /feedback, ADR-0056; the mail guard for email, ADR-0053). Examples follow the table.
+**USAGE.md**: the first table with the header `| verb | arguments | changes | what it does |` lists every verb. The contract test checks that it matches the verbs the tool answers to, in both directions. Write a literal `|` inside a cell as `\|`. In `changes` write `no` for read-only verbs, `yes` for changes, `deletes` for verbs that remove data, `loads` for verbs that put load on the shared server (the guard asks first), and `sends` for verbs whose data leaves the machine (a hook asks first: feedback-send for /feedback, [ADR-0056](../../../docs/adr/0056-feedback-what-pikkumies-sends-to-pulsed-media.md); the mail guard for email, [ADR-0053](../../../docs/adr/0053-email-category.md)). Examples follow the table.
 
 **The tool**: one PHP script (PHP 7.3, no Composer, no Python) that ends with `Cli::run($argv, ['verb' => function ($args, $opt) { ... }], $usage)`.
 
-- Output is JSON Lines by default, the last line `{"ok":true}` or `{"ok":false,"error":...,"hint":...}`, with raw units (ADR-0016); `--human` prints the same records for people (ADR-0017). Return records; never print secrets (Cli drops secret-named fields anyway).
+- Output is JSON Lines by default, the last line `{"ok":true}` or `{"ok":false,"error":...,"hint":...}`, with raw units ([ADR-0016](../../../docs/adr/0016-jsonl-is-the-default-output.md)); `--human` prints the same records for people ([ADR-0017](../../../docs/adr/0017-human-output-option.md)). Return records; never print secrets (Cli drops secret-named fields anyway).
 - Throw `CliError($what, $hint)` for a failure the user can act on.
-- HTTP goes through `lib/Http.php`, which refuses a 127.0.0.1 port another account owns (ADR-0019). Read credentials from the user's own app config; never weaken an app's login.
-- A verb that deletes data takes `--with-data`, or is named `prune`, `forget` or `purge`, so the delete guard asks the user first (ADR-0020).
+- HTTP goes through `lib/Http.php`, which refuses a 127.0.0.1 port another account owns ([ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md)). Read credentials from the user's own app config; never weaken an app's login.
+- A verb that deletes data takes `--with-data`, or is named `prune`, `forget` or `purge`, so the delete guard asks the user first ([ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)).
 - Write verbs read the state back and report `"verified"` in the status line.
 - Tools of one category use the same verb names and record fields, listed in `tools/<category>/README.md`.
 
@@ -57,7 +57,7 @@ description: Control rTorrent: list, inspect, add, remove, pause torrents, stats
 
 ## Hook
 
-Every hook is one directory, laid out like a tool unit (ADR-0030). Hermes runs one entry per event, `hooks/orchestrator.php <event>`; it runs the units of that event in name order, each with its own timeout, and merges their answers the way Hermes merges hooks. Install, update and every run list the units in `hooks/INDEX.md` (generated, never tracked).
+Every hook is one directory, laid out like a tool unit ([ADR-0030](../../../docs/adr/0030-hooks-as-units-run-by-one-orchestrator.md)). Hermes runs one entry per event, `hooks/orchestrator.php <event>`; it runs the units of that event in name order, each with its own timeout, and merges their answers the way Hermes merges hooks. Install, update and every run list the units in `hooks/INDEX.md` (generated, never tracked).
 
 ```text
 pikkumies/hooks/guard/guard-destructive/
@@ -98,3 +98,4 @@ timeout: 10
 
 - `php tests/run.php` passes.
 - A significant change in behaviour, interface, security or workflow ships with an ADR in `docs/adr/`.
+- Link the first mention of a local ADR in each markdown file, relative to that file: `[ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)`. The link test fails on an unlinked mention and prints the exact link; another project's ADR is linked to that project, an example goes in backticks, and the four core doctrine files keep plain text because they are copied into SOUL.md ([ADR-0060](../../../docs/adr/0060-links-and-the-link-graph.md)).

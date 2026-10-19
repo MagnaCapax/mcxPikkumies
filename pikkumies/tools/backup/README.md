@@ -1,6 +1,6 @@
 # backup
 
-Tools for snapshot backups in the user's own repository: `restic` and `borg`, one unit each (ADR-0015). Both have the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the table below.
+Tools for snapshot backups in the user's own repository: `restic` and `borg`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Both have the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the table below.
 
 ## Verbs (the same in every unit)
 
@@ -33,7 +33,7 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 ## Removing snapshots
 
 1. `show --prune-plan --keep-daily 7 --keep-weekly 4` lists the snapshots that would go and the `expect` value. It changes nothing (it runs `restic forget --dry-run` or `borg prune --dry-run`).
-2. `prune --keep-daily 7 --keep-weekly 4 --expect <n>` rebuilds the plan, refuses when the count differs, and removes exactly the planned snapshots by id (restic `forget <ids>` then `prune`; borg `delete :: <names>` then `compact` on 1.2+). The delete guard asks the user once for the whole batch (`prune` after `php`, ADR-0020).
+2. `prune --keep-daily 7 --keep-weekly 4 --expect <n>` rebuilds the plan, refuses when the count differs, and removes exactly the planned snapshots by id (restic `forget <ids>` then `prune`; borg `delete :: <names>` then `compact` on 1.2+). The delete guard asks the user once for the whole batch (`prune` after `php`, [ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)).
 3. The records name what was removed; `verified` says none of them is listed any more.
 
 ## Restoring
@@ -42,7 +42,7 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 
 ## Passwords and repositories
 
-- The password is typed once at a terminal (`login`, ADR-0019) and handed to the program as a file: restic `RESTIC_PASSWORD_FILE`, borg `BORG_PASSCOMMAND` = `cat <file>`. It is never printed, logged or put on a command line, and the delete guard blocks the agent from reading `local/secrets/`.
+- The password is typed once at a terminal (`login`, [ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md)) and handed to the program as a file: restic `RESTIC_PASSWORD_FILE`, borg `BORG_PASSCOMMAND` = `cat <file>`. It is never printed, logged or put on a command line, and the delete guard blocks the agent from reading `local/secrets/`.
 - Repositories that also need cloud keys (S3, B2) read them from the user's environment as the program documents; this tool does not store them.
 - restic and borg keep a local cache (`~/.cache/restic`, `~/.cache/borg`) that can grow to gigabytes and counts against the account's quota; a backup or check that fails with "disk quota exceeded" on a full account is often this. The tools never delete it. Sources: restic `internal/cache/dir.go:22` (0.11.0, under the user cache directory), `cmd_cache.go:47` (`restic cache --cleanup` removes old cache directories); borg `delete --cache-only` (`archiver.py:1293`, 1.2.4) drops its cache, which borg rebuilds. Both are the user's commands.
 - restic trims spaces around a password it reads from a file (`cmd/restic/global.go:301`, `strings.TrimSpace`, 0.11.0). [UNVERIFIED] whether a password with leading or trailing spaces typed at `restic init` is trimmed the same way; if not, it would not match.

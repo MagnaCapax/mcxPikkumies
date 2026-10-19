@@ -1,6 +1,6 @@
 # wiki
 
-Search and list the provider's wiki, downloaded to this machine (ADR-0037). The sources are this host's `kind: wiki` sources in `config/documentationSources.md` (on Pulsed Media: `pm-wiki`). Search words never leave the machine.
+Search and list the provider's wiki, downloaded to this machine ([ADR-0037](../../../../docs/adr/0037-wiki-and-kb-tool-units.md)). The sources are this host's `kind: wiki` sources in `config/documentationSources.md` (on Pulsed Media: `pm-wiki`). Search words never leave the machine.
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Adds the hook unit `guard/fileops-check` (ADR-0030) next to the delete guard (ADR-0020), which is unchanged.
+- Status: Accepted. Adds the hook unit `guard/fileops-check` ([ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md)) next to the delete guard ([ADR-0020](0020-deletes-need-the-users-approval.md)), which is unchanged.
 
 ## Context
 The operator's request of 2026-10-18, verbatim: "Do we have for all shell command safety check which flags to the agent for double confirm whenever potentially desctrutive commands detected? if not ... quite light weight and modularized gate. Before fileops we should store a gzipped useraccount file list with permissions, extended attributes etc. just in case we fsck something up, so we can double check. for example permission changes, renames etc. but lightweight, just a quick text list."
@@ -39,5 +39,5 @@ What was found:
 - Tests: `tests/FileopsCheckTest.php` (block once and the 10-minute pass, the ask tier ignoring a marker, silent cases, the list name from a hostile tool call id, lstat and the home boundary, the walk cap, the glob cap, unwritable marker, disabled, relative paths), mutation checked.
 
 ## References
-- ADR-0020 (delete guard, approve and `rule_key`), ADR-0030 (hook units, orchestrator, merge order), ADR-0032 (`sessions.retentionDays`), ADR-0044 (command log)
+- ADR-0020 (delete guard, approve and `rule_key`), ADR-0030 (hook units, orchestrator, merge order), [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) (`sessions.retentionDays`), [ADR-0044](0044-every-shell-command-is-logged.md) (command log)
 - Hermes v2026.9.24: `model_tools.py`, `agent/shell_hooks.py`, `agent/message_sanitization.py`, `tools/terminal_tool.py`

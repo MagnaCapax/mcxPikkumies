@@ -1,6 +1,6 @@
 # media
 
-Tools for one media file at a time, on the user's own request: `ffmpeg` (inspect and convert) and `transcribe` (speech to text, cloud first with a local fallback). Both are for a single file; a whole library belongs to the media server (Jellyfin/Plex, `tools/media-servers/`) instead, which already watches a library and transcodes on demand. ADR-0045.
+Tools for one media file at a time, on the user's own request: `ffmpeg` (inspect and convert) and `transcribe` (speech to text, cloud first with a local fallback). Both are for a single file; a whole library belongs to the media server (Jellyfin/Plex, `tools/media-servers/`) instead, which already watches a library and transcodes on demand. [ADR-0045](../../../docs/adr/0045-media-tools-ffmpeg-and-transcription.md).
 
 The two units share `lib/Ffmpeg.php`: finding ffmpeg/ffprobe, probing a file, and running the fixed conversion presets. They use no other verbs or record fields in common, so this category has no verb table (the same reasoning as `tools/storage/README.md`); each unit's USAGE.md lists its own.
 

@@ -7,7 +7,7 @@ Controls the user's own Emby server: status, libraries and scans, who is watchin
 1. **`--url http://127.0.0.1:<port>`** (loopback only; `/emby` is added when missing).
 2. **A container on the user's own rootless Docker**: only a socket the user owns: a `unix://` `DOCKER_HOST`, else `/run/user/<uid>/docker.sock` (PMSS `docs/docker-help.md:17`), the same rule as the *ARR units (`lib/Host.php` `dockerSocket`); `tcp://` and a root or other account's daemon are never used, a running container whose image is `emby` or `embyserver` (`lscr.io/linuxserver/emby` as in PMSS's recipe, `docs/linuxserver.io.md:366-381`, or the official `emby/embyserver`), at the host port it publishes for 8096 (the recipe uses `-p 8097:8096`, which publishes on every interface; `stats` shows that as `listen: 0.0.0.0:8097`).
 
-Every request goes only to a listener this user's uid owns (ADR-0019).
+Every request goes only to a listener this user's uid owns ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md)).
 
 ## Credentials
 

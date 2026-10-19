@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Superseded by ADR-0033 (vanilla Hermes as a git checkout in pikkumies/hermes, updated separately). It had superseded the install method and the 0.19.0 pin of ADR-0008.
+- Status: Superseded by [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) (vanilla Hermes as a git checkout in pikkumies/hermes, updated separately). It had superseded the install method and the 0.19.0 pin of [ADR-0008](0008-hermes-version-pinned.md).
 
 ## Context
 ADR-0008 pinned Hermes 0.19.0 from PyPI. That channel is a dead end:
@@ -38,5 +38,5 @@ ADR-0008 pinned Hermes 0.19.0 from PyPI. That channel is a dead end:
 In a throwaway HOME with `HERMES_HOME` pointing into it (never the real one): `pikkumies install` or `update` until `local/install.log` says ready; `pikkumies doctor`; `pikkumies run skills list` (all skills, disabled ones marked); `pikkumies run hooks test pre_tool_call --for-tool terminal` with a destructive command (blocked); one request against a local OpenAI-compatible stub that checks the key arrives.
 
 ## References
-- ADR-0005, ADR-0007, ADR-0008; issue #1
+- [ADR-0005](0005-hermes-wiring-verified-against-source.md), [ADR-0007](0007-customising-shipped-skills.md), ADR-0008; issue #1
 - Hermes v2026.9.24 source: `pyproject.toml`, `setup.py`, `hermes_cli/update_cmd.py`, `scripts/install.sh`, `hermes_cli/config_defaults.py`

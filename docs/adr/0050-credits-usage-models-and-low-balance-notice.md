@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Extends the credits tool unit (ADR-0040); adds one `pre_llm_call` hook unit (ADR-0030).
+- Status: Accepted. Extends the credits tool unit ([ADR-0040](0040-credits-line.md)); adds one `pre_llm_call` hook unit ([ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md)).
 
 ## Context
 The operator's request of 2026-10-18, verbatim except for the bracketed paraphrase: "virsilipas tooling, doctrine etc. for what functions there could be, [including server-side extras], and wire the statusline to use that tooling etc. as well." Server-side extras are a separate project and are not part of this ADR.
@@ -40,5 +40,5 @@ What was found:
 - The platform's own server-side tools are a separate project and not part of this change.
 
 ## References
-- ADR-0015 (tool units), ADR-0030 (hook units), ADR-0040 (the credits line, its cache and the statusline), ADR-0041 (a once-only `pre_llm_call` reminder, the pattern this hook follows).
+- [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units), ADR-0030 (hook units), ADR-0040 (the credits line, its cache and the statusline), [ADR-0041](0041-memory-metrics-save-reminder-and-wide-search.md) (a once-only `pre_llm_call` reminder, the pattern this hook follows).
 - `pikkumies/tools/system/credits/` (`CreditsUsage.php`, `CreditsFormat.php`, `CreditsLine.php`), `pikkumies/hooks/system/low-balance/`, `tests/CreditsUsageTest.php`, `tests/LowBalanceHookTest.php`.

@@ -12,6 +12,8 @@
  * Every file is written to a temporary name and renamed: a full disk leaves the old file, never an
  * empty config without the safety hooks.
  */
+require_once __DIR__ . '/Links.php';
+
 class HermesConfig
 {
     public static function home()
@@ -178,9 +180,9 @@ class HermesConfig
      * SOUL.md: what this machine allows, the static doctrine (soul, then the name line when the user
      * named the agent, ADR-0032; voice, doctrine, safety), then "## Tool doctrine" with the DOCTRINE.md
      * of every enabled tool category (ADR-0029). $toolDoctrine false gives the core alone, whose
-     * budget is 8000 bytes.
+     * budget is 8000 bytes. $toolsDir: a test tree instead of the shipped tools (as Units::doctrines).
      */
-    public static function renderSoul(array $profile, array $config, $toolDoctrine = true)
+    public static function renderSoul(array $profile, array $config, $toolDoctrine = true, $toolsDir = null)
     {
         $parts = [self::capabilities($profile, $config)];
         foreach (['soul', 'voice', 'doctrine', 'safety'] as $f) {
@@ -189,7 +191,7 @@ class HermesConfig
                 $parts[] = trim((string) file_get_contents($p)) . ($f === 'soul' ? self::nameLine($config) : '');
             }
         }
-        $rules = $toolDoctrine ? Units::doctrines(Generate::disabledCategories($config)) : [];
+        $rules = $toolDoctrine ? Units::doctrines(Generate::disabledCategories($config), $toolsDir) : [];
         if ($rules) {
             $section = "## Tool doctrine\n\nRules for each tool category; follow them whenever you use its tools.";
             foreach ($rules as $category => $text) {
@@ -197,7 +199,8 @@ class HermesConfig
             }
             $parts[] = $section;
         }
-        return implode("\n\n---\n\n", $parts) . "\n";
+        // ADR links in the doctrine are relative to the repository; in SOUL.md (in HERMES_HOME) they point nowhere (ADR-0060).
+        return Links::stripAdrLinks(implode("\n\n---\n\n", $parts)) . "\n";
     }
 
     /** "\n\nYour name is ..." when the user named the agent something other than Pikkumies, else ''. */

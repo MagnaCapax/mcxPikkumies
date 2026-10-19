@@ -8,17 +8,17 @@
 ## Context
 The operator's request of 2026-10-18: "We should probably have feedback API option ... Basicly integrated with pikkumies, so people can /feedback and that sends us crucial information + transcript and we store it for later analysis ... private secure storage, only for us", and on the place: "should we do it separately a pikkumies.mcx.fi domain for functions like this? I think we will regardless need to create one so we can upsell power functionality".
 
-AGENTS.md says Pikkumies "never sends anything off the machine that the user did not ask it to". ADR-0032 keeps `privacy.telemetry` a setting with no sender and says a sender needs its own ADR. This is that ADR, for feedback only.
+AGENTS.md says Pikkumies "never sends anything off the machine that the user did not ask it to". [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) keeps `privacy.telemetry` a setting with no sender and says a sender needs its own ADR. This is that ADR, for feedback only.
 
 Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - Hermes' built-in `/debug` uploads system information and log tails to a public paste service. Typed in the terminal it passes `yes=True` and asks nothing (`hermes_cli/cli_commands_mixin.py`, `_handle_debug_command`); from a chat platform it uploads first and shows the privacy notice with the links (`gateway/slash_commands.py`, `_handle_debug_command`). Only `hermes debug share` on a terminal asks y/N (`hermes_cli/debug.py`, `_confirm_upload`). `/debug local` uploads nothing.
-- A tool unit is a skill the model runs (ADR-0015), so a y/N inside the tool, or a `--yes`, is answered by the model. Hermes' human-approval gate is not (ADR-0020): a `pre_tool_call` hook answering `approve` makes Hermes ask the user, the model cannot answer, and unattended runs are refused unless approvals are turned off (ADR-0020).
+- A tool unit is a skill the model runs ([ADR-0015](0015-tool-units-one-skill-per-tool.md)), so a y/N inside the tool, or a `--yes`, is answered by the model. Hermes' human-approval gate is not ([ADR-0020](0020-deletes-need-the-users-approval.md)): a `pre_tool_call` hook answering `approve` makes Hermes ask the user, the model cannot answer, and unattended runs are refused unless approvals are turned off (ADR-0020).
 - `hermes sessions export <dir> --format md --session-id <id> --redact --lineage logical` writes one session, compacted turns included, with secrets removed from the messages (`hermes_cli/sessions_cmd.py`, `redact_session_data`). Its redaction leaves a bare `vsk-` key in prose untouched.
 - Hermes sets `HERMES_SESSION_ID` in the environment of every command it runs (`gateway/session_context.py`).
 
 ## Options Considered
 - **Point users at Hermes `/debug`.** Public, and a typed `/debug` asks nothing. Rejected for anything private.
-- **Disable or wrap Hermes `/debug`.** Hermes stays vanilla (ADR-0033) and has no setting that removes a built-in command. Rejected; the feedback skill and README say `/debug` is public and point to `/feedback` or `/debug local`.
+- **Disable or wrap Hermes `/debug`.** Hermes stays vanilla ([ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md)) and has no setting that removes a built-in command. Rejected; the feedback skill and README say `/debug` is public and point to `/feedback` or `/debug local`.
 - **A y/N in the tool before sending.** The model can answer it, and text the agent reads (a torrent name, a file) can steer it. Rejected.
 - **Open a support ticket with the transcript.** Puts the transcript in the general ticket queue and needs billing credentials where the feedback arrives. Rejected.
 - **Send in the clear over HTTPS and encrypt on the server.** The plaintext would pass through the receiving server's memory. Rejected: the client seals it.
@@ -43,6 +43,6 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - Feedback needs a Pulsed Media AI key and PHP with sodium; without either, the draft is kept and the tool says why.
 
 ## References
-- ADR-0015 (tool units), ADR-0020 (approval gate), ADR-0030 (hook units), ADR-0032 (telemetry setting), ADR-0033 (vanilla Hermes), ADR-0044 (command log)
+- ADR-0015 (tool units), ADR-0020 (approval gate), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (hook units), ADR-0032 (telemetry setting), ADR-0033 (vanilla Hermes), [ADR-0044](0044-every-shell-command-is-logged.md) (command log)
 - Code: `pikkumies/tools/system/feedback/`, `pikkumies/hooks/guard/feedback-send/`, `pikkumies/lib/Redact.php`, `pikkumies/config/feedback-public-key.txt`
 - Tests: `tests/FeedbackTest.php`, `tests/GuardUsageContractTest.php`, `tests/CommandLogTest.php`

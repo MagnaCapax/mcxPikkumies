@@ -1,6 +1,6 @@
 # smtp
 
-Sends mail as the user through their own relay, TLS only: port 465, or 587 with STARTTLS required (ADR-0053). Shared rules: `tools/email/README.md`.
+Sends mail as the user through their own relay, TLS only: port 465, or 587 with STARTTLS required ([ADR-0053](../../../../docs/adr/0053-email-category.md)). Shared rules: `tools/email/README.md`.
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

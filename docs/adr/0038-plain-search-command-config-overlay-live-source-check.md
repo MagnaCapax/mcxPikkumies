@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Amends ADR-0011 and ADR-0031 (how the gate recognises a search) and adds a setting surface beside `local/config.php`.
+- Status: Accepted. Amends [ADR-0011](0011-documentation-sources-and-search-first.md) and [ADR-0031](0031-search-tiers.md) (how the gate recognises a search) and adds a setting surface beside `local/config.php`.
 
 ## Context
 The request of 2026-10-18: "that memory search and then the search from known sources is being enforced and it is fully functional, test each provider sources, ask questions etc." and "you need to [plan] the testing so that provider and other configs can be forced, both sometimes automation might get it wrong but also for testing suite."
@@ -17,7 +17,7 @@ What was found:
 - **Gate:** have the search write the gate marker itself instead of the hook recognising the command. The search does not know the Hermes session id, so it cannot write that session's marker. Rejected.
 - **Gate:** recognise only one plain call of the tool. Chosen.
 - **Forcing:** one environment variable per setting (`PIKKUMIES_MODEL`, `PIKKUMIES_LIGHT_MODEL`, …). Each new setting would need a new variable and code. Rejected.
-- **Forcing:** command-line flags on `pikkumies`. Free text after `pikkumies` is a prompt (ADR-0022), so flags would collide with prompts, and hooks and tools run without them. Rejected.
+- **Forcing:** command-line flags on `pikkumies`. Free text after `pikkumies` is a prompt ([ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md)), so flags would collide with prompts, and hooks and tools run without them. Rejected.
 - **Forcing:** one overlay file named by `PIKKUMIES_CONFIG`, merged over `local/config.php` by `Config::load`. Every reader of the settings (Hermes config generation, hooks, tools, host detection) already goes through `Config::load`, so one change covers all of them. Chosen.
 - **Live check:** a new production command that bypasses the scope. The overlay can already force the host family, after which the existing `refresh` downloads that family's sources. Rejected in favour of a test script.
 

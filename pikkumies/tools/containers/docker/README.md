@@ -1,6 +1,6 @@
 # docker
 
-Manages the user's own Docker daemon and its containers: engine facts and space used, listing with who can reach each published port, a container's settings and logs, start, stop, restart, removing containers and unused images with a preview, diagnosing a daemon that does not answer or a container that keeps failing, and launching one or more containers after checking that this account can run them. It runs the `docker` CLI as the user, never as root for another account, and never through a shell string. The rules for the agent are in `../DOCTRINE.md`, with their reasons in `../README.md`; the decision record is ADR-0034.
+Manages the user's own Docker daemon and its containers: engine facts and space used, listing with who can reach each published port, a container's settings and logs, start, stop, restart, removing containers and unused images with a preview, diagnosing a daemon that does not answer or a container that keeps failing, and launching one or more containers after checking that this account can run them. It runs the `docker` CLI as the user, never as root for another account, and never through a shell string. The rules for the agent are in `../DOCTRINE.md`, with their reasons in `../README.md`; the decision record is [ADR-0034](../../../../docs/adr/0034-containers-category.md).
 
 ## Where the daemon is found
 

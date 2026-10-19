@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Superseded by ADR-0015 (tool units replace packs). Earlier superseded in part by ADR-0006.
+- Status: Superseded by [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units replace packs). Earlier superseded in part by [ADR-0006](0006-every-pack-always-loaded.md).
 
 ## Context
 Different machines need different skills and tools. A seedbox needs app know-how; a server with root needs administration skills. Bundles should install automatically based on what the machine looks like, and stay easy to add.
@@ -22,7 +22,7 @@ Different machines need different skills and tools. A seedbox needs app know-how
 
 ## Consequences
 - Adding a pack is adding a directory and a manifest.
-- The `root` pack enables only when the OS grants root and the user has not turned it off (ADR-0004).
+- The `root` pack enables only when the OS grants root and the user has not turned it off ([ADR-0004](0004-provider-key-and-root-detection.md)).
 
 ## References
-- ADR-0001
+- [ADR-0001](0001-layout-install-and-update.md)

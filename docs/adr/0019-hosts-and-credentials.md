@@ -34,7 +34,7 @@ Facts this rests on, checked 2026-10-14:
 - The user enters the qBittorrent password once per machine.
 
 ## References
-- ADR-0004 (provider key and root detection), ADR-0015, ADR-0020
+- [ADR-0004](0004-provider-key-and-root-detection.md) (provider key and root detection), [ADR-0015](0015-tool-units-one-skill-per-tool.md), [ADR-0020](0020-deletes-need-the-users-approval.md)
 
 ## Addendum 2026-10-14: Jackett's API key goes in the URL
 - Context: every other tool sends an app's API key in a request header. Jackett accepts its key only as the `apikey` (or `passkey`) query parameter of its Torznab and results routes (Jackett `src/Jackett.Server/Controllers/ResultsController.cs:33-49` at commit `6fdd78f6`); there is no header option, and its admin API needs a browser login cookie instead (`Startup.cs:51-58,83-86`).

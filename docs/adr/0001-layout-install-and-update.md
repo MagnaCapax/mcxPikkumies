@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. The "local skill with the same name" override is superseded by ADR-0007; where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by ADR-0033; `packs/` in the layout by ADR-0015 (tool units under `pikkumies/tools/<category>/<tool>/`); "Release tags and channels come later" by ADR-0057 (update and a first install follow the newest release by default, a git branch when asked).
+- Status: Accepted. The "local skill with the same name" override is superseded by [ADR-0007](0007-customising-shipped-skills.md); where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md); `packs/` in the layout by [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units under `pikkumies/tools/<category>/<tool>/`); "Release tags and channels come later" by [ADR-0057](0057-release-channel.md) (update and a first install follow the newest release by default, a git branch when asked).
 
 ## Context
 Pikkumies runs on the machine it manages, as the user. It must be quick to install and easy to update from git. Updates must never overwrite what the user or the agent changed locally. The repository also holds developer material (docs, tests, CI) that the runtime does not need.
@@ -26,8 +26,8 @@ Pikkumies runs on the machine it manages, as the user. It must be quick to insta
 
 ## Consequences
 - An update cannot destroy local work: it either fast-forwards cleanly or changes nothing and says why.
-- Users override a shipped skill by creating a local skill with the same name (Hermes precedence, ADR-0003), not by editing tracked files.
+- Users override a shipped skill by creating a local skill with the same name (Hermes precedence, [ADR-0003](0003-hermes-integration.md)), not by editing tracked files.
 - `~/pikkumies` is a symlink. To remove Pikkumies, run `rm -rf ~/.mcxPikkumies ~/pikkumies`.
 
 ## References
-- ADR-0002 (packs), ADR-0003 (Hermes integration), ADR-0004 (provider key and detection)
+- [ADR-0002](0002-packs.md) (packs), ADR-0003 (Hermes integration), [ADR-0004](0004-provider-key-and-root-detection.md) (provider key and detection)

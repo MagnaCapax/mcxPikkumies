@@ -17,8 +17,8 @@ Facts checked this session:
 - Proxy-style and some self-hosted OpenAI-compatible endpoints refuse audio/multipart bodies or cap upload size well under typical provider limits; run therefore treats any non-2xx or network failure as "try the next thing" (local fallback), not a hard stop, and splits a large upload into about 150 second pieces first.
 
 ## Options Considered
-- Extend Hermes itself with a transcription tool. Rejected: Hermes is kept vanilla (ADR-0033); its own gateway-shaped transcription is not this tool's job, and a Pikkumies unit is provider-agnostic by construction (AGENTS.md) in a way a Hermes-side change would not be.
-- Copy an existing transcription wrapper from elsewhere wholesale. Rejected by the operator's own words ("not direct copy ... separateley built"): this tool is built from the ground up against this repo's own conventions (ADR-0015, ADR-0019), sharing only pikkumies/lib/ and pikkumies/lib/ToolProc.php's pattern, never another project's code.
+- Extend Hermes itself with a transcription tool. Rejected: Hermes is kept vanilla ([ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md)); its own gateway-shaped transcription is not this tool's job, and a Pikkumies unit is provider-agnostic by construction (AGENTS.md) in a way a Hermes-side change would not be.
+- Copy an existing transcription wrapper from elsewhere wholesale. Rejected by the operator's own words ("not direct copy ... separateley built"): this tool is built from the ground up against this repo's own conventions ([ADR-0015](0015-tool-units-one-skill-per-tool.md), [ADR-0019](0019-hosts-and-credentials.md)), sharing only pikkumies/lib/ and pikkumies/lib/ToolProc.php's pattern, never another project's code.
 - Cloud-only transcription. Simpler, but leaves the user stranded with no key stored or a dead endpoint; rejected per the operator's explicit fallback request.
 - Local-only (whisper.cpp always). No cloud dependency, but slower and needs a build step on every account that wants it; rejected per the operator's explicit "option to use ... API ... and then fallback" ordering (cloud first).
 - Cloud first, local whisper.cpp fallback, built and verified by this account only when asked (chosen).
@@ -54,7 +54,7 @@ Facts checked this session:
 - No argv-array proc_open on PHP 7.3. Every subprocess argv is built as a PHP array and escaped word by word by ToolProc::line() before being handed to proc_open's single string form, the same pattern every other category already uses.
 
 ## References
-- ADR-0015 (tool units), ADR-0019 (hosts and credentials, the SecretFile/login pattern, Http's local-listener check), ADR-0033 (vanilla Hermes), ADR-0044 (command logging -- it logs the shell commands the agent itself runs (its terminal tool calls), so the agent's call of a media verb is logged, but not the ffmpeg/curl/cmake/whisper-cli subprocesses the verb starts; no new logging added here)
+- ADR-0015 (tool units), ADR-0019 (hosts and credentials, the SecretFile/login pattern, Http's local-listener check), ADR-0033 (vanilla Hermes), [ADR-0044](0044-every-shell-command-is-logged.md) (command logging -- it logs the shell commands the agent itself runs (its terminal tool calls), so the agent's call of a media verb is logged, but not the ffmpeg/curl/cmake/whisper-cli subprocesses the verb starts; no new logging added here)
 - tools/storage/README.md (the lib/ promotion plan this ADR fulfils), tools/arr/autobrr/README.md (the login/secret pattern transcribe login follows)
 - whisper.cpp ggml-org/whisper.cpp at tag v1.9.5 (examples/cli/CMakeLists.txt names the target whisper-cli; root CMakeLists.txt requires cmake >= 3.5 and sets CMAKE_RUNTIME_OUTPUT_DIRECTORY to <build>/bin)
 - PMSS scripts/lib/update/dpkg/selections-debian11.txt, selections-debian12.txt (ffmpeg ships by default)

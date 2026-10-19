@@ -3,10 +3,10 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. The install method (PyPI) and the 0.19.0 pin are superseded by ADR-0009.
+- Status: Accepted. The install method (PyPI) and the 0.19.0 pin are superseded by [ADR-0009](0009-hermes-from-a-pinned-release-tarball.md).
 
 ## Context
-The generated Hermes config, the hook output contract and the skill rules were verified against the source of Hermes Agent 0.19.0 (ADR-0005, ADR-0007). The installer asked pip for `latest`.
+The generated Hermes config, the hook output contract and the skill rules were verified against the source of Hermes Agent 0.19.0 ([ADR-0005](0005-hermes-wiring-verified-against-source.md), [ADR-0007](0007-customising-shipped-skills.md)). The installer asked pip for `latest`.
 
 Two facts, checked on 2026-10-04:
 - `latest` on PyPI already is 0.19.0, uploaded 2026-07-20. Hermes's own code lists pip as an unsupported install method (`hermes_cli/config.py`, `_UNSUPPORTED_INSTALL_METHODS`), and the project has published 14 releases on GitHub since then (v2026.7.30 to v2026.9.24).
@@ -28,5 +28,5 @@ Two facts, checked on 2026-10-04:
 - 0.19.0 lacks the fixes in the 14 later releases. Moving the install off PyPI to a pinned release tag, having `update` reconcile the installed version with the pin, and closing the `hermes update` pass-through are tracked in issue #1.
 
 ## References
-- ADR-0003, ADR-0005, ADR-0007
+- [ADR-0003](0003-hermes-integration.md), ADR-0005, ADR-0007
 - PyPI `hermes-agent` JSON API; GitHub releases of the Hermes Agent project (both read 2026-10-04)

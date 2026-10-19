@@ -1,8 +1,8 @@
 # storage
 
-Tools for the space the user has and where their files go: `storage` (disk space and quota) and `rclone` (cloud and SFTP remotes, transfers, mounts). The two share no verbs, so this category has no verb table and no shared contract (ADR-0015); each unit's USAGE.md lists its own. Snapshot backups (restic, borg) are the `backup` category.
+Tools for the space the user has and where their files go: `storage` (disk space and quota) and `rclone` (cloud and SFTP remotes, transfers, mounts). The two share no verbs, so this category has no verb table and no shared contract ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)); each unit's USAGE.md lists its own. Snapshot backups (restic, borg) are the `backup` category.
 
-`lib/` holds what both units, and the backup units, use: the error text and listing size taken from a program's output (`ToolText.php`, `ToolList.php`). Running a program from PATH with a quoted argv and reading its output line by line (`ToolProc.php`) and deciding which paths a verb may touch (`HomePath.php`) moved to `pikkumies/lib/` once a third category (media, ADR-0045) needed them.
+`lib/` holds what both units, and the backup units, use: the error text and listing size taken from a program's output (`ToolText.php`, `ToolList.php`). Running a program from PATH with a quoted argv and reading its output line by line (`ToolProc.php`) and deciding which paths a verb may touch (`HomePath.php`) moved to `pikkumies/lib/` once a third category (media, [ADR-0045](../../../docs/adr/0045-media-tools-ffmpeg-and-transcription.md)) needed them.
 
 ## Safety rules (in the code and in the skills)
 

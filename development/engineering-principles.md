@@ -90,7 +90,7 @@ Most of the value is in steps 1 and 2. The best part is no part.
 
 **Taught by:**
 - PMSS serves accounts that are many years old on servers of several Debian generations. Its rules say outright that old users must not break.
-- Pikkumies kept older Debian releases working by installing a standalone runtime where the system's one is too old, instead of dropping them (ADR-0014).
+- Pikkumies kept older Debian releases working by installing a standalone runtime where the system's one is too old, instead of dropping them ([ADR-0014](../docs/adr/0014-standalone-python-when-the-system-one-is-too-old.md)).
 
 ## 8. Tests that can fail
 

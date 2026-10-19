@@ -1,6 +1,6 @@
 # save-reminder
 
-Runs before each turn (`pre_llm_call`) and may add one line to the user's message (ADR-0041).
+Runs before each turn (`pre_llm_call`) and may add one line to the user's message ([ADR-0041](../../../../docs/adr/0041-memory-metrics-save-reminder-and-wide-search.md)).
 
 When the newest memory search found no lesson (tier 1 had no hit), nothing in `memory/` was saved or appended after it, and it is under 2 hours old, the agent is told: the last search found no lesson; if that task is solved, save what you learned, or what did not settle it, with the exact `save` command.
 

@@ -1,6 +1,6 @@
 # imap
 
-The user's own IMAP mailbox over TLS, port 993 (ADR-0053). Shared rules: `tools/email/README.md`.
+The user's own IMAP mailbox over TLS, port 993 ([ADR-0053](../../../../docs/adr/0053-email-category.md)). Shared rules: `tools/email/README.md`.
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

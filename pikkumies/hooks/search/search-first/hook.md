@@ -5,4 +5,4 @@ description: Tells the agent to search lessons and documentation first and lists
 failClosed: false
 timeout: 10
 ---
-First turn: the search instruction plus matching titles. Later turns: only for a new question, which also re-arms `search-first-gate`. Titles, trust and paths only, at most 1500 bytes (ADR-0011, ADR-0028).
+First turn: the search instruction plus matching titles. Later turns: only for a new question, which also re-arms `search-first-gate`. Titles, trust and paths only, at most 1500 bytes ([ADR-0011](../../../../docs/adr/0011-documentation-sources-and-search-first.md), [ADR-0028](../../../../docs/adr/0028-search-first-every-turn-and-a-light-model-for-hooks.md)).

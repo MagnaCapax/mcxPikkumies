@@ -63,6 +63,39 @@ return [
         $core = HermesConfig::renderSoul($p, Config::defaults(), false);
         check(strpos($core, '## Tool doctrine') === false && strpos($s, rtrim($core)) === 0, 'core SOUL must be the start of the full SOUL');
     },
+    'doctrine: SOUL.md and the generated SKILL.md files carry no relative .md link; an ADR link in the copied text becomes plain ADR-NNNN (ADR-0060)' => function () {
+        $relative = function ($text) {
+            return array_values(array_filter(Links::targets($text), function ($t) {
+                return $t[0] !== '/' && substr($t, -3) === '.md';
+            }));
+        };
+        Generate::$dockerPresentOverride = true;
+        try {
+            foreach (soulProfiles() as $name => $p) {
+                check($relative(HermesConfig::renderSoul($p, Config::defaults())) === [], "$name: SOUL.md has a relative link: " . json_encode($relative(HermesConfig::renderSoul($p, Config::defaults()))));
+            }
+        } finally {
+            Generate::$dockerPresentOverride = null;
+        }
+        $sources = 0;
+        foreach (Units::all() as $u) {
+            $sources += preg_match('/\[ADR-\d{4}\]\(/', $u['body'] . json_encode($u['verbs'], JSON_UNESCAPED_SLASHES));
+            check($relative(Units::renderSkill($u)) === [], "{$u['name']}: SKILL.md has a relative link: " . json_encode($relative(Units::renderSkill($u))));
+        }
+        check($sources >= 1, 'no skill.md or USAGE.md verb table links an ADR any more; this check would be vacuous');
+        $dir = testTempDir('pk-soul-adr');
+        try {
+            mkdir("$dir/cat/unit", 0700, true);
+            $keep = "- see [the guide](../guide.md) and PMSS [ADR-0026](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0026-kernel-ephemeral-port-reservation.md)\n";
+            file_put_contents("$dir/cat/DOCTRINE.md", "- a rule ([ADR-0020](../../docs/adr/0020-deletes-need-the-users-approval.md))\n" . $keep);
+            file_put_contents("$dir/cat/unit/skill.md", "---\nname: unit\ndescription: d\n---\nbody\n");
+            $s = HermesConfig::renderSoul(soulProfiles()['generic, no root'], Config::defaults(), true, $dir);
+            // Lossless: only the relative ADR link is made plain; a non-ADR link and a web ADR link stay, and the check reports the relative one.
+            check(strpos($s, "### cat\n\n- a rule (ADR-0020)\n" . $keep) !== false && $relative($s) === ['../guide.md'], 'tool doctrine links: ' . substr($s, (int) strpos($s, '### cat'), 300));
+        } finally {
+            testRmTree($dir);
+        }
+    },
     'doctrine: a disabled category keeps its DOCTRINE.md out of SOUL.md' => function () {
         $p = soulProfiles()['generic, no root'];
         $cats = array_keys(Units::doctrines());

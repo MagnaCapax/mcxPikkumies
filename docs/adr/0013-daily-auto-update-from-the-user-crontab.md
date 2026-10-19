@@ -3,10 +3,10 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-08
-- Status: Accepted. Since ADR-0033 the daily update no longer builds a newly pinned Hermes release: Hermes updates separately. Since ADR-0057 the daily update moves to the newest release (fast-forward only, never backwards), or follows a branch when `update.channel` says so.
+- Status: Accepted. Since [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) the daily update no longer builds a newly pinned Hermes release: Hermes updates separately. Since [ADR-0057](0057-release-channel.md) the daily update moves to the newest release (fast-forward only, never backwards), or follows a branch when `update.channel` says so.
 
 ## Context
-The request of 2026-10-08: "should insert auto-update cron job for the user too when pikkumies installed". Pikkumies runs as the user, without root or systemd units, and `pikkumies update` already fast-forwards safely: it stops and changes nothing when a tracked file was edited (ADR-0001), regenerates the agent config, and builds a newly pinned Hermes release in the background (ADR-0009).
+The request of 2026-10-08: "should insert auto-update cron job for the user too when pikkumies installed". Pikkumies runs as the user, without root or systemd units, and `pikkumies update` already fast-forwards safely: it stops and changes nothing when a tracked file was edited ([ADR-0001](0001-layout-install-and-update.md)), regenerates the agent config, and builds a newly pinned Hermes release in the background ([ADR-0009](0009-hermes-from-a-pinned-release-tarball.md)).
 
 ## Options Considered
 - **Platform installer writes the cron line** (for example a PMSS wrapper). Every platform would repeat the crontab handling, and in a shell wrapper that is logic, not glue.

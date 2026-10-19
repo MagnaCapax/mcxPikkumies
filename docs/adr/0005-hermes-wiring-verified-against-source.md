@@ -1,9 +1,9 @@
-# ADR-0005: Hermes wiring verified against the Hermes source (supersedes parts of ADR-0003)
+# ADR-0005: Hermes wiring verified against the Hermes source (supersedes parts of [ADR-0003](0003-hermes-integration.md))
 
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. The guard bullet ("Escalation is not available to shell hooks in this version") is superseded by ADR-0020; the skill directories by ADR-0015.
+- Status: Accepted. The guard bullet ("Escalation is not available to shell hooks in this version") is superseded by [ADR-0020](0020-deletes-need-the-users-approval.md); the skill directories by [ADR-0015](0015-tool-units-one-skill-per-tool.md).
 
 ## Context
 The first live run of Pikkumies under Hermes Agent 0.19.0 against an OpenAI-compatible endpoint found that three ADR-0003 decisions, taken from the Hermes documentation, do not match what the Hermes code does:
@@ -18,7 +18,7 @@ Two Pikkumies gaps showed up in the same run:
 5. **Late key.** `run` did not regenerate the Hermes config, so a key set after install, as the README tells users to do, never reached Hermes.
 
 ## Options Considered
-- **Inline `model.api_key` in `config.yaml`.** Works, but puts the key in a second file, against ADR-0004.
+- **Inline `model.api_key` in `config.yaml`.** Works, but puts the key in a second file, against [ADR-0004](0004-provider-key-and-root-detection.md).
 - **A named provider `providers.pikkumies` with `key_env`.** Keeps the key in `$HERMES_HOME/.env` only.
 - **Hooks:** pass `--accept-hooks` from `run`, or write `hooks_auto_accept: true`. The flag would not cover the gateway or a direct `hermes` call; the config line covers every entry point.
 - **Guard:** block, or keep escalating to human approval. Escalation is not available to shell hooks in this version.

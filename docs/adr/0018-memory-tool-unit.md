@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Supersedes ADR-0012 (the one search lives in `docs.php`). Amends ADR-0011: the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
+- Status: Accepted. Supersedes [ADR-0012](0012-one-search-command-and-curl.md) (the one search lives in `docs.php`). Amends [ADR-0011](0011-documentation-sources-and-search-first.md): the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
 
 ## Context
 The request of 2026-10-14: "a skill for memorySave, memoryAppend, memorySearch a bit like ours but lightened, but not less powerful, so memorySearch is just the first step and the last big step if not found -- combine merge the other memory things, and make sure the memory doctrine is there", with "Minimal frontmatter, but full on hierarchy for the memory, autofetches and a hook similar to here to enforce memory searches. cross linking enforced", and the location `tools/memory/pikkumies/ {save,search,append}`, so later memory sources can sit beside it.
@@ -12,7 +12,7 @@ Today lessons are saved by `tools/memory/memory.php save` and searched, together
 
 ## Options Considered
 - **Keep two tools and add verbs.** Memory and documentation stay in two places that the agent must both remember.
-- **Use the Hermes built-in memory.** It holds about 2,200 characters, goes into every turn and cannot be searched (ADR-0007).
+- **Use the Hermes built-in memory.** It holds about 2,200 characters, goes into every turn and cannot be searched ([ADR-0007](0007-customising-shipped-skills.md)).
 - **One memory unit that owns the lessons and the documentation copies.** One skill and one search, and a place for later memory sources (`tools/memory/<source>/`).
 
 ## Decision
@@ -41,10 +41,10 @@ Today lessons are saved by `tools/memory/memory.php save` and searched, together
 - Later memory sources (chat exports, other memory systems) become sibling units under `tools/memory/`.
 
 ## References
-- ADR-0007, ADR-0011, ADR-0012, ADR-0015
+- ADR-0007, ADR-0011, ADR-0012, [ADR-0015](0015-tool-units-one-skill-per-tool.md)
 
 ## Amendment 2026-10-17
-The wiki and the knowledge base are also tool units of their own (ADR-0037): `tools/documentation/wiki` and `tools/documentation/kb` search and list only those sources. This unit is unchanged: its search still covers the lessons and every source, and it keeps `refresh` and `sources`.
+The wiki and the knowledge base are also tool units of their own ([ADR-0037](0037-wiki-and-kb-tool-units.md)): `tools/documentation/wiki` and `tools/documentation/kb` search and list only those sources. This unit is unchanged: its search still covers the lessons and every source, and it keeps `refresh` and `sources`.
 
 ## Amendment 2026-10-18
-Save and append write each link to a memory file in the new text relative to the file written, and the unit gains a read-only `links` verb (ADR-0060). Every link form save accepted still counts (a link in code no longer does; one with a fragment or a title now does); what is already in a memory file is never rewritten.
+Save and append write each link to a memory file in the new text relative to the file written, and the unit gains a read-only `links` verb ([ADR-0060](0060-links-and-the-link-graph.md)). Every link form save accepted still counts (a link in code no longer does; one with a fragment or a title now does); what is already in a memory file is never rewritten.

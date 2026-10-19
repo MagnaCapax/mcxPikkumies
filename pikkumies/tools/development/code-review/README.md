@@ -9,6 +9,6 @@ A code review in four passes, for the agent and for any coding agent that reads 
 
 The report puts the result first, then a status line per pass and a table of findings (severity, file:line, finding, fix). The agent changes code only when asked.
 
-`code-review.php context` finds the starting material without guessing: the project root, which rules files and ADRs exist, and which files changed, with line counts and the files now over the 150-line target. It only reads; the project's own git config cannot make it run anything (ADR-0042).
+`code-review.php context` finds the starting material without guessing: the project root, which rules files and ADRs exist, and which files changed, with line counts and the files now over the 150-line target. It only reads; the project's own git config cannot make it run anything ([ADR-0042](../../../../docs/adr/0042-development-review-unit.md)).
 
 Pikkumies contributors run it on their own change before committing (AGENTS.md).

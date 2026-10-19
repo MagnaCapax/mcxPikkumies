@@ -16,8 +16,8 @@ Facts checked 2026-10-15 in the pinned source (`hermes_cli/config_defaults.py`, 
 
 ## Options Considered
 - **Leave everything at Hermes' defaults.** Two of the five (background review, curator) already match what this ADR pins; the other three (guard scan, checkpoints, security-guidance) would stay off with no record of that being a choice rather than an oversight.
-- **Turn on every optional feature, including consolidation and cron-spawned scheduling.** Rejected (see Decision): consolidation is an aux-model cost with no measured benefit yet, and cron-spawned scheduling is an unattended-escalation risk (see ADR-0025's cron-tick design, which exists precisely because cron jobs run with nobody watching).
-- **Pin only what changes behaviour, leave the two already-on features unset.** Rejected (round 4 of the design loop): an unset key silently tracks whatever Hermes' own default becomes on the next pinned-release bump (ADR-0009); pinning the two headline features protects the operator's intent across an upgrade even though today's value matches.
+- **Turn on every optional feature, including consolidation and cron-spawned scheduling.** Rejected (see Decision): consolidation is an aux-model cost with no measured benefit yet, and cron-spawned scheduling is an unattended-escalation risk (see [ADR-0025](0025-scheduled-jobs-per-minute-tick-under-no-new-privs.md)'s cron-tick design, which exists precisely because cron jobs run with nobody watching).
+- **Pin only what changes behaviour, leave the two already-on features unset.** Rejected (round 4 of the design loop): an unset key silently tracks whatever Hermes' own default becomes on the next pinned-release bump ([ADR-0009](0009-hermes-from-a-pinned-release-tarball.md)); pinning the two headline features protects the operator's intent across an upgrade even though today's value matches.
 
 ## Decision
 `HermesConfig::renderYaml()` adds, each a deliberate choice, not a restated default:
@@ -29,7 +29,7 @@ Facts checked 2026-10-15 in the pinned source (`hermes_cli/config_defaults.py`, 
 Deliberately **not** set, so a future contributor does not treat their absence as an oversight:
 - `curator.consolidate` — stays at Hermes' own `False`. It is an LLM consolidation pass (umbrella-building across skills) with a real aux-model cost on every run; nothing in this repository has measured whether that cost is worth it yet. `hermes curator run --consolidate` remains available as a one-time manual override.
 - `cron.allow_agent_scheduling` — stays at Hermes' own `False`. It lets a cron-spawned agent use the cronjob toolset to schedule MORE cron jobs itself ("cron-librarian" pattern) with nobody watching between ticks. ADR-0025 is Pikkumies' own answer to "how do due jobs get ticked at all"; letting an unattended run create new unattended runs is a separate, larger decision this ADR does not make.
-- `auxiliary.background_review.max_input_tokens` — left unset (runtime derives a budget from the active model's context window); no number here has a measured basis yet, and the proxy accounting this launch is held behind (ADR-0021's launch hold) is what will eventually bound real cost, not a guessed token cap.
+- `auxiliary.background_review.max_input_tokens` — left unset (runtime derives a budget from the active model's context window); no number here has a measured basis yet, and the proxy accounting this launch is held behind ([ADR-0021](0021-web-access-off-unless-configured.md)'s launch hold) is what will eventually bound real cost, not a guessed token cap.
 - `model`/model-selection keys anywhere in this block — AGENTS.md: never name a provider or model in code; model choice is entirely the deployer's config.
 - Browser keys — ADR-0021 already covers browser/lazy-install behaviour; nothing here duplicates it.
 
@@ -39,7 +39,7 @@ Deliberately **not** set, so a future contributor does not treat their absence a
 - `pikkumies doctor` reads the generated `config.yaml` back and prints one line per feature, so a write failure (disk full, a bad render) is visible rather than silently assumed.
 
 ## References
-- ADR-0009 (pinned builds), ADR-0015 (skills), ADR-0020 (approvals), ADR-0021 (web access / lazy installs), ADR-0025 (the cron ticker this ADR deliberately does not turn into agent-spawned scheduling), ADR-0026 (adopt_external_logins, the third pin from the same request)
+- ADR-0009 (pinned builds), [ADR-0015](0015-tool-units-one-skill-per-tool.md) (skills), [ADR-0020](0020-deletes-need-the-users-approval.md) (approvals), ADR-0021 (web access / lazy installs), ADR-0025 (the cron ticker this ADR deliberately does not turn into agent-spawned scheduling), [ADR-0026](0026-hermes-uses-only-its-own-logins.md) (adopt_external_logins, the third pin from the same request)
 
 ## Addendum 2026-10-15: measured Hermes process RSS; delegation concurrency stays at Hermes' default
 Measured this session in a scratch `HERMES_HOME` under `/tmp/` (never the real `~/.hermes`), sampling `/proc/<pid>/status` `VmRSS` every ~30ms for the life of the process (`hermes-v2026.9.24/venv/bin/python3`, no provider endpoint/model/key configured — a genuinely empty account):

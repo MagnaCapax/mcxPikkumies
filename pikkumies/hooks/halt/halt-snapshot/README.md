@@ -1,6 +1,6 @@
 # halt-snapshot
 
-Runs on `pre_llm_call`, once per turn, before `halt-guard` (`pre_verify`) can run at the end of it (ADR-0047): captures what the turn started with, so the guard has something to judge against once the turn is over.
+Runs on `pre_llm_call`, once per turn, before `halt-guard` (`pre_verify`) can run at the end of it ([ADR-0047](../../../../docs/adr/0047-halt-guard.md)): captures what the turn started with, so the guard has something to judge against once the turn is over.
 
 - **Where:** `local/state/halt/<sha1 of session_id>.json`, one file per session, directory `0700`, file `0600`, written through a temporary name and a rename.
 - **What it holds:** `user_message` (the latest user text), `tail` (the conversation so far, cut to the last 25% by characters — at least 12 000 when that much exists, at most 40 000, never splitting a message in the middle), `turn_started` (when this turn began) and reset counters for the new turn (`continues`, `wrapup_sent`, `last_judged_turn`).

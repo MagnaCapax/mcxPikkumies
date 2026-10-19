@@ -25,11 +25,11 @@ The request of 2026-10-14: every tool "should have --human option to output pret
 
 ## Consequences
 - The agent decides success from one line, and skills can rely on the same field names across a category.
-- A person needs `--human` to read output comfortably (ADR-0017).
+- A person needs `--human` to read output comfortably ([ADR-0017](0017-human-output-option.md)).
 - Existing tools change their output when they move into tool units; their skills and tests change in the same commit.
 
 ## References
-- ADR-0017 (`--human` output), ADR-0015 (tool units)
+- ADR-0017 (`--human` output), [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units)
 
 ## Addendum 2026-10-14: what `total` counts
 - When the app reports its own total (Plex totalSize, Servarr totalRecords, Bazarr total, autobrr count), the status line `total` is that number, never lower than the records read; when the app reports none, `total` is the number read, or `null` when more may exist but the count is unknown. `--human` prints "N shown of M" or "N shown, more exist". Found in a live run: Plex `recent --limit 1` reported `total:2` while the server held 3.
@@ -37,4 +37,4 @@ The request of 2026-10-14: every tool "should have --human option to output pret
 ## Addendum 2026-10-17: error text is not cut to fit a guess
 - Error and log text inside a record was cut to 300 or 400 characters at twelve places, with no stated reason, so a long backup, docker or app error reached the agent without its end. One constant now bounds one free-text field: `Cli::TEXT_MAX` = 4000 bytes, the value the docker log lines already used, a quarter of the 16 KiB record budget so a record with an error still fits. Hermes' own terminal cap is 50 000 bytes (`tools/tool_output_limits.py`).
 - system-status keeps 300 per matched log line: it puts up to 50 lines in one record, and 50 x 300 stays under the record budget.
-- Before cutting text to fit any size check, find what the check protects and measure it (ADR-0029 amendment).
+- Before cutting text to fit any size check, find what the check protects and measure it ([ADR-0029](0029-tool-doctrine-loaded-into-soul.md) amendment).

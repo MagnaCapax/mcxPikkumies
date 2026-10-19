@@ -1,6 +1,6 @@
 # torrent-clients
 
-Tools for the user's own torrent clients: `rtorrent`, `qbittorrent` and `deluge`, one unit each (ADR-0015). Every unit has the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the list below.
+Tools for the user's own torrent clients: `rtorrent`, `qbittorrent` and `deluge`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Every unit has the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the list below.
 
 ## Verbs (the same in every unit)
 
@@ -64,7 +64,7 @@ The shared-file check sees only the torrents of the client being called: when tw
 | qbittorrent | WebUI on 127.0.0.1, port in `~/.qbittorrentPort`; password set once by the user with `login` | `WebUI\Port` in `~/.config/qBittorrent/qBittorrent.conf` |
 | deluge | deluge-web on 127.0.0.1, port in `~/.delugeWebPort`; secret from `~/.config/deluge/auth` | `port` in `~/.config/deluge/web.conf` |
 
-A client on a port owned by another account is never contacted (ADR-0019). When a client cannot be reached, the error says which: not installed, not enabled, not running (with the config file it found when that file names the client but no binary is on `PATH`: a stopped client, or one run in a container), busy (no answer in time: unknown, not down), refused, or the port belongs to another account.
+A client on a port owned by another account is never contacted ([ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md)). When a client cannot be reached, the error says which: not installed, not enabled, not running (with the config file it found when that file names the client but no binary is on `PATH`: a stopped client, or one run in a container), busy (no answer in time: unknown, not down), refused, or the port belongs to another account.
 
 ## Sample tasks
 

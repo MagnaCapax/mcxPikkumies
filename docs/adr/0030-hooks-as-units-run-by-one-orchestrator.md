@@ -3,12 +3,12 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted. Supersedes the hook parts of ADR-0003 (`hooks/<event>/<name>.php`, one Hermes entry per script) and of ADR-0015 (units cover tools only).
+- Status: Accepted. Supersedes the hook parts of [ADR-0003](0003-hermes-integration.md) (`hooks/<event>/<name>.php`, one Hermes entry per script) and of [ADR-0015](0015-tool-units-one-skill-per-tool.md) (units cover tools only).
 
 ## Context
 The operator's request of 2026-10-16: "then we do hooks/*/ which follows the exact same pattern as tools/ and hooks/orchestrator.php to trigger the hooks for each event ... make it as identical to tools as possible and you can."
 
-Until now each hook was a script `hooks/<event>/<name>.php`, and `HermesConfig::hookEntries()` wrote one Hermes shell-hook entry per script (ADR-0003). Every entry got a 10 second timeout. Only the delete guard failed closed, and that was decided by a file-name check in `HermesConfig` (ADR-0020). A hook had no description or README of its own, and the agent had no index of the hooks.
+Until now each hook was a script `hooks/<event>/<name>.php`, and `HermesConfig::hookEntries()` wrote one Hermes shell-hook entry per script (ADR-0003). Every entry got a 10 second timeout. Only the delete guard failed closed, and that was decided by a file-name check in `HermesConfig` ([ADR-0020](0020-deletes-need-the-users-approval.md)). A hook had no description or README of its own, and the agent had no index of the hooks.
 
 Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - A shell hook's stdout is read by `agent/shell_hooks.py` `_evaluate_result` and `_parse_response`. A spawn error or timeout lets the call run unless the entry has `fail_closed`. Exit code 2 on `pre_tool_call` blocks, with the stdout block or the stderr text (at most 400 characters) or "Blocked by shell hook." as the message. Other non-zero exits still have their stdout read. A `fail_closed` entry blocks on stdout that is not a JSON object. A block without a message gets the default message, so it still blocks. An approve's `message` and `rule_key` are trimmed.
@@ -32,7 +32,7 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - **The orchestrator** reads stdin once and runs the units of the event in name order, each as its own `php` process with the same stdin and its own timeout:
   - Each unit's output is read as `_evaluate_result` reads a shell hook.
   - One addition: a fail-closed unit that exits non-zero with no answer also blocks. With PHP's `display_errors` off, a fatal error leaves stdout empty and exits 255, which Hermes would let through.
-  - Every `hooks/<category>/<hook>/` directory is a unit, even with a missing or unreadable `hook.md` (amended 2026-10-16; amended 2026-10-18, ADR-0055: a directory there with subdirectories but no `hook.md` and no `<hook>.php` is a nested category, see the amendment below). For `pre_tool_call` any broken unit blocks the call, whatever event or `failClosed` it claims; for `pre_llm_call` a broken unit is skipped.
+  - Every `hooks/<category>/<hook>/` directory is a unit, even with a missing or unreadable `hook.md` (amended 2026-10-16; amended 2026-10-18, [ADR-0055](0055-recursive-discovery.md): a directory there with subdirectories but no `hook.md` and no `<hook>.php` is a nested category, see the amendment below). For `pre_tool_call` any broken unit blocks the call, whatever event or `failClosed` it claims; for `pre_llm_call` a broken unit is skipped.
   - All units run even after a block, as Hermes runs all hooks, so their side effects (the search-first markers) stay as before.
   - The orchestrator itself blocks on a fatal error of its own for `pre_tool_call`: its crash handler is registered before it loads `lib/`, and the requires are wrapped so a broken library file blocks too.
 - **Merging** follows Hermes:
@@ -51,7 +51,7 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - A timed-out unit is killed, but not any processes it started (Hermes kills the hook's process group); the shipped hooks start none.
 
 ## References
-- ADR-0003, ADR-0011, ADR-0015, ADR-0020, ADR-0028
+- ADR-0003, [ADR-0011](0011-documentation-sources-and-search-first.md), ADR-0015, ADR-0020, [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md)
 - Hermes v2026.9.24: `agent/shell_hooks.py`, `hermes_cli/plugins.py`, `agent/turn_context.py`, `tools/hook_output_spill.py`
 
 ## Amendment 2026-10-18: hook units at any depth (ADR-0055)

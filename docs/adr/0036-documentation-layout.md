@@ -33,13 +33,13 @@ Facts read for this decision:
 
 ## Consequences
 - A new user sees one line to paste. Detail is one link away.
-- Older ADRs that say "the README" mean these pages: the tmux aliases (ADR-0032) are now in docs/commands.md, and the Kalevala episodes (ADR-0010) are now in docs/name.md.
-- install.sh is a second way in next to the PMSS skel installer (`~/bin/install-pikkumies.sh`, PMSS ADR 0090). That installer adds the platform key file and updates itself from PMSS. install.sh is for any Linux account.
+- Older ADRs that say "the README" mean these pages: the tmux aliases ([ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)) are now in docs/commands.md, and the Kalevala episodes ([ADR-0010](0010-soul-and-voice.md)) are now in docs/name.md.
+- install.sh is a second way in next to the PMSS skel installer (`~/bin/install-pikkumies.sh`, [PMSS ADR 0090](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0090-separate-per-user-pikkumies-installer.md)). That installer adds the platform key file and updates itself from PMSS. install.sh is for any Linux account.
 - The placement rule is checked in review only. The tests catch a broken link or a moved install line, not a feature section added back to the README.
 
 ## References
-- PMSS README (one-line install, docs/ links); PMSS ADR 0090 (the skel installer).
+- PMSS README (one-line install, docs/ links); [PMSS ADR 0090](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0090-separate-per-user-pikkumies-installer.md) (the skel installer).
 - ADR-0010, ADR-0032 (sections that moved).
 
 ## Amendment 2026-10-18
-The link test covers every tracked `.md` file, not only the README and `docs/*.md`: each relative link resolves to a file or directory relative to its own file, with fragments dropped and code skipped (ADR-0060).
+The link test covers every tracked `.md` file, not only the README and `docs/*.md`: each relative link resolves to a file or directory relative to its own file, with fragments dropped and code skipped ([ADR-0060](0060-links-and-the-link-graph.md)).

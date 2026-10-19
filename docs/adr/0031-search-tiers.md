@@ -3,13 +3,13 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted. Supersedes the search ladder of ADR-0027 (its "Doctrine" point) and the order of what search-first enforces in ADR-0028; everything else in both stands.
+- Status: Accepted. Supersedes the search ladder of [ADR-0027](0027-provider-and-app-documentation-scoped-to-the-detected-host.md) (its "Doctrine" point) and the order of what search-first enforces in [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md); everything else in both stands.
 
 ## Context
 The operator's request of 2026-10-16: "make sure the memory searches / data finding mission is executed and the tiering is local memory, this provider documentation (all of it), then 3rd party similar provider documentation, and final is deep research online", with rules that enforce such searches.
 
 What existed:
-- One search ranked lessons and this host's documentation together by score (ADR-0011, ADR-0018). A long lesson could rank below a short app-manual page that merely named the same words.
+- One search ranked lessons and this host's documentation together by score ([ADR-0011](0011-documentation-sources-and-search-first.md), [ADR-0018](0018-memory-tool-unit.md)). A long lesson could rank below a short app-manual page that merely named the same words.
 - Sources scoped to another provider were filtered out entirely (`DocSources::usable()`, ADR-0027). Similar providers document the same apps and the same problems (rTorrent, a full disk, the *arr apps), so a host with thin documentation of its own could not use theirs.
 - The ladder in `doctrine/doctrine.md` was: memory and this host's docs, then deep research, then the support link, then ask the user.
 - The search-first gate opened for every tool, the web tools included, as soon as a search command started (ADR-0028).
@@ -46,7 +46,7 @@ ADR-0027's load note: every account fills its own copy, so on a shared server a 
 - **Load:** a peer source costs an enabled account at most 50 requests a day until filled, then about pages ÷ 30 a day. Only accounts that have had a tier-1/2 miss fetch peers at all. On a shared server this still multiplies by the number of such accounts; the root-maintained shared cache of ADR-0027 remains the answer if sites start refusing.
 - **Disk and time:** peer copies count against the same 200 MB cache cap. Searches, including the first-turn hint, read more pages once peers are filled, at the same per-page cost as tier 2.
 - **Enforcement limits:** the record is per account, not per session, because the search does not know the session id. Two sessions searching at once can satisfy each other's gate. Every file involved is writable by the agent's own user, so this remains a safety prompt, not a security boundary (AGENTS.md). A search always covers tiers 1-3; tier 3 counts as searched even when no peer copy is on disk yet.
-- **Follow-ups:** the gate hook itself is wired after the hook move of ADR-0030. The memory unit's `USAGE.md` and `skill.md` should name the tiers in the same words.
+- **Follow-ups:** the gate hook itself is wired after the hook move of [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md). The memory unit's `USAGE.md` and `skill.md` should name the tiers in the same words.
 
 ## References
 - ADR-0011, ADR-0018, ADR-0027 (load note, `site` fill), ADR-0028 (re-arm, gate), ADR-0030 (hook units).

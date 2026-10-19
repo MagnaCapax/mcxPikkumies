@@ -3,17 +3,17 @@
 | Command | What it does |
 |---|---|
 | `pikkumies install` | Detect the machine, generate the skills and the tool index, write config, install Hermes in the background, add the daily auto-update line to your crontab, put `pikkumies` on your `PATH` |
-| `pikkumies update` | Fast-forward to the newest release, or to a branch when `update.channel` is `git/<branch>`, and print the channel (refuses to overwrite local edits, never moves backwards); never updates Hermes (ADR-0057) |
+| `pikkumies update` | Fast-forward to the newest release, or to a branch when `update.channel` is `git/<branch>`, and print the channel (refuses to overwrite local edits, never moves backwards); never updates Hermes ([ADR-0057](adr/0057-release-channel.md)) |
 | `pikkumies detect` | Print the machine profile (JSON) |
 | `pikkumies doctor` | Show provider, masked key, the update channel and the release or commit installed, Hermes and tool status |
 | `pikkumies generate` | Regenerate the skills, `tools/INDEX.md` and the agent config (install, update and run do this too) |
 | `pikkumies` | Start a plain interactive session (same as `pikkumies run` with no further arguments) |
-| `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, ADR-0022) |
+| `pikkumies <free text>` | Start a session with that text as the first prompt — interactive on a real terminal, one answer and exit otherwise (Hermes' own `-q`, [ADR-0022](adr/0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md)) |
 | `pikkumies -- <free text>` | Same, forced even when the text starts with one of the names above (a name followed by ordinary words is already a prompt) |
-| `pikkumies -m <model> [free text]` | A session with that model, for this session only; `--model <model>` and `--model=<model>` work too. `--reasoning <level>` sets the reasoning effort the same way. Only at the start of the line: the words after them are the prompt, even a name from above. `php ~/pikkumies/tools/system/credits/credits.php models` lists the models (ADR-0052) |
+| `pikkumies -m <model> [free text]` | A session with that model, for this session only; `--model <model>` and `--model=<model>` work too. `--reasoning <level>` sets the reasoning effort the same way. Only at the start of the line: the words after them are the prompt, even a name from above. `php ~/pikkumies/tools/system/credits/credits.php models` lists the models ([ADR-0052](adr/0052-launcher-model-flag-and-configure.md)) |
 | `pikkumies configure` | On a terminal: a session that reviews your settings and helps you change them. Without one: prints the settings review and starts nothing (ADR-0052) |
-| `pikkumies configure undo` | Set the setting the last configure change replaced back to its old value, without a session, for example after a model that no longer starts. It shows `key old -> new (tier)` and, on a terminal, asks y/N first (the agent can write the change log too); without a terminal it makes only a change the agent could make itself. A model is checked against the endpoint's list as with any change; the provider, the terms and turning a safety layer off stay yours to change in `~/pikkumies/local/config.php` (ADR-0059) |
-| `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …); started from inside an agent it refuses the flags and Hermes commands that turn approvals, hooks or rules off or pick another config (ADR-0020) |
+| `pikkumies configure undo` | Set the setting the last configure change replaced back to its old value, without a session, for example after a model that no longer starts. It shows `key old -> new (tier)` and, on a terminal, asks y/N first (the agent can write the change log too); without a terminal it makes only a change the agent could make itself. A model is checked against the endpoint's list as with any change; the provider, the terms and turning a safety layer off stay yours to change in `~/pikkumies/local/config.php` ([ADR-0059](adr/0059-settings-tiers-free-asked-and-the-persons-own.md)) |
+| `pikkumies run [hermes args]` | Pass arguments straight through to Hermes (`pikkumies run sessions list`, `pikkumies run --tui`, …); started from inside an agent it refuses the flags and Hermes commands that turn approvals, hooks or rules off or pick another config ([ADR-0020](adr/0020-deletes-need-the-users-approval.md)) |
 | `pikkumies run update` | Update Hermes with its own updater, separately from Pikkumies; refuses while another session runs |
 | `pikkumies tmux [1-9]` | Open window `pmN` (default `pm1`) of the tmux session `pikkumies`, running `pikkumies`; the session and the window are created when missing. Without tmux it says so |
 
@@ -28,11 +28,11 @@ alias pm2='pikkumies tmux 2'   # ... up to pm9
 
 `pm2` attaches to the `pikkumies` tmux session at window `pm2`, starting a new agent session there if that window is not open yet; detach with `Ctrl-b d` and the sessions keep running.
 
-With a Pulsed Media AI key, `pikkumies` prints the credits line when a session starts, and the `pikkumies` tmux session shows it at the right of its status line, refreshed every minute: `💳 4.7M credits ▰▰▰▰▰▰▰▰▰▱ 94% left · ≥1.1M tokens · today 35k`. The bar is what is left of the newest grant; the tokens are a floor from the model's rates, since the platform counts credits. Your other tmux sessions are not changed, and a provider that does not report usage shows nothing. The same line on demand: `php ~/pikkumies/tools/system/credits/credits.php line` (ADR-0040).
+With a Pulsed Media AI key, `pikkumies` prints the credits line when a session starts, and the `pikkumies` tmux session shows it at the right of its status line, refreshed every minute: `💳 4.7M credits ▰▰▰▰▰▰▰▰▰▱ 94% left · ≥1.1M tokens · today 35k`. The bar is what is left of the newest grant; the tokens are a floor from the model's rates, since the platform counts credits. Your other tmux sessions are not changed, and a provider that does not report usage shows nothing. The same line on demand: `php ~/pikkumies/tools/system/credits/credits.php line` ([ADR-0040](adr/0040-credits-line.md)).
 
 ## Forcing settings for one run
 
-Three environment variables override the settings for one command, without editing `local/config.php` (ADR-0038):
+Three environment variables override the settings for one command, without editing `local/config.php` ([ADR-0038](adr/0038-plain-search-command-config-overlay-live-source-check.md)):
 
 | Variable | What it forces |
 |---|---|

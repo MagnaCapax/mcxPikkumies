@@ -1,6 +1,6 @@
 # performance
 
-Answers "why is it slow" from inside the user's own account, without root (ADR-0035). It looks at the account's limits and what uses them, at how busy the server is, at the user's own transfer sessions, at the route to a target and at the disk, and names what it found from a fixed rule table. By default it never stresses the server: load tests run only when the user asks and approves each one.
+Answers "why is it slow" from inside the user's own account, without root ([ADR-0035](../../../../docs/adr/0035-performance-diagnostics.md)). It looks at the account's limits and what uses them, at how busy the server is, at the user's own transfer sessions, at the route to a target and at the disk, and names what it found from a fixed rule table. By default it never stresses the server: load tests run only when the user asks and approves each one.
 
 It reads only your own account: its own processes, its own cgroup directory, its own connections. Nothing it finds is sent anywhere; the probe packets of `net` and the traffic of a `heavy` test the user approved are the only things that leave the machine.
 
@@ -38,7 +38,7 @@ The client-area Diagnose button on PMSS checks the account and the server with t
 
 ## Rules
 
-`tools/system/DOCTRINE.md` goes into SOUL.md word for word (ADR-0029). Each rule, then why it is there:
+`tools/system/DOCTRINE.md` goes into SOUL.md word for word ([ADR-0029](../../../../docs/adr/0029-tool-doctrine-loaded-into-soul.md)). Each rule, then why it is there:
 
 - Read only this account's processes, cgroup files and connections; never read, name or count other accounts.
   Why: other customers' activity is theirs (privacy first), and an agent that talks about "a noisy neighbour" invents what it cannot see and repeats it to the user.

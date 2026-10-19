@@ -8,7 +8,7 @@
 ## Context
 The operator's request of 2026-10-15: hooks that enforce searching memory and documentation "when something is requested which might need this". Also: "Hooks which need LLM use the same settings as the main pikkumies agent ofc, but if bigger model is chosen then the ligthweight version."
 
-Until now, the `pre_llm_call` hook spoke only on a session's first turn, and the search-first gate opened once per session (ADR-0011, ADR-0018). In Hermes `pre_llm_call` runs once per turn (`agent/turn_context.py`), and the hook payload carries the session id (`agent/shell_hooks.py`). The documentation the hook searches is ADR-0027.
+Until now, the `pre_llm_call` hook spoke only on a session's first turn, and the search-first gate opened once per session ([ADR-0011](0011-documentation-sources-and-search-first.md), [ADR-0018](0018-memory-tool-unit.md)). In Hermes `pre_llm_call` runs once per turn (`agent/turn_context.py`), and the hook payload carries the session id (`agent/shell_hooks.py`). The documentation the hook searches is [ADR-0027](0027-provider-and-app-documentation-scoped-to-the-detected-host.md).
 
 ## Options Considered
 - **A model router on every turn** deciding which sources to search. Rejected: a model call on every turn of a metered provider, for a decision the offline search makes for free on most turns.
@@ -48,5 +48,5 @@ Until now, the `pre_llm_call` hook spoke only on a session's first turn, and the
 - Hooks stay safety prompts, not security (AGENTS.md): every marker file is writable by the agent's own user.
 
 ## References
-- ADR-0011, ADR-0018, ADR-0022, ADR-0027.
+- ADR-0011, ADR-0018, [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md), ADR-0027.
 - Hermes `agent/turn_context.py`, `agent/shell_hooks.py` (v2026.9.24).

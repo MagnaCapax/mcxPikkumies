@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Supersedes ADR-0001's "Release tags and channels come later"; amends ADR-0013 (what the daily update moves to) and ADR-0032 (one more settable key, `update.channel`, as ADR-0052 requires an ADR for).
+- Status: Accepted. Supersedes [ADR-0001](0001-layout-install-and-update.md)'s "Release tags and channels come later"; amends [ADR-0013](0013-daily-auto-update-from-the-user-crontab.md) (what the daily update moves to) and [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) (one more settable key, `update.channel`, as [ADR-0052](0052-launcher-model-flag-and-configure.md) requires an ADR for).
 
 ## Context
 The request of 2026-10-18: "we should do the release // git version branching on to pikkumies too, people defaulting to latest release ... and the pikkuimies update and installer defaulting to the release, unelss you specify git version".

@@ -8,9 +8,9 @@
 ## Context
 The operator's request of 2026-10-16: "let's also do tools/*/DOCTRINE.md which is loaded upon the dynamic start as part of the doctrine ... ofc we will still have separate static doctrine and agent.md type of stuff, but we need to load up like that."
 
-Each tool category already states rules for the agent in its README (storage "Safety rules", media-servers "Safety rules (binding for every unit)", the torrent clients' ids and delete flow, the backup password and restore rules). Those READMEs are written for people and run to 6-14 KB, so the agent sees them only if it opens one. The skills index shows about 100 bytes per tool (ADR-0015).
+Each tool category already states rules for the agent in its README (storage "Safety rules", media-servers "Safety rules (binding for every unit)", the torrent clients' ids and delete flow, the backup password and restore rules). Those READMEs are written for people and run to 6-14 KB, so the agent sees them only if it opens one. The skills index shows about 100 bytes per tool ([ADR-0015](0015-tool-units-one-skill-per-tool.md)).
 
-`SOUL.md` is regenerated on every `install`, `update` and `run` (ADR-0003, ADR-0022) and Hermes sends it to the model on every turn. Hermes cuts a context file past 20 000 characters (`agent/prompt_builder.py`, `CONTEXT_FILE_MAX_CHARS`). ADR-0010 kept the whole `SOUL.md` at or under 8000 bytes, but only one profile (PMSS with root) was tested: the shared and generic profiles rendered 8069-8188 bytes on 2026-10-16.
+`SOUL.md` is regenerated on every `install`, `update` and `run` ([ADR-0003](0003-hermes-integration.md), [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md)) and Hermes sends it to the model on every turn. Hermes cuts a context file past 20 000 characters (`agent/prompt_builder.py`, `CONTEXT_FILE_MAX_CHARS`). [ADR-0010](0010-soul-and-voice.md) kept the whole `SOUL.md` at or under 8000 bytes, but only one profile (PMSS with root) was tested: the shared and generic profiles rendered 8069-8188 bytes on 2026-10-16.
 
 ## Options Considered
 - **Load the category rules through a first-turn hook.** Only the first turn of a task would see them, and the operator asked for them "as part of the doctrine".
@@ -21,7 +21,7 @@ Each tool category already states rules for the agent in its README (storage "Sa
 - A category may have `pikkumies/tools/<category>/DOCTRINE.md`: plain Markdown rules for the agent, no heading (the category name becomes the heading), at most 1200 bytes. It sits beside the category README, not inside a tool unit, so `Units::all()` never reads it as a unit.
 - `Units::doctrines($disabled)` returns `[category => text]` for every category not in `Generate::disabledCategories($config)` (so `tools.disabled`, and `root.disabled` for server-admin), sorted by category; empty files are skipped.
 - `HermesConfig::renderSoul()` = capabilities, then the static doctrine in its existing order (soul, voice, doctrine, safety), then `## Tool doctrine` with one `### <category>` per enabled category. The static doctrine stays as it is: DOCTRINE.md adds to it, it does not replace it.
-- Budgets, tested for every profile renderSoul gets (PMSS with root, PMSS shared with and without root, generic without root, generic shared): the core (everything but the tool doctrine) at most 8000 bytes, also with the longest agent name (ADR-0032); the whole SOUL.md at most 16 000; each DOCTRINE.md at most 1200. The core was brought under 8000 by tightening text, not by raising the cap: shorter capability lines (the PMSS line only when yes, the Host line only when it is not PMSS, no repeated "own files" on shared hosts without root, a shorter footer), and fewer words in voice.md and safety.md with every rule kept.
+- Budgets, tested for every profile renderSoul gets (PMSS with root, PMSS shared with and without root, generic without root, generic shared): the core (everything but the tool doctrine) at most 8000 bytes, also with the longest agent name ([ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)); the whole SOUL.md at most 16 000; each DOCTRINE.md at most 1200. The core was brought under 8000 by tightening text, not by raising the cap: shorter capability lines (the PMSS line only when yes, the Host line only when it is not PMSS, no repeated "own files" on shared hosts without root, a shorter footer), and fewer words in voice.md and safety.md with every rule kept.
 - Seeded from rules the category READMEs already state, condensed, nothing invented: `torrent-clients`, `storage`, `backup`, `media-servers`. A category whose README states no agent rules gets no DOCTRINE.md.
 
 ## Consequences
@@ -46,7 +46,7 @@ Fitting text to the chosen numbers cost real rules: a load-bearing steer was dro
 - A rule that does not fit is a reason to look at the limit, not to shorten the rule. Before cutting text to fit any size check, find what the check protects and measure it.
 - Load-bearing sentences are pinned by tests (the built-in memory steer, the accuracy rule), so a later edit fails loudly instead of losing them.
 
-## Amendment 2026-10-18: DOCTRINE.md in any category directory (ADR-0055)
+## Amendment 2026-10-18: DOCTRINE.md in any category directory ([ADR-0055](0055-recursive-discovery.md))
 
 - `DOCTRINE.md` may sit in any category directory, also a nested one (`tools/email/imap/DOCTRINE.md`). It goes into SOUL.md under `### <category path>`.
 - It is shown only while at least one enabled unit lies below it, so rules whose units are all switched off leave SOUL.md with them.

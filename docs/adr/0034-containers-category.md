@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-17
-- Status: Accepted (foundations; the verbs land in stages, each answering "not built yet" until it does). Amends ADR-0020 (dated amendment there) and adds the `docker` key to the ADR-0023 host table.
+- Status: Accepted (foundations; the verbs land in stages, each answering "not built yet" until it does). Amends [ADR-0020](0020-deletes-need-the-users-approval.md) (dated amendment there) and adds the `docker` key to the [ADR-0023](0023-host-detection-cache.md) host table.
 
 ## Context
 The request of 2026-10-17 asks for tools to manage rootless Docker as on PMSS: the basics, stats, diagnosis, analysis, watchdog checks, recognition of other providers, and launching a number of containers with given settings after checking that the user can run them.
@@ -21,13 +21,13 @@ Facts read for this decision (PMSS tree at c8ba1754, Hermes v2026.9.24, this rep
 - **One unit per capability** (status, diagnose, launch...), as some categories split. Three or more skills on every turn for one daemon, two classifiers of the same daemon state.
 - **One `docker` unit with thirteen verbs, code split into class files inside it.** One skill, one daemon ladder, one exposure classifier, one reference resolver; builders stay file-disjoint.
 - **Wrap compose** (`compose-up`/`compose-down` verbs). Compose runs fine in the terminal; the tool checks a compose file before it is run instead.
-- **Auto-heal** (restart exited containers, restart the daemon). Exited containers are the ones the user or a server move stopped (PMSS ADR-0072 keeps source containers stopped after a transfer); restarting the daemon collides with the watchdog.
+- **Auto-heal** (restart exited containers, restart the daemon). Exited containers are the ones the user or a server move stopped ([PMSS ADR-0072](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0072-usertransfer-hands-over-rootless-docker-containers.md) keeps source containers stopped after a transfer); restarting the daemon collides with the watchdog.
 
 ## Decision
 - **One unit**, `tools/containers/docker/` (skill `docker`): stats, list, show, logs, start, stop, restart, remove, images, prune, diagnose, launch-plan, launch. Not added: status, df, inspect (it is `show`), pull, compose verbs, scale, presets, a plan id, `--env K=V`, a podman adapter.
 - **Only the user's own daemon** (`Host::dockerSocket`): a unix socket this account owns; for uid 0 also `/var/run/docker.sock` (then root's daemon is the user's own). `tcp://`, root's daemon for any other account and another account's daemon are refused with the reason, never used. The *ARR and media units share the rule.
 - **CLI only, bounded:** every call is `timeout <N> docker ...` through `tools/storage/lib/ToolProc.php` (required from there, as the backup units do; moving the storage helpers to `pikkumies/lib` is a separate change), with `DOCKER_HOST` set and `DOCKER_CONTEXT` removed. Every verb probes first (10 s) and stops with the diagnosis instead of fanning out; 60 s per call, 150 s per verb, 30 s for the scheduled check. Only `--format '{{json .}}'` is parsed; missing fields are unknown.
-- **The platform owns the PMSS daemon.** The tool never stops, restarts or kills it as a fix. Down: wait for the watchdog, then `systemctl --user start docker.service` (the customer path PMSS kept, its ADR-0066), then support. Wedged: only on the user's yes, the platform's documented recovery as a link (`Host::TABLE`), then a check that no process the watchdog counts is left.
+- **The platform owns the PMSS daemon.** The tool never stops, restarts or kills it as a fix. Down: wait for the watchdog, then `systemctl --user start docker.service` (the customer path PMSS kept, its [ADR-0066](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0066-rootless-docker-unit-masked-not-deleted.md)), then support. Wedged: only on the user's yes, the platform's documented recovery as a link (`Host::TABLE`), then a check that no process the watchdog counts is left.
 - **Deletes follow ADR-0020:** `remove` and `prune` take `--expect`, are previewed (`list`, `images --prune-plan`), never pass `-f`, and are asked by the guard.
 - **Exposure:** every published port is classified `public`, `local-shared` or `none`. A port is published on 127.0.0.1 unless `--public`; on a shared server a launch with a port needs `--accept-shared-exposure`, because 127.0.0.1 is not private there.
 - **Provider facts live in `Host::TABLE`** (`docker` key, null where a provider documents none): who runs the daemon, the preferred port window, ports dropped inbound, the recovery page, with `source` and `verified`.
@@ -44,5 +44,5 @@ Facts read for this decision (PMSS tree at c8ba1754, Hermes v2026.9.24, this rep
 - To be added when the verbs are built and measured on a live account: wall time, CPU and memory of `stats`, `list`, `diagnose`, `diagnose --changes` and `stats --sizes`, with the client and server versions measured.
 
 ## References
-- ADR-0015, ADR-0016, ADR-0019, ADR-0020, ADR-0023, ADR-0025, ADR-0029
-- PMSS: `docs/docker-help.md`, `scripts/util/userDocker.php`, `scripts/cron/checkRootlessDocker.php`, ADR-0026, ADR-0027, ADR-0066, ADR-0072
+- [ADR-0015](0015-tool-units-one-skill-per-tool.md), [ADR-0016](0016-jsonl-is-the-default-output.md), [ADR-0019](0019-hosts-and-credentials.md), ADR-0020, ADR-0023, [ADR-0025](0025-scheduled-jobs-per-minute-tick-under-no-new-privs.md), [ADR-0029](0029-tool-doctrine-loaded-into-soul.md)
+- PMSS: `docs/docker-help.md`, `scripts/util/userDocker.php`, `scripts/cron/checkRootlessDocker.php`, [ADR-0026](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0026-kernel-ephemeral-port-reservation.md), [ADR-0027](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0027-rootless-docker-decoupled-from-per-user-systemd-manager.md), [ADR-0066](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0066-rootless-docker-unit-masked-not-deleted.md), [ADR-0072](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0072-usertransfer-hands-over-rootless-docker-containers.md)

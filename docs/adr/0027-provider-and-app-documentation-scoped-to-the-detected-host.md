@@ -6,12 +6,12 @@
 - Status: Accepted
 
 ## Context
-The operator's request of 2026-10-15: when Pikkumies detects the hosting provider, map that provider's primary sources (wiki, manuals, docs, knowledge base, support services) for all providers, and search them like memory ("this is like memory, no different just different name"). The hooks that enforce searching, and the model they use, are ADR-0028.
+The operator's request of 2026-10-15: when Pikkumies detects the hosting provider, map that provider's primary sources (wiki, manuals, docs, knowledge base, support services) for all providers, and search them like memory ("this is like memory, no different just different name"). The hooks that enforce searching, and the model they use, are [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md).
 
 What already existed covered Pulsed Media's own sources only:
 - `documentationSources.md` lists the sources.
-- Downloaded copies are searched together with the lessons by one command (ADR-0011, ADR-0012, ADR-0018).
-- The deep-research unit handles questions the local search cannot answer (ADR-0021).
+- Downloaded copies are searched together with the lessons by one command ([ADR-0011](0011-documentation-sources-and-search-first.md), [ADR-0012](0012-one-search-command-and-curl.md), [ADR-0018](0018-memory-tool-unit.md)).
+- The deep-research unit handles questions the local search cannot answer ([ADR-0021](0021-web-access-off-unless-configured.md)).
 
 Research on 2026-10-15 (raw responses kept with the session notes) found:
 - **Providers and stacks:** seven of the ten serve a sitemap. Those are Whatbox, Ultra.cc, Bytesized, Seedhost, RapidSeedbox, QuickBox, and the Docusaurus/MkDocs sites of Swizzin, Saltbox and the old Seedbox.io. Feral's wiki has no sitemap; one index page links its 72 pages.
@@ -77,4 +77,4 @@ Research on 2026-10-15 (raw responses kept with the session notes) found:
 ADR-0011 forbids downloading any `/clients/` address, because unauthenticated requests there can look like failed logins. A `link` is never downloaded; it is only given to the user. So `DocSources::problems()` now refuses `/clients/` only for downloaded types, and the Pulsed Media `pm-support` link points at the ticket form, the same address the PMSS landing page gives. Fetching still refuses every `/clients/` address on its own: `DocSources::get()` and `DocSite` check the URL before any request. The agent is told to give links to the user and never fetch them.
 
 ## References
-- ADR-0011, ADR-0012, ADR-0018, ADR-0021, ADR-0023, ADR-0028.
+- ADR-0011, ADR-0012, ADR-0018, ADR-0021, [ADR-0023](0023-host-detection-cache.md), ADR-0028.

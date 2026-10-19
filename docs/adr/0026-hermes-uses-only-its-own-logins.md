@@ -9,7 +9,7 @@
 ## Context
 Facts checked 2026-10-15 in the pinned Hermes v2026.9.24 (`hermes_cli/config_defaults.py:1709-1731`): `auth.adopt_external_logins` defaults `True`. Its own comment states the mechanism and the failure mode plainly: Hermes borrows and refreshes the logins of other AI coding tools installed in the same home directory (their credential files) when it has no usable login of its own. Those refresh tokens are single-use and rotate, so two programs on one login can log each other out.
 
-Pikkumies already names a configured, endpoint-pointed provider under `providers.pikkumies` (`model.provider: "custom:pikkumies"`, ADR-0005) — Hermes is never meant to be short a login it needs to borrow one for. On a machine where the same account also runs another AI coding tool (plausible on a developer's own box, not just a seedbox account), leaving the default on means Hermes can silently pick up that tool's login, use its single-use refresh token, and rotate the other program's session out from under it — a cross-tool outage with no Pikkumies-side symptom to point at.
+Pikkumies already names a configured, endpoint-pointed provider under `providers.pikkumies` (`model.provider: "custom:pikkumies"`, [ADR-0005](0005-hermes-wiring-verified-against-source.md)) — Hermes is never meant to be short a login it needs to borrow one for. On a machine where the same account also runs another AI coding tool (plausible on a developer's own box, not just a seedbox account), leaving the default on means Hermes can silently pick up that tool's login, use its single-use refresh token, and rotate the other program's session out from under it — a cross-tool outage with no Pikkumies-side symptom to point at.
 
 ## Options Considered
 - **Leave Hermes' default (`True`).** The failure above is silent and intermittent (only triggers when Hermes judges its own login "unusable" at that moment) and would land on the operator as an unexplained logout of the other tool with no connection drawn back to Hermes.
@@ -24,4 +24,4 @@ Pikkumies already names a configured, endpoint-pointed provider under `providers
 - A user who wants Hermes to run on another tool's login imports it once, explicitly, via `hermes auth add <provider>` — a deliberate choice instead of an implicit fallback.
 
 ## References
-- ADR-0005 (provider wiring, `providers.pikkumies`), ADR-0024 (the feature pins installed alongside this)
+- ADR-0005 (provider wiring, `providers.pikkumies`), [ADR-0024](0024-hermes-features-on-at-install.md) (the feature pins installed alongside this)

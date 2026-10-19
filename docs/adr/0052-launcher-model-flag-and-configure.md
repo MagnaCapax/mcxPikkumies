@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Amends ADR-0022 (a leading `-m`/`--model`/`--reasoning` pair is a flag, not prompt text), ADR-0038 (launcher flags are allowed for per-run Hermes chat flags only) and ADR-0032 (routing of `configure`).
+- Status: Accepted. Amends [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md) (a leading `-m`/`--model`/`--reasoning` pair is a flag, not prompt text), [ADR-0038](0038-plain-search-command-config-overlay-live-source-check.md) (launcher flags are allowed for per-run Hermes chat flags only) and [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) (routing of `configure`).
 
 ## Context
 The requests of 2026-10-18: "pikkumies needs to take in --arg for the model too, and probably other arguments too." and "further pikkumies configure should be prompts tools etc and the agent should configure itself as far as possible, as an agent".
@@ -18,8 +18,8 @@ What was found:
 - **Force the model through the `PIKKUMIES_CONFIG` overlay for the run.** The overlay is merged by `Config::load`, and `run` writes the generated Hermes config from it, so the model would stay for every later start, scheduled job and parallel session until the next start without it (ADR-0038 addendum). Rejected: not one run.
 - **Pass any Hermes chat flag (`--provider`, `-c`, `-t`, `--yolo`, …).** `--provider` can route traffic away from the configured provider, whose choice belongs to the deployer (AGENTS.md); `-c` takes an optional value, so `pikkumies -c fix my plex` would read "fix" as a session name; `--yolo`, `--safe-mode`, `--ignore-rules`, `--ignore-user-config` and `--accept-hooks` switch off approvals, hooks or rules. Rejected.
 - **Only document `pikkumies run chat -m`.** Does less than was asked ("needs to take in --arg"). Rejected.
-- **Check the model against the provider's model list at start.** The server already refuses a model it does not serve, a request costs seconds at every start, and ADR-0050 rejected fixed model lists. Rejected.
-- **Start an agent review automatically at the first start, or `configure` without a terminal as a one-shot session.** Spends credits nobody asked for; without a terminal the halt guard may resume it several times (ADR-0047). The review is fixed text the unit already prints. Rejected.
+- **Check the model against the provider's model list at start.** The server already refuses a model it does not serve, a request costs seconds at every start, and [ADR-0050](0050-credits-usage-models-and-low-balance-notice.md) rejected fixed model lists. Rejected.
+- **Start an agent review automatically at the first start, or `configure` without a terminal as a one-shot session.** Spends credits nobody asked for; without a terminal the halt guard may resume it several times ([ADR-0047](0047-halt-guard.md)). The review is fixed text the unit already prints. Rejected.
 - **Leading `-m`/`--model`/`--reasoning` pairs turned into the arguments `run chat` already takes; `configure` a session with the configure skill on a terminal, the printed review otherwise.** Chosen.
 
 ## Decision
@@ -38,11 +38,11 @@ What was found:
 - Tests: `tests/LaunchRoutingTest.php` (flags, errors, `--`, last wins, subcommand words, `-v`), `tests/LaunchTest.php` (configure routing, no-terminal review, first-start line, banner model).
 
 ## References
-- ADR-0022 (launcher routing), ADR-0032 (settings and the configure skill), ADR-0038 (overlay), ADR-0040 (credits line), ADR-0047 (halt guard), ADR-0050 (model list, credits per model)
+- ADR-0022 (launcher routing), ADR-0032 (settings and the configure skill), ADR-0038 (overlay), [ADR-0040](0040-credits-line.md) (credits line), ADR-0047 (halt guard), ADR-0050 (model list, credits per model)
 - Hermes Agent v2026.9.24: `hermes_cli/_parser.py` (`_build_chat_parser`: `-m`, `--reasoning`, `-s`; `-q` TTY behaviour), `hermes_cli/cli_init_mixin.py` (`self.model = model or _config_model`)
 
 ## Amendment 2026-10-18
-ADR-0020 (amendment 2026-10-18): `pikkumies run chat …` stays the full passthrough for the user; started from inside an agent (`PIKKUMIES_DEPTH` 1 or more) it refuses the flags listed under "Never passed by the launcher", and `-z`, a top-level `--oneshot`, `--profile`/`-p`, `profile use` and `config set approvals.…`.
+[ADR-0020](0020-deletes-need-the-users-approval.md) (amendment 2026-10-18): `pikkumies run chat …` stays the full passthrough for the user; started from inside an agent (`PIKKUMIES_DEPTH` 1 or more) it refuses the flags listed under "Never passed by the launcher", and `-z`, a top-level `--oneshot`, `--profile`/`-p`, `profile use` and `config set approvals.…`.
 
-## Amendment 2026-10-18 (ADR-0059)
+## Amendment 2026-10-18 ([ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md))
 `pikkumies configure undo`, exactly those words, is the person's own shell command: it shows the last configure change and, on a terminal, sets it back after they answer y, without a session; `pikkumies configure <other words>` stays a prompt. "What the agent may change through `configure` is unchanged" no longer holds: ADR-0059 gives every setting a tier.

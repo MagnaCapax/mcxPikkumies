@@ -29,9 +29,9 @@ Pikkumies talks to any OpenAI-compatible endpoint with the user's own key. A hos
 - Detection never escalates privileges or asks for a password.
 
 ## References
-- ADR-0002 (root pack), ADR-0003 (key in .env)
+- [ADR-0002](0002-packs.md) (root pack), [ADR-0003](0003-hermes-integration.md) (key in .env)
 
-## Addendum 2026-10-15: a cached root value is a hint, never an authority (ADR-0023)
+## Addendum 2026-10-15: a cached root value is a hint, never an authority ([ADR-0023](0023-host-detection-cache.md))
 `Detect::cached()` (ADR-0023) may answer from `local/host.json` instead of probing again. That file is user-writable (it lives under the account's own `local/`, same as `local/config.php`), so a user — or anything with the account's own access — could in principle edit it to claim `root.available: true`. That edit changes nothing real: the cached value is read only to decide which skills to *offer* (the root pack, ADR-0002); every actual privileged action still asks the OS at the time it runs (`sudo -n -k -l`, the real uid, `CAP_SYS_ADMIN`), exactly as this ADR already specified. A false cached "yes" buys no privilege, only a skill listing that then fails its own OS-level check; a false cached "no" only hides a skill that would have worked. The general rule: state the agent's own account can write is never, by itself, a source of authorization — the OS decides, every time, not the cache.
 
 ## Amendment 2026-10-17: the platform key file ~/.virsilipasKey

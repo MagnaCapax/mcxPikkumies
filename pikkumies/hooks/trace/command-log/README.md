@@ -1,6 +1,6 @@
 # command-log
 
-Runs after each tool call (`post_tool_call`) and writes one line for every shell command the agent ran (ADR-0044), so a session can be traced later: what ran, where, when, and how it ended.
+Runs after each tool call (`post_tool_call`) and writes one line for every shell command the agent ran ([ADR-0044](../../../../docs/adr/0044-every-shell-command-is-logged.md)), so a session can be traced later: what ran, where, when, and how it ended.
 
 - **Where:** `local/logs/commands/YYYYMMDD.jsonl`, one file per UTC day, next to the hook log `local/logs/hooks/`. The directory is 0700 and the files 0600: only the account can read them.
 - **What one line holds:** `ts`, `session_id`, `tool_call_id`, `cwd`, `tool`, `command`, `background`, `exit_code`, `status`, `duration_ms`, `output_bytes`, and `error` or `truncated` when they apply. The output itself is never logged.

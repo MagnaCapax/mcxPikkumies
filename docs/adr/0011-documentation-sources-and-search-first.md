@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-08
-- Status: Accepted. The context line on Hermes web tools is corrected by ADR-0021; the search command the hook and gate name is changed by ADR-0018.
+- Status: Accepted. The context line on Hermes web tools is corrected by [ADR-0021](0021-web-access-off-unless-configured.md); the search command the hook and gate name is changed by [ADR-0018](0018-memory-tool-unit.md).
 
 ## Context
 The spec asks for a helper "which looks into our KB+Wiki" with "configurable information sources (wikis, KB, etc.)". The request of 2026-10-08 adds: one human-editable config file listing URLs and types (`pikkumies/config/documentationSources.md`), a skill to search them, a hook or gate so memory and documentation are searched first after the first prompt of a task, and accuracy doctrine that defines trust levels (in the doctrine and in the config file) and resolves conflicting sources by adversarial rounds.
@@ -13,7 +13,7 @@ Facts this rests on, checked 2026-10-08:
 - Hermes' own `web_search` and `web_extract` need a paid gateway or API keys (`features/tools.md`), so they cannot be assumed.
 - The Pulsed Media wiki is MediaWiki with a public API (one request returns 50 pages with their text); the knowledge base is a public JSON export (`/remote/kb.json`). Its article links point at the billing client site, where unauthenticated requests can look like failed logins.
 - Documentation of this kind is exact-term text (app names, error messages, config keys), where plain word matching over a local copy finds pages reliably and cheaply; the same ranker already serves the lessons.
-- `pikkumies update` stops when a tracked file was edited (ADR-0001), so users cannot edit a shipped config file in place.
+- `pikkumies update` stops when a tracked file was edited ([ADR-0001](0001-layout-install-and-update.md)), so users cannot edit a shipped config file in place.
 
 ## Options Considered
 - **Search each source live per query** (MediaWiki search API and similar). Always fresh, no disk use. But every query leaves the machine, each type needs its own search, and results are ranked differently per source.
@@ -38,7 +38,7 @@ Facts this rests on, checked 2026-10-08:
 - Follow-ups not built: more source types (for example PMSS documentation on GitHub, about 125 files) when a pack needs them.
 
 ## References
-- ADR-0001 (local state, update stops on edited files), ADR-0003 and ADR-0005 (Hermes shell hooks), ADR-0006 (packs).
+- ADR-0001 (local state, update stops on edited files), [ADR-0003](0003-hermes-integration.md) and [ADR-0005](0005-hermes-wiring-verified-against-source.md) (Hermes shell hooks), [ADR-0006](0006-every-pack-always-loaded.md) (packs).
 - Hermes v2026.9.24: `website/docs/user-guide/features/hooks.md`, `agent/shell_hooks.py`, `website/docs/user-guide/features/tools.md`.
 
-- Amended by ADR-0043 (2026-10-18): reading the downloaded documentation now waits for the memory search; other reading stays allowed.
+- Amended by [ADR-0043](0043-lessons-before-documentation.md) (2026-10-18): reading the downloaded documentation now waits for the memory search; other reading stays allowed.

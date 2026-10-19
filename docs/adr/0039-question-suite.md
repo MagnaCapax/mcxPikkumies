@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Builds on ADR-0038 (the `PIKKUMIES_CONFIG` overlay and the live source check). Amended 2026-10-18: the budget flag is `--token-budget` (`--max-tokens` still accepted), and `local/config.php` is put back before each question. Amended 2026-10-18 (RCA): Hermes' terminal tool snapshots a login bash, which re-reads `/etc/profile` and can lose the fake `crontab`'s place on PATH — a run during this amendment reached the account's real crontab through it. A `home/.bash_profile` the sandbox writes now wins that race; a login-shell check refuses to ask anything until it is proven to work; the real crontab is compared after the install, after each documentation refresh and after every question, not only at the end; and `Sandbox::reset()` also restores the fake crontab's own saved tab file, which already existed before the first snapshot (the install schedules the auto-update through it) and so was not covered by the generic new-file sweep.
+- Status: Accepted. Builds on [ADR-0038](0038-plain-search-command-config-overlay-live-source-check.md) (the `PIKKUMIES_CONFIG` overlay and the live source check). Amended 2026-10-18: the budget flag is `--token-budget` (`--max-tokens` still accepted), and `local/config.php` is put back before each question. Amended 2026-10-18 (RCA): Hermes' terminal tool snapshots a login bash, which re-reads `/etc/profile` and can lose the fake `crontab`'s place on PATH — a run during this amendment reached the account's real crontab through it. A `home/.bash_profile` the sandbox writes now wins that race; a login-shell check refuses to ask anything until it is proven to work; the real crontab is compared after the install, after each documentation refresh and after every question, not only at the end; and `Sandbox::reset()` also restores the fake crontab's own saved tab file, which already existed before the first snapshot (the install schedules the auto-update through it) and so was not covered by the generic new-file sweep.
 
 ## Context
 The request of 2026-10-18: a suite of questions, run outside CI because the provider keys are not in CI and every run spends tokens, that tests various models and where adding a question is easy. ADR-0038 made the search-first gate strict and gave one file to force the provider, model, light model and host family per run; nothing yet asked the agent a real question end to end and looked at what it did.
@@ -36,9 +36,9 @@ Forces:
 - A model, a pikkumies change or a new Hermes can be compared on the same questions with one command; adding a question is one file.
 - The suite must run as a dedicated account; on any other account it refuses. This is a deliberate cost: the OS is the only boundary for what the agent's terminal can reach.
 - Results are a report, not a gate: answers vary between runs, and the judge is a model's opinion, so it never mixes with the exact code checks.
-- The documentation each host family downloads is part of the snapshot for the rest of the run, so a later family's questions can also see an earlier family's documentation (tier 3 of ADR-0031).
+- The documentation each host family downloads is part of the snapshot for the rest of the run, so a later family's questions can also see an earlier family's documentation (tier 3 of [ADR-0031](0031-search-tiers.md)).
 - A run stopped with Ctrl-C skips the final crontab comparison and the cleanup; the README says to compare `crontab -l` with the saved copy by hand.
 
 ## References
-- ADR-0011, ADR-0031, ADR-0038 (search-first gate, search tiers, overlay and live source check), ADR-0025 and ADR-0013 (the crontab lines), ADR-0033 (the runtime build).
+- [ADR-0011](0011-documentation-sources-and-search-first.md), ADR-0031, ADR-0038 (search-first gate, search tiers, overlay and live source check), [ADR-0025](0025-scheduled-jobs-per-minute-tick-under-no-new-privs.md) and [ADR-0013](0013-daily-auto-update-from-the-user-crontab.md) (the crontab lines), [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) (the runtime build).
 - `tests/testing/questions/README.md`.

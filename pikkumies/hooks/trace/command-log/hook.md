@@ -5,4 +5,4 @@ description: Logs every shell command the agent ran, with its exit code, to loca
 failClosed: false
 timeout: 5
 ---
-One JSON line per `terminal` call after it ran: time, session, tool call id, directory, the command with secrets removed, exit code, status, duration and output size, never the output itself (ADR-0044).
+One JSON line per `terminal` call after it ran: time, session, tool call id, directory, the command with secrets removed, exit code, status, duration and output size, never the output itself ([ADR-0044](../../../../docs/adr/0044-every-shell-command-is-logged.md)).

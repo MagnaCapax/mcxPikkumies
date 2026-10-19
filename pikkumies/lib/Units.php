@@ -6,6 +6,7 @@
  * description), USAGE.md (its verbs table is the one list of verbs), README.md, and <tool>.php if it has a tool.
  */
 require_once __DIR__ . '/Tree.php';
+require_once __DIR__ . '/Links.php';
 
 class Units
 {
@@ -171,7 +172,7 @@ class Units
         } else {
             $out .= "\nFull usage: `{$u['dir']}/USAGE.md`\n";
         }
-        return $out;
+        return Links::stripAdrLinks($out); // the copy sits under local/, where a relative ADR link points nowhere (ADR-0060)
     }
 
     public static function renderIndex(array $units)

@@ -7,7 +7,7 @@ Controls the user's own autobrr, the release automation that watches tracker IRC
 - autobrr source `autobrr/autobrr` at commit `32210b47a2f4246db8c4e01ac6e016a997ddaf0f` (branch `develop`, 2026-10-13): `internal/http/*.go`, `internal/domain/*.go`, `internal/config/config.go`, `internal/api/service.go`, `Dockerfile`. PMSS installs autobrr's latest GitHub release (`etc/skel/install-media-stack.sh:471-494`), so a user's copy can be older than this commit.
 - PMSS facts: the PMSS repository (commit `5b493872`, 2026-10-08), read only.
 
-## The API key (ADR-0019)
+## The API key ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md))
 
 - PMSS's installer creates only a login user for autobrr (`autobrrctl create-user`, `etc/skel/install-media-stack.sh:1790`) and no API key. autobrr makes a key in its web page (Settings, API keys) or through `/api/keys` (`internal/http/server.go:240`); a key is 16 random bytes in hex, 32 characters (`internal/api/service.go:53-54,104-110`). The tool never creates one: making a new admin key needs the user's own setup step.
 - `login` reads the key at a terminal prompt without echo (never in the chat, never on a command line), checks it with `GET config`, and stores it in `pikkumies/local/secrets/autobrr` (directory 0700, file 0600, temporary file and rename), the pattern of `torrent-clients/qbittorrent/QbitSecret.php` and `backup/lib/BackupStore.php`. A wrong key stores nothing; when autobrr does not answer, the key is stored unchecked and the record says so. autobrr answers a wrong key with 401 and nothing more (`internal/http/middleware.go:71-85`), so no "rejected" mark is kept as for qBittorrent.

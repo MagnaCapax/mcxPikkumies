@@ -22,5 +22,5 @@ Pikkumies can do whatever its account can do. Install it in an account of its ow
 ## What to expect
 
 - One question is one run: Pikkumies answers and exits. Follow-ups resume the same session by its id.
-- Deletes and the other steps the guard asks about are refused in these runs (ADR-0020). Claude Code shows you the command, and runs it only after you say yes.
+- Deletes and the other steps the guard asks about are refused in these runs ([ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)). Claude Code shows you the command, and runs it only after you say yes.
 - Each question spends model credits, the same as asking Pikkumies yourself.

@@ -23,7 +23,7 @@ If Pikkumies already writes a Hermes `auxiliary.*` setting for this provider (it
 
 ## Safety
 
-- Both hooks are fail-open: `failClosed: false` (ADR-0030 fails closed only for `pre_tool_call`, where the delete guard lives). An unreadable snapshot, a dead model endpoint or a timeout always lets the turn end.
+- Both hooks are fail-open: `failClosed: false` ([ADR-0030](adr/0030-hooks-as-units-run-by-one-orchestrator.md) fails closed only for `pre_tool_call`, where the delete guard lives). An unreadable snapshot, a dead model endpoint or a timeout always lets the turn end.
 - The continue and wrap-up messages are built only from fixed PHP sentences (`lib/HaltJudge.php`); the model's reply contributes only its eight yes/no/unsure answers. A transcript or tool output containing "ignore previous instructions" can at most flip one answer, never inject text into what the agent is told next.
 - Hermes' own `agent.max_verify_nudges` (default 3) bounds the live hook; it is also checked locally against the `pre_verify` payload's `attempt`, and once a wrap-up has been sent for a turn it is never sent twice. The one-shot wrapper bounds itself to the same 3 continues plus one wrap-up.
 - `session_id` must match `^[A-Za-z0-9._-]{1,128}$` everywhere it is used to name a file, or nothing happens.

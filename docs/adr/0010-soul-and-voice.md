@@ -30,13 +30,13 @@ The soul named the agent and its working loop but never stated its job, who may 
 - The English renderings of the verses are ours, from the 1849 Finnish text. "Asun mukahan" is read from Runo XXXV, where the same couplet pairs it with "tarpehen takoa" (as the need demands) and Kullervo, who rows "väen mukahan" (with all his strength), breaks the boat, then beats the water with full force and shreds the net and the fish. Crawford's 1888 translation is loose here: it renders Väinämöinen's answer as "scare with all thy forces", the opposite of the Finnish.
 
 ## References
-- ADR-0003 (Hermes integration, SOUL.md assembly), ADR-0006 (the "This machine" block opens SOUL.md)
+- [ADR-0003](0003-hermes-integration.md) (Hermes integration, SOUL.md assembly), [ADR-0006](0006-every-pack-always-loaded.md) (the "This machine" block opens SOUL.md)
 - *Kalevala*, Elias Lönnrot, 1849 (Project Gutenberg #7000); J. M. Crawford's English translation, 1888 (Project Gutenberg #5186)
 - Hermes Agent source: `agent/system_prompt.py`, `agent/prompt_builder.py` (`DEFAULT_AGENT_IDENTITY`, `CONTEXT_FILE_MAX_CHARS`)
 
 ## Amendment 2026-10-17
 
-The 8000-byte budget above is withdrawn: it was based on reading Hermes' 20 000-character floor as the limit. SOUL.md is now checked only against the cut Hermes really applies (ADR-0029 amendment). The doctrine's accuracy section was restored in full: a source for every fact about the machine, no typical values in place of read ones, proof for causes, checks that could have found what is claimed absent, more than one check for big claims, and saying "I don't know".
+The 8000-byte budget above is withdrawn: it was based on reading Hermes' 20 000-character floor as the limit. SOUL.md is now checked only against the cut Hermes really applies ([ADR-0029](0029-tool-doctrine-loaded-into-soul.md) amendment). The doctrine's accuracy section was restored in full: a source for every fact about the machine, no typical values in place of read ones, proof for causes, checks that could have found what is claimed absent, more than one check for big claims, and saying "I don't know".
 
 ## Amendment 2026-10-18: reports are made to be scanned
 

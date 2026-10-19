@@ -1,6 +1,6 @@
 # smtp
 
-Sends mail as the user through their own SMTP relay over TLS (ADR-0053). It works with any provider that offers SMTP on port 465 (TLS) or 587 (STARTTLS); port 25 is never used. The user types the relay at `login`.
+Sends mail as the user through their own SMTP relay over TLS ([ADR-0053](../../../../docs/adr/0053-email-category.md)). It works with any provider that offers SMTP on port 465 (TLS) or 587 (STARTTLS); port 25 is never used. The user types the relay at `login`.
 
 ## Why sending takes two steps
 

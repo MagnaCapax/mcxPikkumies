@@ -1,6 +1,6 @@
 # ffmpeg
 
-Inspects and converts the user's own media files with the account's own ffmpeg/ffprobe (ADR-0045). One file at a time, on request: a long library of transcodes belongs to the media server (Jellyfin/Plex) instead, which already watches a library and transcodes on demand; this tool does not replace it and does not run on a schedule.
+Inspects and converts the user's own media files with the account's own ffmpeg/ffprobe ([ADR-0045](../../../../docs/adr/0045-media-tools-ffmpeg-and-transcription.md)). One file at a time, on request: a long library of transcodes belongs to the media server (Jellyfin/Plex) instead, which already watches a library and transcodes on demand; this tool does not replace it and does not run on a schedule.
 
 ## Why no GPU transcoding across machines
 

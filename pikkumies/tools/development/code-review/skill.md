@@ -47,7 +47,7 @@ Name the CWE number when you are sure of it.
 
 ## 4. Conformance
 
-Check the change against the target project's own rules: the files `context` listed (AGENTS.md or another coding agent's instruction file, CONTRIBUTING, SECURITY, `development/` principles) and its accepted ADRs. Name the rule or the ADR for every finding ("AGENTS.md: camelCase", "ADR-0020"). Typical checks: language and version limits, naming, file size target, tests with the change, an ADR for a significant change in behaviour, interface, security or workflow, and anything that works around an accepted ADR instead of superseding it.
+Check the change against the target project's own rules: the files `context` listed (AGENTS.md or another coding agent's instruction file, CONTRIBUTING, SECURITY, `development/` principles) and its accepted ADRs. Name the rule or the ADR for every finding (`AGENTS.md: camelCase`, `ADR-0020`). Typical checks: language and version limits, naming, file size target, tests with the change, an ADR for a significant change in behaviour, interface, security or workflow, and anything that works around an accepted ADR instead of superseding it.
 
 Only when `context` says `fallback: true` (the project has no rules of its own), check against the bundled engineering principles at the `principles` path, and say in the report: "This project has no rules files; checked against the Pikkumies engineering principles." Never apply the bundled principles over a project's own rules.
 

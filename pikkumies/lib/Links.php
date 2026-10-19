@@ -91,6 +91,15 @@ class Links
     }
 
     /**
+     * A relative `[ADR-NNNN](...)` back to plain `ADR-NNNN`, for text copied to where a relative link points nowhere
+     * (SOUL.md, SKILL.md). A web link stays: another project's ADR-NNNN would read as the local one.
+     */
+    public static function stripAdrLinks($text)
+    {
+        return preg_replace('/\[(ADR-\d{4})\]\((?![A-Za-z][A-Za-z0-9+.-]*:)[^)\s]*\)/', '$1', (string) $text);
+    }
+
+    /**
      * $text with YAML front matter, fenced blocks (any indent, so also inside list items) and code spans blanked
      * to spaces, same length, so offsets still point into $text. A code span ends at the next run of as many
      * backticks, never past a blank line. A pattern that fails leaves the text as it was.

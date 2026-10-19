@@ -1,6 +1,6 @@
 # transcribe
 
-Speech to text for the user's own audio or video (ADR-0045). Shared rules: `tools/media/README.md`.
+Speech to text for the user's own audio or video ([ADR-0045](../../../../docs/adr/0045-media-tools-ffmpeg-and-transcription.md)). Shared rules: `tools/media/README.md`.
 
 | verb | arguments | changes | what it does |
 |---|---|---|---|

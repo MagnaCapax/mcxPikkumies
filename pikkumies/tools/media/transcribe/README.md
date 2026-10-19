@@ -1,8 +1,8 @@
 # transcribe
 
-Speech to text for one of the user's own audio or video files: an OpenAI-compatible cloud endpoint when the user has logged in, with a local whisper.cpp engine as the fallback and as the only option when `--local` is given or no login is stored (ADR-0045).
+Speech to text for one of the user's own audio or video files: an OpenAI-compatible cloud endpoint when the user has logged in, with a local whisper.cpp engine as the fallback and as the only option when `--local` is given or no login is stored ([ADR-0045](../../../../docs/adr/0045-media-tools-ffmpeg-and-transcription.md)).
 
-## The login (ADR-0019)
+## The login ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md))
 
 `login` is the only way in: the user runs it at their own terminal, which prompts for the endpoint (an OpenAI-compatible base URL; https required unless it is this account's own local listener — `pikkumies/lib/Http.php` already refuses a local port another account owns), the model name (required; there is no default to fall back to silently) and the API key (never echoed). All three are stored together as one secret, `pikkumies/local/secrets/transcription` (`pikkumies/lib/SecretFile.php`: directory 0700, file 0600, written to a temporary file and renamed). Binding the endpoint and the key in one secret means a later change to one does not quietly send the other's key to a different place: changing the endpoint needs running `login` again. There is no `provider`/`endpoint`/`model`/`key` setting in `local/config.php`; the agent can change ordinary config, but the write path for `local/secrets/` is the login prompt alone.
 

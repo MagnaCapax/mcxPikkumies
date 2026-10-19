@@ -8,7 +8,7 @@ Sources below: `PMSS:` = the PMSS clone at commit `5b493872` (2026-10-08), read-
 
 1. **Host.** PMSS when `/etc/seedbox/config` exists, else the provider from the hostname, else generic (`lib/Host.php`).
 2. **Port.** PMSS: `~/.qbittorrentPort` (written by PMSS `scripts/util/userConfig.php:214`, kept equal to the config by `scripts/lib/user/torrentPort.php:105-134`). Everywhere, and as the PMSS fallback: `WebUI\Port` in the `[Preferences]` section of `~/.config/qBittorrent/qBittorrent.conf` (PMSS `etc/seedbox/config/template.qbittorrent.conf:59`; the file path is PMSS `scripts/lib/user/qbittorrent.php:15-18`). PMSS binds the WebUI to 127.0.0.1 (`template.qbittorrent.conf:50`).
-3. **Owner check.** The port must be this user's listener in `/proc/net/tcp(6)`; another account's port is never contacted and no login is sent there (ADR-0019, `lib/Host.php`, `lib/Http.php`).
+3. **Owner check.** The port must be this user's listener in `/proc/net/tcp(6)`; another account's port is never contacted and no login is sent there ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md), `lib/Host.php`, `lib/Http.php`).
 4. **Username.** `WebUI\Username` from the same file (PMSS sets it to the account name, `template.qbittorrent.conf:61`).
 5. **The WebUI secret.** Not on disk: PMSS keeps only a PBKDF2 hash (`scripts/lib/user/qbittorrent.php:167-173`). The user types it once with `login` at a terminal (no echo); it is kept in `pikkumies/local/secrets/qbittorrent` (directory 0700, file 0600, set explicitly). On PMSS it is normally the account's own login: `scripts/changePw.php:109-112` copies a changed account password into qBittorrent. It goes only into the login request body; it is never printed, logged or put on a command line.
 

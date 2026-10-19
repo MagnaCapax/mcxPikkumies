@@ -1,6 +1,6 @@
 # ADR-0000: ADR Template
 
-> Follows the mcx ADR rails (mcxForge ADR-0004, authored by Aleksi Ursin), with Options Considered and References added from the PMSS template. One ADR decides one subject. File names: `NNNN-kebab-title.md`.
+> Follows the mcx ADR rails ([mcxForge ADR-0004](https://github.com/MagnaCapax/mcxForge/blob/main/docs/adr/0004-adr-metadata-and-discoverability.md), authored by Aleksi Ursin), with Options Considered and References added from the PMSS template. One ADR decides one subject. File names: `NNNN-kebab-title.md`.
 
 ## Metadata
 - Author: <Your Name>

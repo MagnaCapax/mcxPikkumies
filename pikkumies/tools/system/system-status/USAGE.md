@@ -13,7 +13,7 @@ php ~/pikkumies/tools/system/system-status/system-status.php show --human    # f
 ```
 
 - `root.available` comes from what the OS allows (real uid 0 or passwordless sudo), never from configuration.
-- `family` is `pmss`, a known seedbox host family (`feral`, `whatbox`, `ultra`, ...), or `generic`; `stack` is `pmss` or a known self-hosted installer (`swizzin`, `quickbox`, `saltbox`), or `none` (ADR-0019, ADR-0023).
+- `family` is `pmss`, a known seedbox host family (`feral`, `whatbox`, `ultra`, ...), or `generic`; `stack` is `pmss` or a known self-hosted installer (`swizzin`, `quickbox`, `saltbox`), or `none` ([ADR-0019](../../../../docs/adr/0019-hosts-and-credentials.md), [ADR-0023](../../../../docs/adr/0023-host-detection-cache.md)).
 - `apps` lists only the current user's processes.
 - `limits.cpuQuota`/`limits.cpuset`/`limits.memMb`/`limits.disk` are read live every call, each with its own `source` (`userShowLimits` on PMSS, `cgroupv1`/`cgroupv2` elsewhere, `host` only on a dedicated, non-shared account, or `nproc`/`df` as a last resort).
 - `pikkumies detect [--refresh]` re-runs the classification once and writes the cache this tool reads; `detect` is the only command that probes identity/rDNS.

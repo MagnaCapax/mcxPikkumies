@@ -3,16 +3,16 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Supersedes ADR-0032's list of settable keys and its refusal of every other key; amends ADR-0020 (a new question class, `rule_key` `pikkumies-config:`), ADR-0022 and ADR-0052 (`pikkumies configure undo` is a subcommand).
+- Status: Accepted. Supersedes [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)'s list of settable keys and its refusal of every other key; amends [ADR-0020](0020-deletes-need-the-users-approval.md) (a new question class, `rule_key` `pikkumies-config:`), [ADR-0022](0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md) and [ADR-0052](0052-launcher-model-flag-and-configure.md) (`pikkumies configure undo` is a subcommand).
 
 ## Context
 The request of 2026-10-18: "further pikkumies configure should be prompts tools etc and the agent should configure itself as far as possible, as an agent".
 
 What was found:
-- `pikkumies-configure set` wrote five keys (ADR-0032, ADR-0057) and refused the other eighteen keys of `Config::defaults()` with "edit local/config.php". The agent could not switch a hook back on, pick a model or hide a skill it had copied; the update skill told it to add a name to `skills.disabled` in `local/config.php` while the configure skill told it never to edit that file.
+- `pikkumies-configure set` wrote five keys (ADR-0032, [ADR-0057](0057-release-channel.md)) and refused the other eighteen keys of `Config::defaults()` with "edit local/config.php". The agent could not switch a hook back on, pick a model or hide a skill it had copied; the update skill told it to add a name to `skills.disabled` in `local/config.php` while the configure skill told it never to edit that file.
 - Two keys are read but are not in the defaults: `host.*`, merged over what detection found (`Detect::applyOverride`), and `arr.<app>.config`, where an *arr tool finds its app's config (`tools/arr/lib/Arr.php`, the Autobrr, Bazarr and Jackett runners).
 - Turning a tool category off drops its `DOCTRINE.md` from SOUL.md with its skills (`Units::doctrines`): `tools.disabled` can take rules out of the agent's instructions.
-- A model the endpoint does not serve breaks the next start; a light model that answers badly turns the hooks' judges off without a word (ADR-0047, ADR-0050).
+- A model the endpoint does not serve breaks the next start; a light model that answers badly turns the hooks' judges off without a word ([ADR-0047](0047-halt-guard.md), [ADR-0050](0050-credits-usage-models-and-low-balance-notice.md)).
 - `sessions.retentionDays` 0 keeps sessions forever, so going from 0 to a number deletes history, and so does a smaller number.
 - Hermes' approval prompt (ADR-0020) is already there: a hook answers `approve`, the person answers, the model cannot, and cron and one-shot runs refuse. "always" answers are remembered by `rule_key`.
 
@@ -65,7 +65,7 @@ What was found:
 - Tests: `tests/ConfigureTiersTest.php` (every default key has a rule, each row's directions, the reasons per direction), `tests/ConfigureChangeTest.php` (apply, refusals and their text, an overlay-forced key, the question suite's overlay stopping nothing else, owned *arr path, model check, log, skills), `tests/ConfigureUndoTest.php` (forged log lines and keys, terminal and no terminal, inside an agent, overlay), `tests/ConfigChangeHookTest.php` (the hook in a throwaway tree, V4A and replace patches, Unicode headers, symlinked directories, `Config` and `Configure*` spellings, asked keys next to set or apply, a regex engine failure), `tests/ConfigTest.php` (`Config::set` refuses the person's changes for every caller), `tests/ConfigSettingsTest.php`, `tests/ConfigureToolTest.php`, `tests/LaunchTest.php` (`configure undo`).
 
 ## References
-- ADR-0004 (privilege from the OS), ADR-0007 (local skills and `skills.disabled`), ADR-0015, ADR-0020 (approval prompt, `rule_key`, nested agents), ADR-0022 and ADR-0052 (routing), ADR-0029 (SOUL.md), ADR-0030 (hook units), ADR-0032 (settings), ADR-0038 (overlay), ADR-0047, ADR-0050 (model list and rates), ADR-0057 (`update.channel`)
+- [ADR-0004](0004-provider-key-and-root-detection.md) (privilege from the OS), [ADR-0007](0007-customising-shipped-skills.md) (local skills and `skills.disabled`), [ADR-0015](0015-tool-units-one-skill-per-tool.md), ADR-0020 (approval prompt, `rule_key`, nested agents), ADR-0022 and ADR-0052 (routing), [ADR-0029](0029-tool-doctrine-loaded-into-soul.md) (SOUL.md), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (hook units), ADR-0032 (settings), [ADR-0038](0038-plain-search-command-config-overlay-live-source-check.md) (overlay), ADR-0047, ADR-0050 (model list and rates), ADR-0057 (`update.channel`)
 
 ## Amendment 2026-10-19: the V4A header reading is shared
 The hook's V4A header reading moved to `lib/PatchPaths.php`, which guard-destructive now also uses (the gap named under Consequences is closed, ADR-0020 amendment 2026-10-19); it also counts U+001C to U+001F as whitespace, as Python does, and an empty `*** Update File:` line no longer swallows the next line's header, so those two forms are now asked.
