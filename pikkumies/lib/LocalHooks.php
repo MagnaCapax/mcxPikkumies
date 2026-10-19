@@ -10,11 +10,12 @@
  * generate, which prints what is new to the terminal and puts it in SOUL.md): a unit written or edited mid-session,
  * also its lib/ code, waits for the next start. A start by an agent (PIKKUMIES_DEPTH 1 or more) records nothing. A local unit with a
  * problem is skipped and named, never blocks; hooks/orchestrator.php runs local units after the shipped ones and
- * always fails open for them.
+ * always fails open for them. The user's local notes (LocalNotes, ADR-0076) share the record, the notice and the check of local/.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HookUnits.php';
 require_once __DIR__ . '/LocalHookCheck.php';
+require_once __DIR__ . '/LocalNotes.php';
 
 class LocalHooks
 {
@@ -39,12 +40,7 @@ class LocalHooks
         if (!file_exists($dir) && !is_link($dir)) {
             return $out;
         }
-        $st = @stat("$root/local");
-        if ($st === false || $st['uid'] !== self::uid() || ($st['mode'] & 077)) {
-            $out['off'] = Config::shown("$root/local") . ' is not owned by this account or is open to others (it must be 0700)';
-        } elseif (is_link($dir) || !is_dir($dir) || @fileowner($dir) !== self::uid()) {
-            $out['off'] = Config::shown($dir) . ' is a symlink or not this account\'s directory';
-        }
+        $out['off'] = self::closed($root, 'hooks');
         if ($out['off'] !== '') {
             return $out;
         }
@@ -72,6 +68,23 @@ class LocalHooks
         return $out;
     }
 
+    /**
+     * '' when local/<$sub> may be read: local/ is this account's and closed to group and others (Pikkumies keeps it
+     * 0700), and local/<$sub> is this account's directory, no symlink. Else why nothing in it is read (ADR-0054).
+     */
+    public static function closed($root, $sub)
+    {
+        $dir = "$root/local/$sub";
+        $st = @stat("$root/local");
+        if ($st === false || $st['uid'] !== self::uid() || ($st['mode'] & 077)) {
+            return Config::shown("$root/local") . ' is not owned by this account or is open to others (it must be 0700)';
+        }
+        if (is_link($dir) || !is_dir($dir) || @fileowner($dir) !== self::uid()) {
+            return Config::shown($dir) . ' is a symlink or not this account\'s directory';
+        }
+        return '';
+    }
+
     /** The usable local units of $event from a scan, in name order like the shipped ones; with $pending also the new ones. */
     public static function forEvent($event, array $scan, $pending = false)
     {
@@ -94,9 +107,10 @@ class LocalHooks
      * it when nothing is new. Returns the notice text ('' = none), which generate also prints to the terminal. Without
      * $record (a start by an agent) nothing new is recorded and the notice says the units wait for a start by the user.
      * The record is the agent's own state: the guard asks before a visible write to it, but it is a record of what the
-     * user was told, not a lock.
+     * user was told, not a lock. $notes: LocalNotes::scan() of the same root (scanned here when not given); the local
+     * notes share the record (keys tools/<path>) and the notice (ADR-0076).
      */
-    public static function noteChanges($root = null, $scan = null, $record = true)
+    public static function noteChanges($root = null, $scan = null, $record = true, $notes = null)
     {
         $root = $root ?: Config::root();
         $local = "$root/local";
@@ -104,6 +118,8 @@ class LocalHooks
             return '';
         }
         $scan = $scan !== null ? $scan : self::scan($root);
+        $notes = $notes !== null ? $notes : LocalNotes::scan($root);
+        $old = self::record($root);
         $hashes = [];
         foreach (array_merge($scan['units'], array_values($scan['pending'])) as $u) {
             $hashes[self::key($u)] = $u['hash'];
@@ -111,18 +127,35 @@ class LocalHooks
         $changed = array_map(function ($u) {
             return self::key($u);
         }, array_values($scan['pending']));
+        $changedNotes = [];
+        foreach ($notes['notes'] as $n) {
+            $hashes[$n['key']] = $n['hash'];
+            if (!isset($old[$n['key']]) || $old[$n['key']] !== $n['hash']) {
+                $changedNotes[] = $n['key'];
+            }
+        }
         $parts = [];
         if ($scan['off'] !== '') {
             $parts[] = 'local hooks are off: ' . $scan['off'];
+        }
+        if ($notes['off'] !== '' && $notes['off'] !== $scan['off']) {
+            $parts[] = 'local notes are off: ' . $notes['off'];
         }
         if ($changed) {
             $parts[] = count($changed) . ' local hook' . (count($changed) > 1 ? 's' : '') . ' new or changed since the last start: ' . implode(', ', $changed)
                 . ($record ? '; they run from this start' : '; not recorded, because an agent started this, so they wait for a start by the user');
         }
+        if ($changedNotes) {
+            $parts[] = count($changedNotes) . ' local note file' . (count($changedNotes) > 1 ? 's' : '') . ' new or changed since the last start: ' . implode(', ', $changedNotes)
+                . ($record ? '; they apply from this start' : '; not recorded, because an agent started this, so they wait for a start by the user');
+        }
         if ($scan['problems']) {
             $parts[] = count($scan['problems']) . ' local hook' . (count($scan['problems']) > 1 ? 's' : '') . ' skipped, see pikkumies doctor';
         }
-        if ($record && $hashes !== self::record($root)) {
+        if ($notes['problems']) {
+            $parts[] = count($notes['problems']) . ' local note file' . (count($notes['problems']) > 1 ? 's' : '') . ' skipped, see pikkumies doctor';
+        }
+        if ($record && $hashes !== $old) {
             self::write("$local/" . self::RECORD, json_encode($hashes, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
         }
         $text = implode('; ', $parts);
@@ -139,15 +172,16 @@ class LocalHooks
         return $text;
     }
 
-    /** The record's key for a unit: the tree, then its path (hooks/<category>/<hook>), so local notes can join later. */
+    /** The record's key for a unit: the tree, then its path (hooks/<category>/<hook>); local notes use tools/<path>. */
     private static function key(array $u)
     {
         return 'hooks/' . substr($u['id'], strlen('local/'));
     }
 
     /** [key => hash] from local-changes.json; [] when missing, unreadable or not this account's plain file. */
-    private static function record($root)
+    public static function record($root = null)
     {
+        $root = $root ?: Config::root();
         $file = "$root/local/" . self::RECORD;
         if (is_link($file) || !is_file($file) || @fileowner($file) !== self::uid()) {
             return [];
@@ -168,7 +202,7 @@ class LocalHooks
         }
     }
 
-    private static function uid()
+    public static function uid()
     {
         return function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
     }

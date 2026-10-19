@@ -25,7 +25,8 @@ pikkumies/            the runtime (~/pikkumies)
   memory/             your lessons, one markdown file each (never tracked)
   hermes/             Hermes Agent: an unmodified upstream git checkout (never tracked); its Python, tools and dependencies are in local/hermes/
   include/            install state, never tracked: the Hermes ready marker and build lock
-  local/              your config, machine profile and agent state (never tracked); local/hooks/ holds your own hook units
+  local/              your config, machine profile and agent state (never tracked); local/hooks/ holds your own hook units,
+                      local/tools/<path>/DOCTRINE.md your own notes for a tool or category (ADR-0076)
 docs/                 install, commands, design and name pages; adr/ holds the architecture decisions
 tests/                php tests/run.php
 ```

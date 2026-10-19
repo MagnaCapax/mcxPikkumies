@@ -19,6 +19,7 @@
 require_once __DIR__ . '/Links.php';
 require_once __DIR__ . '/HermesUserConfig.php';
 require_once __DIR__ . '/AskReview.php'; // AskReview::TIMEOUT in the pre_tool_call entry
+require_once __DIR__ . '/LocalNotes.php';
 
 class HermesConfig
 {
@@ -278,8 +279,10 @@ class HermesConfig
     /**
      * SOUL.md: what this machine allows, the static doctrine (soul, then the name line when the user
      * named the agent, ADR-0032; voice, doctrine, safety), then "## Tool doctrine" with the DOCTRINE.md
-     * of every enabled tool category (ADR-0029). $toolDoctrine false gives the core alone, whose
-     * budget is 8000 bytes. $toolsDir: a test tree instead of the shipped tools (as Units::doctrines).
+     * of every enabled tool category (ADR-0029), then the user's local notes for a category as recorded at the last
+     * start (LocalNotes, ADR-0076), after all shipped text; when SOUL.md would pass SOUL_MAX, local notes are left out
+     * from the last one, and a line says how many. $toolDoctrine false gives the core alone, whose budget is 8000 bytes.
+     * $toolsDir: a test tree instead of the shipped tools (as Units::doctrines); local/ is read beside it.
      */
     public static function renderSoul(array $profile, array $config, $toolDoctrine = true, $toolsDir = null)
     {
@@ -290,16 +293,43 @@ class HermesConfig
                 $parts[] = trim((string) file_get_contents($p)) . ($f === 'soul' ? self::nameLine($config) : '');
             }
         }
-        $rules = $toolDoctrine ? Units::doctrines(Generate::disabledCategories($config), $toolsDir) : [];
-        if ($rules) {
-            $section = "## Tool doctrine\n\nRules for each tool category; follow them whenever you use its tools.";
-            foreach ($rules as $category => $text) {
-                $section .= "\n\n### $category\n\n" . $text;
-            }
-            $parts[] = $section;
+        $disabled = $toolDoctrine ? Generate::disabledCategories($config) : [];
+        $rules = $toolDoctrine ? Units::doctrines($disabled, $toolsDir) : [];
+        $local = [];
+        if ($toolDoctrine) {
+            $root = dirname($toolsDir ?: Units::toolsDir());
+            $local = LocalNotes::visible(LocalNotes::scan($root, $toolsDir), LocalHooks::record($root), $disabled, $toolsDir ?: Units::toolsDir())['categories'];
         }
-        // ADR links in the doctrine are relative to the repository; in SOUL.md (in HERMES_HOME) they point nowhere (ADR-0060).
-        return Links::stripAdrLinks(implode("\n\n---\n\n", $parts)) . "\n";
+        for ($left = 0;; $left++) {
+            $section = self::toolDoctrine($rules, array_slice($local, 0, count($local) - $left, true), $left);
+            // ADR links in the doctrine are relative to the repository; in SOUL.md (in HERMES_HOME) they point nowhere (ADR-0060).
+            $soul = Links::stripAdrLinks(implode("\n\n---\n\n", $section === '' ? $parts : array_merge($parts, [$section]))) . "\n";
+            if (strlen($soul) <= self::SOUL_MAX || $left >= count($local)) {
+                return $soul;
+            }
+        }
+    }
+
+    /** "## Tool doctrine": the shipped category rules, then the local notes; $left local note files did not fit. '' for none. */
+    private static function toolDoctrine(array $rules, array $local, $left)
+    {
+        if (!$rules && !$local && !$left) {
+            return '';
+        }
+        $section = "## Tool doctrine\n\nRules for each tool category; follow them whenever you use its tools.";
+        foreach ($rules as $category => $text) {
+            $section .= "\n\n### $category\n\n" . $text;
+        }
+        if ($local || $left) {
+            $section .= "\n\n### Local notes\n\n" . LocalNotes::INTRO;
+            foreach ($local as $category => $text) {
+                $section .= "\n\n#### $category\n\n" . $text;
+            }
+            if ($left) {
+                $section .= "\n\n($left local note file" . ($left > 1 ? 's' : '') . ' left out: SOUL.md would pass its size limit. `pikkumies-configure notes` lists every note.)';
+            }
+        }
+        return $section;
     }
 
     /** "\n\nYour name is ..." when the user named the agent something other than Pikkumies, else ''. */

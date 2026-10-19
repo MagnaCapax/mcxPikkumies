@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Amends [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (which units run, how approves merge, the Hermes entry command), [ADR-0044](0044-every-shell-command-is-logged.md) (a post_tool_call context is used) and the hook part of `pikkumies/doctrine/SOP/make-a-skill-tool-hook-or-pack.md`. Builds on [ADR-0055](0055-recursive-discovery.md) (units at any depth).
+- Status: Accepted. Amends [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (which units run, how approves merge, the Hermes entry command), [ADR-0044](0044-every-shell-command-is-logged.md) (a post_tool_call context is used) and the hook part of `pikkumies/doctrine/SOP/make-a-skill-tool-hook-or-pack.md`. Builds on [ADR-0055](0055-recursive-discovery.md) (units at any depth). Amended by [ADR-0076](0076-local-notes-for-a-tool-or-category.md): local notes join the record (keys `tools/<path>`), the notice and the check of `local/`.
 
 ## Context
 The operator's request of 2026-10-18: "tool hooks! so pre and post tool execution hooks dynamic like hooks/tools/ for the global, along with the local ones local/hooks/tools ... build the systme, docs and ADRs all around it so it sticks."

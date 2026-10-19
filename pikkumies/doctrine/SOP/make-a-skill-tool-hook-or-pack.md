@@ -11,10 +11,11 @@ One page for contributors and for the agent itself. Checked against Hermes Agent
 | A check on every tool call | a hook unit | `pikkumies/hooks/<category>/<hook>/` |
 | A check on one tool's calls | a tool hook | `pikkumies/hooks/tools/<tool>/<hook>/` (shipped) or `~/pikkumies/local/hooks/tools/<tool>/<hook>/` (one machine) |
 | A check of your own, on one machine | a local hook unit | `~/pikkumies/local/hooks/<category>/<hook>/` |
+| A rule of the user's for one tool or category, on one machine | a local note | `pikkumies-configure note-add <tool or category>` writes `~/pikkumies/local/tools/<path>/DOCTRINE.md` ([ADR-0076](../../../docs/adr/0076-local-notes-for-a-tool-or-category.md)) |
 | How a problem got solved | a lesson, not any of the above | the memory skill (`pikkumies save`) |
 | A wiki or knowledge base the agent should search | a documentation source | a section in `pikkumies/config/documentationSources.md` (shipped) or `~/pikkumies/local/documentationSources.md` (one machine) |
 
-On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Shipped hooks and changes to shipped units come only from the repository, after review. Hooks for one machine go to `~/pikkumies/local/hooks/`, in the shipped format, written on the user's request (the guard asks before each write there, [ADR-0054](../../../docs/adr/0054-tool-hooks-and-local-hooks.md)).
+On a running box the agent never writes tracked files: `pikkumies update` stops if any is edited. Skills the agent makes for itself go to `~/pikkumies/local/hermes/skills/` (Hermes `skill_manage`). Shipped hooks and changes to shipped units come only from the repository, after review. Hooks for one machine go to `~/pikkumies/local/hooks/`, in the shipped format, written on the user's request (the guard asks before each write there, [ADR-0054](../../../docs/adr/0054-tool-hooks-and-local-hooks.md)). A rule for one tool or category on one machine is a local note: `pikkumies-configure note-add`, which adds it after the shipped text and keeps it across updates; copying a skill under a new name (below) replaces the skill instead, and the copy no longer gets the shipped skill's updates.
 
 ## Tool unit
 

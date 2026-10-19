@@ -31,7 +31,7 @@ return [
             check(trim((string) file_get_contents($f)) !== '', "$cat/DOCTRINE.md is empty");
         }
         foreach ($units as $u) {
-            check(!is_file($u['dir'] . '/DOCTRINE.md'), "{$u['category']}/{$u['name']}/DOCTRINE.md: a unit's own DOCTRINE.md is not read yet; put it at category level (ADR-0055)");
+            check(!is_file($u['dir'] . '/DOCTRINE.md'), "{$u['category']}/{$u['name']}/DOCTRINE.md: a shipped unit's rules are its skill.md; a unit DOCTRINE.md is read only from local/tools (ADR-0055, ADR-0076)");
         }
     },
     'doctrine: Units::doctrines skips disabled categories and empty files, sorted by category' => function () {

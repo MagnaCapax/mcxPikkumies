@@ -1,6 +1,6 @@
 ---
 name: pikkumies-configure
-description: Show, review and change Pikkumies' own settings (the agent's name, also "from now on call yourself X", performance logging, telemetry, the occasional feedback question, session history retention, which version updates follow, the model, the hooks, tool categories, skills).
+description: Show, review and change Pikkumies' own settings (the agent's name, also "from now on call yourself X", performance logging, telemetry, the occasional feedback question, session history retention, which version updates follow, the model, the hooks, tool categories, skills), and keep the user's own rules for one tool or tool category (note-add).
 ---
 
 # Configure Pikkumies
@@ -14,6 +14,7 @@ Use it when the user asks about Pikkumies' own settings: what the agent is calle
 - "From now on call yourself Kalle" (or "always", "your name is") asks for a lasting name: `set agent.name Kalle`, then say it applies from the next session. Answering as Kalle only in this chat is not what was asked.
 - A model (`provider.model`, `hooks.model`): pick an id the `credits` tool's `models` lists; the tool checks it against the endpoint's list and shows its rate. `pikkumies -m <model>` uses another model for one session without changing the setting.
 - SSH lists (`ssh.allow`, `ssh.deny`, `ssh.blockUnknown`): when the user asks to allow, refuse or stop asking about hosts the agent connects to over SSH. `set` replaces the whole list: include the entries already there (`get` shows them). Adding to `ssh.allow` and turning `ssh.blockUnknown` off run when the user asked for them; removing a host from `ssh.deny` the tool refuses: only the person does that, by hand in `~/pikkumies/local/config.php`.
+- A rule the user wants for one tool or one tool category from now on ("always restart rtorrent through its tool", "for email, never send to more than one address"): `note-add <tool or category> --text="<the rule>"`, one rule per note, in the user's words, as a command of its own (a file written in the same command, then `--text-file`, is stopped by the settings check). Do it when asked, without asking first; say that it applies from the next start. `notes` lists them with numbers, `note-remove <tool or category> <n>` takes one back. A preference for everything goes to the built-in memory instead, and how a problem was solved to a lesson. Never put a password, key or token in a note: it is refused.
 - To hide a shipped skill (for example after copying it under a new name): `skills disable <name>`; `skills enable <name>` shows it again.
 - To go back: `set <key> <old value>` (`set` prints the old value), or `pikkumies configure undo`, which sets the last change back.
 - Never accept the terms of service or privacy policy for the user: do not run `set terms.accepted` at all, not even to see the refusal. The person accepts them when the first interactive session asks, or installs with `pikkumies install --accept-terms`.

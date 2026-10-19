@@ -153,10 +153,14 @@ class Units
         return $verbs;
     }
 
-    public static function renderSkill(array $u)
+    /**
+     * The SKILL.md Hermes reads. $localNotes: the user's notes for this tool (LocalNotes::visible, ADR-0076), added at
+     * the end under their own heading; '' for none.
+     */
+    public static function renderSkill(array $u, $localNotes = '')
     {
         $out = "---\nname: " . $u['name'] . "\ndescription: " . json_encode($u['meta']['description'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n---\n"
-            . "<!-- Generated from tools/{$u['category']}/{$u['name']}/skill.md. To change it, copy it under a new name into your own skills (ADR-0007). -->\n\n"
+            . "<!-- Generated from tools/{$u['category']}/{$u['name']}/skill.md. To add a rule of your own for this tool, use pikkumies-configure note-add; it is kept across updates (ADR-0076). To replace the skill, copy it under a new name into your own skills (ADR-0007). -->\n\n"
             . rtrim($u['body']) . "\n";
         if ($u['verbs']) {
             $out .= "\n## Verbs\n\n";
@@ -171,6 +175,10 @@ class Units
             }
         } else {
             $out .= "\nFull usage: `{$u['dir']}/USAGE.md`\n";
+        }
+        if ((string) $localNotes !== '') {
+            require_once __DIR__ . '/LocalNotes.php';
+            $out .= LocalNotes::skillSection((string) $localNotes);
         }
         return Links::stripAdrLinks($out); // the copy sits under local/, where a relative ADR link points nowhere (ADR-0060)
     }

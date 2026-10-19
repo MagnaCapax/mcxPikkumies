@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Amends [ADR-0015](0015-tool-units-one-skill-per-tool.md) (layout, `tools.disabled`), [ADR-0029](0029-tool-doctrine-loaded-into-soul.md) (where DOCTRINE.md sits) and [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (which directory is a hook unit).
+- Status: Accepted. Amends [ADR-0015](0015-tool-units-one-skill-per-tool.md) (layout, `tools.disabled`), [ADR-0029](0029-tool-doctrine-loaded-into-soul.md) (where DOCTRINE.md sits) and [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (which directory is a hook unit). Amended by [ADR-0076](0076-local-notes-for-a-tool-or-category.md): a `DOCTRINE.md` for one unit is read from `local/tools/<category>/<tool>/` (the user's notes); a shipped unit still has none.
 
 ## Context
 The operator's request of 2026-10-18: "hooks, tools, doctrine etc. all of that stuff should be recursively dynamic in certain formats, that makes development easy and the systme as flexible and dnyamic as possible, with minimalistic core code, while maximizing easy , structured flexibiltiy".

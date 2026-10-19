@@ -55,9 +55,9 @@ function generate(array $profile)
     foreach ($result['problems'] as $unit => $problems) {
         fwrite(STDERR, "unit $unit skipped: " . implode('; ', $problems) . "\n");
     }
-    // What changed in the user's own hooks is shown here, at every start, before they run (ADR-0054).
+    // What changed in the user's own hooks and notes is shown here, at every start, before they run (ADR-0054, ADR-0076).
     if ($result['localNotice'] !== '') {
-        fwrite(STDERR, 'local hooks: ' . $result['localNotice'] . ' (' . Config::shown(Config::localDir() . '/hooks') . "; pikkumies doctor lists them)\n");
+        fwrite(STDERR, 'local: ' . $result['localNotice'] . ' (' . Config::shown(Config::localDir()) . "/hooks and /tools; pikkumies doctor lists them)\n");
     }
     HermesConfig::write($config, $profile);
     return $result;
@@ -253,6 +253,19 @@ switch ($cmd) {
             . implode('', array_map(function ($id, $why) {
                 return "; skipped $id: $why";
             }, array_keys($localHooks['problems']), $localHooks['problems']))));
+        // The user's notes for a tool or category (ADR-0076): shown, waiting for the next start, or skipped and why.
+        $localNotes = LocalNotes::scan();
+        $recorded = LocalHooks::record();
+        $waiting = array_keys(array_filter($localNotes['notes'], function ($n) use ($recorded) {
+            return !isset($recorded[$n['key']]) || $recorded[$n['key']] !== $n['hash'];
+        }));
+        out('notes:    local (' . Config::shown(Config::localDir() . '/tools') . '): '
+            . ($localNotes['off'] !== '' ? 'off, ' . $localNotes['off'] : (count($localNotes['notes']) - count($waiting)) . ' note files in use'
+            . ($waiting ? ', waiting for the next start: ' . implode(', ', $waiting) : '')
+            . ($localNotes['problems'] ? ', ' . count($localNotes['problems']) . ' skipped' : '')
+            . implode('', array_map(function ($id, $why) {
+                return "; skipped $id: $why";
+            }, array_keys($localNotes['problems']), $localNotes['problems']))));
         $localNotice = trim((string) @file_get_contents(Config::localDir() . '/' . LocalHooks::NOTICE));
         if ($localNotice !== '') {
             out('note:     ' . $localNotice . ' (at the last start)');

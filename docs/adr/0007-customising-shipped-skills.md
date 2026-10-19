@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. Supersedes the "local skill with the same name" override in [ADR-0001](0001-layout-install-and-update.md) and [ADR-0003](0003-hermes-integration.md). Amended by [ADR-0062](0062-hermes-config-seeded-once-pins-in-hermes-managed-scope.md): a shipped skill listed in `skills.disabled` is no longer generated, instead of being written into Hermes' own `skills.disabled`.
+- Status: Accepted. Supersedes the "local skill with the same name" override in [ADR-0001](0001-layout-install-and-update.md) and [ADR-0003](0003-hermes-integration.md). Amended by [ADR-0062](0062-hermes-config-seeded-once-pins-in-hermes-managed-scope.md): a shipped skill listed in `skills.disabled` is no longer generated, instead of being written into Hermes' own `skills.disabled`. Amended by [ADR-0076](0076-local-notes-for-a-tool-or-category.md): a rule of the user's for one tool is a local note (`pikkumies-configure note-add`), added at the end of the shipped skill and kept across its updates; a copy under a new name replaces the skill and no longer gets them.
 
 ## Context
 ADR-0001 and ADR-0003 said a user overrides a shipped skill by creating a local skill with the same name, because local skills take precedence over `skills.external_dirs`. That came from the Hermes documentation. The installed Hermes 0.19.0 code does not work that way:

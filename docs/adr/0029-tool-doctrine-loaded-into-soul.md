@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-16
-- Status: Accepted
+- Status: Accepted. Amended by [ADR-0076](0076-local-notes-for-a-tool-or-category.md): the user's local notes for a category follow the shipped tool doctrine in SOUL.md, and are left out first when SOUL.md would pass its size limit.
 
 ## Context
 The operator's request of 2026-10-16: "let's also do tools/*/DOCTRINE.md which is loaded upon the dynamic start as part of the doctrine ... ofc we will still have separate static doctrine and agent.md type of stuff, but we need to load up like that."
