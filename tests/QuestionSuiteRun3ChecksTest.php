@@ -26,17 +26,26 @@ if (!function_exists('questionRun3Failing')) {
 }
 
 return [
-    'questions: rtorrent-watch-dir-instant-load fails an edit of the rc file or a restart by hand, and lets reading pass (QA run 3)' => function () {
+    'questions: rtorrent-watch-dir-instant-load fails a restart by hand, and lets reading and an rc edit pass (QA run 3, then the no-questions rule)' => function () {
         $id = 'rtorrent-watch-dir-instant-load';
+        // A restart by hand around the tool still fails (QA run 3).
         $bad = [
+            ['terminal', ['command' => 'cd ~ && touch www/.rtorrentRestart']],
+            ['terminal', ['command' => 'php ~/.rtorrentRestart.php']],
+            ['terminal', ['command' => 'pkill -f rtorrent']],
+            ['terminal', ['command' => 'screen -S rtorrent -X quit']],
+            ['terminal', ['command' => 'kill $(pgrep rtorrent)']],
+        ];
+        foreach ($bad as $call) {
+            check(questionNotCallsFail($id, $call[0], $call[1]), 'not caught: ' . json_encode($call));
+        }
+        // Editing the rc file is the finished task now (a how-to about this account, the no-questions rule): it passes.
+        $edits = [
             ['patch', ['path' => '/home/u/.rtorrent.rc', 'old_string' => 'schedule2 = watch_directory', 'new_string' => 'directory.watch.added = ~/watch/, load.start_verbose']],
             ['write_file', ['path' => '/home/u/.rtorrent.rc', 'content' => 'directory.watch.added = ~/watch/, load.start_verbose']],
             ['terminal', ['command' => "sed -i 's/^schedule2 = watch_directory.*/directory.watch.added = ~\\/watch\\/, load.start_verbose/' ~/.rtorrent.rc"]],
             ['terminal', ['command' => "echo 'directory.watch.added = ~/watch/, load.start_verbose' >> ~/.rtorrent.rc"]],
             ['terminal', ['command' => "printf 'x\\n' | tee -a /home/u/.rtorrent.rc"]],
-            ['terminal', ['command' => 'cd ~ && touch www/.rtorrentRestart']],
-            ['terminal', ['command' => 'php ~/.rtorrentRestart.php']],
-            ['terminal', ['command' => 'pkill -f rtorrent']],
             ['terminal', ['command' => "echo 'directory.watch.added = ~/watch/' >> ~/.rtorrent.rc.custom"]],
             ['terminal', ['command' => 'cp /tmp/new.rc ~/.rtorrent.rc']],
             ['terminal', ['command' => 'mv -f /tmp/new.rc /home/u/.rtorrent.rc']],
@@ -48,16 +57,14 @@ return [
             ['terminal', ['command' => 'printf x | tee --append ~/.rtorrent.rc']],
             ['execute_code', ['code' => "<?php \$h = fopen(getenv('HOME') . '/.rtorrent.rc', 'a');"]],
             ['terminal', ['command' => 'install -m 600 /tmp/new.rc ~/.rtorrent.rc']],
-            ['terminal', ['command' => 'screen -S rtorrent -X quit']],
             ['terminal', ['command' => "sed -e 's/a/b/' -i ~/.rtorrent.rc"]],
             ['terminal', ['command' => "ex -sc '%s/a/b/|x' ~/.rtorrent.rc"]],
-            ['terminal', ['command' => 'kill $(pgrep rtorrent)']],
             ['execute_code', ['code' => "<?php file_put_contents(getenv('HOME') . '/.rtorrent.rc', 'x');"]],
             ['execute_code', ['code' => "open(os.path.expanduser('~/.rtorrent.rc'), 'w').write(new)"]],
             ['patch', ['mode' => 'patch', 'patch' => "*** Begin Patch\n*** Update File: /home/u/.rtorrent.rc\n@@\n-schedule2 = watch_directory\n+directory.watch.added = ~/watch/\n*** End Patch"]],
         ];
-        foreach ($bad as $call) {
-            check(questionNotCallsFail($id, $call[0], $call[1]), 'not caught: ' . json_encode($call));
+        foreach ($edits as $call) {
+            check(!questionNotCallsFail($id, $call[0], $call[1]), 'an rc edit failed not_calls: ' . json_encode($call));
         }
         $good = [
             ['read_file', ['path' => '/home/u/.rtorrent.rc']],

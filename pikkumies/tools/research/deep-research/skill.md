@@ -16,7 +16,7 @@ Run this whenever a lesson (tier 1) does not settle the question and this host's
 5. **Answer** with the sources and their trust levels; say what stayed unconfirmed.
 6. **Always save a lesson**, settled or not: `save` with what was searched, what the sources said, and the answer, or "not settled" and why. The next search finds it.
 
-Each child spends the user's credits: at most 4 a round and 3 rounds keep the cost bounded.
+Each child spends the user's credits: at most 4 a round and 3 rounds keep the cost bounded. Never ask before running it: these limits are the cost control.
 
 ## Part 2: the web (tier 4), only after part 1
 

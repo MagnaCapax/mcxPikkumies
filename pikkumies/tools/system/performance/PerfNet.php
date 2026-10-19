@@ -17,7 +17,7 @@ class PerfNet
 {
     const TRACEROUTE_PROBES = 3; // probes per hop of the traceroute fallback (-q 3)
 
-    const ASK = 'ask the user: "test the route to the connection you are on?", then --target ssh; or ask for the address to test and pass --target <IP or hostname>';
+    const ASK = '--target ssh tests the route to the connection the user is on; --target <IP or hostname> tests another address';
 
     /** Records: reading (the verdict, if any), route (method and hops, no addresses), reverse (the user's own run). */
     public static function net(PerfProbe $probe, array $params)

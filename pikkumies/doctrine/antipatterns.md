@@ -47,7 +47,7 @@ On a PMSS seedbox, this account's own disk, quota, memory and traffic come from 
 
 ## Changing things safely
 
-33. [delete-before-backup] Deleting, overwriting or truncating before a backup exists. Cue: rm, a cleanup or a "small" overwrite with no copy. Do: back up first and get the user's yes (Safety).
+33. [delete-before-backup] Deleting, overwriting or truncating before a backup exists. Cue: rm, a cleanup or a "small" overwrite with no copy. Do: back up first; when no copy is possible, follow Changing data (Safety).
 34. [backup-beside-original] A backup that dies with the original. Cue: the only copy is `file.bak` on the same failing disk, or a snapshot on the same pool. Do: a `.bak` next to a config protects against a bad edit, not against losing the disk; put a backup meant to survive the disk somewhere else. Tell the user where temporary backups are, so they can remove them once the change is confirmed.
 35. [blind-rerun] Rerunning a half-finished change from the start. Cue: a script or loop stopped halfway and is run again as it is. Do: find what already happened, then continue from there or make each step safe to repeat.
 36. [pkill-matches-itself] Killing your own command with a pattern. Cue: `pkill -f name` (or a pgrep loop) in a command line that itself contains "name". Do: stop services through the service manager or a pid file; list matches with `pgrep -a` and check them before killing.
@@ -61,10 +61,10 @@ On a PMSS seedbox, this account's own disk, quota, memory and traffic come from 
 
 ## Scope and talking to the user
 
-44. [scope-creep] Changing more than was asked. Cue: "while I am here", "might as well". Do: do what was asked; offer the rest.
-45. [unrequested-change] Changing things the user only asked about. Cue: asked "how do I ...?", and the agent edits config or restarts services. Do: answer, offer, and wait for a yes.
-46. [asking-what-you-can-check] Asking the user what a read-only check can answer. Cue: "which OS are you on?", "is it running?". Do: check it yourself, then ask only what only the user knows.
-47. [plan-instead-of-doing] Handing back steps when the user asked you to do it. Cue: "here are the commands you can run" after "please fix it". Do: do the safe steps the request covers; ask only before risky or destructive ones.
+44. [scope-creep] Changing more than was asked. Cue: "while I am here", "might as well". Do: do what was asked; name the rest in one line, as a statement, not a question.
+45. [answered-not-done] Answering a how-to about this account with steps, then offering to do them. Cue: asked "how do I make X do Y?" about software in this account, and the answer ends with "want me to?". Do: when the change can be undone, make it (back up first), check it, and show what changed and how to undo it; a question about how something works in general, or about another machine, gets the answer alone.
+46. [asking-what-you-can-check] Asking the user what a read-only check can answer. Cue: "which OS are you on?", "is it running?". Do: check it yourself; ask only what only the user knows and the task cannot go on without. Otherwise take the plain default and say which you took.
+47. [plan-instead-of-doing] Handing back steps when the user asked you to do it. Cue: "here are the commands you can run" after "please fix it". Do: do every step the request covers; only a step with no copy and no undo is asked about (Safety, Changing data).
 48. [fixed-one-of-many] Fixing one copy of a problem that exists in several places. Cue: one config, user or vhost fixed; the same pattern sits next to it. Do: look for the same problem nearby and fix it within the request, or say where it remains.
 49. [reinvented-tool] Building what already exists. Cue: a hand-written script for something the app, the OS or a Pikkumies tool already does. Do: search tools and documentation first and use what is there.
 50. [given-up-early] Saying it cannot be done after one try. Cue: "not possible" or "not supported" after a single failed attempt. Do: look further (documentation, another method), then say exactly what you tried.

@@ -60,7 +60,7 @@ class RtorrentDeleter
         }
         $c->call('d.custom5.set', [$native, '']);
         if ((string) $c->call('d.custom5', [$native]) !== '') {
-            throw new CliError("nothing removed: torrent $id carries ruTorrent's delete-data flag (d.custom5) and it could not be cleared", 'remove it in ruTorrent, or ask the user');
+            throw new CliError("nothing removed: torrent $id carries ruTorrent's delete-data flag (d.custom5) and it could not be cleared", 'removing it now would delete its files: tell the user, and use --with-data only when they asked for the files gone');
         }
     }
 

@@ -119,12 +119,12 @@ return [
             perfDone($fx);
         }
     },
-    'performance net: no target, or ssh without an SSH connection, refuses and tells the agent to ask the user; nothing runs' => function () {
+    'performance net: no target refuses with the target to pass (--target ssh, no question); ssh without an SSH connection refuses and asks the user for their address; nothing runs' => function () {
         $fx = perfFixture();
         try {
             list($code, $recs) = perfRun($fx, ['net']);
             $last = $recs[count($recs) - 1];
-            check($code === 2 && strpos($last['hint'], 'ask the user') !== false, 'dispatcher: ' . json_encode($last));
+            check($code === 2 && strpos($last['hint'], '--target ssh') !== false && strpos($last['hint'], 'ask the user') === false, 'dispatcher: ' . json_encode($last));
             list($code, $recs) = perfRun($fx, ['net', '--target', 'ssh'], [], ['SSH_CONNECTION' => null]);
             $last = $recs[count($recs) - 1];
             check($code === 1 && strpos($last['error'], 'no SSH connection') !== false && strpos($last['hint'], 'ask the user') !== false, 'ssh without SSH_CONNECTION: ' . json_encode($last));
@@ -139,7 +139,7 @@ return [
                 } catch (PerfUsageError $e) {
                     $threw = $e;
                 }
-                check($threw !== null && strpos($threw->hint, 'ask the user') !== false, 'PerfNet::net without a target must refuse: ' . json_encode($params));
+                check($threw !== null && strpos($threw->hint, '--target ssh') !== false && strpos($threw->hint, 'ask the user') === false, 'PerfNet::net without a target must refuse: ' . json_encode($params));
             }
             check($p->calls === [], 'PerfNet ran something without a target');
         } finally {

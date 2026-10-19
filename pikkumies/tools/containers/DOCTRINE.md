@@ -1,5 +1,5 @@
 - Only a daemon your own account owns; never `sudo docker`, root's or another account's daemon, tcp://.
-- On PMSS the platform runs the daemon: never stop, restart or kill it to fix something. Down: wait 5 min, then `systemctl --user start docker.service`, then support. Wedged: only on the user's yes, follow the platform's documented recovery (diagnose prints it; it stops every container) and confirm afterwards that no dockerd-rootless process of the account remains.
+- On PMSS the platform runs the daemon: never stop, restart or kill it to fix something. Down: wait 5 min, then `systemctl --user start docker.service`, then support. Wedged: review it first (every container stops; a `--rm` container is deleted), then follow the platform's documented recovery (diagnose prints it; Pikkumies asks the user to approve it) and confirm afterwards that no dockerd-rootless process of the account remains.
 - On a shared server 127.0.0.1 reaches every account and 0.0.0.0 the internet: the app's login must exist before it is reachable.
 - Per-container limits are not enforced on cgroup v1 or a cgroupfs rootless daemon; the account's limits are shared with the torrent client.
 - Removing containers, images or volumes and any prune need approval; preview first.

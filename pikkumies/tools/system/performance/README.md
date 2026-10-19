@@ -50,7 +50,7 @@ The client-area Diagnose button on PMSS checks the account and the server with t
   Why: the tool sees that a cap exists, not why. Selling an upgrade for a problem the plan does not cause costs the user money and fixes nothing; an I/O cap lower than the plan says is a ticket, not an upgrade.
 - Route verdicts come from the hop where loss starts and lasts to the end, never mid-path loss; the home side is measured by the user, never inferred.
   Why: routers answer probes at low priority, so one hop showing loss that later hops do not is that router's rate limit. The user's own line can only be measured from the user's own computer (the wiki procedure runs mtr both ways).
-- Load tests (fio, iperf3, speedtest, big downloads) only via `performance heavy` on the user's yes, never chained or scheduled; results are the share now, not the ceiling.
+- Load tests (fio, iperf3, speedtest, big downloads) only via `performance heavy` when the user asked for one (Pikkumies asks them to approve it), never chained or scheduled; results are the share now, not the ceiling.
   Why: on a shared server a load test takes disk and bandwidth from everyone, and its number is what this account got at that moment, not what the server can do. The guard asks before each one.
 - Never promise what support or the provider will do; no prices.
   Why: the agent cannot commit anyone but itself, and prices change; the client area and the provider's own pages are the source.

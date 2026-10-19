@@ -342,8 +342,8 @@ class DockerDiagnose
         $facts = $d->facts();
         if ($d->pmss() && in_array($ladder['state'], ['down', 'linger-missing'], true) && $procs['watchdog_alive'] > 0) {
             $recs[] = self::finding('leftover-process', ['watchdog_processes' => $procs['watchdog_alive'], 'needs_user_ok' => true,
-                'next_step' => 'a process the platform\'s watchdog counts as a running daemon is still alive, so it will not start a new one: only on the user\'s yes, follow the platform\'s documented recovery ('
-                    . $facts['recovery'] . '); it stops every container; afterwards run `diagnose` again and check that watchdog_processes is 0',
+                'next_step' => 'a process the platform\'s watchdog counts as a running daemon is still alive, so it will not start a new one: review it first (a container started with --rm is deleted when it stops), then follow the platform\'s documented recovery ('
+                    . $facts['recovery'] . '); it stops every container and Pikkumies asks the user to approve it; afterwards run `diagnose` again and check that watchdog_processes is 0',
                 'source' => $facts['source'], 'verified' => $facts['verified']]);
         }
         if (!$probe['ok']) {
@@ -544,7 +544,7 @@ class DockerDiagnose
         if ($r === null || $r['code'] !== 0) {
             $err = $r === null ? 'time budget spent' : (string) $r['err'];
             if (stripos($err, "'compose' is not a docker command") !== false) {
-                throw new CliError('docker compose is not installed here (the compose plugin); nothing was checked', 'the user installs the compose plugin, or runs the containers one by one with launch-plan');
+                throw new CliError('docker compose is not installed here (the compose plugin); nothing was checked', 'install the compose plugin for this account (Docker documents a manual per-user install), or run the containers one by one with launch-plan');
             }
             $first = preg_split('/\r?\n/', trim($err));
             throw new CliError('docker compose could not read the file: ' . self::redact(substr((string) $first[0], 0, Cli::TEXT_MAX), $secrets), 'fix the compose file; nothing was started');

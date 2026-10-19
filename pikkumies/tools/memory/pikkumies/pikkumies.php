@@ -18,7 +18,7 @@ require_once __DIR__ . '/Lessons.php';
 require_once __DIR__ . '/MemoryStats.php';
 require_once __DIR__ . '/MemoryLinks.php';
 
-const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing else, ask the user; then save what you learn with `save`';
+const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing settles it, say what you searched and that it stays unknown; then save what you learn with `save`';
 const SAVE_NEXT = 'no lesson matched: when the task is done, save what you learned, or what you searched and why it did not settle it: ';
 const PEER_NEXT = 'only other providers\' documentation (tier 3) matched: it may not apply here, so check it on this machine; if it does not answer, tier 4 is deep research (the deep-research skill); for the provider\'s own policies give the support link in the notes; then save what you learn with `save`';
 

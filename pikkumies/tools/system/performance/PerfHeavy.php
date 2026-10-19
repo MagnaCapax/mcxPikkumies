@@ -301,13 +301,13 @@ class PerfHeavy
     {
         $r = Http::request('GET', $url, self::downloadOptions());
         if ($r['error'] !== '' && empty($r['bytes'])) {
-            throw new CliError('the download did not start: ' . self::firstLine($r['error']), 'check the address with the user; nothing was measured');
+            throw new CliError('the download did not start: ' . self::firstLine($r['error']), 'check the address (curl -sI <url>); nothing was measured');
         }
         if ($r['code'] >= 300 && $r['code'] < 400) {
-            throw new CliError("the address redirects (HTTP {$r['code']}); nothing was measured", 'Pikkumies does not follow redirects: ask the user for the final address of the file');
+            throw new CliError("the address redirects (HTTP {$r['code']}); nothing was measured", 'Pikkumies does not follow redirects: pass the final address (the Location header of curl -sI <url>)');
         }
         if ($r['code'] >= 400 || $r['code'] < 200) {
-            throw new CliError("the server answered HTTP {$r['code']}; nothing was measured", 'check the address with the user');
+            throw new CliError("the server answered HTTP {$r['code']}; nothing was measured", 'check the address (curl -sI <url>)');
         }
         $probe->addCost('bytes_downloaded', $r['bytes']);
         $transfer = $r['total_time'] - $r['start_time'];

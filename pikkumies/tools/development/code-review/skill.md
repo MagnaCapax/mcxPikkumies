@@ -9,7 +9,7 @@ Use it when the user asks you to review code, a change, a commit, a branch or a 
 
 ## 0. Gather
 
-1. Run `context` inside the project (`--path DIR` for another directory, `--base REF` for a branch or an older commit; ask the user which base when they named one). Add `--limit 0` when the status line says `truncated`.
+1. Run `context` inside the project (`--path DIR` for another directory, `--base REF` for a branch or an older commit, the one the user named). Add `--limit 0` when the status line says `truncated`.
 2. Read every rules file and the ADR titles it lists. Read the newest ADRs whole, and any older ADR whose title touches what the change touches.
 3. Read the whole diff that `compared` names (`git diff HEAD`, `git diff HEAD~1 HEAD` or `git diff REF`; untracked files are new, read them whole) and every changed file whole, not only the changed lines: a bug often sits next to the change.
 4. Read the tests that cover the changed code, and the callers of every changed function (search for its name).

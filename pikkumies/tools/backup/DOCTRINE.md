@@ -1,6 +1,6 @@
 - The repository password is typed by the user at a terminal (`login`), never in chat or on a command line. Never read `local/secrets/`.
 - `backup remote` is the one exception ([ADR-0049](../../../docs/adr/0049-backup-remote-over-ssh.md)): the one-time login of the backup machine may come from the chat, only as a `PIKKUMIES_REMOTE_PASSWORD='...'` prefix to `setup`. Never repeat it or save it anywhere; tell the user once that it reached the model provider and that changing it is what scrubs it. The gpg passphrase never enters the chat (`passphrase` is the user's own terminal).
 - Removing snapshots: `show --prune-plan --keep-...` first, then `prune --keep-... --expect <n>`; the user approves once for the whole batch.
-- Restore only into a new or empty directory inside the home, never into a FUSE mount, never over existing files. To put a file back, the user moves it with `mv -n`.
+- Restore only into a new or empty directory inside the home, never into a FUSE mount, never over existing files. To put a file back, move it with `mv -n` (it never replaces a file that is there).
 - `check` never repairs; `--read-data` only when asked. `finished: false` says nothing about damage.
-- The tools never delete the restic/borg cache. "disk quota exceeded" during a backup is often that cache; its cleanup (`restic cache --cleanup`, `borg delete --cache-only`) is the user's command.
+- The tools never delete the restic/borg cache. "disk quota exceeded" during a backup is often that cache; it is rebuilt from the repository, so when it is the measured cause clean it (`restic cache --cleanup` for old caches, `borg delete --cache-only <repository>`).

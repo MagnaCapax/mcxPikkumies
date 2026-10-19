@@ -83,7 +83,7 @@ class MediaRestart
         $marker = "$home/.{$app}Disable";
         if (is_link($marker) || (file_exists($marker) && !is_file($marker))) {
             throw new CliError("~/.{$app}Disable is not a plain file; not restarting",
-                'the PMSS panel refuses this too; ask the user to look at it');
+                'the PMSS panel refuses this too; look at it with ls -la and tell the user what it is');
         }
         if (file_exists($marker)) {
             throw new CliError(ucfirst($app) . " is turned off on this account (~/.{$app}Disable); not restarting",

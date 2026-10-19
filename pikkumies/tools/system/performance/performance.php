@@ -67,7 +67,7 @@ function perfTarget($t, $allowSsh)
         return $t;
     }
     throw new PerfUsageError("not a target: an IP address or a hostname" . ($allowSsh ? ', or ssh' : '') . " was expected", $allowSsh
-        ? 'ask the user: "test the route to the connection you are on?", then --target ssh; or --target <IP or hostname>'
+        ? '--target ssh (the route to the connection the user is on), or --target <IP or hostname>'
         : 'the server to test against, e.g. --target iperf.example.net');
 }
 
@@ -122,7 +122,7 @@ function perfParams($verb, array $args, array $opt)
             return ['tick' => false, 'symptom' => $symptom, 'share' => $has('share'), 'with_ip' => $has('with-ip')];
         case 'net':
             if (!$has('target')) {
-                throw new PerfUsageError('net needs --target; nothing was run', 'ask the user: "test the route to the connection you are on?", then --target ssh');
+                throw new PerfUsageError('net needs --target; nothing was run', '--target ssh tests the route to the connection the user is on');
             }
             return ['target' => perfTarget($str('target'), true), 'count' => perfInt($opt, 'count', 1, PerfLimits::NET_COUNT_MAX, PerfLimits::NET_QUICK_COUNT)];
         case 'disk':
@@ -130,7 +130,7 @@ function perfParams($verb, array $args, array $opt)
         case 'heavy':
             $test = $has('test') ? $str('test') : '';
             if (!in_array($test, PERF_HEAVY_TESTS, true)) {
-                throw new PerfUsageError('heavy needs --test ' . implode('|', PERF_HEAVY_TESTS), 'run disk first; a heavy test only after the user said yes');
+                throw new PerfUsageError('heavy needs --test ' . implode('|', PERF_HEAVY_TESTS), 'run disk first; heavy only when the user asked for a speed test or benchmark (Pikkumies asks them to approve it)');
             }
             $p = ['test' => $test, 'url' => null, 'target' => null];
             if ($test === 'download') {

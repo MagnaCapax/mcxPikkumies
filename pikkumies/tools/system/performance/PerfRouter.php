@@ -509,7 +509,7 @@ class PerfRouter
             }
         };
         if (in_array($symptom, ['slow-download', 'slow-upload', 'lag', 'everything'], true)) {
-            $out[] = ['unit' => 'performance', 'verb' => 'net --target ssh', 'why' => 'the route to your connection; ask the user first'];
+            $out[] = ['unit' => 'performance', 'verb' => 'net --target ssh', 'why' => 'the route to your connection'];
         }
         if (in_array($symptom, ['stalls', 'torrents'], true)) {
             $out[] = ['unit' => 'performance', 'verb' => 'disk', 'why' => 'a light disk probe compared with the server\'s disk wait'];

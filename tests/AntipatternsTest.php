@@ -56,9 +56,9 @@ return [
         check(strpos($s, '[load-is-not-cpu]') === false && strpos($s, '# Common mistakes') === false, 'antipatterns.md reached SOUL.md; it is read on demand (ADR-0063)');
         check(strpos($s, 'doctrine/antipatterns.md') !== false, 'the doctrine must point the agent to doctrine/antipatterns.md');
     },
-    'antipatterns: the Never line on user data stays word for word; Changing data, the Python rule and the common-mistakes pointer reach SOUL.md (ADR-0063)' => function () {
+    'antipatterns: the Never line on user data says the 2026-10-19 rule word for word (a copy, or the exact request plus a clean review); Changing data, the Python rule and the common-mistakes pointer reach SOUL.md (ADR-0063)' => function () {
         $safety = (string) file_get_contents(Config::root() . '/doctrine/safety.md');
-        check(explode("\n", $safety)[6] === "- Never delete, overwrite or truncate user data without a backup and the user's clear yes, both. Size does not matter: one byte or one terabyte.", 'safety.md line 7 changed: ' . explode("\n", $safety)[6]);
+        check(explode("\n", $safety)[6] === "- Never delete, overwrite or truncate user data that has no copy, unless the user asked for exactly that and an adversarial review found nothing they would not want. Size does not matter: one byte or one terabyte.", 'safety.md line 7 changed: ' . explode("\n", $safety)[6]);
         check(strpos($safety, "## Never\n") < strpos($safety, "## Changing data\n") && strpos($safety, "## Changing data\n") < strpos($safety, "## Always\n"), 'Changing data must sit between Never and Always');
         $doctrine = (string) file_get_contents(Config::root() . '/doctrine/doctrine.md');
         $accuracy = substr($doctrine, 0, (int) strpos($doctrine, "\n## Sources and trust"));

@@ -255,8 +255,8 @@ class DockerCli
         }
         if (!empty($o['processes'])) {
             return $mk('wedged', $facts
-                ? 'the daemon\'s processes are alive but it does not answer: only on the user\'s yes, follow the platform\'s documented recovery (' . $facts['recovery'] . '); it stops every container; afterwards confirm that no dockerd-rootless process of this account remains'
-                : 'the daemon\'s processes are alive but it does not answer: only on the user\'s yes, restart the user\'s own daemon the way it was started (for a systemd user unit: systemctl --user restart docker); it stops every container', 'every container stops during the recovery', true);
+                ? 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then follow the platform\'s documented recovery (' . $facts['recovery'] . '); it stops every container and Pikkumies asks the user to approve it; afterwards confirm that no dockerd-rootless process of this account remains'
+                : 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then restart the user\'s own daemon the way it was started (for a systemd user unit: systemctl --user restart docker); it stops every container and Pikkumies asks the user to approve it', 'every container stops during the recovery', true);
         }
         if (array_key_exists('docker_enabled', $o) && $o['docker_enabled'] === false) {
             return $mk('disabled-for-account', 'the platform reports Docker as off for this account (userShowLimits "Docker enabled": false), so nothing starts the daemon: tell the user; support can say why', 'the daemon cannot start', false);
