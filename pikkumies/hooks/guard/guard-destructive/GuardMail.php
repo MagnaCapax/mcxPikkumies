@@ -45,7 +45,7 @@ function guardMail($command, array $texts)
         if (!HookUnits::approveShown($approveMessage)) {
             return ['action' => 'block', 'message' => 'Pikkumies safety: the smtp test command is too long to show the user in full. Not run.'];
         }
-        return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $id, 'message' => $approveMessage];
+        return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $id, 'message' => $approveMessage, 'kind' => 'mail'];
     }
     if (!$hit('/send-draft' . $word . '/')) {
         return null; // send writes a draft only; send-self goes only to the user's own addresses
@@ -107,5 +107,5 @@ function guardMail($command, array $texts)
             $hi = $mid - 1;
         }
     }
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $sha, 'message' => $best !== null ? $best : $headOnly];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $sha, 'message' => $best !== null ? $best : $headOnly, 'kind' => 'mail'];
 }

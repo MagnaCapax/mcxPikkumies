@@ -66,6 +66,10 @@ class HookAnswers
                     $out[$k] = trim($get($k));
                 }
             }
+            // What the question is about, for the ask policy (ADR-0073); never part of the answer Hermes gets.
+            if (is_string($get('kind')) && preg_match('/^[a-z][a-z-]{0,23}\z/', $get('kind'))) {
+                $out['kind'] = $get('kind');
+            }
             return $out;
         }
         return null;

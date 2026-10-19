@@ -22,9 +22,9 @@ class HermesInstall
     const STABLE_TAG_RE = '/^v(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/';
     // The official repository in the URL forms upstream accepts for origin (hermes_cli/source_releases.py).
     const ORIGIN_RE = '#^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)NousResearch/hermes-agent(?:\.git)?/?$#i';
-    // What the delete guard answers for the rm -rf in verify() (hooks/guard/guard-destructive); any other block,
+    // What the delete guard answers for the mkfs in verify() (hooks/guard/guard-destructive; rm -rf is asked, ADR-0073); any other block,
     // such as "could not be read", means the payload did not reach the guard the way a real call does.
-    const GUARD_BLOCK = 'Pikkumies safety: recursive force delete';
+    const GUARD_BLOCK = 'Pikkumies safety: filesystem format';
     // Optional tools upstream's installer can leave out (install.sh --skip-browser / --skip-computer-use);
     // pm records the choice, so `hermes update` keeps them out too (pm/defaults.py). Left out unless
     // hermes.lazyInstalls is on (ADR-0021).
@@ -63,6 +63,10 @@ class HermesInstall
         'sessions.auto_prune' => ['hermes_cli/config_defaults.py', '"auto_prune":'],
         'sessions.retention_days' => ['hermes_cli/config_defaults.py', '"retention_days":'],
         'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
+        'onboarding.profile_build' => ['agent/onboarding.py', '_onboarding_section(config).get("profile_build")'],
+        'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
+        'agent.disabled_toolsets' => ['hermes_cli/tools_config.py', '.get("disabled_toolsets")'],
+        'auxiliary.approval' => ['hermes_cli/config_defaults.py', '"approval": _aux('],
     ];
 
     /**
@@ -543,7 +547,7 @@ class HermesInstall
 
     /**
      * The checks a changed checkout must pass before Hermes starts on it: every config key we set still
-     * exists, the managed settings layer is there and refuses a pinned key, and the delete guard still blocks `rm -rf`
+     * exists, the managed settings layer is there and refuses a pinned key, and the delete guard still blocks `mkfs`
      * through Hermes' own hook runner. HermesConfig::env() must already be in the environment. $prefix: e.g. setpriv for an unattended caller.
      * Returns the problems, [] when it passed.
      */
@@ -558,7 +562,7 @@ class HermesInstall
         }
         $bin = self::bin();
         $payload = self::localDir() . '/hook-check-' . getmypid() . '.json';
-        $json = json_encode(['args' => ['command' => 'rm -rf /tmp/pikkumies-hook-check']], JSON_UNESCAPED_SLASHES);
+        $json = json_encode(['args' => ['command' => 'mkfs.ext4 /tmp/pikkumies-hook-check']], JSON_UNESCAPED_SLASHES);
         if ($bin === '' || @file_put_contents($payload, $json) !== strlen($json)) {
             $problems[] = 'could not run the delete guard check';
             return $problems;
@@ -569,7 +573,7 @@ class HermesInstall
         @unlink($payload);
         $text = implode("\n", $out);
         if (strpos($text, '"action": "block"') === false || strpos($text, self::GUARD_BLOCK) === false) {
-            $problems[] = 'the delete guard did not block rm -rf in `hermes hooks test` (exit ' . $code . ')';
+            $problems[] = 'the delete guard did not block mkfs in `hermes hooks test` (exit ' . $code . ')';
         }
         // The pins are applied: Hermes refuses to change one. A user config.yaml that does not parse is the user's
         // file to fix (doctor says where the copies are), not a reason to refuse Hermes (ADR-0062).

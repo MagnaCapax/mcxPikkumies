@@ -43,7 +43,7 @@ return [
     },
     'guard coverage: text written into a background shell is checked like a terminal command; poll and kill are not' => function () {
         $d = guardToolAnswer('process_manage', ['action' => 'submit', 'session_id' => 'proc_1', 'data' => 'rm -rf ~/files']);
-        check($d !== null && $d['action'] === 'block', 'submit of rm -rf must block: ' . json_encode($d));
+        check($d !== null && $d['action'] === 'approve' && $d['kind'] === 'delete', 'submit of rm -rf must be asked as a delete (ADR-0073): ' . json_encode($d));
         $d = guardToolAnswer('process_manage', ['action' => 'write', 'session_id' => 'proc_1', 'data' => "cat ~/.virsilipasKey\n"]);
         check($d !== null && $d['action'] === 'block', 'write of a key read must block');
         $d = guardToolAnswer('process_manage', ['action' => 'submit', 'session_id' => 'proc_1', 'data' => 'rm old.log']);

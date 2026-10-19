@@ -116,6 +116,6 @@ if (!function_exists('haltRunReplies')) {
     /** The light model's answer sets the tests script: [continue (Q3 no), done, chat]. */
     function haltRunReplies()
     {
-        return ["Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no", "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no", "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no"];
+        return ["Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no", "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no", "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"];
     }
 }

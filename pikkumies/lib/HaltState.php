@@ -4,7 +4,7 @@
  * (writes it at pre_llm_call), hooks/halt/halt-guard/ (reads and updates it at pre_verify) and
  * lib/HaltRun.php (the one-shot wrapper, reads and updates it after Hermes exits). One file per
  * session, local/state/halt/<sha1 of session_id>.json (dir 0700, file 0600, written through a
- * temporary name and a rename): {user_message, tail, turn_started, continues, wrapup_sent,
+ * temporary name and a rename): {user_message, tail, asked, turn_started, continues, wrapup_sent,
  * last_judged_turn}. Also owns the halt-guard decision log, local/logs/halt-guard/YYYYMMDD.jsonl.
  */
 require_once __DIR__ . '/Config.php';
@@ -21,11 +21,14 @@ class HaltState
         return self::dir() . '/' . sha1((string) $sessionId) . '.json';
     }
 
-    /** A fresh snapshot for a new turn: $continues, $wrapup_sent and $last_judged_turn always start over. */
-    public static function writeSnapshot($sessionId, $userMessage, $tail)
+    /**
+     * A fresh snapshot for a new turn: $continues, $wrapup_sent and $last_judged_turn always start over. $asked: what the
+     * user wrote or saw (AskReview::evidence), the only evidence the ask review reads (ADR-0073).
+     */
+    public static function writeSnapshot($sessionId, $userMessage, $tail, array $asked = [])
     {
         $new = !is_file(self::file($sessionId));
-        self::put($sessionId, ['user_message' => (string) $userMessage, 'tail' => (string) $tail, 'turn_started' => time(),
+        self::put($sessionId, ['user_message' => (string) $userMessage, 'tail' => (string) $tail, 'asked' => array_values($asked), 'turn_started' => time(),
             'continues' => 0, 'wrapup_sent' => false, 'last_judged_turn' => 0]);
         if ($new) {
             self::prune();

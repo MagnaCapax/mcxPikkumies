@@ -49,6 +49,7 @@ try {
     require_once dirname(__DIR__) . '/lib/LocalHooks.php';
     require_once dirname(__DIR__) . '/lib/HookNotes.php';
     require_once dirname(__DIR__) . '/lib/HookAnswers.php';
+    require_once dirname(__DIR__) . '/lib/AskPolicy.php';
 } catch (\Throwable $e) {
     $hookError = $e->getMessage();
     exit(1);
@@ -177,7 +178,9 @@ try {
     $local = ['units' => [], 'pending' => [], 'problems' => [], 'off' => 'they could not be read (' . substr($e->getMessage(), 0, 120) . ')'];
 }
 // The entry's own timeout comes from the command (HermesConfig::hookEntries); without it, the shipped units' sum.
-$budget = 2;
+// On pre_tool_call the ask review's time is part of it and kept free of local units (ADR-0073).
+$reserve = $hookEvent === 'pre_tool_call' ? AskReview::TIMEOUT : 0;
+$budget = 2 + $reserve;
 foreach ($units as $u) {
     $budget += $u['timeout'];
 }
@@ -202,7 +205,7 @@ foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
     if (!HookPayload::selects($u, $payload, $callTexts)) {
         continue; // a tool hook for another tool
     }
-    if ($isLocal && $start - $started + $u['timeout'] + 2 > $budget) {
+    if ($isLocal && $start - $started + $u['timeout'] + 2 + $reserve > $budget) {
         // Started now it could outlast the Hermes entry, whose timeout blocks every tool call (fail_closed).
         hookLog($hookEvent, $id, 0, 'not-started');
         $notes[] = [$id, "was not started: its {$u['timeout']}s timeout does not fit in what is left of the {$budget}s hook entry; run pikkumies generate", false];
@@ -224,6 +227,7 @@ foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
     }
     if ($hookEvent === 'pre_tool_call' && is_array($directive) && $directive['action'] === 'approve') {
         $directive['unit'] = $id; // named when merged questions are too long to show (HookAnswers::mergeApproves)
+        $directive['local'] = $isLocal; // the person's own question: the ask policy keeps it (ADR-0073)
     }
     if ($isLocal && $hookEvent === 'pre_llm_call' && is_array($directive) && isset($directive['context'])) {
         $directive['context'] = "Local hook $id (written on this machine): " . $directive['context'];
@@ -260,6 +264,15 @@ if ($hookEvent === 'pre_llm_call') {
         }
     }
     $all = array_merge($results, $localResults);
+    if ($hookEvent === 'pre_tool_call') {
+        // Which questions still reach the user (ADR-0073); any doubt keeps them. Counts only, never the payload, go to the log.
+        $askStart = microtime(true);
+        list($all, $asked) = AskPolicy::apply($all, isset($payload['tool_name']) ? (string) $payload['tool_name'] : '',
+            AskPolicy::evidenceFor($session), (int) floor($budget - ($askStart - $started) - 1));
+        if ($asked['dropped'] + $asked['cleared'] + (isset($asked['error']) ? 1 : 0) > 0) { // a kept question is the old behaviour: not logged
+            hookLog($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked));
+        }
+    }
     $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);
 }
 if ($answer !== null) {

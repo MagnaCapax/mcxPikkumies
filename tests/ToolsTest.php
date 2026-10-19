@@ -9,7 +9,7 @@ register_shutdown_function(function () use ($guardTree) {
     exec('rm -rf ' . escapeshellarg($guardTree));
 });
 return [
-    'guard hook blocks rm -rf' => function () use ($guardOrchestrator) {
+    'guard hook blocks rm -rf of a whole home folder' => function () use ($guardOrchestrator) {
         $hook = $guardOrchestrator;
         list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /home/x']]));
         $d = json_decode($out, true);

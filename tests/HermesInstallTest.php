@@ -49,7 +49,7 @@ if (isset($argv[2]) && $argv[1] === "hooks" && $argv[2] === "test") {
     $i = array_search("--payload-file", $argv, true);
     file_put_contents(getenv("PK_FAKE_LOG"), "payload " . ($i !== false ? file_get_contents($argv[$i + 1]) : "none") . "\n", FILE_APPEND);
     $o = getenv("PK_FAKE_HOOK_OUT");
-    echo $o !== false && $o !== "" ? $o : "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies safety: recursive force delete. Not run.\"}\n";
+    echo $o !== false && $o !== "" ? $o : "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies safety: filesystem format. Refused outright, not asked.\"}\n";
 }
 // `config set` of a pinned key: what Hermes prints when it refuses one, or the text in PK_FAKE_SET_OUT (exit 0).
 if (isset($argv[2]) && $argv[1] === "config" && $argv[2] === "set") {
@@ -455,7 +455,7 @@ return [
                 check(HermesInstall::checkBeforeStart() === [], 'a good checkout must be accepted: ' . json_encode(HermesInstall::checkBeforeStart()));
                 check(HermesInstall::verifiedCommit() === $w['release'], 'the accepted commit must be recorded');
                 $log = (string) file_get_contents($w['log']);
-                check(strpos($log, 'hermes hooks test pre_tool_call --for-tool terminal --payload-file ') !== false && strpos($log, 'payload {"args":{"command":"rm -rf /tmp/pikkumies-hook-check"}}') !== false, 'the guard must be tested with rm -rf: ' . $log);
+                check(strpos($log, 'hermes hooks test pre_tool_call --for-tool terminal --payload-file ') !== false && strpos($log, 'payload {"args":{"command":"mkfs.ext4 /tmp/pikkumies-hook-check"}}') !== false, 'the guard must be tested with mkfs: ' . $log);
                 check(!glob($w['root'] . '/local/hook-check-*'), 'the payload file must be removed');
                 // Same commit: no second run, even if the guard would now fail.
                 testWithEnv(['PK_FAKE_HOOK_OUT' => "      parsed: <none>\n"], function () use ($w) {
@@ -469,7 +469,7 @@ return [
                 $moved = HermesInstall::head();
                 testWithEnv(['PK_FAKE_HOOK_OUT' => "      parsed: <none — hook contributed nothing to the dispatcher>\n"], function () use ($w) {
                     $p = HermesInstall::checkBeforeStart();
-                    check($p === ['the delete guard did not block rm -rf in `hermes hooks test` (exit 0)'], 'got ' . json_encode($p));
+                    check($p === ['the delete guard did not block mkfs in `hermes hooks test` (exit 0)'], 'got ' . json_encode($p));
                     check(HermesInstall::verifiedCommit() === $w['release'], 'a failing commit must not be recorded');
                 });
                 $f = "$tree/hermes_cli/config_defaults.py";
@@ -519,7 +519,7 @@ return [
     'hermes start check: the shipped delete guard answers the rm -rf check with the block text verify() expects' => function () {
         // Hermes hands the hook tool_input from the payload's args (agent/shell_hooks.py), so this is what the guard sees.
         list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php', [],
-            json_encode(['hook_event_name' => 'pre_tool_call', 'tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /tmp/pikkumies-hook-check'], 'session_id' => 'test-session']));
+            json_encode(['hook_event_name' => 'pre_tool_call', 'tool_name' => 'terminal', 'tool_input' => ['command' => 'mkfs.ext4 /tmp/pikkumies-hook-check'], 'session_id' => 'test-session']));
         $answer = json_decode(trim($out), true);
         check($code === 0 && is_array($answer) && $answer['action'] === 'block' && strpos($answer['message'], HermesInstall::GUARD_BLOCK) === 0, 'guard answer: ' . $out);
     },

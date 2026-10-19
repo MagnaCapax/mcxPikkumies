@@ -135,13 +135,13 @@ return [
     'hook entries: the summed timeout is clamped to 300; an errored unit\'s timeout still counts' => function () {
         $dir = testTempDir('pk-hu');
         try {
-            foreach ([60, 60, 60, 60, 57] as $i => $t) {
+            foreach ([60, 60, 60, 60, 49] as $i => $t) { // plus 2, plus AskReview::TIMEOUT (8) on pre_tool_call (ADR-0073)
                 hookUnitsAdd($dir, "s/u$i", hookUnitsMd("u$i", ['timeout' => (string) $t]));
             }
-            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 299, 'unclamped sum 297 + 2');
+            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 299, 'unclamped sum 289 + 2 + 8');
             unlink("$dir/s/u4/hook.md");
-            hookUnitsAdd($dir, 's/u4', hookUnitsMd('u4', ['timeout' => '59']));
-            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 300, 'sum 299 + 2 not clamped to 300');
+            hookUnitsAdd($dir, 's/u4', hookUnitsMd('u4', ['timeout' => '51']));
+            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 300, 'sum 291 + 2 + 8 not clamped to 300');
         } finally {
             testRmTree($dir);
         }
@@ -149,7 +149,7 @@ return [
         try {
             hookUnitsAdd($dir, 'e/ok', hookUnitsMd('ok', ['timeout' => '10']));
             hookUnitsAdd($dir, 'e/bad', hookUnitsMd('bad', ['timeout' => '20', 'failClosed' => 'yes']));
-            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 32, 'errored unit timeout not counted: ' . json_encode(HermesConfig::hookEntries($dir)));
+            check(HermesConfig::hookEntries($dir)['pre_tool_call']['timeout'] === 40, 'errored unit timeout not counted (10 + 20 + 2 + 8): ' . json_encode(HermesConfig::hookEntries($dir)));
         } finally {
             testRmTree($dir);
         }

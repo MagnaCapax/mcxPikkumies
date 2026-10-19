@@ -78,8 +78,8 @@ if (!function_exists('haltHookTree')) {
     }
 }
 
-$continueReply = "Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no"; // Q3 no -> continue
-$doneReply = "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no"; // work carried out, nothing left -> wrap-up
+$continueReply = "Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"; // Q3 no -> continue
+$doneReply = "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"; // work carried out, nothing left -> wrap-up
 
 return [
     'halt-snapshot: writes {user_message, tail, turn_started, continues:0, wrapup_sent:false}, dir 0700, file 0600, prints nothing' => function () {

@@ -11,7 +11,7 @@ if (!function_exists('haltOfferAnswers')) {
     /** A full Q1..Q8 answer set: everything 'no' except the overrides. */
     function haltOfferAnswers(array $over)
     {
-        return array_merge(['Q1' => 'no', 'Q2' => 'no', 'Q3' => 'no', 'Q4' => 'no', 'Q5' => 'no', 'Q6' => 'no', 'Q7' => 'no', 'Q8' => 'no'], $over);
+        return array_merge(['Q1' => 'no', 'Q2' => 'no', 'Q3' => 'no', 'Q4' => 'no', 'Q5' => 'no', 'Q6' => 'no', 'Q7' => 'no', 'Q8' => 'no', 'Q9' => 'no'], $over);
     }
 
     /** Question $n exactly as the light model reads it in the prompt. */
@@ -24,7 +24,7 @@ if (!function_exists('haltOfferAnswers')) {
 }
 
 return [
-    'HaltJudge offer (wording only, not model behaviour): how-to is no request, a polite request is one, an unrequested change waits on the user, a change the requested work needs counts as asked' => function () {
+    'HaltJudge offer (wording only, not model behaviour): how-to is no request, a polite request is one, an unrequested change that cannot be undone waits on the user, a change the requested work needs counts as asked' => function () {
         $want = [
             1 => ['how something works or what to do'],
             2 => ['A polite request to do something ("can you check ...", "please restart ...") is a request', 'how it could be done ("how do I ...?", "can you tell me how ...?", "can you explain ...?") is not'],

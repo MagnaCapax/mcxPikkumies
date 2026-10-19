@@ -50,11 +50,11 @@ return [
         guardEdgeExpect(['git push --force', 'git push origin main --force', 'git push -f origin main', 'git push --force-with-lease'], 'block', 'force push');
         guardEdgeExpect(['git push origin main', 'git push -u origin feature-f'], 'none');
     },
-    'guard: rm -rf behind env, sudo, command, a subshell or a backslash is still blocked' => function () {
-        guardEdgeExpect(['FOO=1 rm -rf ~/a', 'env rm -rf ~/a', 'sudo rm -rf ~/a', 'command rm -rf ~/a', '(rm -rf ~/a)', '\\rm -rf ~/a', 'cd ~ && rm -fr a'], 'block', 'recursive force delete');
+    'guard: rm -rf behind env, sudo, command, a subshell or a backslash is still asked as a delete (the ask review decides, ADR-0073)' => function () {
+        guardEdgeExpect(['FOO=1 rm -rf ~/a', 'env rm -rf ~/a', 'sudo rm -rf ~/a', 'command rm -rf ~/a', '(rm -rf ~/a)', '\\rm -rf ~/a', 'cd ~ && rm -fr a'], 'approve', 'deletes or empties files');
     },
     'guard: a quote-split verb is the same command once the shell joins it' => function () {
-        guardEdgeExpect(['r"m" -rf /home/x', "'r'm -rf /home/x", 'r\\m -rf ~/a', "\"rm\" '-rf' ~/a"], 'block', 'recursive force delete');
+        guardEdgeExpect(['r"m" -rf /home/x/a', "'r'm -rf /home/x/a", 'r\\m -rf ~/a', "\"rm\" '-rf' ~/a"], 'approve', 'deletes or empties files');
         guardEdgeExpect(["'r'm ~/x", 'u"nlink" ~/x'], 'approve', 'deletes or empties files');
         guardEdgeExpect(['c"h"mod 0777 x'], 'block', 'world-writable permissions');
     },
@@ -72,8 +72,9 @@ return [
         guardEdgeExpect([': > ~/data/x', 'cd ~/data; : > big.log', 'cp /dev/null ~/x', 'mv ~/x /dev/null', 'find . -name a | xargs rm', 'ls *.part | xargs -0 rm'], 'approve', 'deletes or empties files');
         guardEdgeExpect(['ls ~/data 2>/dev/null', 'cp a b 2> /dev/null', 'mv a b >/dev/null 2>&1', 'echo ok > out.txt', 'echo a: > notes.txt', 'which rm'], 'none');
     },
-    'guard: a destructive phrase inside quoted prose is still blocked (accepted over-blocking)' => function () use ($forkBomb) {
-        guardEdgeExpect(['echo "never run rm -rf / on a server"', "git commit -m 'stop the fork bomb $forkBomb'"], 'block');
+    'guard: a destructive phrase inside quoted prose is still caught (accepted over-blocking and over-asking)' => function () use ($forkBomb) {
+        guardEdgeExpect(["git commit -m 'stop the fork bomb $forkBomb'"], 'block');
+        guardEdgeExpect(['echo "never run rm -rf / on a server"'], 'approve', 'deletes or empties files');
     },
     'guard: rclone serve with --addr= on loopback gets no answer, on all interfaces asks the user' => function () {
         guardEdgeExpect(['rclone serve http ~/data --addr=127.0.0.1:8080', 'rclone serve webdav ~/d --addr=localhost:9000'], 'none');
@@ -121,9 +122,9 @@ return [
         }
     },
     'guard: a payload too deep or broken to decode blocks; empty input and other tools get no answer' => function () {
-        $deep = '{"tool_name":"terminal","tool_input":{"command":"rm -rf /home/x","x":' . str_repeat('[', 600) . str_repeat(']', 600) . '}}';
+        $deep = '{"tool_name":"terminal","tool_input":{"command":"rm -rf /home/x/a","x":' . str_repeat('[', 600) . str_repeat(']', 600) . '}}';
         list($code, $d, $raw) = guardEdgeRun($deep);
-        check($code === 0 && is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'recursive force delete') !== false, 'a 600-deep payload hid rm -rf: ' . $raw);
+        check($code === 0 && is_array($d) && $d['action'] === 'approve' && strpos($d['message'], 'deletes or empties files') !== false, 'a 600-deep payload hid rm -rf: ' . $raw);
         foreach (['{"tool_name":"terminal","tool_input":{"command":"rm -rf', 'not json', '"a string"', '42'] as $bad) {
             list($code, $d, $raw) = guardEdgeRun($bad);
             check($code === 0 && is_array($d) && $d['action'] === 'block' && $d['message'] !== '', "undecodable payload got no block: $bad -> $raw");

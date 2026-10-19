@@ -1,8 +1,8 @@
 <?php
 /**
- * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): blocks obviously destructive terminal commands and tells
- * the agent to ask the user first; data deletes the user may want (backup prunes, torrent data)
- * go to Hermes' human-approval gate instead (ADR-0020). Reads the hook JSON on stdin, prints a
+ * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): refuses obviously destructive terminal commands outright;
+ * data deletes the user may want (backup prunes, torrent data) are asked, and the orchestrator's ask policy decides
+ * which of those questions reach the user (ADR-0020, ADR-0073). Reads the hook JSON on stdin, prints a
  * JSON decision on stdout (agent/shell_hooks.py _parse_pre_tool_call).
  *
  * This is a safety prompt for the agent's own mistakes, NOT a security boundary: the user
@@ -79,6 +79,8 @@ $secretPatterns = [
     // `credits balance` answers balance questions without it.
     '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
+    // The halt snapshot holds what the user wrote, the only evidence the ask review trusts (ADR-0073): the agent never touches it.
+    '#state/+halt\b#' => 'a command on the halt guard\'s state (local/state/halt/), which records what the user asked; the agent never needs it',
 ];
 if ($fileTool) {
     // A V4A patch has no path: each file its headers name, both sides of a Move, is checked like a path (ADR-0020).
@@ -116,11 +118,12 @@ if ($scheduleTool) {
         echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a scheduled script job too long to show the user in full. Not run.']) . "\n";
         exit(0);
     }
-    guardSay(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => $approveMessage]);
+    guardSay(['action' => 'approve', 'rule_key' => 'pikkumies-schedule:' . $id, 'message' => $approveMessage, 'kind' => 'schedule']);
 }
 
 $patterns = $secretPatterns + [
-    '/\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i' => 'recursive force delete',
+    // Hermes' hardline list refuses rm -r of ~ and $HOME, not the same folder written as /home/<name> (tools/approval_detection.py).
+    '#(^|[\s;&|(`])rm\s+(-\S*\s+)*-[a-zA-Z]*[rR][a-zA-Z]*\s+(\S+\s+)*["\']?/home/[^/\s"\']+/?\*?["\']?(\s|$|[;&|)])#' => 'recursive delete of a whole home folder',
     '/\bmkfs(\.|\s)/'                              => 'filesystem format',
     '/\bdd\s+[^|]*\bof=\/dev\//'                    => 'raw write to a device',
     '/\b(fdisk|parted|sgdisk|wipefs)\b/'            => 'partition or signature change',
@@ -153,13 +156,13 @@ foreach ($patterns as $re => $why) {
         $why = 'a command too long or complex to check'; // a regex engine error must not let the call through
     }
     if ($hit !== 0) {
-        echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run. Show the user the exact command and ask them to run it themselves if they want it."]) . "\n";
+        echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
         exit(0);
     }
 }
 // A Hermes command line read word by word: -z anywhere, --oneshot before the subcommand, -p, profile use (ADR-0020).
 if (NestedAgent::guardCommand($texts)) {
-    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: ' . NestedAgent::WHY_START . '. Not run. Show the user the exact command and ask them to run it themselves if they want it.']) . "\n";
+    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: ' . NestedAgent::WHY_START . '. Refused outright, not asked. Do the work in this session instead.']) . "\n";
     exit(0);
 }
 
@@ -263,7 +266,8 @@ $approve = [
     '/\bcore\.remove_torrents?\b/'                                                            => ['delete', 'removes torrents, and with remove_data their files, through Deluge'],
     '/\bexecute[a-z0-9.]*\b.*\brm\b/s'                                                         => ['delete', 'runs rm through rTorrent'],
     // Plain file deletes: Hermes' own list catches only rm -r and rm /, and its default "smart" mode lets a
-    // second model approve them; the user decides about their files (ADR-0020). rm -rf stays blocked above.
+    // second model approve them. rm -rf is asked here too, and the ask review decides whether it reaches the user (ADR-0073);
+    // Hermes' own hardline list still blocks rm -rf of /, the home and system folders.
     '/(^|[\s;&|(`"\'])(rm|unlink|shred|truncate)\s/'                                           => ['delete', 'deletes or empties files'],
     // Emptying or deleting without a delete verb: `: > f`, `cp /dev/null f`, `mv f /dev/null`, `... | xargs rm`.
     '#(^|[\s;&|(]):\s*>(?!>)|\b(cp|mv)\b[^;&|\n]*(?<![>&\s])\s+/dev/null\b|\bxargs\b.*\b(rm|unlink|shred)\b#s' => ['delete', 'deletes or empties files'],
@@ -320,7 +324,7 @@ foreach ($approve as $re => $rule) {
             echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why, and the command is too long to show the user in full. Not run. Split it into smaller commands."]) . "\n";
             exit(0);
         }
-        guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => $approveMessage]);
+        guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => $approveMessage, 'kind' => $kind]); // kind: for the ask policy (ADR-0073)
     }
 }
 // Writes to local hooks and notes (ADR-0054), when no rule above asked already.

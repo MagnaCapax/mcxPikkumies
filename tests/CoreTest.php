@@ -114,7 +114,7 @@ return [
         check(strpos($y, 'secret') === false, 'key leaked into config.yaml');
         check(strpos($y, '"/a/skills"') !== false, 'external dir');
         check(strpos($y, "security:\n  allow_lazy_installs: false\n") !== false, 'runtime installs must be off by default (ADR-0021)');
-        check(strpos($y, "approvals:\n  mode: manual\n") !== false, 'dangerous commands must ask the user, not a second model (ADR-0020)');
+        check(strpos($y, "approvals:\n  mode: smart\n") !== false, 'Hermes\' dangerous list goes to its guardian first, the user only on a deny (ADR-0073)');
         $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], true);
         check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
         // Unapproved shell hooks are silently skipped in a non-interactive run.
@@ -130,12 +130,12 @@ return [
         check($entries['pre_tool_call']['failClosed'] === true && $entries['pre_llm_call']['failClosed'] === false
             && $entries['post_tool_call']['failClosed'] === false && $entries['pre_verify']['failClosed'] === false && $entries['post_api_request']['failClosed'] === false, 'only the event with the delete guard fails closed');
         check($entries['post_tool_call']['timeout'] === 9 && $entries['post_api_request']['timeout'] === 4, 'command log 5 s + session counters 2 s + 2; session context 2 s + 2: ' . json_encode($entries));
-        check($entries['pre_tool_call']['timeout'] === 38 && $entries['pre_llm_call']['timeout'] === 26 && $entries['pre_verify']['timeout'] === 32,
-            'timeout = sum of unit timeouts + 2: ' . json_encode($entries));
-        check(preg_match('#/hooks/orchestrator\.php pre_tool_call 38$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
+        check($entries['pre_tool_call']['timeout'] === 48 && $entries['pre_llm_call']['timeout'] === 26 && $entries['pre_verify']['timeout'] === 32,
+            'timeout = sum of unit timeouts + 2, plus the ask review (8 s) on pre_tool_call (ADR-0073): ' . json_encode($entries));
+        check(preg_match('#/hooks/orchestrator\.php pre_tool_call 48$#', $entries['pre_tool_call']['command']) === 1, 'entry runs the orchestrator');
         $guard = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], $entries);
         check(substr_count($guard, '    - command: ') === 5 && substr_count($guard, 'fail_closed') === 1
-            && strpos($guard, "orchestrator.php pre_tool_call 38\"\n      timeout: 38\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
+            && strpos($guard, "orchestrator.php pre_tool_call 48\"\n      timeout: 48\n      fail_closed: true\n") !== false, 'the guarded event must fail closed, and only it: ' . $guard);
         check(strpos($noHooks, "updates:\n  check: false\n") !== false, 'no update check at session start: an unasked call to GitHub (AGENTS.md, ADR-0033)');
         check(strpos($noHooks, "cli:\n  expose_on_path: false\n") !== false, 'Hermes updates must not write launchers into ~/.local/bin (ADR-0033)');
         check(strpos($noHooks, "web:\n  keyless_fallback: false\n  keyless_rescue: false\n") !== false, 'web search must not fall back to outside services unasked');

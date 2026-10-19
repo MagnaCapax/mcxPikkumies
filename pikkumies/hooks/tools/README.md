@@ -7,4 +7,4 @@ A hook unit in `hooks/tools/<tool>/<hook>/` runs only for calls of one tool ([AD
 - A tool hook cannot change a call: `modify` is ignored.
 - The same layout under `~/pikkumies/local/hooks/tools/<tool>/<hook>/` is a local tool hook for one machine; it runs after the shipped hooks from the next start, never blocks by failing, and like every hook sees Hermes' environment, credentials included.
 
-No tool hook ships yet. How to write one: [the SOP](../../doctrine/SOP/make-a-skill-tool-hook-or-pack.md#hook).
+One tool hook ships: [`clarify/decide-yourself`](clarify/decide-yourself/README.md) blocks Hermes' clarify tool ([ADR-0073](../../../docs/adr/0073-no-questions-no-deferrals-one-reviewed-exception.md)). How to write one: [the SOP](../../doctrine/SOP/make-a-skill-tool-hook-or-pack.md#hook).

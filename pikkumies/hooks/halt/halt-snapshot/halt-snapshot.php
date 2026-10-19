@@ -9,6 +9,7 @@
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/HaltState.php';
 require_once dirname(__DIR__, 3) . '/lib/HaltJudge.php';
+require_once dirname(__DIR__, 3) . '/lib/AskReview.php';
 
 const HALT_SNAPSHOT_SESSION_RE = '/^[A-Za-z0-9._-]{1,128}$/';
 
@@ -24,4 +25,6 @@ $extra = isset($payload['extra']) && is_array($payload['extra']) ? $payload['ext
 $messages = isset($extra['conversation_history']) && is_array($extra['conversation_history']) ? $extra['conversation_history'] : [];
 $userMessage = isset($extra['user_message']) ? $extra['user_message'] : '';
 $tail = HaltJudge::tail($messages, $userMessage);
-HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail);
+// What the user wrote or saw, for the ask review (ADR-0073); empty outside a person's own session (cron, a subagent).
+$platform = isset($extra['platform']) && is_string($extra['platform']) ? $extra['platform'] : '';
+HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail, AskReview::evidence($messages, $userMessage, $platform));

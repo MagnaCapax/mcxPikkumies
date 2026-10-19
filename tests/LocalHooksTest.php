@@ -127,12 +127,12 @@ return [
         localHookUnit($tree, 'mine/slow', 'pre_tool_call', false, 10, $sayLH(['action' => 'block', 'message' => 'slow ran']));
         localHookStart($tree);
         try {
-            list(, $raw) = runPhp("$tree/pikkumies/hooks/orchestrator.php", ['pre_tool_call', '9'], json_encode($ls));
+            list(, $raw) = runPhp("$tree/pikkumies/hooks/orchestrator.php", ['pre_tool_call', '17'], json_encode($ls)); // the ask review's 8 s are kept free of local units (ADR-0073)
             check(trim($raw) === '', 'a local modify or an over-budget unit acted: ' . $raw);
             $log = hookFailOutcomes($tree);
             check(in_array('local/mine/mod=modify-ignored', $log, true) && in_array('local/mine/slow=not-started', $log, true), 'log: ' . json_encode($log));
             check(strpos(localHookTurn($tree), 'local/mine/slow was not started') !== false, 'the skipped unit was not named');
-            list(, $raw) = runPhp("$tree/pikkumies/hooks/orchestrator.php", ['pre_tool_call', '22'], json_encode($ls));
+            list(, $raw) = runPhp("$tree/pikkumies/hooks/orchestrator.php", ['pre_tool_call', '30'], json_encode($ls));
             check(strpos($raw, 'slow ran') !== false, 'a unit that fits was not started: ' . $raw);
         } finally {
             testRmTree($tree);
@@ -145,7 +145,7 @@ return [
         try {
             $e = HermesConfig::hookEntries("$tree/pikkumies/hooks");
             check(array_keys($e) === ['pre_tool_call', 'pre_verify'], 'entries: ' . json_encode(array_keys($e)));
-            check($e['pre_tool_call']['timeout'] === 17 && substr($e['pre_tool_call']['command'], -17) === ' pre_tool_call 17', 'pre_tool_call: ' . json_encode($e['pre_tool_call']));
+            check($e['pre_tool_call']['timeout'] === 25 && substr($e['pre_tool_call']['command'], -17) === ' pre_tool_call 25', 'pre_tool_call: ' . json_encode($e['pre_tool_call']));
             check($e['pre_verify']['timeout'] === 6 && $e['pre_verify']['failClosed'] === false, 'pre_verify: ' . json_encode($e['pre_verify']));
         } finally {
             testRmTree($tree);

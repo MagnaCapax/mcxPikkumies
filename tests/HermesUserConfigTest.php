@@ -53,8 +53,8 @@ return [
                 $seed = (string) file_get_contents($w['home'] . '/config.yaml');
                 $pins = (string) file_get_contents($w['local'] . '/hermes-managed/config.yaml');
                 check(strpos($seed, HermesConfig::seedHeader()) === 0 && strpos($seed, HermesConfig::q(Units::generatedDir())) !== false, 'seed: ' . $seed);
-                check(strpos($seed, "checkpoints:\n  enabled: true\n") !== false && strpos($seed, "approvals:\n  mode: manual\n") !== false, 'the seed carries every setting');
-                check(strpos($pins, "approvals:\n  mode: manual\n") !== false && strpos($pins, "hooks:\n") !== false && strpos($pins, 'external_dirs') === false, 'managed: ' . $pins);
+                check(strpos($seed, "checkpoints:\n  enabled: true\n") !== false && strpos($seed, "approvals:\n  mode: smart\n") !== false, 'the seed carries every setting');
+                check(strpos($pins, "approvals:\n  mode: smart\n") !== false && strpos($pins, "hooks:\n") !== false && strpos($pins, 'external_dirs') === false, 'managed: ' . $pins);
                 check((string) file_get_contents($w['local'] . '/hermes-managed/.env') === "PIKKUMIES_API_KEY=sk-secret-value-123\n"
                     && (fileperms($w['local'] . '/hermes-managed/.env') & 0777) === 0600, 'the key goes to the managed .env, 0600');
                 check(!file_exists($w['home'] . '/.env'), 'Pikkumies no longer writes the user\'s .env');

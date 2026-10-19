@@ -18,6 +18,7 @@
  */
 require_once __DIR__ . '/Links.php';
 require_once __DIR__ . '/HermesUserConfig.php';
+require_once __DIR__ . '/AskReview.php'; // AskReview::TIMEOUT in the pre_tool_call entry
 
 class HermesConfig
 {
@@ -111,7 +112,7 @@ class HermesConfig
      * Shell hooks (ADR-0030): one entry per event that has hook units, running hooks/orchestrator.php,
      * which runs the units. The pre_tool_call entry always fails closed: whether the guard does is read
      * from its hook.md, and a broken hook.md must not turn that off. Its timeout covers every unit's own
-     * timeout run one after another, plus 2 seconds, within Hermes' maximum of 300. display_errors=stdout
+     * timeout run one after another, plus 2 seconds (and AskReview::TIMEOUT on pre_tool_call, ADR-0073), within Hermes' maximum of 300. display_errors=stdout
      * (fatal errors only, 4437 = E_ERROR|E_PARSE|E_CORE_ERROR|E_COMPILE_ERROR|E_USER_ERROR|E_RECOVERABLE_ERROR)
      * makes an orchestrator that cannot even compile print text, which a fail-closed entry blocks on.
      * The user's local units (local/hooks/ beside hooks/, ADR-0054) count too, and an event with only local units gets
@@ -130,7 +131,7 @@ class HermesConfig
             if (!$units) {
                 continue;
             }
-            $timeout = 2;
+            $timeout = 2 + ($event === 'pre_tool_call' ? AskReview::TIMEOUT : 0); // the ask review's time (ADR-0073)
             foreach ($units as $u) {
                 $timeout += $u['timeout'];
             }
@@ -181,11 +182,14 @@ class HermesConfig
         // Off unless the user sets hermes.lazyInstalls (ADR-0021), which also decides whether the install
         // declines the optional tools; the required ones (node, ffmpeg, ...) always come (ADR-0033).
         $y .= "security:\n  allow_lazy_installs: " . ($lazyInstalls ? 'true' : 'false') . "\n";
-        // Hermes' default approvals.mode is "smart": a second model decides whether a command on Hermes'
-        // dangerous list (rm -r, find -delete, ...) runs, and it approves "safe file operations"
-        // (tools/approval_smart.py). Deletes need the user's approval (ADR-0020), so the user decides.
-        // config.yaml is deep-merged over the defaults, so timeout and cron_mode: deny stay.
-        $y .= "approvals:\n  mode: manual\n";
+        // Hermes' approvals.mode "smart" (its default): a second model judges a command on Hermes' dangerous list first
+        // and only a deny or an unsure answer asks the user (tools/approval_smart.py); Pikkumies' own hook questions never
+        // pass through it and get their own review (lib/AskPolicy.php). "manual" asked about every restart; "off" would
+        // approve every hook question too (ADR-0073). Deep-merged over the defaults, so timeout and cron_mode: deny stay.
+        $y .= "approvals:\n  mode: smart\n";
+        // No first-contact offer: on the first message Hermes otherwise tells the agent to offer a profile and to ask
+        // consent before every lookup (agent/onboarding.py), and run starts the desktop's onboarding chat (ADR-0073).
+        $y .= "onboarding:\n  profile_build: \"off\"\n  run: false\n";
         // Per-turn working-directory snapshots (/rollback): Hermes defaults this off; the size caps
         // (max_snapshots, max_total_size_mb, max_file_size_mb) stay at Hermes' own values (ADR-0024).
         $y .= $pinsOnly ? '' : "checkpoints:\n  enabled: true\n";
@@ -199,7 +203,12 @@ class HermesConfig
         // goals.max_turns stays at Hermes' own default; nothing here was measured to pick a number.
         if ($goalJudgeModel !== '') {
             $y .= "  goal_judge:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";
+            // The smart approvals guardian (auxiliary.approval) on the same light model (ADR-0073).
+            $y .= "  approval:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";
         }
+        // The seed only, so the line stays the user's: clarify is how Hermes lets the agent stop to ask; the tool hook
+        // hooks/tools/clarify/decide-yourself blocks it on every install, this keeps it out of the model's list (ADR-0073).
+        $y .= $pinsOnly ? '' : "agent:\n  disabled_toolsets:\n    - \"clarify\"\n";
         // Set on explicitly (already Hermes' default): background pruning/archiving of agent-created skills;
         // consolidate stays off, left at Hermes' own default (ADR-0024).
         $y .= $pinsOnly ? '' : "curator:\n  enabled: true\n";

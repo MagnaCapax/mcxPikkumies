@@ -53,8 +53,8 @@ $say = function (array $answer) {
 return [
     'orchestrator: the shipped guard still blocks, asks and stays silent through the orchestrator' => function () {
         $tree = orchestratorTree();
-        list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -rf /home/x']]);
-        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'recursive force delete') !== false, 'rm -rf not blocked through the orchestrator');
+        list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'mkfs.ext4 /home/x.img']]);
+        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'filesystem format') !== false, 'mkfs not blocked through the orchestrator');
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rclone sync ~/a remote:a']]);
         check(is_array($d) && $d['action'] === 'approve' && strpos($d['rule_key'], 'pikkumies-delete:') === 0, 'delete not asked through the orchestrator');
         list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]);
@@ -181,7 +181,7 @@ return [
         ]);
         $e = HermesConfig::hookEntries("$tree/pikkumies/hooks");
         check(array_keys($e) === ['pre_llm_call', 'pre_tool_call'], 'entries: ' . json_encode($e));
-        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call 19", 'failClosed' => true, 'timeout' => 19], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call']));
+        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call 27", 'failClosed' => true, 'timeout' => 27], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call'])); // 10 + 7 + 2, plus AskReview::TIMEOUT (8) for the ask review (ADR-0073)
         check($e['pre_llm_call']['failClosed'] === false && $e['pre_llm_call']['timeout'] === 5, 'pre_llm_call entry: ' . json_encode($e['pre_llm_call']));
         $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], $e);
         check(substr_count($y, '    - command: ') === 2 && substr_count($y, 'fail_closed: true') === 1 && strpos($y, "hooks_auto_accept: true\n") !== false, 'yaml: ' . $y);

@@ -44,7 +44,7 @@ function guardLocal($kind, $tool, array $input, $command, array $texts)
         if (!HookUnits::approveShown($approveMessage)) {
             return ['action' => 'block', 'message' => "Pikkumies safety: a write that can reach local hooks or notes, and the question is too long to show the user in full. Not run. Write less at once."];
         }
-        return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage];
+        return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage, 'kind' => 'local'];
     }
     $write = '#(?<![0-9&])>(?!&)|\b(cp|mv|install|ln|tee|touch|mkdir|rsync|tar|unzip|cpio|patch|curl|wget|dd|truncate|chmod|chown|git)\b'
         . '|\b(sed|perl)\b[^;&|\n]*\s-[a-zA-Z]*i|\b(open|write_text|write_bytes|file_put_contents|fopen|copy|rename|symlink|makedirs|mkdir|move)\s*\(#';
@@ -69,7 +69,7 @@ function guardLocal($kind, $tool, array $input, $command, array $texts)
     if (!HookUnits::approveShown($approveMessage)) {
         return ['action' => 'block', 'message' => 'Pikkumies safety: a write that can reach local hooks or notes, and the command is too long to show the user in full. Not run. Split it into smaller commands.'];
     }
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-local:' . $id, 'message' => $approveMessage, 'kind' => 'local'];
 }
 
 /** $s with /./ and seg/../ folded away, so a path that steps out and back in reads as the path it reaches. */

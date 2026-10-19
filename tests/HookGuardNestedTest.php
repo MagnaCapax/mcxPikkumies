@@ -200,8 +200,8 @@ return [
         $d = nestedGuard('cronjob_manage', $job, '2', null);
         check($d !== null && $d['action'] === 'block', 'a nested agent could schedule a script: ' . json_encode($d));
         check(nestedGuard('cronjob_manage', $job, '1', '1')['action'] === 'approve', 'the top-level schedule question changed');
-        $d = nestedGuard('terminal', ['command' => 'rm -rf ~/a'], '2', '1');
-        check($d !== null && $d['action'] === 'block' && strpos($d['message'], 'recursive force delete') !== false, 'a block rule changed in a nested agent: ' . json_encode($d));
+        $d = nestedGuard('terminal', ['command' => 'mkfs.ext4 ~/a.img'], '2', '1');
+        check($d !== null && $d['action'] === 'block' && strpos($d['message'], 'filesystem format') !== false, 'a block rule changed in a nested agent: ' . json_encode($d));
         check(nestedGuard('terminal', ['command' => 'ls ~'], '2', '1') === null, 'an ordinary command got an answer in a nested agent');
     },
     'nested agent: depth parsing, the exported child depth and the nested test' => function () {
