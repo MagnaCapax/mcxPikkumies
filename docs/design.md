@@ -21,7 +21,7 @@ pikkumies/            the runtime (~/pikkumies)
   hooks/<category>/<hook>/  hook units: hook.md, README.md, <hook>.php, nested the same way; orchestrator.php runs them per event; INDEX.md is generated
                       hooks/tools/<tool>/<hook>/ runs only for calls of that tool (ADR-0054)
   config/             documentationSources.md: the wikis and knowledge bases it searches
-  doctrine/           soul, voice, doctrine, safety; SOP/ for procedures
+  doctrine/           soul, voice, doctrine, safety (in SOUL.md); antipatterns.md, common mistakes read on demand (ADR-0063); SOP/ for procedures
   memory/             your lessons, one markdown file each (never tracked)
   hermes/             Hermes Agent: an unmodified upstream git checkout (never tracked); its Python, tools and dependencies are in local/hermes/
   include/            install state, never tracked: the Hermes ready marker and build lock
