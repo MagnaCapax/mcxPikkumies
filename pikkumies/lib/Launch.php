@@ -21,7 +21,7 @@
 class Launch
 {
     /** Subcommands bin/pikkumies dispatches on its own. */
-    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'configure'];
+    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'configure', 'status-line'];
     const HELP = ['help', '--help', '-h'];
     /** `pikkumies configure` on a terminal: a session with the configure skill loaded and this first prompt (ADR-0052). */
     const CONFIGURE_ARGS = ['chat', '-s', 'pikkumies-configure', '--query=Review my setup and help me configure Pikkumies'];
@@ -99,9 +99,11 @@ class Launch
      * when missing; named windows, so tmux's base-index and other windows never matter. $windows: the
      * session's window names, or null when the session does not exist. $statusCmd, when given, is a shell command
      * whose output leads the session's status-right, refreshed every minute: the credits line (ADR-0040). Set on
-     * this session only, never with -g, so the person's other tmux sessions keep their own status line.
+     * this session only, never with -g, so the person's other tmux sessions keep their own status line. $paneCmd, when given,
+     * is run before it with `--pane=#{pane_id}` added: the memories and the active pane's counters (ADR-0061). tmux cuts
+     * status-right from the left when the terminal is too narrow, so the credits line and the clock stay longest.
      */
-    public static function tmuxPlan($n, $windows, $insideTmux, $cmd, $statusCmd = '')
+    public static function tmuxPlan($n, $windows, $insideTmux, $cmd, $statusCmd = '', $paneCmd = '')
     {
         $s = '=' . self::TMUX_SESSION;
         $w = 'pm' . $n;
@@ -112,9 +114,12 @@ class Launch
             $plan[] = ['tmux', 'new-window', '-d', '-t', $s . ':', '-n', $w, $cmd];
         }
         if ($statusCmd !== '') {
-            // tmux expands formats (#) and strftime (%) inside #() too: doubled, a path holding them still runs.
-            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', '#(' . strtr($statusCmd, ['%' => '%%', '#' => '##']) . ') %H:%M'];
-            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right-length', '90'];
+            // tmux expands formats (#) and strftime (%) inside #() too: doubled, a path holding them still runs; #{pane_id} is
+            // added after the doubling, so tmux puts the active pane's id there.
+            $double = ['%' => '%%', '#' => '##'];
+            $pane = $paneCmd === '' ? '' : '#(' . strtr($paneCmd, $double) . ' --pane=#{pane_id}) ';
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', $pane . '#(' . strtr($statusCmd, $double) . ') %H:%M'];
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right-length', $paneCmd === '' ? '90' : '150'];
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-interval', '60'];
         }
         $plan[] = ['tmux', 'select-window', '-t', "$s:$w"];

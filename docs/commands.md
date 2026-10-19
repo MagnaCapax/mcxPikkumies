@@ -32,6 +32,8 @@ alias pm2='pikkumies tmux 2'   # ... up to pm9
 
 With a Pulsed Media AI key, `pikkumies` prints the credits line when a session starts, and the `pikkumies` tmux session shows it at the right of its status line, refreshed every minute: `💳 4.7M credits ▰▰▰▰▰▰▰▰▰▱ 94% left · ≥1.1M tokens · today 35k`. The bar is what is left of the newest grant; the tokens are a floor from the model's rates, since the platform counts credits. Your other tmux sessions are not changed, and a provider that does not report usage shows nothing. The same line on demand: `php ~/pikkumies/tools/system/credits/credits.php line` ([ADR-0040](adr/0040-credits-line.md)).
 
+To the left of the credits line, the same status line shows the memories and what the agent in the pane in front has done since `pikkumies` started there: `Memories: 42 +3 today · Ctx: 48.2k/1M 4% · Tools: 17 · Code: +120 -8`. Memories are the files `pikkumies doctor` counts, and those saved today (UTC); Ctx is the context the agent's last model request used out of the model's window; Tools counts tool calls, delegated agents' included; Code counts the lines its file edits added and removed (`patch` and `write_file`, not shell commands). A plain session prints the memories once when it starts. On a narrow terminal tmux cuts this part first ([ADR-0061](adr/0061-status-line-memories-context-tool-calls-code-lines.md)).
+
 ## Forcing settings for one run
 
 Three environment variables override the settings for one command, without editing `local/config.php` ([ADR-0038](adr/0038-plain-search-command-config-overlay-live-source-check.md)):

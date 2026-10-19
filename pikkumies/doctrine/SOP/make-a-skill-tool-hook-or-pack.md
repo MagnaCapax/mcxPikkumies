@@ -82,7 +82,7 @@ timeout: 10
 ---
 ```
 
-- `event` is `pre_tool_call` (before each tool call; can block it or ask the user), `pre_llm_call` (before each turn; can add text to the user's message) or `post_tool_call` (after each tool call, with its result in `extra`; observe only, a printed context waits for the next turn).
+- `event` is `pre_tool_call` (before each tool call; can block it or ask the user), `pre_llm_call` (before each turn; can add text to the user's message) `post_tool_call` (after each tool call, with its result in `extra`; observe only, a printed context waits for the next turn) or `post_api_request` (after each model request, with `usage`, `context_length` and `platform` in `extra`; observe only, its output is ignored, [ADR-0061](../../../docs/adr/0061-status-line-memories-context-tool-calls-code-lines.md)).
 - `failClosed: true` (only for `pre_tool_call`): if the hook crashes, times out, exits non-zero without an answer or prints something that is not a JSON object, the call is blocked. Use it only for a hook whose silence would let real damage through, like the delete guard; `false` lets the call run when the hook fails.
 - `timeout` is whole seconds, 1 to 60. The Hermes entry of an event gets the sum of its units' timeouts plus 2 seconds (at most 300), so keep hooks fast.
 

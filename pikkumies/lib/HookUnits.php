@@ -14,9 +14,10 @@ class HookUnits
      * The events the orchestrator runs: pre_tool_call and pre_llm_call are merged (hermes_cli/plugins.py,
      * agent/turn_context.py); post_tool_call is an observer whose answer Hermes ignores (model_tools.py, ADR-0044);
      * pre_verify's first continue answer is the one Hermes keeps the turn going on (agent/turn_stop_gates.py,
-     * agent/verify_hooks.py, ADR-0047).
+     * agent/verify_hooks.py, ADR-0047); post_api_request is an observer after each model request, with the usage under
+     * `extra` (agent/turn_response_intake.py, ADR-0061).
      */
-    const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call', 'pre_verify'];
+    const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call', 'pre_verify', 'post_api_request'];
     const FIELDS = ['name', 'event', 'description', 'failClosed', 'timeout'];
     const MAX_TIMEOUT = 60;
     const MD_MAX = 65536; // bytes of hook.md read; a longer one is a broken unit

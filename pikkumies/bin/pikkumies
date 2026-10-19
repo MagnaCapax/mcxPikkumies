@@ -457,6 +457,11 @@ switch ($cmd) {
             if ($creditsBanner !== '') {
                 out($creditsBanner);
             }
+            // The memories once, and the tmux status line counts this pane from zero again (ADR-0061).
+            require_once dirname(__DIR__) . '/tools/memory/pikkumies/MemoryMetrics.php';
+            list($memTotal, $memToday) = SessionCounters::memories(MemoryMetrics::memoryFiles(), gmdate('Ymd'));
+            out(SessionCounters::render($memTotal, $memToday, null, $creditsUtf8, ['CreditsFormat', 'short']));
+            SessionCounters::reset(Config::localDir(), (string) getenv('TMUX_PANE'));
         }
         // A seeded prompt answered-and-exited (not a TTY on stdin or stdout, Hermes' own behaviour,
         // ADR-0022): pre_verify may never fire for this turn (it only fires after a file edit), so
@@ -529,7 +534,9 @@ switch ($cmd) {
         $insideTmux = (string) getenv('TMUX') !== '';
         // The session's status line shows the credits line, refreshed every minute (ADR-0040).
         $creditsCmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
-        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__), $creditsCmd);
+        // Before it: the memories and the active pane's counters (ADR-0061).
+        $self = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__);
+        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, $self, $creditsCmd, $self . ' status-line');
         $attach = array_pop($plan);
         foreach ($plan as $step) {
             exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);
@@ -540,6 +547,20 @@ switch ($cmd) {
         }
         passthru(implode(' ', array_map('escapeshellarg', $attach)), $code);
         exit($code);
+
+    case 'status-line': // internal: the tmux status segment `pikkumies tmux` sets (ADR-0061); prints nothing on any failure, as the credits line
+        try {
+            require_once dirname(__DIR__) . '/tools/system/credits/CreditsFormat.php';
+            require_once dirname(__DIR__) . '/tools/memory/pikkumies/MemoryMetrics.php';
+            $pane = '';
+            foreach ($passArgs as $a) {
+                $pane = strncmp($a, '--pane=', 7) === 0 ? substr($a, 7) : $pane;
+            }
+            list($memTotal, $memToday) = SessionCounters::memories(MemoryMetrics::memoryFiles(), gmdate('Ymd'));
+            out(SessionCounters::render($memTotal, $memToday, SessionCounters::read(Config::localDir(), $pane), CreditsFormat::utf8Locale(), ['CreditsFormat', 'short']));
+        } catch (\Throwable $x) {
+        }
+        exit(0);
 
     case 'help':
     default:
