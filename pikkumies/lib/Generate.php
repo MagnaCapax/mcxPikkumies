@@ -1,7 +1,7 @@
 <?php
 /**
  * Generate: write the Hermes skills and tools/INDEX.md from the tool units (ADR-0015), and
- * hooks/INDEX.md from the hook units (ADR-0030).
+ * hooks/INDEX.md from the hook units (ADR-0030); reports the user's local hooks and notes what changed (ADR-0054).
  *
  * Runs on install, update and every `pikkumies run`. Under a lock, each file is written only when
  * its content changed, through a temporary file and a rename, so a Hermes session that is running
@@ -11,6 +11,8 @@
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Units.php';
 require_once __DIR__ . '/HookUnits.php';
+require_once __DIR__ . '/LocalHooks.php';
+require_once __DIR__ . '/NestedAgent.php';
 require_once __DIR__ . '/Host.php';
 
 class Generate
@@ -43,13 +45,16 @@ class Generate
         return $docker ? [] : ['containers'];
     }
 
-    /** Returns ['skills' => n, 'written' => n, 'removed' => n, 'problems' => [unit => [..]], 'error' => '']. */
+    /**
+     * Returns ['skills' => n, 'written' => n, 'removed' => n, 'problems' => [unit => [..]], 'error' => '', 'localNotice' => text]:
+     * localNotice is what changed in the user's local hooks (ADR-0054), for the caller to print; '' when nothing did.
+     */
     public static function run(array $disabled, $toolsDir = null, $outDir = null, $indexFile = null)
     {
         $toolsDir = $toolsDir ?: Units::toolsDir();
         $outDir = $outDir ?: Units::generatedDir();
         $indexFile = $indexFile ?: $toolsDir . '/INDEX.md';
-        $result = ['skills' => 0, 'written' => 0, 'removed' => 0, 'problems' => [], 'error' => ''];
+        $result = ['skills' => 0, 'written' => 0, 'removed' => 0, 'problems' => [], 'error' => '', 'localNotice' => ''];
         if (!@mkdir($outDir, 0700, true) && !is_dir($outDir)) {
             $result['error'] = "cannot create $outDir";
             return $result;
@@ -106,6 +111,14 @@ class Generate
             if (self::writeIfChanged("$hooksDir/INDEX.md", HookUnits::renderIndex($hooks)) === null) {
                 $result['error'] = "cannot write $hooksDir/INDEX.md";
             }
+            // The user's local hooks (ADR-0054): skipped ones are reported here, and what changed since the last
+            // start becomes the one local-changes notice in SOUL.md.
+            $local = LocalHooks::scan(dirname($toolsDir));
+            foreach ($local['problems'] as $id => $why) {
+                $result['problems'][$id] = [$why];
+            }
+            // A start by an agent (PIKKUMIES_DEPTH, ADR-0020) records nothing: nobody it could tell is a user.
+            $result['localNotice'] = LocalHooks::noteChanges(dirname($toolsDir), $local, NestedAgent::depth() === 0);
         }
         flock($lock, LOCK_UN);
         fclose($lock);

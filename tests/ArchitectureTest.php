@@ -198,12 +198,12 @@ return [
     'architecture: no model/vendor name appears under pikkumies/ outside the 3 doctrine-sanctioned lines (AGENTS.md: provider-agnostic)' => function () {
         $root = dirname(__DIR__);
         // Allowed by FILE + a safe exact substring, not by line number: other builders edit these files
-        // concurrently (orchestrator.php's own "Claude-Code" comment moved from line 53 to 72 mid-session),
+        // concurrently (the "Claude-Code" comment, now in lib/HookAnswers.php, moved from line 53 to 72 mid-session),
         // so a line-number allowlist is a false-failure trap, not a guard.
         $allowed = [
             "$root/pikkumies/lib/Provider.php" => 'OpenAI-compatible',
             "$root/pikkumies/lib/Config.php" => 'OpenAI-compatible',
-            "$root/pikkumies/hooks/orchestrator.php" => 'Claude-Code',
+            "$root/pikkumies/lib/HookAnswers.php" => 'Claude-Code',
             "$root/pikkumies/tools/media/transcribe/TranscribeSecret.php" => 'OpenAI-compatible',
             "$root/pikkumies/tools/media/transcribe/TranscribeCloud.php" => 'OpenAI-compatible',
             "$root/pikkumies/tools/media/transcribe/transcribe.php" => 'OpenAI-compatible',

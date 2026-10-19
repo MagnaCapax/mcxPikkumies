@@ -108,7 +108,7 @@ return [
         check(is_array($d) && $d['action'] === 'approve' && $d['message'] === 'ask', 'a fail-open crash hid the next unit');
         exec('rm -rf ' . escapeshellarg($tree));
     },
-    'orchestrator: block beats approve whatever the order; the first approve wins; modifies merge in order' => function () use ($terminal, $say) {
+    'orchestrator: block beats approve whatever the order; two approves become one question; modifies merge in order' => function () use ($terminal, $say) {
         $tree = orchestratorTree([
             'aa/a-approve' => ['pre_tool_call', false, 5, $say(['action' => 'approve', 'message' => 'ask first', 'rule_key' => 'k1'])],
             'zz/z-block' => ['pre_tool_call', false, 5, $say(['action' => 'block', 'message' => 'no'])],
@@ -122,7 +122,8 @@ return [
             'y/c-noise' => ['pre_tool_call', false, 5, $say(['action' => 'allow', 'message' => 'irrelevant'])],
         ]);
         list($d) = orchestratorRun($tree, 'pre_tool_call', $terminal);
-        check($d === ['action' => 'approve', 'message' => 'first', 'rule_key' => 'k1'], 'first approve in name order (across categories) must win, trimmed: ' . json_encode($d));
+        // ADR-0054: every question is shown, in run order (name, across categories), trimmed; the key covers both.
+        check($d === ['action' => 'approve', 'message' => 'Pikkumies: 2 checks ask about this call. (1) first (2) second', 'rule_key' => 'pikkumies-multi:' . substr(sha1("k1\nk2"), 0, 16)], 'two approves must merge into one question: ' . json_encode($d));
         exec('rm -rf ' . escapeshellarg($tree));
         $tree = orchestratorTree([
             'm/a-mod' => ['pre_tool_call', false, 5, $say(['action' => 'modify', 'args' => ['a' => 1, 'b' => 1]])],
@@ -180,7 +181,7 @@ return [
         ]);
         $e = HermesConfig::hookEntries("$tree/pikkumies/hooks");
         check(array_keys($e) === ['pre_llm_call', 'pre_tool_call'], 'entries: ' . json_encode($e));
-        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call", 'failClosed' => true, 'timeout' => 19], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call']));
+        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call 19", 'failClosed' => true, 'timeout' => 19], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call']));
         check($e['pre_llm_call']['failClosed'] === false && $e['pre_llm_call']['timeout'] === 5, 'pre_llm_call entry: ' . json_encode($e['pre_llm_call']));
         $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], $e);
         check(substr_count($y, '    - command: ') === 2 && substr_count($y, 'fail_closed: true') === 1 && strpos($y, "hooks_auto_accept: true\n") !== false, 'yaml: ' . $y);

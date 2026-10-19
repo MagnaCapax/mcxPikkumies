@@ -67,20 +67,31 @@ class HermesConfig
      * timeout run one after another, plus 2 seconds, within Hermes' maximum of 300. display_errors=stdout
      * (fatal errors only, 4437 = E_ERROR|E_PARSE|E_CORE_ERROR|E_COMPILE_ERROR|E_USER_ERROR|E_RECOVERABLE_ERROR)
      * makes an orchestrator that cannot even compile print text, which a fail-closed entry blocks on.
+     * The user's local units (local/hooks/ beside hooks/, ADR-0054) count too, and an event with only local units gets
+     * an entry. The timeout is also the command's last argument, so the orchestrator knows how long it has and starts
+     * a local unit only while it still fits.
      * Returns [event => ['command' => ..., 'failClosed' => bool, 'timeout' => seconds]].
      */
     public static function hookEntries($hooksDir = null)
     {
         $hooksDir = $hooksDir ?: HookUnits::hooksDir();
+        $shipped = HookUnits::byEvent($hooksDir);
+        $local = LocalHooks::generated(dirname($hooksDir)); // the scan generate just recorded, else a new one
         $entries = [];
-        foreach (HookUnits::byEvent($hooksDir) as $event => $units) {
-            $timeout = 0;
+        foreach (HookUnits::EVENTS as $event) {
+            $units = array_merge(isset($shipped[$event]) ? $shipped[$event] : [], LocalHooks::forEvent($event, $local, true));
+            if (!$units) {
+                continue;
+            }
+            $timeout = 2;
             foreach ($units as $u) {
                 $timeout += $u['timeout'];
             }
-            $entries[$event] = ['command' => PHP_BINARY . ' -d display_errors=stdout -d error_reporting=4437 ' . $hooksDir . '/orchestrator.php ' . $event,
-                'failClosed' => $event === 'pre_tool_call', 'timeout' => min(300, $timeout + 2)];
+            $timeout = min(300, $timeout);
+            $entries[$event] = ['command' => PHP_BINARY . ' -d display_errors=stdout -d error_reporting=4437 ' . $hooksDir . '/orchestrator.php ' . $event . ' ' . $timeout,
+                'failClosed' => $event === 'pre_tool_call', 'timeout' => $timeout];
         }
+        ksort($entries);
         return $entries;
     }
 
@@ -147,8 +158,10 @@ class HermesConfig
         $y .= "auth:\n  adopt_external_logins: false\n";
         if ($hooks) {
             // Hermes registers a shell hook only after first-use consent; a non-interactive run
-            // silently skips unapproved hooks. These hooks ship with pikkumies, so the
-            // installer gives the consent (hooks_auto_accept, agent/shell_hooks.py).
+            // silently skips unapproved hooks. The entries run the shipped orchestrator, so the
+            // installer gives the consent (hooks_auto_accept, agent/shell_hooks.py). The user's
+            // local units (local/hooks/) run under that consent too: they are the user's own
+            // files, read only when local/ is theirs alone, and never block by failing (ADR-0054).
             $y .= "hooks_auto_accept: true\n";
             $y .= "hooks:\n";
             foreach ($hooks as $event => $h) {
@@ -260,13 +273,14 @@ class HermesConfig
     const DOCTRINE_MAX = 16384; // bytes of one tools/<category>/DOCTRINE.md
     const NOTICES_MAX = 2;      // notice lines in SOUL.md
     const NOTICE_BYTES = 120;   // bytes of text per line
+    const OWN_SLOT = 'local-changes'; // LocalHooks::NOTICE: shown first and beside the NOTICES_MAX others (ADR-0054)
 
     /** Test seam: a notices directory other than local/notices. */
     public static $noticesDir = null;
 
     /**
      * Short notices tools leave for the next session (ADR-0034: the scheduled Docker check), from
-     * local/notices/<name>.txt, at most NOTICES_MAX in name order: [['from' => name, 'text' => ...]]. SOUL.md is
+     * local/notices/<name>.txt, at most NOTICES_MAX in name order, plus local-changes first in a slot of its own: [['from' => name, 'text' => ...]]. SOUL.md is
      * the system-prompt tier, so a notice is counts and fixed words only: a file not owned by this account, a link
      * or a name outside [a-z0-9-] is skipped, the text is cut to NOTICE_BYTES and keeps only letters, digits, spaces
      * and plain punctuation (no markdown, no backticks, no line breaks). The tool that wrote a notice removes it.
@@ -277,9 +291,14 @@ class HermesConfig
         $dir = $dir !== null ? $dir : (self::$noticesDir !== null ? self::$noticesDir : Config::localDir() . '/notices');
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         $out = [];
-        foreach ((array) glob($dir . '/*.txt') as $f) {
+        $files = (array) glob($dir . '/*.txt');
+        // The local-changes notice (ADR-0054) comes first in a slot of its own: no other notice can crowd it out.
+        $own = "$dir/" . self::OWN_SLOT . '.txt';
+        $files = array_merge(in_array($own, $files, true) ? [$own] : [], array_values(array_diff($files, [$own])));
+        $others = 0;
+        foreach ($files as $f) {
             $name = basename($f, '.txt');
-            if (count($out) >= self::NOTICES_MAX) {
+            if ($name !== self::OWN_SLOT && $others >= self::NOTICES_MAX) {
                 break;
             }
             if (!preg_match('/^[a-z0-9-]{1,32}$/', $name) || is_link($f) || !is_file($f) || @fileowner($f) !== $uid) {
@@ -290,6 +309,7 @@ class HermesConfig
             $text = trim(substr(trim((string) preg_replace('/ {2,}/', ' ', (string) $text)), 0, self::NOTICE_BYTES));
             if ($text !== '') {
                 $out[] = ['from' => $name, 'text' => $text];
+                $others += $name === self::OWN_SLOT ? 0 : 1;
             }
         }
         return $out;

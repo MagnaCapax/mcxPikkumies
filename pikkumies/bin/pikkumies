@@ -54,6 +54,10 @@ function generate(array $profile)
     foreach ($result['problems'] as $unit => $problems) {
         fwrite(STDERR, "unit $unit skipped: " . implode('; ', $problems) . "\n");
     }
+    // What changed in the user's own hooks is shown here, at every start, before they run (ADR-0054).
+    if ($result['localNotice'] !== '') {
+        fwrite(STDERR, 'local hooks: ' . $result['localNotice'] . ' (' . Config::shown(Config::localDir() . '/hooks') . "; pikkumies doctor lists them)\n");
+    }
     HermesConfig::write($config, $profile);
     return $result;
 }
@@ -257,6 +261,18 @@ switch ($cmd) {
             return $u['errors'];
         });
         out('tools:    ' . count($units) . ' units' . ($bad ? ', ' . count($bad) . ' with problems (run `pikkumies generate`)' : '') . '; off: ' . (implode(', ', Generate::disabledCategories($config)) ?: 'none'));
+        // Hook units, and the user's local ones with why any is skipped (ADR-0054).
+        $localHooks = LocalHooks::scan();
+        out('hooks:    ' . count(HookUnits::all()) . ' units; local (' . Config::shown(Config::localDir() . '/hooks') . '): '
+            . ($localHooks['off'] !== '' ? 'off, ' . $localHooks['off'] : count($localHooks['units']) . ' running'
+            . ($localHooks['pending'] ? ', waiting for the next start: ' . implode(', ', array_keys($localHooks['pending'])) : '')
+            . implode('', array_map(function ($id, $why) {
+                return "; skipped $id: $why";
+            }, array_keys($localHooks['problems']), $localHooks['problems']))));
+        $localNotice = trim((string) @file_get_contents(Config::localDir() . '/' . LocalHooks::NOTICE));
+        if ($localNotice !== '') {
+            out('note:     ' . $localNotice . ' (at the last start)');
+        }
         if (!empty($config['packs']['disabled'])) {
             out('note:     packs.disabled in ' . Config::shown(Config::localDir() . '/config.php') . ' is no longer read; use tools.disabled with category names (ADR-0015)');
         }

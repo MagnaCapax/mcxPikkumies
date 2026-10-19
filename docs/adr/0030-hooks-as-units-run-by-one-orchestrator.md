@@ -60,3 +60,12 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - Below that, a directory is a unit when it holds `hook.md` or `<hook>.php`, or has no subdirectory. A unit whose `hook.md` is missing is still a broken unit, also when it has subdirectories such as `fixtures/`, and it still blocks every `pre_tool_call`. The walk never goes into a unit.
 - A symlinked directory, a directory that cannot be read, or a category deeper than 8 levels that still has subdirectories, is a broken unit. A `lib/` directory is skipped.
 - A contract test checks that every shipped hook unit has no errors, so a shipped broken unit cannot block every call by accident.
+
+## Amendment 2026-10-18: tool hooks, local hooks and merged questions ([ADR-0054](0054-tool-hooks-and-local-hooks.md))
+
+- A unit in `hooks/tools/<tool>/<hook>/` runs only for calls of `<tool>` (`pre_tool_call` or `post_tool_call`); every other unit still runs on every call of its event. A broken one still blocks every `pre_tool_call`.
+- The user's own units in `local/hooks/` run after all shipped units, in the same name order, only as they were recorded at the last start, and always fail open: a local unit's crash, timeout or broken `hook.md` skips it and is named to the agent, never blocks. Their `pre_llm_call` context is labelled with the unit's name.
+- `modify` is honoured only from shipped units outside `hooks/tools/`.
+- Merging `pre_tool_call` no longer keeps only the first approve: two or more become one question showing every unit's question, keyed `pikkumies-multi:`, or a block naming the units when together they pass 350 characters. One approve alone is unchanged. Reading and merging answers moved to `lib/HookAnswers.php`.
+- The Hermes entry's timeout counts local units, and is passed as the command's last argument (`orchestrator.php <event> <timeout>`), so a local unit is started only while it still fits. An event with only local units gets an entry.
+- A `post_tool_call` unit's context is kept as a hook note and added to the next `pre_llm_call`, marked as untrusted text from that hook.

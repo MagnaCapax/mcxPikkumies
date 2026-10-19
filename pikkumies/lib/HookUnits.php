@@ -19,6 +19,23 @@ class HookUnits
     const EVENTS = ['pre_tool_call', 'pre_llm_call', 'post_tool_call', 'pre_verify'];
     const FIELDS = ['name', 'event', 'description', 'failClosed', 'timeout'];
     const MAX_TIMEOUT = 60;
+    const MD_MAX = 65536; // bytes of hook.md read; a longer one is a broken unit
+    /**
+     * The tools a hook under hooks/tools/<tool>/ may name besides a Pikkumies unit (ADR-0054): every literal
+     * registry.register(name=...) in Hermes v0.22.2 (d923a5eb4) tools/, without example_tool. A tool registered under a
+     * computed name (Home Assistant, MCP servers, plugins) is not here, and a hook for one is refused until it is added.
+     */
+    const HERMES_TOOLS = 'annotate_preview browser_cdp browser_dialog browser_exec browser_vault clarify close_terminal computer_use cronjob_manage delegate_task desktop_preview desktop_project drive_preview execute_code feishu_doc_read focus_pane gui_tour image_generate manage_catalog manage_connections memory patch process_manage react_to_message read_file read_terminal read_window_below search_files session_search set_theme setup_beat show_tip skill_manage skills_list skill_view terminal text_to_speech todo_list video_analyze video_generate vision_analyze web_extract web_search write_file x_search';
+    /**
+     * Characters of an approve message the user is sure to see in full (ADR-0054). Hermes shows a hook's approve message
+     * as the description of its approval panel: on a 24x80 terminal that is 7 rows of 64 columns (Hermes v0.22.2:
+     * hermes_cli/cli_tui_mixin.py _PANEL_RESERVED_BELOW, _get_approval_display_fragments; hermes_cli/cli_render.py
+     * _panel_box_width). That has four choices: the fifth, "view", appears only for a command over 70 characters
+     * (cli_modal_mixin.py _approval_choices), and a hook's command is the short label "<tool> (plugin approval rule)"
+     * (tools/approval.py request_tool_approval). 448 columns, less what word wrapping leaves empty at line ends. A merged question longer than this is blocked
+     * instead of shown in part.
+     */
+    const APPROVE_SHOWN = 350;
 
     public static function hooksDir()
     {
@@ -30,24 +47,33 @@ class HookUnits
      * Units sit at any depth (ADR-0055). Below hooks/<category>/ a directory with hook.md or <hook>.php, or with no
      * subdirectory, is a unit, also when its hook.md is missing or unreadable: a broken hook.md must show up as a
      * broken unit, never make the unit disappear (ADR-0030). A symlinked directory is a broken unit too.
+     * A unit in hooks/tools/<tool>/ is a tool hook (ADR-0054): 'tool' is <tool>, 'toolCategory' the category of the
+     * Pikkumies unit it names ('' for a Hermes tool); the tool units are read from $toolsDir (default: tools/ beside).
      */
-    public static function all($hooksDir = null)
+    public static function all($hooksDir = null, $toolsDir = null)
     {
+        $hooksDir = $hooksDir ?: self::hooksDir();
         $units = [];
-        foreach (Tree::units($hooksDir ?: self::hooksDir(), 'hook.md', true) as $t) {
+        $toolUnits = null; // [name => category] of the tool units, read once and only when a tool hook exists
+        foreach (Tree::units($hooksDir, 'hook.md', true) as $t) {
             $dir = $t['dir'];
             $name = $t['name'];
             $file = "$dir/hook.md";
-            list($meta, $body) = self::frontmatter(is_file($file) ? (string) file_get_contents($file) : '');
+            // Read with a cap: a huge hook.md (a local one is the user's) must not exhaust memory in the orchestrator.
+            $text = is_file($file) ? (string) @file_get_contents($file, false, null, 0, self::MD_MAX + 1) : '';
+            list($meta, $body) = self::frontmatter(strlen($text) > self::MD_MAX ? '' : $text);
             $u = ['category' => $t['category'], 'name' => $name, 'dir' => $dir, 'meta' => $meta, 'body' => $body,
                 'script' => "$dir/$name.php", 'event' => isset($meta['event']) ? $meta['event'] : '',
                 'failClosed' => isset($meta['failClosed']) && $meta['failClosed'] === 'true',
                 'timeout' => isset($meta['timeout']) && ctype_digit($meta['timeout']) ? (int) $meta['timeout'] : 0,
-                'errors' => $t['problem'] !== '' ? [$t['problem']] : []];
+                'errors' => $t['problem'] !== '' ? [$t['problem']] : [], 'tool' => '', 'toolCategory' => ''];
             if ($t['problem'] !== '') {
                 // Tree could not read it (symlink, unreadable, too deep): that one reason, not the follow-on errors.
                 $units[] = $u;
                 continue;
+            }
+            if (strlen($text) > self::MD_MAX) {
+                $u['errors'][] = 'hook.md is larger than ' . self::MD_MAX . ' bytes';
             }
             $keys = array_keys($meta);
             sort($keys);
@@ -74,6 +100,14 @@ class HookUnits
             if (!is_file($file) || !is_file("$dir/README.md") || !is_file($u['script'])) {
                 $u['errors'][] = "hook.md, README.md and $name.php are required";
             }
+            if (Tree::within($t['category'], 'tools')) {
+                if ($toolUnits === null) {
+                    $toolUnits = self::toolUnits($toolsDir !== null ? $toolsDir : dirname($hooksDir) . '/tools');
+                }
+                $u['tool'] = (string) substr($t['category'], strlen('tools/'));
+                $u['toolCategory'] = isset($toolUnits[$u['tool']]) ? $toolUnits[$u['tool']] : '';
+                $u['errors'] = array_merge($u['errors'], self::toolErrors($u, $toolUnits));
+            }
             $units[] = $u;
         }
         return $units;
@@ -93,10 +127,44 @@ class HookUnits
                 $out[] = $u;
             }
         }
-        usort($out, function ($a, $b) {
+        return self::byName($out);
+    }
+
+    /** Units in the orchestrator's run order: name, then category. */
+    public static function byName(array $units)
+    {
+        usort($units, function ($a, $b) {
             return strcmp($a['name'], $b['name']) ?: strcmp($a['category'], $b['category']);
         });
+        return $units;
+    }
+
+    /** [name => category] of the tool units under $toolsDir that Tree could read. */
+    private static function toolUnits($toolsDir)
+    {
+        $out = [];
+        foreach (Tree::units($toolsDir, 'skill.md') as $t) {
+            if ($t['problem'] === '') {
+                $out[$t['name']] = $t['category'];
+            }
+        }
         return $out;
+    }
+
+    /** A tool hook (ADR-0054) sits at hooks/tools/<tool>/<hook>/, runs before or after a call, and names a real tool. */
+    private static function toolErrors(array $u, array $toolUnits)
+    {
+        $errors = [];
+        if ($u['tool'] === '' || strpos($u['tool'], '/') !== false) {
+            return ['a tool hook sits in hooks/tools/<tool>/<hook>/'];
+        }
+        if (!in_array($u['event'], ['pre_tool_call', 'post_tool_call'], true)) {
+            $errors[] = 'a tool hook runs on pre_tool_call or post_tool_call';
+        }
+        if (!isset($toolUnits[$u['tool']]) && !in_array($u['tool'], explode(' ', self::HERMES_TOOLS), true)) {
+            $errors[] = "tools/{$u['tool']} names neither a Pikkumies tool unit nor a Hermes tool";
+        }
+        return $errors;
     }
 
     /** [event => units in name order] for every known event that has at least one unit. */

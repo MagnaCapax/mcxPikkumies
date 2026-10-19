@@ -26,38 +26,34 @@ if (!is_array($payload) && trim($stdin) !== '') {
     echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: the tool call could not be read to check it. Not run; tell the user this safety check is failing.']) . "\n";
     exit(0);
 }
-// The terminal command, the code of execute_code (which can run the same programs), or the text written into a
-// background process's stdin (process_manage write/submit, which a shell started in the background runs).
-$tool = is_array($payload) && isset($payload['tool_name']) ? $payload['tool_name'] : '';
-$input = is_array($payload) && isset($payload['tool_input']) && is_array($payload['tool_input']) ? $payload['tool_input'] : [];
-$field = $tool === 'terminal' ? 'command' : ($tool === 'execute_code' ? 'code' : '');
-if ($tool === 'process_manage' && isset($input['action']) && in_array($input['action'], ['write', 'submit'], true)) {
-    $field = 'data';
-}
+// What the call says (lib/HookPayload.php, shared with the orchestrator's tool-hook selection, ADR-0054): the terminal
+// command, the code of execute_code (which can run the same programs), the text written into a background process's
+// stdin (process_manage write/submit), the path and search pattern of Hermes' file tools, or the arguments of a
+// cronjob_manage call; every form also without quotes and backslashes (the shell joins r"m", 'r'm and r\m into rm)
+// and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
+require_once dirname(__DIR__, 3) . '/lib/HookPayload.php';
+require __DIR__ . '/GuardLocal.php';
+$payload = is_array($payload) ? $payload : [];
+list($callKind, $command, $texts) = HookPayload::read($payload);
+$tool = isset($payload['tool_name']) ? $payload['tool_name'] : '';
+$input = isset($payload['tool_input']) && is_array($payload['tool_input']) ? $payload['tool_input'] : [];
 // Hermes' file tools reach the same files without a command: only the path (and a search pattern), and each file a V4A
-// patch names, are checked, and only against the stored-password and AI-key rules below, so an ordinary file whose name
-// looks like a command is not asked.
-$fileTool = in_array($tool, ['read_file', 'write_file', 'patch', 'search_files'], true);
+// patch names, are checked, and only against the stored-password and AI-key rules below (and a write to local hooks or
+// notes, GuardLocal.php), so an ordinary file whose name looks like a command is not asked.
+$fileTool = $callKind === 'file';
 // A scheduled job with a script runs that script every time it is due, with no guard and nobody to ask.
-$scheduleTool = $tool === 'cronjob_manage';
-if ($field === '' && !$fileTool && !$scheduleTool) {
+$scheduleTool = $callKind === 'schedule';
+if ($callKind === '') {
     exit(0); // no opinion
 }
-if ($fileTool) {
-    $command = (isset($input['path']) ? (string) $input['path'] : '') . ' ' . (isset($input['pattern']) ? (string) $input['pattern'] : '');
-} elseif ($scheduleTool) {
-    $command = json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-} else {
-    $command = isset($input[$field]) ? (string) $input[$field] : '';
-}
 // The shell joins r"m", 'r'm and r\m into rm: every pattern also reads the command without quotes and backslashes,
-// and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
+// and with repeated slashes and /./ folded (hermes//.env is hermes/.env). $command and $texts for the call itself
+// come from HookPayload::read() above; this is reused below to read each file a V4A patch names the same way.
 function guardTexts($command)
 {
     $bare = str_replace(['"', "'", '\\'], '', $command);
     return array_unique([$command, $bare, preg_replace('#/(\./)*/*#', '/', $bare)]);
 }
-$texts = guardTexts($command);
 
 /** preg_match over every form of the command: 1 on a hit, false on a regex engine error, else 0. */
 function guardMatch($re, array $texts)
@@ -98,6 +94,10 @@ if ($fileTool) {
                 exit(0);
             }
         }
+    }
+    $local = guardLocal($callKind, $tool, $input, $command, $texts);
+    if ($local !== null) {
+        guardSay($local); // an agent started by another agent blocks instead of asking (ADR-0020)
     }
     exit(0);
 }
@@ -319,5 +319,10 @@ foreach ($approve as $re => $rule) {
         $key = ($kind === 'load' ? 'pikkumies-load:' : ($kind === 'send' ? 'pikkumies-send:' : 'pikkumies-delete:')) . $id;
         guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command]);
     }
+}
+// Writes to local hooks and notes (ADR-0054), when no rule above asked already.
+$local = guardLocal($callKind, $tool, $input, $command, $texts);
+if ($local !== null) {
+    guardSay($local);
 }
 exit(0);

@@ -122,7 +122,7 @@ return [
         try {
             $h = "$dir/hooks";
             treeHookUnit($h, 'guard/fine');
-            treeHookUnit($h, 'tools/rtorrent/ask');      // three levels deep
+            treeHookUnit($h, 'tools/terminal/ask');      // three levels deep
             file_put_contents("$h/tools/README.md", "# per-tool hooks\n");
             mkdir("$h/docs");
             file_put_contents("$h/docs/README.md", "# a README-only category\n");
@@ -134,10 +134,10 @@ return [
             foreach (HookUnits::all($h) as $u) {
                 $e[$u['category'] . '/' . $u['name']] = $u['errors'];
             }
-            check(array_keys($e) === ['guard/empty', 'guard/fine', 'guard/lost', 'tools/rtorrent/ask'], 'hook units: ' . json_encode(array_keys($e)));
-            check($e['guard/fine'] === [] && $e['tools/rtorrent/ask'] === [], 'good hook units: ' . json_encode($e));
+            check(array_keys($e) === ['guard/empty', 'guard/fine', 'guard/lost', 'tools/terminal/ask'], 'hook units: ' . json_encode(array_keys($e)));
+            check($e['guard/fine'] === [] && $e['tools/terminal/ask'] === [], 'good hook units: ' . json_encode($e));
             check($e['guard/lost'] && $e['guard/empty'], 'a lost hook.md or an empty leaf must be a broken unit');
-            check(treeIds(HookUnits::forEvent('pre_tool_call', $h)) === ['tools/rtorrent/ask', 'guard/empty', 'guard/fine', 'guard/lost'], 'broken units run on pre_tool_call');
+            check(treeIds(HookUnits::forEvent('pre_tool_call', $h)) === ['tools/terminal/ask', 'guard/empty', 'guard/fine', 'guard/lost'], 'broken units run on pre_tool_call');
         } finally {
             testRmTree($dir);
         }

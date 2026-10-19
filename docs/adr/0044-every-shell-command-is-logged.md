@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Adds the hook event `post_tool_call` to the hook units ([ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md)).
+- Status: Accepted. Adds the hook event `post_tool_call` to the hook units ([ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md)). Amended 2026-10-18 by [ADR-0054](0054-tool-hooks-and-local-hooks.md) (a post_tool_call context becomes a hook note).
 
 ## Context
 The request of 2026-10-18, verbatim: "make sure pikkumies logs every shell command it runs, on the sharded log directories, in case something needs to be traced".
@@ -37,3 +37,7 @@ What was found:
 
 ## References
 - ADR-0030 (hook units, the hook log), [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md) (settings, session retention), ADR-0041 (memory metrics)
+
+## Amendment 2026-10-18: a post_tool_call context is used (ADR-0054)
+
+- Hermes still ignores a `post_tool_call` answer. The orchestrator now keeps a unit's `{"context": "..."}` from that event as a hook note in `local/state/hook-notes/`, and the next `pre_llm_call` adds it to the turn as untrusted text written by that hook. `command-log` prints nothing, so its behaviour is unchanged.

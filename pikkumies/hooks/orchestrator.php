@@ -1,16 +1,25 @@
 <?php
 /**
- * Hook orchestrator (ADR-0030): `php orchestrator.php <event>`. Hermes runs this one shell hook per
- * event; it runs every hook unit of that event (hooks/<category>/<hook>/, lib/HookUnits.php) in name
- * order, each as `php <hook>.php` with the same stdin JSON and its own timeout, and prints one answer.
+ * Hook orchestrator (ADR-0030, ADR-0054): `php orchestrator.php <event> [<entry timeout>]`. Hermes runs this one
+ * shell hook per event; it runs every hook unit of that event (hooks/<category>/<hook>/, lib/HookUnits.php) in name
+ * order, then the user's local units (local/hooks/, lib/LocalHooks.php), each as `php <hook>.php` with the same
+ * stdin JSON and its own timeout, and prints one answer. A tool hook (hooks/tools/<tool>/<hook>/) runs only for
+ * calls of its tool (lib/HookPayload.php selects). A local unit runs only as recorded at the last start, is started
+ * only while the entry timeout leaves room for it, always fails open, and its failure is named to the agent; a tool or
+ * local unit's modify is ignored. Reading local hooks is wrapped: anything thrown there turns them off for this call.
  *
- * Each unit's output is read the way Hermes reads a shell hook (agent/shell_hooks.py, Hermes
- * v2026.9.24: _evaluate_result, _parse_response). The answers are merged the way Hermes merges hooks:
+ * Each unit's output is read, and the answers merged, by lib/HookAnswers.php, the way Hermes does (agent/shell_hooks.py,
+ * Hermes v2026.9.24: _evaluate_result, _parse_response):
  * - pre_tool_call (hermes_cli/plugins.py _get_pre_tool_call_directive_details): a block with a
- *   message wins over any approve whatever the order; else the first approve; modify args are
- *   shallow-merged in order; anything else is no opinion.
+ *   message wins over any approve whatever the order; modify args are shallow-merged in order; anything else
+ *   is no opinion. One approve is passed on as it is. Two or more become one approve holding every question
+ *   unaltered, keyed pikkumies-multi:<sha1 of the sorted keys>, or a block naming the units when together they are too
+ *   long to show (HookUnits::APPROVE_SHOWN): Hermes would keep only the first, and drop the delete guard's question.
  * - pre_llm_call (agent/turn_context.py _collect_pre_llm_call_context): contexts joined by a blank
- *   line, capped at 9000 characters (Hermes spills a hook's context to disk above 10000).
+ *   line, capped at 9000 characters (Hermes spills a hook's context to disk above 10000): shipped units first,
+ *   then Pikkumies' notes and the hook notes (lib/HookNotes.php, untrusted), local units last, each labelled with its
+ *   id, so they are cut first.
+ * - post_tool_call: Hermes ignores the answer; a unit's context becomes a hook note for the next turn.
  * - pre_verify (agent/turn_stop_gates.py _pre_verify_nudge, hermes_cli/plugins.py
  *   get_pre_verify_continue_message): the first unit answering {"action":"continue","message":"..."}
  *   wins; the message is what Hermes appends as the next-turn nudge (ADR-0047).
@@ -36,75 +45,17 @@ register_shutdown_function(function () use (&$hookDone, &$hookError, $hookEvent)
 try {
     require_once dirname(__DIR__) . '/lib/Config.php';
     require_once dirname(__DIR__) . '/lib/HookUnits.php';
+    require_once dirname(__DIR__) . '/lib/HookPayload.php';
+    require_once dirname(__DIR__) . '/lib/LocalHooks.php';
+    require_once dirname(__DIR__) . '/lib/HookNotes.php';
+    require_once dirname(__DIR__) . '/lib/HookAnswers.php';
 } catch (\Throwable $e) {
     $hookError = $e->getMessage();
     exit(1);
 }
 
-const HOOK_BLOCK_EXIT = 2;                 // agent/shell_hooks.py BLOCK_EXIT_CODE
-const HOOK_DEFAULT_BLOCK = 'Blocked by shell hook.';
-const HOOK_STDERR_LIMIT = 400;
-const HOOK_CONTEXT_MAX = 9000;
 const HOOK_OUTPUT_MAX = 1048576;          // a unit printing more than this is not giving a hook answer
 const HOOK_LOG_DAYS = 7;
-
-/** Python truthiness of a decoded JSON value (json_decode without assoc: objects are stdClass). */
-function hookTruthy($v)
-{
-    return is_object($v) ? (bool) get_object_vars($v) : (bool) $v;
-}
-
-/** agent/shell_hooks.py _parse_response: stdout -> directive array or null. */
-function hookParse($event, $stdout)
-{
-    $stdout = trim((string) $stdout);
-    if ($stdout === '') {
-        return null;
-    }
-    $data = json_decode($stdout);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_object($data)) {
-        return null;
-    }
-    $get = function ($k) use ($data) {
-        return property_exists($data, $k) ? $data->$k : null;
-    };
-    if ($event === 'pre_verify') {
-        // agent/shell_hooks.py _parse_pre_verify: "continue" (Hermes) or "block" (Claude-Code Stop)
-        // both mean keep going; no message is a no-op.
-        $action = hookTruthy($get('action')) ? $get('action') : $get('decision');
-        $message = hookTruthy($get('message')) ? $get('message') : $get('reason');
-        $action = strtolower(trim((string) $action));
-        return in_array($action, ['continue', 'block'], true) && is_string($message) && trim($message) !== ''
-            ? ['action' => 'continue', 'message' => trim($message)] : null;
-    }
-    if ($event !== 'pre_tool_call') {
-        $context = $get('context');
-        return is_string($context) && trim($context) !== '' ? ['context' => $context] : null;
-    }
-    // Dialects in check order: Hermes "action", then Claude-Code "decision" (_PRE_TOOL_DIALECTS).
-    $dialects = [['action', 'message', 'reason', 'args'], ['decision', 'reason', 'message', 'tool_input']];
-    foreach ($dialects as $d) {
-        if ($get($d[0]) === 'block') {
-            $raw = hookTruthy($get($d[1])) ? $get($d[1]) : $get($d[2]);
-            return ['action' => 'block', 'message' => is_string($raw) && $raw !== '' ? $raw : HOOK_DEFAULT_BLOCK];
-        }
-    }
-    foreach ($dialects as $d) {
-        if ($get($d[0]) === 'modify' && is_object($get($d[3]))) {
-            return ['action' => 'modify', 'args' => $get($d[3])];
-        }
-    }
-    if ($get('action') === 'approve') {
-        $out = ['action' => 'approve'];
-        foreach (['message', 'rule_key'] as $k) {
-            if (is_string($get($k)) && trim($get($k)) !== '') {
-                $out[$k] = trim($get($k));
-            }
-        }
-        return $out;
-    }
-    return null;
-}
 
 /** Run one unit: ['code' => int|null, 'stdout', 'stderr', 'timedOut' => bool, 'error' => string]. */
 function hookSpawn($script, $stdin, $timeout)
@@ -194,120 +145,6 @@ function hookSpawn($script, $stdin, $timeout)
     return $r;
 }
 
-/**
- * agent/shell_hooks.py _evaluate_result for one unit: [directive|null, outcome for the log].
- * One addition: a failClosed unit that exits non-zero with no answer (a crash whose error went to
- * stderr) blocks; Hermes would let that call run.
- */
-function hookEvaluate($event, array $unit, array $r)
-{
-    $id = $unit['category'] . '/' . $unit['name'];
-    $failClosed = $unit['failClosed'] && $event === 'pre_tool_call';
-    $closed = function ($reason) use ($id) {
-        return [['action' => 'block', 'message' => "Pikkumies hook $id failed closed: $reason. Not run; tell the user this safety check is failing."], 'failed-closed'];
-    };
-    if ($r['error'] !== '' || $r['timedOut']) {
-        $reason = $r['error'] !== '' ? $r['error'] : "timed out after {$unit['timeout']}s";
-        return $failClosed ? $closed($reason) : [null, $r['timedOut'] ? 'timeout' : 'error'];
-    }
-    if ($r['code'] === HOOK_BLOCK_EXIT && $event === 'pre_tool_call') {
-        $parsed = hookParse($event, $r['stdout']);
-        if (is_array($parsed) && $parsed['action'] === 'block') {
-            return [$parsed, 'block'];
-        }
-        $stderr = substr(trim($r['stderr']), 0, HOOK_STDERR_LIMIT);
-        return [['action' => 'block', 'message' => $stderr !== '' ? $stderr : HOOK_DEFAULT_BLOCK], 'block'];
-    }
-    $stdout = trim($r['stdout']);
-    $parsed = hookParse($event, $stdout);
-    if ($parsed === null && $failClosed && $stdout !== '' && !is_object(json_decode($stdout))) {
-        return $closed('unparseable output (expected a JSON object)');
-    }
-    if ($parsed === null && $failClosed && $r['code'] !== 0) {
-        return $closed("exited with code {$r['code']}");
-    }
-    if ($parsed === null) {
-        return [null, $r['code'] === 0 ? 'none' : 'exit-' . $r['code']];
-    }
-    return [$parsed, isset($parsed['action']) ? $parsed['action'] : 'context'];
-}
-
-/** hermes_cli/plugins.py _get_pre_tool_call_directive_details over the units' directives, as one hook answer. */
-function hookMergePreToolCall(array $results)
-{
-    $modified = null;
-    $firstApprove = null;
-    foreach ($results as $result) {
-        if (!is_array($result) || !isset($result['action'])) {
-            continue;
-        }
-        if ($result['action'] === 'modify') {
-            $partial = isset($result['args']) && is_object($result['args']) ? get_object_vars($result['args']) : [];
-            if ($partial) {
-                $modified = array_merge($modified === null ? [] : $modified, $partial);
-            }
-            continue;
-        }
-        if (!in_array($result['action'], ['block', 'approve'], true)) {
-            continue;
-        }
-        $message = isset($result['message']) && is_string($result['message']) && $result['message'] !== '' ? $result['message'] : null;
-        if ($result['action'] === 'block' && $message === null) {
-            continue; // a block needs a message (it becomes the tool result)
-        }
-        if ($result['action'] === 'block') {
-            return ['action' => 'block', 'message' => $message];
-        }
-        if ($firstApprove === null) {
-            $firstApprove = ['action' => 'approve'];
-            if ($message !== null) {
-                $firstApprove['message'] = $message;
-            }
-            if (isset($result['rule_key']) && is_string($result['rule_key']) && trim($result['rule_key']) !== '') {
-                $firstApprove['rule_key'] = trim($result['rule_key']);
-            }
-        }
-    }
-    // One shell hook answers with one directive (agent/shell_hooks.py _parse_pre_tool_call), so an
-    // approve together with a modify keeps the approve: asking the user is the safety part.
-    if ($firstApprove !== null) {
-        return $firstApprove;
-    }
-    return $modified === null ? null : ['action' => 'modify', 'args' => (object) $modified];
-}
-
-/** hermes_cli/plugins.py get_pre_verify_continue_message: the first unit's continue answer wins; the rest are ignored. */
-function hookMergePreVerify(array $results)
-{
-    foreach ($results as $result) {
-        if (is_array($result) && isset($result['action']) && $result['action'] === 'continue') {
-            return $result;
-        }
-    }
-    return null;
-}
-
-/** agent/turn_context.py: contexts joined by a blank line; capped at HOOK_CONTEXT_MAX characters. */
-function hookMergeContext(array $results)
-{
-    $parts = [];
-    foreach ($results as $result) {
-        if (is_array($result) && isset($result['context'])) {
-            $parts[] = $result['context'];
-        }
-    }
-    if (!$parts) {
-        return null;
-    }
-    $text = implode("\n\n", $parts);
-    if (preg_match('/^.{0,' . HOOK_CONTEXT_MAX . '}/su', $text, $m)) {
-        $text = $m[0];
-    } else {
-        $text = substr($text, 0, HOOK_CONTEXT_MAX); // not valid UTF-8: cut by bytes
-    }
-    return ['context' => $text];
-}
-
 /** Append one JSONL line; a new day's file prunes all but the newest HOOK_LOG_DAYS files. Never fails the hook. */
 function hookLog($event, $unit, $ms, $outcome)
 {
@@ -328,34 +165,107 @@ function hookLog($event, $unit, $ms, $outcome)
 }
 
 $stdin = (string) stream_get_contents(STDIN);
+$payload = json_decode($stdin, true, 100000);
+$payload = is_array($payload) ? $payload : [];
+list(, , $callTexts) = HookPayload::read($payload);
+$session = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
 $units = HookUnits::forEvent($hookEvent);
-$results = [];
+try {
+    $local = LocalHooks::scan(dirname(__DIR__));
+} catch (\Throwable $e) {
+    // The user's files must never stop a shipped check: anything thrown while reading them turns local hooks off.
+    $local = ['units' => [], 'pending' => [], 'problems' => [], 'off' => 'they could not be read (' . substr($e->getMessage(), 0, 120) . ')'];
+}
+// The entry's own timeout comes from the command (HermesConfig::hookEntries); without it, the shipped units' sum.
+$budget = 2;
 foreach ($units as $u) {
+    $budget += $u['timeout'];
+}
+$budget = min(300, isset($argv[2]) && ctype_digit($argv[2]) ? (int) $argv[2] : $budget);
+$started = isset($_SERVER['REQUEST_TIME_FLOAT']) ? (float) $_SERVER['REQUEST_TIME_FLOAT'] : microtime(true);
+$results = [];
+$localResults = [];
+$notes = []; // [unit id, text, written by the hook?]: post_tool_call contexts, and local units that failed or were not started
+foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
+    $isLocal = !empty($u['local']);
+    $id = $isLocal ? $u['id'] : "{$u['category']}/{$u['name']}";
     $start = microtime(true);
     if ($u['errors']) {
         // A broken unit blocks a tool call (its hook.md cannot be trusted to say whether it fails closed); elsewhere it is skipped.
         $closed = $hookEvent === 'pre_tool_call';
         $results[] = $closed
-            ? ['action' => 'block', 'message' => "Pikkumies hook {$u['category']}/{$u['name']} failed closed: " . implode('; ', $u['errors']) . '. Not run; tell the user this safety check is failing.']
+            ? ['action' => 'block', 'message' => "Pikkumies hook $id failed closed: " . implode('; ', $u['errors']) . '. Not run; tell the user this safety check is failing.']
             : null;
-        hookLog($hookEvent, "{$u['category']}/{$u['name']}", 0, $closed ? 'failed-closed' : 'invalid');
+        hookLog($hookEvent, $id, 0, $closed ? 'failed-closed' : 'invalid');
         continue;
     }
-    list($directive, $outcome) = hookEvaluate($hookEvent, $u, hookSpawn($u['script'], $stdin, $u['timeout']));
-    $results[] = $directive;
-    hookLog($hookEvent, "{$u['category']}/{$u['name']}", (int) round((microtime(true) - $start) * 1000), $outcome);
+    if (!HookPayload::selects($u, $payload, $callTexts)) {
+        continue; // a tool hook for another tool
+    }
+    if ($isLocal && $start - $started + $u['timeout'] + 2 > $budget) {
+        // Started now it could outlast the Hermes entry, whose timeout blocks every tool call (fail_closed).
+        hookLog($hookEvent, $id, 0, 'not-started');
+        $notes[] = [$id, "was not started: its {$u['timeout']}s timeout does not fit in what is left of the {$budget}s hook entry; run pikkumies generate", false];
+        continue;
+    }
+    if ($isLocal) {
+        $u['failClosed'] = false; // a local unit never blocks by failing (ADR-0054)
+    }
+    $run = hookSpawn($u['script'], $stdin, $u['timeout']);
+    list($directive, $outcome) = HookAnswers::evaluate($hookEvent, $u, $run);
+    if (is_array($directive) && isset($directive['action']) && $directive['action'] === 'modify' && ($isLocal || $u['tool'] !== '')) {
+        list($directive, $outcome) = [null, 'modify-ignored']; // only shipped hooks outside hooks/tools/ may change a call
+    }
+    if ($isLocal && $directive === null && ($run['timedOut'] || $run['error'] !== '' || $run['code'] !== 0)) {
+        $notes[] = [$id, "failed ($outcome) and was skipped; it is in " . Config::shown($u['dir']), false];
+    }
+    if ($hookEvent === 'post_tool_call' && is_array($directive) && isset($directive['context'])) {
+        $notes[] = [$id, $directive['context'], true];
+    }
+    if ($hookEvent === 'pre_tool_call' && is_array($directive) && $directive['action'] === 'approve') {
+        $directive['unit'] = $id; // named when merged questions are too long to show (HookAnswers::mergeApproves)
+    }
+    if ($isLocal && $hookEvent === 'pre_llm_call' && is_array($directive) && isset($directive['context'])) {
+        $directive['context'] = "Local hook $id (written on this machine): " . $directive['context'];
+    }
+    if ($isLocal) {
+        $localResults[] = $directive;
+    } else {
+        $results[] = $directive;
+    }
+    hookLog($hookEvent, $id, (int) round((microtime(true) - $start) * 1000), $outcome);
 }
-if ($hookEvent === 'pre_tool_call') {
-    $answer = hookMergePreToolCall($results);
-} elseif ($hookEvent === 'pre_verify') {
-    $answer = hookMergePreVerify($results);
+if ($hookEvent === 'pre_llm_call') {
+    // Shipped context first, then what Pikkumies and hooks noted since the last turn, then local context: the cap cuts from the end.
+    $said = [];
+    if ($local['off'] !== '') {
+        $said[] = 'Pikkumies: local hooks are off because ' . $local['off'] . '.';
+    }
+    foreach ($local['problems'] as $id => $why) {
+        $said[] = "Pikkumies: skipped the local hook $id: $why.";
+    }
+    foreach ($local['pending'] as $id => $u) {
+        $said[] = "Pikkumies: the local hook $id is new or changed since the last start; it runs from the next start, after the user is told.";
+    }
+    foreach ($notes as $n) {
+        $said[] = "Pikkumies: the local hook {$n[0]} {$n[1]}.";
+    }
+    $said[] = HookNotes::drain(Config::localDir(), $session);
+    $said = implode("\n", array_filter($said));
+    $answer = HookAnswers::mergeContext(array_merge($results, $said !== '' ? [['context' => $said]] : [], $localResults));
 } else {
-    $answer = hookMergeContext($results);
+    foreach ($notes as $n) {
+        if (!HookNotes::add(Config::localDir(), $session, $n[0], $n[1], $n[2])) {
+            hookLog($hookEvent, $n[0], 0, 'note-dropped'); // the session's notes are full
+        }
+    }
+    $all = array_merge($results, $localResults);
+    $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);
 }
 if ($answer !== null) {
     $json = json_encode($answer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     if ($json === false && $answer['action'] === 'block') {
-        $json = json_encode(['action' => 'block', 'message' => HOOK_DEFAULT_BLOCK]); // a block must not turn into no answer
+        $json = json_encode(['action' => 'block', 'message' => HookAnswers::DEFAULT_BLOCK]); // a block must not turn into no answer
     }
     echo ($json === false ? '' : $json . "\n");
 }

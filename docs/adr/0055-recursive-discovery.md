@@ -51,7 +51,7 @@ So the work is all on the Pikkumies side.
 - Hermes's skill cache sees a new skill at once only when it lands directly in a top-level category; one added to `email/imap/` shows up when the 30-second cache runs out (`tools/skills_tool.py`, `_skills_scan_signature`). A category named like a directory Hermes skips (`node_modules`, `venv`, ...) would hide its skills from Hermes, so do not use such names.
 - `lib/Units.php` is now about 190 lines, because the reserved list moved in.
 - `tests/ArchitectureTest.php` still lists PHP files with two-level globs. It is a lint over the shipped files and needs a change only when the first nested category is added.
-- Tool hooks, local hooks and local `DOCTRINE.md` notes, including a unit's own `DOCTRINE.md`, are separate changes (planned as ADR-0054). This ADR only finds what is shipped.
+- Tool hooks, local hooks and local `DOCTRINE.md` notes, including a unit's own `DOCTRINE.md`, are separate changes (planned as [ADR-0054](0054-tool-hooks-and-local-hooks.md)). This ADR only finds what is shipped.
 - Where the build departed from the plan: the plan first numbered this ADR-0054, which is now planned for tool hooks. A review suggested dropping the runtime name errors once local tool units were left out; they were kept, because nested shipped units can collide too and generate is where the user sees a problem. The index renderers group by category in the order they are given instead of sorting, because `all()` already sorts. The plan said the walker skips symlinks; it reports a symlinked directory as a broken unit instead, so in `hooks/` one blocks every `pre_tool_call` rather than a check disappearing.
 
 ## References
