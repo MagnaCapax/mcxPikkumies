@@ -547,10 +547,12 @@ switch ($cmd) {
         }
         $insideTmux = (string) getenv('TMUX') !== '';
         // The session's status line shows the credits line, refreshed every minute (ADR-0040).
-        $creditsCmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
+        // NO_COLOR at this start reaches the credits line tmux runs, and keeps the status colours off (ADR-0061).
+        $noColor = StatusTheme::noColor();
+        $creditsCmd = ($noColor ? 'NO_COLOR=1 ' : '') . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
         // Before it: the memories and the active pane's counters (ADR-0061).
         $self = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__);
-        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, $self, $creditsCmd, $self . ' status-line');
+        $plan = Launch::tmuxPlan($n, $windows, $insideTmux, $self, $creditsCmd, $self . ' status-line', !$noColor);
         $attach = array_pop($plan);
         foreach ($plan as $step) {
             exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);

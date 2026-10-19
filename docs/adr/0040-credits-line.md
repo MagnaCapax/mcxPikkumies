@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted. Extends the credits tool unit; adds to the tmux session of [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md).
+- Status: Accepted. Extends the credits tool unit; adds to the tmux session of [ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md). The tmux colours are amended by [ADR-0061](0061-status-line-memories-context-tool-calls-code-lines.md) (2026-10-19 section).
 
 ## Context
 The request of 2026-10-18: "the pikkumies status line shows how many tokens you have when using virsilipas, how much remaining. make sure the statusline is easy to read, pretty nice to look at, graphical for text interface."

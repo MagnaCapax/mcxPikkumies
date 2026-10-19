@@ -7,6 +7,8 @@
  * charged since the newest positive grant's UTC day (a negative grant is a refund). Tokens are a floor: what the
  * balance buys at the model's highest rate, so no mix of input and output buys fewer. Remaining figures round down.
  */
+require_once dirname(__DIR__, 3) . '/lib/StatusTheme.php'; // the tmux colours (ADR-0061)
+
 class CreditsFormat
 {
     const CELLS = 10;
@@ -135,7 +137,10 @@ class CreditsFormat
         return false;
     }
 
-    /** One line for people. $mode: 'utf8', 'ascii' or 'tmux' (no emoji, tmux colours around the bar); $utf8: tmux may use non-ASCII characters. */
+    /**
+     * One line for people. $mode: 'utf8', 'ascii' or 'tmux' (no emoji; the bar in StatusTheme's level colour over the
+     * session's status bar, none when NO_COLOR is set); $utf8: tmux may use non-ASCII characters.
+     */
     public static function render(array $r, $mode, $utf8 = true)
     {
         $u = $mode === 'utf8' || ($mode === 'tmux' && $utf8);
@@ -143,9 +148,9 @@ class CreditsFormat
         if ($r['pct_left'] !== null) {
             $n = self::cells($r['pct_left']);
             $bar = $u ? str_repeat('▰', $n) . str_repeat('▱', self::CELLS - $n) : '[' . str_repeat('#', $n) . str_repeat('-', self::CELLS - $n) . ']';
-            if ($mode === 'tmux') {
-                $colour = $r['pct_left'] > 25 ? 'green' : ($r['pct_left'] >= self::LOW_PCT ? 'yellow' : 'red');
-                $bar = "#[fg=$colour,bg=black]$bar#[default]"; // black behind the bar: tmux's default status bar is green
+            if ($mode === 'tmux' && !StatusTheme::noColor()) {
+                $role = $r['pct_left'] > 25 ? 'good' : ($r['pct_left'] >= self::LOW_PCT ? 'warn' : 'critical');
+                $bar = '#[fg=' . StatusTheme::tmux($role) . ']' . $bar . '#[default]'; // over the theme's bar, which `pikkumies tmux` sets
             }
             $approx = !empty($r['approx']['pot']) ? '~' : '';
             $parts[0] .= ' ' . $bar . ' ' . $approx . (int) max(0, min(100, floor($r['pct_left']))) . '% left';

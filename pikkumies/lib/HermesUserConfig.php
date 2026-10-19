@@ -9,12 +9,14 @@
  *   (local/state/hermes-config.json) is written last; the old line 1 seen again (an older version ran) runs it again.
  * - skills dir: the generated skills directory goes back into skills.external_dirs when it is missing.
  * - telemetry answer: Hermes' shared-metrics "No thanks" goes back in when it is gone (HermesTelemetry, ADR-0072).
+ * - skin: once per install, display.skin gets the Pikkumies skin when the file names no skin (StatusTheme, ADR-0061).
  * The edits of single keys go through Hermes' own `config get/set`, which keeps every other entry and the file's comments, so
  * they wait until Hermes is built. A failed edit is logged and noted on stderr, the start goes on (the pins and hooks
  * are in the managed file), and the next start tries again. Hermes keeps copies too (HERMES_HOME/backups/config/).
  */
 require_once __DIR__ . '/HermesConfigBackup.php';
 require_once __DIR__ . '/HermesTelemetry.php';
+require_once __DIR__ . '/StatusTheme.php';
 
 class HermesUserConfig
 {
@@ -30,7 +32,7 @@ class HermesUserConfig
         $local = dirname($home);
         $cfg = "$home/config.yaml";
         $offer = HermesTelemetry::offerVersion();
-        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir) && HermesTelemetry::isOff($cfg, $offer)) {
+        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir) && HermesTelemetry::isOff($cfg, $offer) && is_file(self::skinMarker($local))) {
             return; // the usual start: no lock, no Hermes process
         }
         @mkdir("$local/state", 0700, true);
@@ -58,10 +60,39 @@ class HermesUserConfig
             if (!HermesTelemetry::isOff($cfg, $offer) && self::bin() !== '') { // else the seed has it, or the next start does it
                 HermesTelemetry::repair($home, $offer);
             }
+            if (!is_file(self::skinMarker($local))) {
+                self::offerSkin($home);
+            }
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
         }
+    }
+
+    public static function skinMarker($local)
+    {
+        return "$local/state/hermes-skin.json";
+    }
+
+    /**
+     * The Pikkumies skin in display.skin, once: only when the user's file names no skin (any `skin:` key, block or flow
+     * YAML, counts as the user's choice and stays). Without a built Hermes it waits; the marker only when done, so a
+     * later `/skin default` is never undone. Backed up and logged as skin-pikkumies.
+     */
+    public static function offerSkin($home)
+    {
+        $local = dirname($home);
+        if (!preg_match('/(^|[\s{,])skin\s*:/m', (string) @file_get_contents("$home/config.yaml"))) {
+            if (self::bin() === '' || !self::setValue($home, 'display.skin', StatusTheme::SKIN, 'skin-pikkumies', 'display.skin ' . StatusTheme::SKIN)) {
+                return false;
+            }
+        }
+        try {
+            HermesConfig::put(self::skinMarker($local), json_encode(['skin' => StatusTheme::SKIN, 'at' => gmdate('c')]) . "\n");
+        } catch (Exception $x) {
+            return HermesConfigBackup::fail($local, 'state', null, $x->getMessage());
+        }
+        return true;
     }
 
     public static function marker($local)

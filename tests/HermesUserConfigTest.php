@@ -89,6 +89,7 @@ return [
             file_put_contents($w['home'] . '/config.yaml', $before);
             @mkdir($w['local'] . '/state', 0700);
             HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");
+            HermesConfig::put(HermesUserConfig::skinMarker($w['local']), "{}\n"); // the skin step already ran (ADR-0061)
             userCfgIn($w, $w['bin'], '["/home/u/more-skills"]', function () use ($w, $before) {
                 HermesUserConfig::apply($w['home'], 'seed', '/gen/skills', []);
                 $log = (string) file_get_contents($w['log']);

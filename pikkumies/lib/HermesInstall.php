@@ -72,6 +72,8 @@ class HermesInstall
         'agent.disabled_toolsets' => ['hermes_cli/tools_config.py', '.get("disabled_toolsets")'],
         // The answer HermesTelemetry records; without it the dashboard and chat ask about sending metrics (ADR-0072).
         'telemetry.shared_metrics.offer_version' => ['hermes_cli/observability/shared_metrics_consent.py', 'section["offer_version"] = OFFER_VERSION'],
+        // The skin the seed selects; its file is read from HERMES_HOME/skins (skin_engine.py load_skin) (ADR-0061).
+        'display.skin' => ['hermes_cli/skin_engine.py', 'display.get("skin", "default")'],
     ];
 
     /**

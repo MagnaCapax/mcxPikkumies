@@ -20,7 +20,7 @@ return [
         $odd = Launch::tmuxPlan('1', ['pm1'], true, $cmd, "'c'", "'/home/a%Hb#c/bin/pikkumies' status-line");
         check($odd[0][5] === "#('/home/a%%Hb##c/bin/pikkumies' status-line --pane=#{pane_id}) #('c') %H:%M", '% and # of the path doubled, the pane format not: ' . $odd[0][5]);
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
-        check(strpos($bin, "Launch::tmuxPlan(\$n, \$windows, \$insideTmux, \$self, \$creditsCmd, \$self . ' status-line')") !== false, 'bin must pass its own status-line to the tmux plan');
+        check(strpos($bin, "Launch::tmuxPlan(\$n, \$windows, \$insideTmux, \$self, \$creditsCmd, \$self . ' status-line', !\$noColor)") !== false, 'bin must pass its own status-line to the tmux plan');
     },
     'status line: `status-line --pane=%N` is the subcommand; a pane id as its own word would be a prompt, so the plan never writes one' => function () {
         check(Launch::route(['pikkumies', 'status-line', '--pane=%3']) === ['status-line', ['--pane=%3']], 'with a pane');

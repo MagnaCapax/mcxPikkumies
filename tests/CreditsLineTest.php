@@ -21,7 +21,7 @@ return [
             list(, $out) = creditsLineRun($dir, "$base/v", ['--ascii']);
             check($out === "cr 4.7M credits [#########-] 94% left | >=1.1M tokens | today 35k\n", '--ascii: ' . $out);
             list(, $out) = creditsLineRun($dir, "$base/v", ['--tmux']);
-            check($out === "4.7M credits #[fg=green,bg=black]▰▰▰▰▰▰▰▰▰▱#[default] 94% left · ≥1.1M tokens · today 35k\n", '--tmux: ' . $out);
+            check($out === "4.7M credits #[fg=colour114]▰▰▰▰▰▰▰▰▰▱#[default] 94% left · ≥1.1M tokens · today 35k\n", '--tmux: ' . $out);
             testRmTree("$dir/state");
             list(, $out) = creditsLineRun($dir, "$base/v", [], 'C.UTF-8', 'second');
             check(strpos($out, '≥2.3M tokens') !== false, 'the configured model\'s rates must be used: ' . $out);
@@ -32,7 +32,7 @@ return [
             list($code, $out) = creditsLineRun($dir, "$base/refund", []);
             check($code === 0 && $out === "💳 -250k credits ▱▱▱▱▱▱▱▱▱▱ 0% left · ≥0 tokens · today 0\n", 'refund: ' . $out);
             list(, $out) = creditsLineRun($dir, "$base/refund", ['--tmux']);
-            check(strpos($out, '#[fg=red,bg=black]▱▱▱▱▱▱▱▱▱▱#[default] 0% left') !== false, 'refund must be red: ' . $out);
+            check(strpos($out, '#[fg=colour210]▱▱▱▱▱▱▱▱▱▱#[default] 0% left') !== false, 'refund must be red: ' . $out);
         });
     },
     'credits line: a second call inside 60 s makes no request; an older line asks usage again but keeps the day-old rates' => function () {
@@ -56,7 +56,7 @@ return [
         $cmd = "'php' 'pikkumies'";
         $status = "'php' 'credits.php' line --tmux";
         $plan = Launch::tmuxPlan('2', null, false, $cmd, $status);
-        check(count($plan) === 6 && $plan[0][1] === 'new-session' && $plan[4] === ['tmux', 'select-window', '-t', '=pikkumies:pm2'], 'plan: ' . json_encode($plan));
+        check(count($plan) === 8 && $plan[0][1] === 'new-session' && $plan[6] === ['tmux', 'select-window', '-t', '=pikkumies:pm2'], 'plan: ' . json_encode($plan)); // + status-position, status-style (ADR-0061)
         check(array_slice($plan, 1, 3) === [
             ['tmux', 'set-option', '-t', '=pikkumies:', 'status-right', "#($status) %H:%M"],
             ['tmux', 'set-option', '-t', '=pikkumies:', 'status-right-length', '90'],
@@ -65,7 +65,7 @@ return [
         foreach ($plan as $step) {
             check(!in_array('-g', $step, true), 'no step may set a global option: ' . json_encode($step));
         }
-        check(count(Launch::tmuxPlan('1', ['pm1'], true, $cmd, $status)) === 5, 'an existing session gets the status steps too');
+        check(count(Launch::tmuxPlan('1', ['pm1'], true, $cmd, $status)) === 7, 'an existing session gets the status steps too');
         check(count(Launch::tmuxPlan('1', ['pm1'], true, $cmd)) === 2, 'without a status command the plan is unchanged');
         // tmux expands % (strftime) and # (formats) inside #() as well: a checkout path holding them must still run.
         $odd = Launch::tmuxPlan('1', ['pm1'], true, $cmd, "'/home/a%Hb#c/credits.php' line --tmux");

@@ -74,14 +74,14 @@ return [
         $r = creditsFormatRecord(4700000, 94.0);
         check(CreditsFormat::render($r, 'utf8') === '💳 4.7M credits ▰▰▰▰▰▰▰▰▰▱ 94% left · ≥1.1M tokens · today 35k', 'utf8: ' . CreditsFormat::render($r, 'utf8'));
         check(CreditsFormat::render($r, 'ascii') === 'cr 4.7M credits [#########-] 94% left | >=1.1M tokens | today 35k', 'ascii: ' . CreditsFormat::render($r, 'ascii'));
-        check(CreditsFormat::render($r, 'tmux', false) === '4.7M credits #[fg=green,bg=black][#########-]#[default] 94% left | >=1.1M tokens | today 35k', 'tmux ascii: ' . CreditsFormat::render($r, 'tmux', false));
+        check(CreditsFormat::render($r, 'tmux', false) === '4.7M credits #[fg=colour114][#########-]#[default] 94% left | >=1.1M tokens | today 35k', 'tmux ascii: ' . CreditsFormat::render($r, 'tmux', false));
         check(strpos(CreditsFormat::render(creditsFormatRecord(4700000, 94.0, 1175000, 35000, true), 'utf8'), '▱ ~94% left ·') !== false, 'approximate pot: ~');
         check(strpos(CreditsFormat::render(creditsFormatRecord(10, 99.9), 'utf8'), '▰▰▰▰▰▰▰▰▰▱ 99% left') !== false, '99.9% is not shown as 100%');
         check(strpos(CreditsFormat::render(creditsFormatRecord(10, 130.0), 'utf8'), '▰▰▰▰▰▰▰▰▰▰ 100% left') !== false, 'over 100 shows a full bar and 100%');
-        $colours = ['25.1' => 'green', '25' => 'yellow', '10' => 'yellow', '9.9' => 'red', '0' => 'red'];
+        $colours = ['25.1' => 'colour114', '25' => 'colour221', '10' => 'colour221', '9.9' => 'colour210', '0' => 'colour210']; // StatusTheme good, warn, critical (ADR-0061)
         foreach ($colours as $pct => $colour) {
             $line = CreditsFormat::render(creditsFormatRecord(100, (float) $pct), 'tmux');
-            check(strpos($line, "#[fg=$colour,bg=black]") === 0 + strlen('100 credits ') && strpos($line, '💳') === false, "tmux at $pct% must be $colour, no emoji: $line");
+            check(strpos($line, "#[fg=$colour]") === 0 + strlen('100 credits ') && strpos($line, '💳') === false, "tmux at $pct% must be $colour, no emoji: $line");
         }
     },
 ];

@@ -66,7 +66,7 @@ class HermesConfig
         return $home;
     }
 
-    /** The two config layers (ADR-0062); throws when the managed files cannot be written. */
+    /** The two config layers (ADR-0062) and the Pikkumies skin (ADR-0061); throws when the managed files cannot be written. */
     public static function writeConfig($home, array $prov, array $config, $light = '')
     {
         $managed = self::managedDir($home);
@@ -78,6 +78,9 @@ class HermesConfig
         self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true) . self::sessionsYaml($config, true));
         // Key lives only in the managed .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($managed . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
+        // The skin display.skin names (StatusTheme), rebuilt like the managed files, before the seed can name it.
+        @mkdir($home . '/skins', 0700, true);
+        self::put($home . '/skins/' . StatusTheme::SKIN . '.yaml', StatusTheme::skinYaml());
         // The user's config.yaml: seeded once with everything, then only careful, backed-up, logged edits.
         HermesUserConfig::apply($home, self::renderYaml($prov, self::skillDirs(), $hooks, $lazy, $light) . self::sessionsYaml($config),
             Units::generatedDir(), self::hiddenShipped(isset($config['skills']['disabled']) ? (array) $config['skills']['disabled'] : []));
@@ -216,6 +219,9 @@ class HermesConfig
         // The seed only, so the line stays the user's: clarify is how Hermes lets the agent stop to ask; the tool hook
         // hooks/tools/clarify/decide-yourself blocks it on every install, this keeps it out of the model's list (ADR-0073).
         $y .= $pinsOnly ? '' : "agent:\n  disabled_toolsets:\n    - \"clarify\"\n";
+        // The seed only, so the look stays the user's (/skin): the Pikkumies skin, written beside this file by writeConfig;
+        // an install from before gets it once through HermesUserConfig (ADR-0061, 2026-10-19 section).
+        $y .= $pinsOnly ? '' : "display:\n  skin: " . self::q(StatusTheme::SKIN) . "\n";
         // Set on explicitly (already Hermes' default): background pruning/archiving of agent-created skills;
         // consolidate stays off, left at Hermes' own default (ADR-0024).
         $y .= $pinsOnly ? '' : "curator:\n  enabled: true\n";

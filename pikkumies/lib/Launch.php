@@ -103,9 +103,11 @@ class Launch
      * whose output leads the session's status-right, refreshed every minute: the credits line (ADR-0040). Set on
      * this session only, never with -g, so the person's other tmux sessions keep their own status line. $paneCmd, when given,
      * is run before it with `--pane=#{pane_id}` added: the memories and the active pane's counters (ADR-0061). tmux cuts
-     * status-right from the left when the terminal is too narrow, so the credits line and the clock stay longest.
+     * status-right from the left when the terminal is too narrow, so the credits line and the clock stay longest. With a
+     * status command the status line is also pinned to the bottom row, below the prompt, whatever the person's tmux.conf
+     * says, and coloured with StatusTheme unless $colour is false (NO_COLOR) (ADR-0061, 2026-10-19 section).
      */
-    public static function tmuxPlan($n, $windows, $insideTmux, $cmd, $statusCmd = '', $paneCmd = '')
+    public static function tmuxPlan($n, $windows, $insideTmux, $cmd, $statusCmd = '', $paneCmd = '', $colour = true)
     {
         $s = '=' . self::TMUX_SESSION;
         $w = 'pm' . $n;
@@ -123,6 +125,10 @@ class Launch
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right', $pane . '#(' . strtr($statusCmd, $double) . ') %H:%M'];
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-right-length', $paneCmd === '' ? '90' : '150'];
             $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-interval', '60'];
+            $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-position', 'bottom'];
+            if ($colour) {
+                $plan[] = ['tmux', 'set-option', '-t', $s . ':', 'status-style', StatusTheme::tmuxStyle()];
+            }
         }
         $plan[] = ['tmux', 'select-window', '-t', "$s:$w"];
         $plan[] = $insideTmux ? ['tmux', 'switch-client', '-t', $s] : ['tmux', 'attach-session', '-t', $s];
