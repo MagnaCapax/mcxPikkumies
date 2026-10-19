@@ -51,6 +51,7 @@ class BrowsePaths
             'config' => 'agent-browser.json', // agent-browser's config: only the profile directory
             'resolv' => 'resolv.conf',        // bound over /etc/resolv.conf inside the namespace
             'shim' => 'path/agent-browser',   // the command Hermes finds first on its PATH
+            'panelAuth' => 'panel-auth',      // the agent's panel login for the guard (ADR-0079), 0600; deleted once read
         ];
         return self::dir() . '/' . $files[$name];
     }

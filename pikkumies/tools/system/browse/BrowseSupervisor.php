@@ -8,7 +8,8 @@
  * plain line. The watcher (`browse.php watch`) stops the browser when any part is gone (the guard exits when its CDP
  * connection drops, so a dead guard or a dead browser both end here) or after IDLE seconds without a CLI call.
  * The stop kills every process of the account in the namespace's network namespace, then slirp4netns, which outlives
- * the namespace otherwise (seen on the development host).
+ * the namespace otherwise (seen on the development host). The guard's panel login is the agent's own where the panel
+ * accepts it (PanelAccess, ADR-0079), in a 0600 file deleted once the guard has read it.
  */
 class BrowseSupervisor
 {
@@ -87,6 +88,7 @@ class BrowseSupervisor
 
     private function start()
     {
+        @unlink(BrowsePaths::file('panelAuth')); // a header file a killed start left behind
         $problem = BrowseCheck::problem();
         $pin = BrowseBinary::currentPin();
         $problem = $problem !== '' ? $problem : BrowsePaths::ensureDirs();
@@ -154,8 +156,9 @@ class BrowseSupervisor
 
         $guardArgv = [PHP_BINARY, __DIR__ . '/guard.php', '--cdp', $cdp, '--log', BrowsePaths::file('guardLog'), '--self', $id['user'],
             '--host', $id['fqdn'], '--intent', BrowsePaths::file('intent'), '--ready', BrowsePaths::file('ready')];
-        if (self::authFileUsable(BrowsePaths::authFile(), $id['uid'])) {
-            $guardArgv = array_merge($guardArgv, ['--auth-file', BrowsePaths::authFile()]);
+        $auth = $this->panelAuth($id);
+        if ($auth !== '') {
+            $guardArgv = array_merge($guardArgv, ['--auth-file', $auth]);
         }
         $s['guard'] = BrowseState::part($p->spawn(BrowseIsolation::nsenterArgv($inner, $guardArgv), $log, ['HOME' => $env['HOME'], 'PATH' => $env['PATH']]), $p);
         BrowseState::write($s);
@@ -163,6 +166,7 @@ class BrowseSupervisor
             clearstatcache(true, BrowsePaths::file('ready'));
             return is_file(BrowsePaths::file('ready')) && $p->alive($s['guard']['pid'], $s['guard']['started']);
         });
+        @unlink(BrowsePaths::file('panelAuth')); // the guard read it once at its start; no copy stays on disk
         if (!$ready) {
             return 'the guard did not attach to the browser within ' . self::GUARD_WAIT . ' s (see ' . Config::shown($log) . ')';
         }
@@ -243,6 +247,26 @@ class BrowseSupervisor
         return ['HOME' => $id['home'], 'PATH' => '/usr/local/bin:/usr/bin:/bin', 'LANG' => 'C.UTF-8', 'TMPDIR' => $d['tmp'],
             'AGENT_BROWSER_SOCKET_DIR' => $d['run'], 'AGENT_BROWSER_CONFIG' => BrowsePaths::file('config'),
             'AGENT_BROWSER_EXECUTABLE_PATH' => BrowsePaths::chromium(), 'AGENT_BROWSER_SESSION' => BrowsePaths::SESSION];
+    }
+
+    /**
+     * The guard's --auth-file, '' for none. Where the panel accepts the agent's own login (ADR-0079): that login made
+     * sure of, then written to a new 0600 file in local/browse/ that is deleted once the guard has read it. Otherwise a
+     * header the user stored (ADR-0077). A failure is one line in browse.log; the browser still starts, without a login.
+     */
+    private function panelAuth(array $id)
+    {
+        $panel = new PanelAccess($id['home'], $id['user'], BrowsePaths::local(), $id['uid']);
+        if ($panel->available()) {
+            list($ok, $what) = $panel->ensure();
+            $file = BrowsePaths::file('panelAuth');
+            $problem = $ok ? $panel->writeHeader($file) : $what;
+            if ($problem === '') {
+                return $file;
+            }
+            BrowseState::log('panel login not used: ' . $problem);
+        }
+        return self::authFileUsable(BrowsePaths::authFile(), $id['uid']) ? BrowsePaths::authFile() : '';
     }
 
     /** The guard reads the Basic header only from a regular file this account owns with mode 0600 (ADR-0019). */

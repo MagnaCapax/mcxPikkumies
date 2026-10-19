@@ -1,7 +1,8 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | browse up|down|status | configure | run [args...]
+ * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | browse up|down|status | access status|rotate|remove
+ *            | configure | run [args...]
  *            | [-m <model>] [--reasoning <level>] <free text prompt>
  *
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
@@ -242,6 +243,7 @@ switch ($cmd) {
         }
         require_once dirname(__DIR__) . '/tools/system/browse/browse.inc.php';
         out(BrowseCheck::doctorLine(BrowseState::running())); // the isolated browser: ready with versions, or the failing check (ADR-0077)
+        out(PanelAccess::forAccount()->statusLine()); // the agent's own panel login: off and why, available, or ready (ADR-0079)
         $units = Units::all();
         $bad = array_filter($units, function ($u) {
             return $u['errors'];
@@ -563,6 +565,16 @@ switch ($cmd) {
         passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/browse/browse.php') . ' ' . escapeshellarg($passArgs[0]) . ' --human', $code);
         exit($code);
 
+    case 'access': // the agent's own panel login (lib/PanelAccess.php, ADR-0079); never prints the secret or the hash
+        $panel = PanelAccess::forAccount();
+        if ($passArgs[0] === 'status') {
+            out($panel->statusLine());
+            exit(0);
+        }
+        list($ok, $what) = $passArgs[0] === 'remove' ? $panel->remove() : $panel->ensure(true);
+        out('panel access: ' . $what);
+        exit($ok ? 0 : 1);
+
     case 'tmux': // window pmN of the tmux session "pikkumies", running pikkumies (ADR-0032)
         $n = isset($passArgs[0]) ? $passArgs[0] : '1';
         if (!preg_match('/^[1-9]$/', $n)) {
@@ -626,5 +638,6 @@ switch ($cmd) {
         out('       pikkumies configure undo                   set the last settings change back (asks y/N only for a change you would be asked about)');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
         out('       pikkumies browse up|down|status            the isolated browser the agent uses (starts and stops by itself)');
+        out('       pikkumies access status|rotate|remove      the agent\'s own panel login (made by itself where the panel accepts it)');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }

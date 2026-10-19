@@ -23,7 +23,7 @@ class BrowseState
 
     public static function clear()
     {
-        foreach (['state', 'ready', 'intent'] as $f) {
+        foreach (['state', 'ready', 'intent', 'panelAuth'] as $f) {
             @unlink(BrowsePaths::file($f));
         }
     }

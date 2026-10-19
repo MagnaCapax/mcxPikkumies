@@ -18,6 +18,8 @@ class FakeBrowseProc
     public $guardReady = true;
     public $leak = false;
     public $oom = [];
+    /** [contents, mode] of the guard's --auth-file at the moment the guard was started; null when none was passed. */
+    public $authSeen = null;
 
     private function newPid($net)
     {
@@ -37,6 +39,11 @@ class FakeBrowseProc
         }
         if (in_array(dirname(__DIR__) . '/pikkumies/tools/system/browse/guard.php', $argv, true)) {
             $ready = $argv[array_search('--ready', $argv, true) + 1];
+            if (in_array('--auth-file', $argv, true)) {
+                $auth = $argv[array_search('--auth-file', $argv, true) + 1];
+                clearstatcache(true, $auth);
+                $this->authSeen = [(string) @file_get_contents($auth), @fileperms($auth) & 0777];
+            }
             if ($this->guardReady) {
                 file_put_contents($ready, "1\n");
             }
@@ -215,6 +222,35 @@ return [
             $guard = $proc->spawned()[2][1];
             check($guard[array_search('--auth-file', $guard, true) + 1] === BrowsePaths::authFile(), 'the file path, never its content: ' . json_encode($guard));
             check(strpos(json_encode($proc->calls), 'ZXhhbXBs') === false, 'the header never appears in any argv');
+        });
+    },
+    'browse supervisor: where the panel accepts the agent, its own login goes to the guard in a 0600 file that is gone once the guard has read it (ADR-0079)' => function () {
+        browseSupWorld(function ($sup, $proc, $t) {
+            mkdir("$t/home/.lighttpd", 0751, true);
+            file_put_contents("$t/home/.lighttpd.conf", "auth.require = (\n \"/user-exampleuser/\" =>\n    (\n        \"realm\" => \"Password protected area (exampleuser)\",\n"
+                . "        \"require\" => \"user=exampleuser|user=pikkumies.agent\"\n    )\n)\n");
+            file_put_contents("$t/home/.lighttpd/.htpasswd", "exampleuser:kept-as-is\n");
+            mkdir("$t/local/secrets", 0700);
+            file_put_contents(BrowsePaths::authFile(), "Basic ZXhhbXBsZTpleGFtcGxl\n"); // a stored header: the agent's own login wins
+            chmod(BrowsePaths::authFile(), 0600);
+            file_put_contents(BrowsePaths::file('panelAuth'), "stale\n"); // left by a killed start
+            $sup->identity['home'] = "$t/home";
+            check($sup->up()[0], 'started');
+            $guard = $proc->spawned()[2][1];
+            check($guard[array_search('--auth-file', $guard, true) + 1] === BrowsePaths::file('panelAuth'), 'the agent header file: ' . json_encode($guard));
+            $secret = json_decode((string) file_get_contents("$t/local/secrets/panel-agent"), true)['password'];
+            check($proc->authSeen === ['Basic ' . base64_encode("pikkumies.agent:$secret") . "\n", 0600], 'the agent login, 0600, at the guard\'s start: ' . json_encode($proc->authSeen));
+            check(!file_exists(BrowsePaths::file('panelAuth')), 'deleted once the guard is ready');
+            check(strpos(json_encode($proc->calls), $secret) === false && strpos(json_encode($proc->calls), base64_encode("pikkumies.agent:$secret")) === false, 'never in any argv');
+            check(PanelHtpasswd::lines(file_get_contents("$t/home/.lighttpd/.htpasswd"))[0] === 'exampleuser:kept-as-is', 'account line kept');
+        });
+        browseSupWorld(function ($sup, $proc, $t) {
+            mkdir("$t/home/.lighttpd", 0751, true);
+            file_put_contents("$t/home/.lighttpd.conf", "auth.require = (\n \"/user-exampleuser/\" => ( \"require\" => \"user=exampleuser\" )\n)\n");
+            file_put_contents("$t/home/.lighttpd/.htpasswd", "exampleuser:kept-as-is\n");
+            $sup->identity['home'] = "$t/home";
+            check($sup->up()[0] && $proc->authSeen === null, 'an older panel: no login passed, the browser still starts');
+            check(file_get_contents("$t/home/.lighttpd/.htpasswd") === "exampleuser:kept-as-is\n" && !file_exists("$t/local/secrets/panel-agent"), 'nothing written');
         });
     },
     'browse supervisor: refusals before anything starts (memory, host name) and fail-closed stops after (leak, no guard)' => function () {

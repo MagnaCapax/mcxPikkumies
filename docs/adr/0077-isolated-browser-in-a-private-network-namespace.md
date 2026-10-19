@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-19
-- Status: Accepted. Amends [ADR-0021](0021-web-access-off-unless-configured.md) (out of the box there is now browser rendering, when the server has Chromium; lazy installs stay off) and [ADR-0024](0024-hermes-features-on-at-install.md) (the seed now sets one browser key, `browser.restrict_evaluate`). [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) is unchanged: Hermes' install still declines agent-browser.
+- Status: Accepted. Amends [ADR-0021](0021-web-access-off-unless-configured.md) (out of the box there is now browser rendering, when the server has Chromium; lazy installs stay off) and [ADR-0024](0024-hermes-features-on-at-install.md) (the seed now sets one browser key, `browser.restrict_evaluate`). [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) is unchanged: Hermes' install still declines agent-browser. Amended by [ADR-0079](0079-the-agents-own-panel-login.md): the guard's `--auth-file` comes first from the agent's own panel login, in a file deleted once the guard has read it.
 
 ## Context
 The operator asked on 2026-10-19 for the full browser kit: Pikkumies logs in to the user's panel and apps, reads pages and takes screenshots, managed by itself with no setup questions. Hermes has the browser tools (a Node CLI, agent-browser, driving Chromium). On a shared seedbox server that browser is a security boundary.
