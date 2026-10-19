@@ -24,6 +24,7 @@ $REQUIRED = [
         'GET wanted/cutoff' => ['includeAuthor', 'monitored'], 'GET history' => ['includeAuthor', 'includeBook'],
         'GET history/since' => ['includeAuthor', 'includeBook']],
 ];
+require __DIR__ . '/config-routes.php';
 $route = $method . ' ' . preg_replace('#/[0-9]+$#', '/#', $rel);
 foreach (isset($REQUIRED[$s['app']][$route]) ? $REQUIRED[$s['app']][$route] : [] as $b) {
     if (!isset($q[$b]) || !in_array($q[$b][0], ['true', 'false'], true)) {

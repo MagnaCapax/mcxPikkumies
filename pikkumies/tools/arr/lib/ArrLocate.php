@@ -34,8 +34,8 @@ class ArrLocate
             if (!$c['valid']) {
                 throw new CliError("{$app['name']}'s config.xml is empty or invalid ({$c['bytes']} bytes, $path)", $family === 'pmss'
                     ? 'rerun `bash ~/install-media-stack.sh` (`--dry-run` first: a rerun removes ~/.config/jellyfin when it has content): it keeps the bad file as config.xml.invalid-<time>'
-                        . ' and writes a new one; this tool never edits config.xml'
-                    : 'restore config.xml from a backup or reinstall the app; this tool never edits config.xml');
+                        . ' and writes a new one; this tool never rewrites config.xml'
+                    : 'restore config.xml from a backup or reinstall the app; this tool never rewrites config.xml');
             }
             if ($c['key'] === '' && !$lenient) {
                 throw new CliError("no ApiKey in $path: {$app['name']} has never started successfully",

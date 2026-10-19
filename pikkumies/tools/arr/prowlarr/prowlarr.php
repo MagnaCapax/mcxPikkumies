@@ -9,6 +9,7 @@ $usage = 'usage: php prowlarr.php <verb> [arguments] [--human]
 verbs: list [--search T] [--limit N] | show <id>... | stats | health | history [--since TIME] | restart
        releases <text> [--indexer ID,ID] [--limit N] | grab <handle> [--client rtorrent|qbittorrent|deluge] [--via-prowlarr]
        test [<id>...] | sync
+       login-check | set-login | repair | config show [SECTION] | config set SECTION FIELD VALUE
 ids: the indexer ids `list` prints; a release handle comes from `releases`. See USAGE.md.';
 
 Arr::run($argv, 'prowlarr', $usage);

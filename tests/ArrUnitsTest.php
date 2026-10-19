@@ -28,4 +28,27 @@ return [
             check(strpos((string) file_get_contents("$dir/$u/skill.md"), $rule) !== false, "$u/skill.md lacks the free-disk rule");
         }
     },
+    'arr units: the Servarr login and settings table is on exactly sonarr, radarr, lidarr, prowlarr, whisparr; README causes mirror the code; each skill points to login-check' => function () {
+        $dir = dirname(__DIR__) . '/pikkumies/tools/arr';
+        require_once "$dir/lib/Arr.php";
+        $readme = (string) file_get_contents("$dir/README.md");
+        $p = strpos($readme, '## Servarr apps: login and settings');
+        check($p !== false, 'README lacks the Servarr login and settings section');
+        $sub = array_column(Units::verbs(substr($readme, $p)), 'verb');
+        check($sub === ['login-check', 'set-login', 'repair', 'config'], 'Servarr sub-table: ' . implode(',', $sub));
+        foreach (['sonarr', 'radarr', 'lidarr', 'prowlarr', 'whisparr', 'readarr', 'bazarr', 'autobrr', 'jackett'] as $u) {
+            list(, $out) = runPhp("$dir/$u/$u.php", ['--verbs']);
+            $code = array_values(array_filter(explode("\n", trim($out)), 'strlen'));
+            $on = in_array($u, ArrAuth::APPS, true);
+            check($on ? !array_diff($sub, $code) : !array_intersect($sub, $code), "$u: login verbs " . ($on ? 'missing' : 'present') . ': ' . implode(',', $code));
+            $skill = (string) file_get_contents("$dir/$u/skill.md");
+            check(!$on || (strpos($skill, 'run `login-check` and do its `next`') !== false && strpos($skill, 'never print the password') !== false
+                && strpos($skill, '`~/.media-stack-credentials.txt`') !== false), "$u/skill.md lacks the login-check pointer");
+        }
+        $c = strpos($readme, '### Why a login fails');
+        preg_match_all('/^\| ([a-z-]+) \|/m', substr($readme, $c, strpos($readme, "\n## ", $c) - $c), $m);
+        $causes = array_values(array_diff($m[1], ['cause']));
+        check($c !== false && $causes === array_keys(ArrLoginCheck::CAUSES), 'README causes ' . implode(',', $causes) . ' but the code has '
+            . implode(',', array_keys(ArrLoginCheck::CAUSES)));
+    },
 ];

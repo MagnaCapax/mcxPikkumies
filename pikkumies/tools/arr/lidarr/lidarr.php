@@ -9,6 +9,7 @@ $usage = 'usage: php lidarr.php <verb> [arguments] [--human]
 verbs: list [--search T] [--limit N] | show <id>... [--files] | stats | health | history [--since TIME] | restart
        lookup <name|mbid:UUID> | add <mbid:UUID>... [--profile P] [--root DIR] [--no-search]
        remove <id>... [--with-data --expect SIZE] | search <id>... | queue | wanted [--cutoff]
+       login-check | set-login | repair | config show [SECTION] | config set SECTION FIELD VALUE
 ids: the artist ids `list` prints; mbid: ids (MusicBrainz) come from `lookup`. See USAGE.md.';
 
 Arr::run($argv, 'lidarr', $usage);

@@ -14,7 +14,7 @@ class WhisparrRun
         $lazy = [];
         foreach (array_keys($verbs) as $name) {
             $lazy[$name] = function ($args, $opt) use ($name) {
-                list($real) = Arr::build(self::detect($name === 'restart'));
+                list($real) = Arr::build(self::detect(in_array($name, ['restart', 'login-check', 'repair'], true)));
                 return call_user_func($real[$name], $args, $opt);
             };
         }
@@ -22,7 +22,7 @@ class WhisparrRun
     }
 
     /**
-     * The table row of the Whisparr that answers. $lenient (restart): a Whisparr that does not answer is not an
+     * The table row of the Whisparr that answers. $lenient (restart, login-check, repair): a Whisparr that does not answer is not an
      * error here (it may be the thing to start); the v3 row is used, and restart needs only the shared fields.
      */
     public static function detect($lenient = false)

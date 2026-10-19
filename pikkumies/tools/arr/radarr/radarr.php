@@ -10,6 +10,7 @@ verbs: list [--search T] [--limit N] | show <id>... [--files] | stats | health |
        lookup <title|tmdb:N|imdb:ttN> | add <tmdb:N|imdb:ttN>... [--profile P] [--root DIR] [--no-search]
        remove <id>... [--with-data --expect SIZE] | search <id>... | queue | wanted [--cutoff]
        releases <id> | grab <handle>
+       login-check | set-login | repair | config show [SECTION] | config set SECTION FIELD VALUE
 ids: the movie ids `list` prints; tmdb:/imdb: ids come from `lookup`; a release handle comes from `releases`. See USAGE.md.';
 
 Arr::run($argv, 'radarr', $usage);

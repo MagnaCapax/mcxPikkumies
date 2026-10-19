@@ -6,12 +6,12 @@
  * PIKKUMIES_PMSS_DIR, PIKKUMIES_ARR_TIMEOUT and PIKKUMIES_ARR_WAIT exist for the tests only.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Http'] as $f) {
+foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Http', 'MediaStackCredentials'] as $f) {
     require_once "$lib/$f.php";
 }
 foreach (['ArrApps', 'ArrAppsMore', 'ArrConfig', 'ArrShell', 'ArrLocate', 'ArrClient', 'ArrErrorText', 'ArrRecords', 'ArrCommand',
     'ArrPages', 'ArrDelete', 'ArrRemove', 'ArrRestart', 'ArrVerbs', 'ArrLibrary', 'ArrAdd', 'ArrReleases', 'ArrIndexers',
-    'ArrGrabClient', 'ArrGrab', 'ArrLibraryReleases'] as $f) {
+    'ArrGrabClient', 'ArrGrab', 'ArrLibraryReleases', 'ArrAuth', 'ArrLoginCheck', 'ArrLoginFix', 'ArrSettings', 'ArrUpdates'] as $f) {
     require_once __DIR__ . "/$f.php";
 }
 
@@ -65,6 +65,7 @@ class Arr
                 $options[] = 'client';
             }
         }
+        $verbs += ArrAuth::verbs($app, $c, $locate, $fresh); // sonarr, radarr, lidarr, prowlarr, whisparr
         return [$verbs, $flags, $options];
     }
 

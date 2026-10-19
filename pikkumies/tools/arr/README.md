@@ -41,6 +41,37 @@ These are the tools for the user's own *ARR apps, one unit each ([ADR-0015](../.
 
 `sonarr` and `radarr` also take `releases <id> [--season N] [--episode <id>]` (Sonarr) or `releases <id>` (Radarr) for a title already in the library, and `grab <handle>`, which sends the release to the app's own configured download client (`DownloadRelease`). This is separate from the shared `search` verb above, which only asks the app to search by itself. The `handle` and the 30-minute window are the same mechanism as Prowlarr's `releases`/`grab` (docs/adr/0046); a handle is refused on the app that did not create it.
 
+## Servarr apps: login and settings (sonarr, radarr, lidarr, prowlarr, whisparr; not readarr)
+
+| verb | arguments | changes | what it does |
+|---|---|---|---|
+| login-check | | no | Why the user cannot log in. First one forms login with the password in `~/.media-stack-credentials.txt`: when it works, says where the password is and stops. Otherwise one record per cause found (table below), and `next`, the one step to take. |
+| set-login | | yes | A new random password for the app's user (the existing user name, or the account name when there is none): written to `~/.media-stack-credentials.txt` first, then set in the app (forms login, required); a refused change puts the file back as it was. Checked by a real login: the API without the key must answer 401/403 and the new pair must log in. The password is never printed. |
+| repair | | yes | Puts the PMSS-safe host settings back through the app's API: listens on 127.0.0.1 only, forms login required (when the app has a user), and on PMSS the installer's proxy UrlBase `/public-<account>/<app>`; then the usual `restart` when the address or UrlBase changed. An empty or invalid config.xml is copied aside and the hint names the installer rerun. |
+| config | `show [<section>]` \| `set <section> <field> <value>` | yes (`show`: no) | The app's own settings, `/api/<v>/config/<section>`: `host`, `ui`, `downloadclient`, and for the library apps `mediamanagement`, `naming`, `indexer`. `show` hides every secret. `set` changes one field, keeps its type and reads it back. The login stays forms and required, the address stays 127.0.0.1, and user name, password, API key, port, UrlBase, update settings and file permissions are never set here. |
+
+The API key these verbs use is the one every verb uses; it already allows changing the login, which is how the PMSS media-stack installer sets it up. The key is never reset (`ResetApiKey` is on the never-sent list). The app refuses "script" updates with no script path, so a host change sends them as `builtIn`, as the installer does while it sets a login; on an app the installer manages, the tool then sets the config.xml tag `UpdateMechanism` back to `Script` the way the installer does (`update_mechanism` in the record) and restarts the app the usual way (`restart`). When config.xml cannot be written or that restart fails, the call ends `ok:false` although the change itself was made, because the app may still update itself (on PMSS its updater has broken the .NET runtime the other media apps share); the hint names the fix: `restart`, or the installer rerun. That tag is the one thing written to config.xml: only in a file this account owns, never through a link, with the file's own mode, and not at all when it already reads `Script`. Every change appends one line to `pikkumies/local/logs/arr/YYYYMMDD.jsonl`: verb, app, outcome, never a value.
+
+### Why a login fails
+
+`login-check` names these causes (lib/ArrLoginCheck.php `CAUSES`, checked by the contract test):
+
+| cause | what it means | next |
+|---|---|---|
+| not-installed | No config.xml was found. | The error's hint (on PMSS: the media-stack installer). |
+| config-invalid | config.xml is empty or has no `</Config>`. | `repair` (copies it aside; the hint names the installer rerun) |
+| not-answering | The app does not answer its API (stopped, starting, busy, or turned off). | The error's hint, usually `restart` |
+| seed-failed | The app's own log of the installer's first start (`<app>-auth-seed.log`) holds a known failure line. | On PMSS `bash ~/install-media-stack.sh --secure-app=<app>` |
+| auth-not-configured | The app does not ask for a login on every address. | On PMSS for sonarr, radarr, prowlarr `bash ~/install-media-stack.sh --secure-app=<app>`; otherwise `set-login` |
+| username-missing | A login method is set, but no user exists. | `set-login` |
+| bind-not-loopback | The app listens on more than 127.0.0.1. | `repair` |
+| urlbase-not-proxy | On PMSS, UrlBase is not `/public-<account>/<app>`, so the web address cannot reach the login page. | `repair` |
+| credentials-missing | `~/.media-stack-credentials.txt` has no `<APP>_PASSWORD` line (or there is no file). | `set-login` |
+| credentials-placeholder | The line holds the installer's `[...]` placeholder: the installer kept a login it did not know. | `set-login` |
+| password-rejected | The app refused the user name with the password in the file. | `set-login` |
+
+When the login works on the app's own port but the web address still refuses it, the proxy in front of the app is the suspect: report it, never weaken the login.
+
 ## Bazarr
 
 | verb | arguments | changes | what it does |
@@ -88,7 +119,7 @@ Library items: `id`, `title`, `year`, `meta_id`, `monitored`, `status`, `size` (
 - Every boolean query parameter an endpoint declares with a default is sent explicitly; no API default is inherited (optional filters whose absence means "all", like Bazarr's `monitored` and `missing`, are left out). Queue removal is not offered: its `removeFromClient` defaults to true and deletes the download's data.
 - Commands come from a fixed list per app (`SeriesSearch`, `MoviesSearch`, `ArtistSearch`, `ApplicationIndexerSync`; Readarr none). Bazarr's only change is `search-missing`, autobrr's `toggle`. Update, key reset, shutdown, file deletes, log clearing, renames and moves can never be sent; there is no generic command verb.
 - In settings (`fields`), a value is shown only when its privacy is `normal`; everything else is hidden.
-- config.xml, Bazarr's config.yaml and autobrr's config.toml are read with regular expressions, never an XML, YAML or TOML library, never evaluated, and never written. Jackett's ServerConfig.json is read with PHP's own `json_decode` (three fields taken), and its Torznab XML answers with regular expressions. autobrr's key is the one the user stored with `login` (`local/secrets/autobrr`, 0600).
+- config.xml, Bazarr's config.yaml and autobrr's config.toml are read with regular expressions, never an XML, YAML or TOML library, never evaluated, and never written, except the one `UpdateMechanism` tag put back to `Script` after a host change on an installer-managed app ("Servarr apps: login and settings"). Jackett's ServerConfig.json is read with PHP's own `json_decode` (three fields taken), and its Torznab XML answers with regular expressions. autobrr's key is the one the user stored with `login` (`local/secrets/autobrr`, 0600).
 - Bazarr and autobrr records are built from lists of allowed fields: tracker settings, IRC passwords, action commands and download links never reach the output.
 - Programs the tool runs (`docker`, `tmux`, the PMSS installer) get an argument list with every word quoted; the app name in it is fixed per unit.
 - The tools never run anything as root. The home folder is `$HOME` only when this user owns it, else the passwd entry's; the PMSS installer runs only when it is this user's own file.

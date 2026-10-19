@@ -6,9 +6,11 @@
  */
 require_once __DIR__ . '/seed.php';
 require_once __DIR__ . '/seed-v1.php';
+require_once __DIR__ . '/auth-seed.php';
 require_once dirname(__DIR__, 3) . '/pikkumies/tools/arr/lib/Arr.php';
 
 const ARR_KEY = '0123456789abcdef0123456789abcdef';
+const ARR_LOGIN = 'Fake-Login-Pass-0001'; // the user's app login in the fake (config-routes.php); never printed either
 
 function arrFreePort()
 {
@@ -50,8 +52,9 @@ function arrFixture($app, array $over = [])
         . "  <Port>$cfgPort</Port>\n  <UrlBase>$base</UrlBase>\n  <ApiKey>" . ARR_KEY . "</ApiKey>\n"
         . "  <AuthenticationMethod>Forms</AuthenticationMethod>\n</Config>\n");
     @mkdir("$dir/pmss", 0700); // PMSS unless a test points PIKKUMIES_PMSS_DIR elsewhere
-    $state = ['app' => $app, 'api' => $api, 'base' => $base, 'key' => ARR_KEY, 'dir' => $dir, 'mode' => '', 'sleep' => 0,
-        'recycleBin' => '', 'refuse' => false, 'commandMode' => 'complete', 'commands' => [], 'calls' => [], 'violations' => []];
+    $state = ['app' => $app, 'api' => $api, 'base' => $base, 'key' => ARR_KEY, 'dir' => $dir, 'configPath' => $cfgPath, 'mode' => '', 'sleep' => 0,
+        'recycleBin' => '', 'refuse' => false, 'commandMode' => 'complete', 'commands' => [], 'calls' => [], 'violations' => []]
+        + arrAuthState($app, $base, $cfgPort);
     $seed = in_array($app, ['lidarr', 'readarr'], true) ? arrSeedV1($app, $home) : arrSeedFor($app, $home);
     $state = array_merge($state, $seed, array_diff_key($over, array_flip(['where', 'config', 'start', 'base'])));
     file_put_contents("$dir/state.json", json_encode($state));
@@ -94,7 +97,7 @@ function arrRun(array $fx, array $args, array $env = [])
     $env += ['HOME' => $fx['home'], 'PATH' => $fx['dir'] . '/bin:/usr/bin:/bin', 'PIKKUMIES_PMSS_DIR' => $fx['dir'] . '/pmss',
         'PIKKUMIES_ARR_TIMEOUT' => '5', 'PIKKUMIES_ARR_WAIT' => '3', 'DOCKER_HOST' => 'unix://' . $fx['dir'] . '/no-docker.sock',
         'PIKKUMIES_ARR_RELEASES_FILE' => $fx['dir'] . '/secrets/releases.json', // never this install's own local/secrets/releases.json
-        'PIKKUMIES_ARR_TMP_DIR' => $fx['dir'] . '/arr-tmp'];
+        'PIKKUMIES_ARR_TMP_DIR' => $fx['dir'] . '/arr-tmp', 'PIKKUMIES_ARR_LOG_DIR' => $fx['dir'] . '/arr-log'];
     $script = isset($fx['script']) ? $fx['script'] : dirname(__DIR__, 3) . "/pikkumies/tools/arr/{$fx['app']}/{$fx['app']}.php";
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . implode('', array_map(function ($a) {
         return ' ' . escapeshellarg($a);
@@ -107,6 +110,7 @@ function arrRun(array $fx, array $args, array $env = [])
     $code = proc_close($p);
     clearstatcache(); // the tool or the fake app changed files in another process; never trust this process's stat cache
     check(stripos($out . $err, ARR_KEY) === false, 'the API key appeared in the output: ' . $out . $err);
+    check(strpos($out . $err, ARR_LOGIN) === false, 'the app login appeared in the output: ' . $out . $err);
     $calls = file_exists($fx['dir'] . '/state.json') ? arrState($fx) : ['violations' => []];
     check(empty($calls['violations']), 'the fake saw a violation: ' . json_encode($calls['violations']));
     return [$code, arrLines($out), $out, $err];

@@ -11,6 +11,7 @@
  * - DELETE item ?deleteFiles=true deletes or recycles the folder (MediaFileDeletionService.cs:91-127)
  *   unless the state says the app refuses.
  */
+require_once __DIR__ . '/auth-seed.php';
 $file = getenv('ARR_FAKE_STATE');
 $s = json_decode((string) file_get_contents($file), true);
 $uri = parse_url($_SERVER['REQUEST_URI']);
@@ -60,11 +61,14 @@ if (!empty($s['sleep'])) {
 if ($s['mode'] === 'html') {
     $send(200, '<html>login</html>', 'text/html');
 }
+if ($method === 'POST' && $path === $s['base'] . '/login') {
+    require __DIR__ . '/login.php';
+}
 if ($rel === null || $s['mode'] === 'redirect') {
     $send(307, '', 'text/plain');
 }
 $given = isset($_SERVER['HTTP_X_API_KEY']) ? $_SERVER['HTTP_X_API_KEY'] : '';
-if ($given !== $s['key']) {
+if ($given !== $s['key'] && !($given === '' && !arrFakeAuthOn($s))) { // no login required: the app lets a keyless call in
     $send(401, '', 'text/plain');
 }
 if ($s['mode'] === 'http500') {

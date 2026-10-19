@@ -18,6 +18,10 @@ The user's own Sonarr through its API on 127.0.0.1 (`/api/v3` under the UrlBase 
 | wanted | `[--cutoff] [--limit N]` | no | Missing monitored episodes: `id`, `item` (series id), `title`, `season`, `episode`, `aired_at`. `--cutoff`: below the quality cutoff instead. |
 | releases | `<id> [--season N] [--episode <id>]` | no | Releases for one episode (`--episode`) or a whole season (`<id>` + `--season`): `handle`, `title`, `size`, `quality`, `indexer`, `seeders`, `rejected`, `rejection` (the first reason, if rejected). Guids and links are never printed; `handle` names the result for `grab`, for 30 minutes. |
 | grab | `<handle>` | yes | Sends the named release (from `releases`) to Sonarr's own `DownloadRelease`, which hands it to Sonarr's configured download client: `result`, `title`, `size`. |
+| login-check | | no | Why the user cannot log in: one forms login with the password in `~/.media-stack-credentials.txt` (works: says where it is and stops), else one record per cause (`cause`, `detail`, `next`) and status `next`, the step to take. Causes: `tools/arr/README.md` "Why a login fails". |
+| set-login | | yes | A new random password for the app's user: written to `~/.media-stack-credentials.txt` first, then set through the API (forms, required); a refused change restores the file. Checked: the API without the key must answer 401/403 and the new pair must log in. Never prints the password: `password_file` and `password_line` say where it is. On an app the PMSS installer manages, config.xml `UpdateMechanism` goes back to `Script` and the app restarts (`update_mechanism`, `restart`), as the installer does; every host change does the same. |
+| repair | | yes | Host settings back to the safe values through the API: 127.0.0.1 only, forms login required, PMSS proxy UrlBase; `changed` lists them, then `restart` when the address or UrlBase changed. An empty or invalid config.xml is copied aside; the hint names the installer rerun. |
+| config | `show [<section>]` \| `set <section> <field> <value>` | yes (`show`: no) | The app's own settings by section (`host`, `ui`, `downloadclient`, library apps also `mediamanagement`, `naming`, `indexer`): `section`, `field`, `value`, secrets `hidden`. `set` changes one field and reads it back: `old`, `value`. The login, the 127.0.0.1 address, API key, port, UrlBase, updates and permissions are never set here. |
 
 ```sh
 T=~/pikkumies/tools/arr/sonarr/sonarr.php
@@ -30,6 +34,9 @@ php $T remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $T history --since "-2 days"
 php $T releases 12 --season 1
 php $T grab a1b2c3
+php $T login-check
+php $T config show host
+php $T config set ui firstDayOfWeek 1
 ```
 
 - Plain numbers are library ids from `list`; `tvdb:N` ids are only for `lookup` and `add`; a release handle comes from `releases` and expires after 30 minutes or the next `releases` call.

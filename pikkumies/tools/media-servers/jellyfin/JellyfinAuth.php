@@ -9,9 +9,11 @@
  * One attempt per call. A refused key or password is marked and never tried again until `login`;
  * a refused session is dropped, and the next call logs in once more. No API key is ever created.
  */
+require_once dirname(__DIR__, 3) . '/lib/MediaStackCredentials.php';
+
 class JellyfinAuth
 {
-    const CREDENTIALS = '.media-stack-credentials.txt';
+    const CREDENTIALS = MediaStackCredentials::FILE;
 
     /** Loads the credential into $mb. Returns [where it lives (for `stats`), literal values to scrub]. */
     public static function load(Mediabrowser $mb, MediaSecret $secret, $home, $family, $script)
@@ -56,25 +58,15 @@ class JellyfinAuth
     }
 
     /**
-     * JELLYFIN_USERNAME and JELLYFIN_PASSWORD, read the way PMSS reads them (install-media-stack.sh:1470-1484:
-     * `KEY = value` lines; a value that starts with "[" is a placeholder). The file is the user's own,
-     * mode 600 (install-media-stack.sh:2018-2049). Null when it is missing, a link, or incomplete.
+     * JELLYFIN_USERNAME and JELLYFIN_PASSWORD, read the way PMSS reads them (lib/MediaStackCredentials.php: `KEY = value`
+     * lines; a value that starts with "[" is a placeholder). The file is the user's own, mode 600. Null when it is
+     * missing, a link, or incomplete.
      */
     public static function pmssCredentials($home)
     {
-        $file = "$home/" . self::CREDENTIALS;
-        if (!is_file($file) || is_link($file)) {
-            return null;
-        }
-        $v = [];
-        foreach (explode("\n", (string) @file_get_contents($file, false, null, 0, 65536)) as $line) {
-            $p = strpos($line, ' = ');
-            if ($p !== false && !isset($v[substr($line, 0, $p)])) {
-                $v[substr($line, 0, $p)] = rtrim(substr($line, $p + 3), "\r");
-            }
-        }
-        $user = isset($v['JELLYFIN_USERNAME']) ? $v['JELLYFIN_USERNAME'] : '';
-        $pw = isset($v['JELLYFIN_PASSWORD']) ? $v['JELLYFIN_PASSWORD'] : '';
-        return $user === '' || $pw === '' || $pw[0] === '[' ? null : ['user' => $user, 'password' => $pw];
+        $v = MediaStackCredentials::read($home);
+        $user = MediaStackCredentials::value($v, 'JELLYFIN_USERNAME');
+        $pw = MediaStackCredentials::value($v, 'JELLYFIN_PASSWORD');
+        return $user === null || $pw === null ? null : ['user' => $user, 'password' => $pw];
     }
 }

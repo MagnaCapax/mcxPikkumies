@@ -10,6 +10,7 @@ verbs: list [--search T] [--limit N] | show <id>... [--files] | stats | health |
        lookup <title|tvdb:N> | add <tvdb:N>... [--profile P] [--root DIR] [--no-search] | remove <id>... [--with-data --expect SIZE]
        search <id>... | queue | wanted [--cutoff]
        releases <id> [--season N] [--episode ID] | grab <handle>
+       login-check | set-login | repair | config show [SECTION] | config set SECTION FIELD VALUE
 ids: the series ids `list` prints; tvdb:N ids come from `lookup`; a release handle comes from `releases`. See USAGE.md.';
 
 Arr::run($argv, 'sonarr', $usage);
