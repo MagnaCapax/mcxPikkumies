@@ -47,7 +47,7 @@ Who makes a change (ADR-0059):
 | `ssh.allow` (SSH hosts reached without a question, [docs/ssh.md](../../../../docs/ssh.md)) | removing a host | adding one | |
 | `ssh.deny` (SSH hosts always refused; wins over `ssh.allow`) | adding a host | | removing one |
 | `ssh.blockUnknown` (refuse SSH hosts on neither list) | on | off: unknown hosts are asked about again | |
-| `provider.endpoint`, `provider.keyFile`, `provider.virsilipasKeyFile`, `host.*`, `terms.accepted` | | | any change |
+| `provider.endpoint`, `provider.keyFile`, `provider.virsilipasKeyFile`, `host.*`, `terms.accepted`, `hooks.mutationCheck.holdsPerTurn` | | | any change |
 
 - "Only the person" is refused with what that change does and how they make it: by hand in `~/pikkumies/local/config.php`, for the terms the first-start question or `pikkumies install --accept-terms`. `Config::set` itself refuses those changes too, whoever calls it. Hermes' approval mode is not a Pikkumies setting at all: it stays manual ([ADR-0020](../../../../docs/adr/0020-deletes-need-the-users-approval.md)).
 - The question comes from the `config-change` hook; in cron and other unattended runs Hermes refuses it, so nothing changes. An "always" answer covers that one change (the same setting from the same old value to the same new one) each time it comes again, never another. Asked with the whole command: a set in a form the hook cannot read exactly, a command or code naming a setting with an asked direction next to `set` or `apply`, `Config`/`ConfigureChange`/`ConfigureSettings` called directly, and edits of `local/config.php`, of this tool, of `lib/` and of the hooks.

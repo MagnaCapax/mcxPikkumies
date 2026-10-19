@@ -25,7 +25,9 @@ class Config
             // reword: a question with no local hit is turned into search terms by the model once (hooks/search/search-first/search-first.php).
             // llm.disabled: no hook ever calls the model. model: the hooks' model; '' = the light model decided at generate (local/llm.json).
             // async.disabled: no interval hook unit runs (ADR-0067); hooks.every.<unit name> = seconds (0 = off) is set per unit, never here.
-            'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => '', 'async' => ['disabled' => false]],
+            'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => '', 'async' => ['disabled' => false],
+                // mutationCheck.holdsPerTurn: how often a turn the change check may hold a call, 1 to 3 (ADR-0070).
+                'mutationCheck' => ['holdsPerTurn' => 1]],
             'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
             'cron' => ['disabled' => false],        // per-minute `cron-tick` from the user's crontab, runs Hermes' own due jobs (ADR-0025)
             'update' => ['channel' => 'release'], // what `pikkumies update` follows: release (the newest date tag) or git/<branch> (ADR-0057)

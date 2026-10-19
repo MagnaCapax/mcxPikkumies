@@ -36,6 +36,7 @@ class ConfigureTiers
         'hooks.reword' => ['bool', 'free', 'approve'],
         'hooks.llm.disabled' => ['bool', 'person', 'free'],
         'hooks.async.disabled' => ['bool', 'person', 'free'],
+        'hooks.mutationCheck.holdsPerTurn' => ['any', 'person'],
         'hooks.model' => ['any', 'approve'],
         'autoUpdate.disabled' => ['bool', 'person', 'free'],
         'cron.disabled' => ['bool', 'approve', 'approve'],

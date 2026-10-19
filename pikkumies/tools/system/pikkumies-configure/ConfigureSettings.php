@@ -27,6 +27,8 @@ class ConfigureSettings
         'fileopsCheck.disabled' => 'Turns off the re-check of bulk chmod, chown and mv.',
         'hooks.reword' => 'Lets the model turn a question with no local hit into search terms, once.',
         'hooks.llm.disabled' => 'No hook ever calls the model (no rewording, no halt judging).',
+        'hooks.every.mutation-check' => 'Seconds between the change check\'s looks at the agent\'s recent tool calls (60 to 3600; unset: 60). 0 turns it off.',
+        'hooks.mutationCheck.holdsPerTurn' => 'How many times a turn the change check may hold a data-changing call, 1 to 3. Only the person sets it.',
         'hooks.async.disabled' => 'Turns off every background check that reads the session\'s records every few minutes (the interval hook units); hooks.every.<unit name> sets one unit\'s interval in seconds, 0 turns that one off.',
         'autoUpdate.disabled' => 'Stops the daily `pikkumies update` from the crontab.',
         'cron.disabled' => 'Stops the per-minute ticker that runs Hermes\' scheduled jobs.',
