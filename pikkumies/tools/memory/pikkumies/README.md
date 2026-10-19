@@ -10,4 +10,4 @@ The same search also covers the documentation copies downloaded from the configu
 
 With performance logging on (`privacy.perfLogging`), the unit keeps its own counts on this machine, never sent: the time and result counts of each search, its words only when it found no lesson, and the time of each lesson save. `stats` shows them, and `pikkumies doctor` shows one line ([ADR-0041](../../../../docs/adr/0041-memory-metrics-save-reminder-and-wide-search.md)).
 
-New lessons must link to related ones, so knowledge stays connected. Lessons are only ever added to, never rewritten. Other memory sources can be added later as sibling units under `tools/memory/`.
+New lessons must link to related ones, so knowledge stays connected. A lesson saved with `--tool <file>` is linked to that file: the first time in a session a tool call uses it, the memory-check hook shows the agent the lesson before the call runs ([ADR-0081](../../../../docs/adr/0081-tool-linked-memories-and-an-agent-facing-soft-confirm.md)). Lessons are only ever added to, never rewritten. Other memory sources can be added later as sibling units under `tools/memory/`.

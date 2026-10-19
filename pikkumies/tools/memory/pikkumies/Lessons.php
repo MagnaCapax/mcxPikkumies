@@ -6,6 +6,8 @@
  * lessons form a web that search can follow. Memory files are only ever appended to; the links in the new text are
  * written relative to the file, so they work in any markdown viewer (ADR-0060).
  * With privacy.perfLogging on, each save is also counted in the memory metrics (ADR-0041).
+ * --tool links a memory to the files it is about (frontmatter `tools`, real paths); the memory-check hook shows it when a
+ * tool call uses one of them (ADR-0081).
  */
 class Lessons
 {
@@ -44,6 +46,7 @@ class Lessons
             throw new CliError("unknown --kind $kind", 'kinds: lesson (default), reference, research');
         }
         $dir = self::root() . ($kind === 'lesson' ? "/lessons/$topic" : "/$kind");
+        $tools = self::toolLinks(isset($opt['tool']) ? (string) $opt['tool'] : '');
         $related = [];
         list($hits) = DocSources::search($title, 5, true, 0.5); // free text: half of the title's words
         foreach ($hits as $h) {
@@ -71,6 +74,7 @@ class Lessons
             }
         }
         $text = "---\ndate: " . gmdate('Y-m-d') . "\ntopic: $topic\nsources: " . json_encode($sources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            . ($tools ? "\ntools: " . json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
             . "\n---\n# $title\n\n" . $body;
         if ((!@mkdir($dir, 0700, true) && !is_dir($dir)) || @file_put_contents($path, $text) !== strlen($text)) {
             throw new CliError("could not write $path", 'is the disk full?');
@@ -84,7 +88,21 @@ class Lessons
         if ($why !== '') {
             $status['no_related'] = $why;
         }
-        return ['records' => [['path' => $path, 'links' => $links, 'related' => $related]], 'status' => $status];
+        return ['records' => [['path' => $path, 'links' => $links, 'related' => $related] + ($tools ? ['tools' => $tools] : [])], 'status' => $status];
+    }
+
+    /** The real paths of the files --tool names (';'-separated); each must be an existing file. ADR-0081. */
+    public static function toolLinks($arg)
+    {
+        $out = [];
+        foreach (array_filter(array_map('trim', explode(';', $arg)), 'strlen') as $p) {
+            $real = realpath($p);
+            if ($real === false || !is_file($real)) {
+                throw new CliError("--tool names no file: $p", 'give the path of an existing file, such as a tool unit\'s script or a config file; several separated by ;');
+            }
+            $out[] = $real;
+        }
+        return array_values(array_unique($out));
     }
 
     public static function append($path, $body)

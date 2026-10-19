@@ -41,7 +41,7 @@ Who makes a change (ADR-0059):
 | `cron.disabled` | | either way: on stops the scheduled jobs the user set up, off lets them run unattended | |
 | `hooks.reword` | on | off: a question with no local hit is then searched with the words as typed | |
 | `root.disabled` | on | | off: root's tools back on |
-| `searchFirst.disabled`, `halt.disabled`, `fileopsCheck.disabled`, `hooks.llm.disabled`, `hooks.async.disabled`, `autoUpdate.disabled`, `hermes.lazyInstalls` | off | | on |
+| `searchFirst.disabled`, `halt.disabled`, `fileopsCheck.disabled`, `memoryCheck.disabled`, `hooks.llm.disabled`, `hooks.async.disabled`, `autoUpdate.disabled`, `hermes.lazyInstalls` | off | | on |
 | `hooks.every.<unit name>` (seconds between a background check's runs, 60 to 3600; 0 turns it off; unset is the unit's own default, [ADR-0067](../../../../docs/adr/0067-interval-hook-units.md)) | a guard check: more often; any other: less often, or 0 | any other: more often (each run may call the model on the user's credits) | a guard check: less often, or 0 |
 | `arr.<app>.config` (where a shipped *arr tool finds its app's config) | a file this account owns | | |
 | `ssh.allow` (SSH hosts reached without a question, [docs/ssh.md](../../../../docs/ssh.md)) | removing a host | adding one | |

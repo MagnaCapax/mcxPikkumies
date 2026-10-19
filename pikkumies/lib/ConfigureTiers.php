@@ -33,6 +33,7 @@ class ConfigureTiers
         'lowBalance.disabled' => ['bool', 'approve', 'free'],
         'feedback.ask' => ['bool', 'approve', 'free'],
         'fileopsCheck.disabled' => ['bool', 'person', 'free'],
+        'memoryCheck.disabled' => ['bool', 'person', 'free'],
         'hooks.reword' => ['bool', 'free', 'approve'],
         'hooks.llm.disabled' => ['bool', 'person', 'free'],
         'hooks.async.disabled' => ['bool', 'person', 'free'],

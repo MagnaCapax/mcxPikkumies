@@ -60,7 +60,10 @@ return [
         check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'delete not blocked through the orchestrator: ' . json_encode($d));
         list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]);
         check(trim($raw) === '', 'harmless command got an answer: ' . $raw);
-        // The search-first gate runs too: with a session and no search yet, an acting call is blocked.
+        // memory-check holds the first write of a file in a session once (ADR-0081); then the search-first gate runs: with a
+        // session and no search yet, the acting call is blocked.
+        list($d) = orchestratorRun($tree, 'pre_tool_call', ['session_id' => 's', 'tool_name' => 'write_file', 'tool_input' => ['path' => 'x']]);
+        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'Pikkumies memory check') === 0, 'memory-check not run by the orchestrator: ' . json_encode($d));
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['session_id' => 's', 'tool_name' => 'write_file', 'tool_input' => ['path' => 'x']]);
         check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'search first') !== false, 'gate not run by the orchestrator');
         list(, $raw) = orchestratorRun($tree, 'no_such_event', ['tool_name' => 'terminal']);
@@ -68,12 +71,13 @@ return [
         $log = (string) @file_get_contents("$tree/pikkumies/local/logs/hooks/" . gmdate('Ymd') . '.jsonl');
         $lines = array_values(array_filter(explode("\n", $log)));
         // Units run in name order: guard/config-change and guard/feedback-send (no opinion on rm -rf), guard/fileops-check, guard/guard-destructive (the block),
-        // search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068); the blocked delete adds one ask-policy line (ADR-0073).
+        // search/memory-check, search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068, ADR-0081): 7 units, 5 calls; the blocked
+        // delete adds one ask-policy line (ADR-0073).
         $config = json_decode($lines[0], true);
         $send = json_decode($lines[1], true);
         $first = json_decode($lines[2], true);
         $guard = json_decode($lines[3], true);
-        check(count($lines) === 25 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
+        check(count($lines) === 36 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
             && $first['unit'] === 'guard/fileops-check' && $first['outcome'] === 'none'
             && $guard['event'] === 'pre_tool_call' && $guard['unit'] === 'guard/guard-destructive' && $guard['outcome'] === 'block'
             && is_int($guard['ms']) && isset($guard['ts']), 'one log line per unit run: ' . $log);

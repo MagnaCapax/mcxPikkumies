@@ -235,7 +235,7 @@ echo "ok";
         // or type change here fails these at the first place that would go stale.
         check(Config::SETTABLE === ['agent.name' => 'name', 'privacy.perfLogging' => 'bool', 'privacy.telemetry' => 'bool', 'sessions.retentionDays' => 'days', 'update.channel' => 'channel',
             'provider.model' => 'model', 'hooks.model' => 'model', 'tools.disabled' => 'names', 'skills.disabled' => 'names', 'root.disabled' => 'bool', 'searchFirst.disabled' => 'bool',
-            'halt.disabled' => 'bool', 'lowBalance.disabled' => 'bool', 'feedback.ask' => 'bool', 'fileopsCheck.disabled' => 'bool', 'hooks.reword' => 'bool', 'hooks.llm.disabled' => 'bool', 'hooks.async.disabled' => 'bool',
+            'halt.disabled' => 'bool', 'lowBalance.disabled' => 'bool', 'feedback.ask' => 'bool', 'fileopsCheck.disabled' => 'bool', 'memoryCheck.disabled' => 'bool', 'hooks.reword' => 'bool', 'hooks.llm.disabled' => 'bool', 'hooks.async.disabled' => 'bool',
             'autoUpdate.disabled' => 'bool', 'cron.disabled' => 'bool', 'hermes.lazyInstalls' => 'bool', 'ssh.allow' => 'hosts', 'ssh.deny' => 'hosts',
             'ssh.blockUnknown' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
         // USAGE.md's tier table names every key with a rule (ADR-0059), so the person reading it sees every setting.

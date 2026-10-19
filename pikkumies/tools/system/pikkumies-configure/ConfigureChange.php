@@ -24,6 +24,7 @@ class ConfigureChange
         'searchFirst.disabled' => 'it turns off the search-first gate, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'halt.disabled' => 'it turns off the halt guard, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'fileopsCheck.disabled' => 'it turns off the re-check of bulk chmod, chown and mv, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
+        'memoryCheck.disabled' => 'it turns off the memory check before a tool is used, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'hooks.llm.disabled' => 'it stops every hook model call, which also turns off the halt guard\'s judging; the person sets it by hand in ~/pikkumies/local/config.php',
         'hooks.async.disabled' => 'it turns off the background checks, among them the change check, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'hooks.every.' => 'a guard check run less often, or turned off with 0, is a weaker safety layer; the person sets it by hand in ~/pikkumies/local/config.php',

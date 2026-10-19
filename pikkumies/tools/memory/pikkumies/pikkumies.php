@@ -135,4 +135,4 @@ Cli::run($argv, [
         }
         return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },
-], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path', 'days']);
+], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'tool', 'path', 'days']);

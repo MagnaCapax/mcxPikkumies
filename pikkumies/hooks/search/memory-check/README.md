@@ -1,0 +1,14 @@
+# memory-check
+
+A soft confirm for the agent before it uses something for the first time in a session, with what its own memory says about it ([ADR-0081](../../../../docs/adr/0081-tool-linked-memories-and-an-agent-facing-soft-confirm.md)). The user is never asked ([ADR-0073](../../../../docs/adr/0073-no-questions-no-deferrals-one-reviewed-exception.md)): the call is held once with a message to the agent, and running it again proceeds.
+
+- **Tool-linked memories.** `save --tool <file>` (several separated by `;`) writes the real path of each file into the memory's frontmatter as `tools: [...]`. A memory file is only appended to, so an older memory gets a link through a new short memory that links to it and carries `--tool`.
+- **What is held**, once per session, tool and target, on `pre_tool_call`:
+  - a file a memory links to, when the call names it (its file name as a word in the command, code or path; also after a `cd`, and for any tool, reading included);
+  - a Pikkumies tool unit verb whose `changes` cell in USAGE.md does not start with `no` (`yes`, `deletes`, `sends`, `loads`); `X=<path>.php` in the same command is read into `$X`;
+  - a Hermes tool that changes something, keyed by its `action` and the `path`, `job_id`, `name` or `session_id` it names (a V4A `patch` by the files in its headers). Not held as such: tools that read, plan or show (`read_file`, `search_files`, `todo`, `clarify` ...), an `action` that only reads (`list`, `poll`, `log`, `wait` ...), `terminal` and `execute_code` (their Pikkumies verbs and linked files are the targets), and web research, which search-first-gate already holds until the memory was searched.
+- **The message** names the targets (at most 5), lists the linked memories (at most 5, path and title, then "and N more"; or "No memory is linked to it"), and asks the agent to search memory if it has not, read what applies, say in one line why the call is right, and run it again.
+- **Never held:** a call naming the memory unit (`pikkumies.php`), so searching and saving are never delayed and search-first-gate never counts a search that did not run; a call without a valid session id; a call whose marker cannot be written.
+- **State:** one empty marker per target, `local/state/memory-check/<sha1 of session id NUL tool NUL target>` (directory 0700), removed after 7 days. The memory files are read on every call (frontmatter and title only); nothing is indexed.
+
+It runs after the guard units and before search-first-gate. When a guard blocks the same first call, that block is what the agent sees and this hold is spent. A file name shared by two files (`config.php`) holds both, once each; the message shows the linked path. Fails open (3 s): a crash lets the call run. The agent can write the markers, so this is a habit prompt, not a security boundary (AGENTS.md). Off with `memoryCheck.disabled` in `local/config.php`, set by the person.

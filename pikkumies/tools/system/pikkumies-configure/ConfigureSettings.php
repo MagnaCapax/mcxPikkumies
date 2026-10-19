@@ -25,6 +25,7 @@ class ConfigureSettings
         'lowBalance.disabled' => 'Turns off the once-per-session low-credits notice.',
         'feedback.ask' => 'Lets Pikkumies now and then ask, in a session, whether you want to send Pulsed Media feedback. Off unless you turn it on; the question itself sends nothing.',
         'fileopsCheck.disabled' => 'Turns off the re-check of bulk chmod, chown and mv.',
+        'memoryCheck.disabled' => 'Turns off the once-a-session memory check before a tool is used.',
         'hooks.reword' => 'Lets the model turn a question with no local hit into search terms, once.',
         'hooks.llm.disabled' => 'No hook ever calls the model (no rewording, no halt judging).',
         'hooks.every.mutation-check' => 'Seconds between the change check\'s looks at the agent\'s recent tool calls (60 to 3600; unset: 60). 0 turns it off.',

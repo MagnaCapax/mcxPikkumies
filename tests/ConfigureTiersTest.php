@@ -38,6 +38,7 @@ return [
             ['halt.disabled', true, false, $f], ['halt.disabled', false, true, $p],
             ['lowBalance.disabled', true, false, $f], ['lowBalance.disabled', false, true, $a],
             ['fileopsCheck.disabled', true, false, $f], ['fileopsCheck.disabled', false, true, $p],
+            ['memoryCheck.disabled', true, false, $f], ['memoryCheck.disabled', false, true, $p],
             ['hooks.reword', false, true, $f], ['hooks.reword', true, false, $a],
             ['hooks.llm.disabled', true, false, $f], ['hooks.llm.disabled', false, true, $p],
             ['hooks.async.disabled', true, false, $f], ['hooks.async.disabled', false, true, $p],
