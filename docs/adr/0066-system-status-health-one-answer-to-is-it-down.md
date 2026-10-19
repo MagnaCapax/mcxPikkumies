@@ -34,7 +34,7 @@ When a user says "my seedbox is down", Pikkumies is running, so the server is up
 ## Consequences
 - A "down" question can be answered in one call. Whether the agent does so is measured by the question suite (`seedbox-down`, `fi-seedbox-down`, `rutorrent-502`: `first_call` health, `max_calls`).
 - Reaches users who ask Pikkumies; web-only users see PMSS's 502 page and Diagnose already.
-- Not done: the expired grace period (the storage unit does not parse it yet), deleted-but-open files (waits for a PMSS `userShowLimits` metric), and the left-behind session files of a crashed rTorrent.
+- Not done: the expired grace period (the storage unit does not parse it yet), deleted-but-open files (shipped 2026-10-19 once PMSS `userShowLimits` reported "held by deleted files": a finding when it is 1 GiB or more and the quota is over or 90% used), and the left-behind session files of a crashed rTorrent.
 - The locate classification reads the first words of each client unit's own error ("not installed", "not enabled", "not running"); a reworded error falls to `unreachable` with the unit's own text, never to a wrong state.
 
 ## References

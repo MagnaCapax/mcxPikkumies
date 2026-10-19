@@ -29,6 +29,7 @@ class StatusHealth
     ];
     const NOT_SHOWN = 'whether the user\'s own network reaches this server: this check runs on the server itself';
     const RECENT = 3600; // a client start this recent is named in the summary
+    const HELD = 1073741824; // deleted-but-open bytes worth naming when the quota is nearly full (1 GiB)
 
     /**
      * $in: family, home, uid, proc (the /proc to read), panel_url (PMSS: the account's own panel address on this machine,
@@ -43,7 +44,9 @@ class StatusHealth
         $q = StorageStats::record($in['home']);
         $quota = ['state' => $q['quota_state'], 'used_pct' => $q['quota_used_percent'], 'server_disk_full' => $q['fs_full'],
             'next_step' => isset($q['hint']) ? $q['hint'] : null, 'doc' => strpos($q['quota_state'], 'over_') === 0 ? DocSources::pageUrl('Seedbox Storage Quota') : null];
-        $mem = $in['usl'] !== null ? StatusAccount::record($in['usl'], $in['family'], [])['memory'] : null;
+        $acct = $in['usl'] !== null ? StatusAccount::record($in['usl'], $in['family'], []) : null;
+        $quota['held_deleted_bytes'] = $acct !== null ? $acct['disk']['held_deleted'] : null;
+        $mem = $acct !== null ? $acct['memory'] : null;
         $memory = $mem === null ? null : ['status' => $mem['status'], 'oom_kills' => $mem['oom_kills']];
         $findings = self::findings($panel, $clients, $quota, $memory);
         return ['summary' => $findings ? $findings[0] : 'this machine is up' . ($panel ? ', the web panel answers' : '') . ($clients ? ' and the torrent clients are reachable' : ''),
@@ -87,6 +90,10 @@ class StatusHealth
         }
         if ($quota['state'] === 'over_hard' || $quota['server_disk_full']) {
             $out[] = $quota['next_step']; // the storage unit's own sentence: hard limit, or the server's disk full
+        }
+        $held = $quota['held_deleted_bytes'];
+        if ($held !== null && $held >= self::HELD && (strpos($quota['state'], 'over_') === 0 || $quota['used_pct'] >= 90)) {
+            $out[] = round($held / self::HELD, 1) . ' GiB of the quota is held by deleted files that a running program still has open: restart the client that holds them (its restart verb); deleting more files does not help';
         }
         if ($memory !== null && in_array($memory['status'], ['HIGH', 'THROTTLED'], true)) {
             $out[] = 'the platform reports memory ' . $memory['status'] . ' for this account; the performance tool says what uses it';

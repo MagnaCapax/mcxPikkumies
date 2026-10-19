@@ -144,6 +144,27 @@ return [
             testRmTree($d);
         }
     },
+    'system-status health: space held by deleted-but-open files is a finding only when the quota is nearly full' => function () {
+        list($d, $srv) = shHost(86400, false, []);
+        $head = "Disk quotas for user fake (uid 1001):\n     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n";
+        $usl = require __DIR__ . '/fixtures/system-status/userShowLimits.php';
+        $usl = ['generated_at' => $usl['generated_at'], 'sections' => $usl['sections']];
+        try {
+            $usl['sections']['disk']['metrics'] = array_values(array_filter($usl['sections']['disk']['metrics'], function ($m) { return $m['metric'] !== 'held by deleted files'; }));
+            Quota::$live = function () use ($head) { return $head . "       /dev/md2    1280G*  1024G   1280G   5 0 0\n"; };
+            $r = shRecord($d, 'pmss', null, $usl);
+            check($r['quota']['held_deleted_bytes'] === null && !preg_grep('/held by deleted/', $r['findings']), 'no metric: ' . json_encode($r['quota']));
+            $usl['sections']['disk']['metrics'][] = ['metric' => 'held by deleted files', 'value' => 300.0 * 1073741824, 'limit' => null, 'unit' => 'bytes', 'percent' => null, 'source' => 'proc'];
+            $r = shRecord($d, 'pmss', null, $usl);
+            check(preg_grep('/^300 GiB of the quota is held by deleted files/', $r['findings']) && $r['quota']['held_deleted_bytes'] === 300.0 * 1073741824, 'full quota: ' . json_encode($r['findings']));
+            Quota::$live = function () use ($head) { return $head . "       /dev/md2    100G   1024G   1280G   5 0 0\n"; };
+            $r = shRecord($d, 'pmss', null, $usl);
+            check(!preg_grep('/held by deleted/', $r['findings']), 'plenty of room: ' . json_encode($r['findings']));
+        } finally {
+            Quota::$live = null;
+            testRmTree($d);
+        }
+    },
     'DocSources::pageUrl: the address of a downloaded wiki page by its title, any case; null for a missing page or a source that is not active' => function () {
         $tree = testTempDir('pk-pageurl');
         mkdir("$tree/config", 0700);

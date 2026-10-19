@@ -21,6 +21,7 @@ class StatusAccount
             'files_soft' => ['disk', 'files soft', 'value'],
             'files_hard' => ['disk', 'files hard', 'value'],
             'age_s' => ['disk', 'snapshot age', 'value'],
+            'held_deleted' => ['disk', 'held by deleted files', 'value'],
         ],
         'memory' => [
             'used' => ['memory', 'memory', 'value'],

@@ -33,6 +33,7 @@ return ['user' => 'fixture-acct-name', 'host' => 'fixture-srv-name.example', 'ge
         $m('blocks against hard', 1200.0 * $gib, 2500.0 * $gib, 'bytes', 'quota-snapshot'),
         $m('files against hard', 120000.0, 2500000.0, 'count', 'quota-snapshot'),
         $m('snapshot age', 240.0, null, 'seconds', 'quota-snapshot'),
+        $m('held by deleted files', 0.0, null, 'bytes', 'proc'),
     ]],
     'memory' => ['available' => true, 'metrics' => [
         $m('ramMiB configured', 4096.0 * 1048576, null, 'bytes', 'account-config'),
