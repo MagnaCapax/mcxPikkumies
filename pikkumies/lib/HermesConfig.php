@@ -20,6 +20,7 @@ require_once __DIR__ . '/Links.php';
 require_once __DIR__ . '/HermesUserConfig.php';
 require_once __DIR__ . '/AskReview.php'; // AskReview::TIMEOUT in the pre_tool_call entry
 require_once __DIR__ . '/LocalNotes.php';
+require_once __DIR__ . '/HookInterval.php';
 
 class HermesConfig
 {
@@ -143,11 +144,23 @@ class HermesConfig
                 $timeout += $u['timeout'];
             }
             $timeout = min(300, $timeout);
-            $entries[$event] = ['command' => PHP_BINARY . ' -d display_errors=stdout -d error_reporting=4437 ' . $hooksDir . '/orchestrator.php ' . $event . ' ' . $timeout,
-                'failClosed' => $event === 'pre_tool_call', 'timeout' => $timeout];
+            $entries[$event] = self::hookEntry($hooksDir, $event, $timeout);
+        }
+        // Interval units (ADR-0067) never get an entry of their own (Hermes refuses an unknown event); while one is on, the
+        // orchestrator must see each turn: the user's message, the tool calls and, once per turn, post_llm_call.
+        if (HookInterval::on(Config::load(), $hooksDir)) {
+            foreach (['pre_llm_call', 'post_tool_call', 'post_llm_call'] as $event) {
+                $entries[$event] = isset($entries[$event]) ? $entries[$event] : self::hookEntry($hooksDir, $event, 5);
+            }
         }
         ksort($entries);
         return $entries;
+    }
+
+    private static function hookEntry($hooksDir, $event, $timeout)
+    {
+        return ['command' => PHP_BINARY . ' -d display_errors=stdout -d error_reporting=4437 ' . $hooksDir . '/orchestrator.php ' . $event . ' ' . $timeout,
+            'failClosed' => $event === 'pre_tool_call', 'timeout' => $timeout];
     }
 
     /**

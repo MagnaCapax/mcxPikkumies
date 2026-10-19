@@ -21,7 +21,9 @@ class FileopsClassify
     /**
      * ['words' => list of words ['w' => text, 'p' => fnmatch pattern, 'g' => has a glob, 't' => starts with ~] and
      * operators ['op' => char], 'complex' => bool]. Single quotes are literal, a backslash escapes one character,
-     * a quoted glob character stays literal in 'p'. A redirect and its file are dropped (2>/dev/null is not a path).
+     * a quoted glob character stays literal in 'p'. A redirect and its file are dropped (2>/dev/null is not a path);
+     * 'redirects' lists each one as [operator, target word] (target '' when none followed), read with the same quoting
+     * (lib/ChangeClassify.php, ADR-0067). 'words' and 'complex' do not depend on it.
      */
     public static function words($command)
     {
@@ -31,6 +33,7 @@ class FileopsClassify
         $quote = '';
         $complex = false;
         $redirect = false;
+        $redirects = [];
         for ($i = 0, $n = strlen($s); $i < $n; $i++) {
             $c = $s[$i];
             if ($quote === "'") {
@@ -67,14 +70,18 @@ class FileopsClassify
                 }
                 if ($w !== null && !$redirect) {
                     $out[] = $w;
+                } elseif ($w !== null) {
+                    $redirects[count($redirects) - 1][1] = $w['w'];
                 }
                 if ($w !== null) {
                     list($redirect, $w) = [false, null];
                 }
                 if ($c === '<' || $c === '>') {
+                    $op = $c;
                     while ($i + 1 < $n && strpos('<>&|', $s[$i + 1]) !== false) {
-                        $i++;
+                        $op .= $s[++$i];
                     }
+                    $redirects[] = [$op, ''];
                     $redirect = true; // the next word is the redirect's file
                 } elseif ($c !== ' ' && $c !== "\t") {
                     $complex = true;
@@ -86,8 +93,10 @@ class FileopsClassify
         }
         if ($w !== null && !$redirect) {
             $out[] = $w;
+        } elseif ($w !== null) {
+            $redirects[count($redirects) - 1][1] = $w['w'];
         }
-        return ['words' => $out, 'complex' => $complex || $quote !== ''];
+        return ['words' => $out, 'complex' => $complex || $quote !== '', 'redirects' => $redirects];
     }
 
     /** Append one character to the current word; an unquoted * ? [ is a glob, an unquoted leading ~ is the home. */

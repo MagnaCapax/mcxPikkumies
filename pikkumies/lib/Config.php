@@ -24,7 +24,8 @@ class Config
             'fileopsCheck' => ['disabled' => false], // the fileops-check hook: bulk chmod/chown/mv re-check and the file list it writes first (ADR-0048)
             // reword: a question with no local hit is turned into search terms by the model once (hooks/search/search-first/search-first.php).
             // llm.disabled: no hook ever calls the model. model: the hooks' model; '' = the light model decided at generate (local/llm.json).
-            'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => ''],
+            // async.disabled: no interval hook unit runs (ADR-0067); hooks.every.<unit name> = seconds (0 = off) is set per unit, never here.
+            'hooks' => ['reword' => true, 'llm' => ['disabled' => false], 'model' => '', 'async' => ['disabled' => false]],
             'autoUpdate' => ['disabled' => false],  // daily `pikkumies update` from the user's crontab (ADR-0013)
             'cron' => ['disabled' => false],        // per-minute `cron-tick` from the user's crontab, runs Hermes' own due jobs (ADR-0025)
             'update' => ['channel' => 'release'], // what `pikkumies update` follows: release (the newest date tag) or git/<branch> (ADR-0057)
@@ -65,6 +66,7 @@ class Config
         'fileopsCheck.disabled' => 'bool',
         'hooks.reword' => 'bool',
         'hooks.llm.disabled' => 'bool',
+        'hooks.async.disabled' => 'bool',
         'autoUpdate.disabled' => 'bool',
         'cron.disabled' => 'bool',
         'hermes.lazyInstalls' => 'bool',
@@ -73,7 +75,7 @@ class Config
         'ssh.blockUnknown' => 'bool',
     ];
     /** Settable keys by pattern: an *arr app's config file (tools/arr/README.md), an absolute path or '' for none. */
-    const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path'];
+    const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path', '/^hooks\.every\.[a-z0-9][a-z0-9-]{0,63}\z/' => 'seconds'];
     /** A model id as an endpoint lists it; a list entry (a tool category path or a skill name). */
     const MODEL_RE = '#^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}\z#';
     const NAMES_RE = '#^[a-z0-9][a-z0-9._/-]{0,99}\z#';
@@ -136,6 +138,11 @@ class Config
                     throw new InvalidArgumentException("$key takes on or off");
                 }
                 return $map[strtolower($text)];
+            case 'seconds':
+                if (!preg_match('/^\d{1,4}$/', $text) || !self::valid('seconds', (int) $text)) {
+                    throw new InvalidArgumentException("$key takes whole seconds, 60 to 3600, or 0 to turn that check off");
+                }
+                return (int) $text;
             case 'days':
                 if (!preg_match('/^\d{1,5}$/', $text) || (int) $text > self::DAYS_MAX) {
                     throw new InvalidArgumentException("$key takes a whole number of days, 0 to " . self::DAYS_MAX . ' (0 = keep forever)');
@@ -169,6 +176,8 @@ class Config
                 return is_bool($value);
             case 'days':
                 return is_int($value) && $value >= 0 && $value <= self::DAYS_MAX;
+            case 'seconds':
+                return is_int($value) && ($value === 0 || ($value >= 60 && $value <= 3600));
             case 'name':
                 return is_string($value) && ($value === '' || self::validName($value));
             case 'channel':

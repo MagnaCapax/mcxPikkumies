@@ -110,6 +110,13 @@ timeout: 10
 - The Hermes entry's timeout includes local hooks from the next start; a local hook whose timeout no longer fits in the time left is not started.
 - A local hook's `pre_llm_call` text reaches the agent as `Local hook <id> (written on this machine): ...`.
 
+**Interval units** ([ADR-0067](../../../docs/adr/0067-interval-hook-units.md)): a check that looks back over a stretch of the session, every few minutes, in the background. Shipped only; a local one is refused.
+
+- `hook.md` says `event: transcript` and adds `every` (default seconds between runs, 60 to 3600) and, optionally, `wake` (the record kinds that make a run worth starting, a comma list of `user`, `assistant`, `reply`, `tool`, `change`; default any). `failClosed: false`; `timeout` 1 to 110; `every` more than `timeout` + 15.
+- It runs at most once per interval per session, started after a `post_tool_call` or `post_llm_call` answer, never inside a turn's wait. `hooks.every.<unit name>` (seconds, 0 = off) and `hooks.async.disabled` turn it down or off.
+- Input on stdin is one JSON object: `unit`, `session` (sha1 of the session id), `interval`, `now`, `first_run`, `scheduled` (a Hermes cron session), `state` (what it returned last time), `dropped` (when the size cap removed some of its records) and `records`, oldest first, each with `seq`, `ts`, `turn_id`, `kind` and: `user` (`text` at most 4000, `first_turn`, `synthetic` for a row Hermes added), `assistant` (`text` at most 1500), `reply` (`text` at most 3000, `compacted` when the turn's start was lost), `tool` (`tool`, `args` as JSON at most 2000, `status`, `error_type`, `error`, `exit_code` for terminal, `change` true, false or "unknown"). Texts are redacted; a tool's output is never there.
+- Output is one JSON object, every key optional: `context` (at most 4000 characters, shown at the next turn), `notice` (at most 900; holds the next call that may change data once, `noticeOn` may only be `change`), `holdsPerTurn` (1 to 3, default 1), `state` (an object of at most 4096 bytes, given back next time) and `skip` (true: keep these records for the next run). It is advisory: it can hold one call once or add text, never approve or change a call. Flatten any text you pass on from the records to one line and label it as untrusted data; the orchestrator cannot tell it from your own words.
+
 ## Before you commit
 
 - `php tests/run.php` passes.

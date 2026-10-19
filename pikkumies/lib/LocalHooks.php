@@ -51,6 +51,9 @@ class LocalHooks
             $u['id'] = LocalHookCheck::cleanId('local/' . ltrim($u['category'] . '/' . $u['name'], '/'));
             $why = LocalHookCheck::badPath($dir, $u['dir']);
             $why = $why !== '' ? $why : implode('; ', $u['errors']);
+            if ($why === '' && $u['event'] === HookInterval::EVENT) {
+                $why = 'an interval unit (event transcript) runs in the background with the session\'s records, so it ships only with Pikkumies (ADR-0067)';
+            }
             if ($why === '') {
                 list($u['hash'], $why) = LocalHookCheck::check($dir, $u, self::uid());
             }

@@ -40,6 +40,7 @@ return [
             ['fileopsCheck.disabled', true, false, $f], ['fileopsCheck.disabled', false, true, $p],
             ['hooks.reword', false, true, $f], ['hooks.reword', true, false, $a],
             ['hooks.llm.disabled', true, false, $f], ['hooks.llm.disabled', false, true, $p],
+            ['hooks.async.disabled', true, false, $f], ['hooks.async.disabled', false, true, $p],
             ['hooks.model', '', 'm-mini', $a],
             ['autoUpdate.disabled', true, false, $f], ['autoUpdate.disabled', false, true, $p],
             ['cron.disabled', false, true, $a], ['cron.disabled', true, false, $a],

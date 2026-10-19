@@ -25,6 +25,8 @@ class ConfigureChange
         'halt.disabled' => 'it turns off the halt guard, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'fileopsCheck.disabled' => 'it turns off the re-check of bulk chmod, chown and mv, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'hooks.llm.disabled' => 'it stops every hook model call, which also turns off the halt guard\'s judging; the person sets it by hand in ~/pikkumies/local/config.php',
+        'hooks.async.disabled' => 'it turns off the background checks, among them the change check, a safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
+        'hooks.every.' => 'a guard check run less often, or turned off with 0, is a weaker safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'autoUpdate.disabled' => 'it stops the daily update, and with it security and bug fixes; the person sets it by hand in ~/pikkumies/local/config.php',
         'hermes.lazyInstalls' => 'it lets Hermes download and run packages and a browser from the internet while it runs; the person sets it by hand in ~/pikkumies/local/config.php',
         'ssh.deny' => 'removing a host from the SSH deny list lets the agent connect there again; the person edits ssh.deny by hand in ~/pikkumies/local/config.php',

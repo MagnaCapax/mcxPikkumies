@@ -27,6 +27,7 @@ class ConfigureSettings
         'fileopsCheck.disabled' => 'Turns off the re-check of bulk chmod, chown and mv.',
         'hooks.reword' => 'Lets the model turn a question with no local hit into search terms, once.',
         'hooks.llm.disabled' => 'No hook ever calls the model (no rewording, no halt judging).',
+        'hooks.async.disabled' => 'Turns off every background check that reads the session\'s records every few minutes (the interval hook units); hooks.every.<unit name> sets one unit\'s interval in seconds, 0 turns that one off.',
         'autoUpdate.disabled' => 'Stops the daily `pikkumies update` from the crontab.',
         'cron.disabled' => 'Stops the per-minute ticker that runs Hermes\' scheduled jobs.',
         'hermes.lazyInstalls' => 'Lets Hermes download optional packages and a browser while it runs.',
@@ -107,6 +108,8 @@ class ConfigureSettings
                 return "longer, or 0 (forever): {$w['free']}; shorter: {$w['approve']}";
             case 'channel':
                 return "release: {$w['free']}; git/<branch>: {$w['approve']}";
+            case 'every':
+                return "more often: {$w[$rule[1]]}; less often, or 0 (off): {$w[$rule[2]]}";
         }
         return "any change: {$w[$rule[1]]}";
     }

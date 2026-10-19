@@ -62,3 +62,7 @@ Facts this rests on, read in Hermes v0.22.2 (commit d923a5eb4, what installs get
 - Code: `pikkumies/hooks/orchestrator.php`, `lib/HookAnswers.php`, `lib/HookPayload.php`, `lib/LocalHooks.php`, `lib/LocalHookCheck.php`, `lib/HookNotes.php`, `lib/HookUnits.php`, `lib/HermesConfig.php` (`hookEntries`), `lib/Generate.php`, `hooks/guard/guard-destructive/GuardLocal.php`
 - Tests: `tests/ToolHooksTest.php`, `tests/LocalHooksTest.php`, `tests/LocalHooksStartTest.php`, `tests/LocalHooksReviewTest.php`, `tests/HookNotesTest.php`, `tests/HookMergeTest.php`, `tests/HookGuardLocalTest.php`
 - Hermes Agent v0.22.2 (d923a5eb4): `agent/shell_hooks.py`, `hermes_cli/env_loader.py`, `model_tools.py`, `agent/turn_context.py`, `hermes_cli/plugins.py`, `tools/approval.py`, `hermes_cli/cli_tui_mixin.py`, `hermes_cli/cli_render.py`, `hermes_cli/cli_modal_mixin.py`
+
+## Amendment 2026-10-19: no local interval units ([ADR-0067](0067-interval-hook-units.md))
+
+- A local unit with `event: transcript` is refused and named like any other local problem: an interval unit reads the session's records in the background, so only reviewed, shipped code may be one. Its background text reaches the agent after Pikkumies' own notes and before local units' text, so the context cap cuts it before the local-hook failure lines this ADR requires.

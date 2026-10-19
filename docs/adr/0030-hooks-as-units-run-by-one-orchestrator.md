@@ -69,3 +69,8 @@ Facts this rests on, checked 2026-10-16 against Hermes v2026.9.24:
 - Merging `pre_tool_call` no longer keeps only the first approve: two or more become one question showing every unit's question, keyed `pikkumies-multi:`, or a block naming the units when together they pass 350 characters. One approve alone is unchanged. Reading and merging answers moved to `lib/HookAnswers.php`.
 - The Hermes entry's timeout counts local units, and is passed as the command's last argument (`orchestrator.php <event> <timeout>`), so a local unit is started only while it still fits. An event with only local units gets an entry.
 - A `post_tool_call` unit's context is kept as a hook note and added to the next `pre_llm_call`, marked as untrusted text from that hook.
+
+## Amendment 2026-10-19: interval units ([ADR-0067](0067-interval-hook-units.md))
+
+- `hook.md` may say `event: transcript`, a unit-only event, with one more field, `every` (60 to 3600 seconds), and optionally `wake`. Such a unit never gets a Hermes entry and no unit of a real event runs it: the orchestrator records each turn for it and starts it in the background at most once per interval (`hooks/worker.php`). Its `timeout` may be up to 110 seconds and `failClosed` must be false. A broken unit that declares it still blocks every `pre_tool_call`.
+- While one is on, the orchestrator also runs on `post_llm_call` (an entry of 5 seconds) and, at `pre_tool_call`, may hold one call for an interval unit's notice when no unit had an opinion. The unit runner and the hook log moved to `lib/HookSpawn.php` and `lib/HookLog.php`, unchanged.

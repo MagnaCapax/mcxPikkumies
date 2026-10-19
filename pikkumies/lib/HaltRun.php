@@ -8,10 +8,14 @@
  * wrote at pre_llm_call and the command log (ADR-0044) as evidence, and skips judging whenever the
  * live hook already judged that turn (HaltState::alreadyJudgedThisTurn). Interactive sessions never
  * call this: bin/pikkumies only reaches it for a seeded prompt without a TTY on stdin or stdout.
+ * Every Hermes run here carries PIKKUMIES_ONESHOT=1 (HookAsync::ONESHOT_ENV): the interval hook units' records are still
+ * kept, but post_llm_call starts no background run, which could never be shown and would take the run a check made at
+ * the end of the judged turn needs (ADR-0067).
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HaltState.php';
 require_once __DIR__ . '/HaltJudge.php';
+require_once __DIR__ . '/HookAsync.php';
 
 class HaltRun
 {
@@ -70,7 +74,9 @@ class HaltRun
         foreach ($argv as $a) {
             $cmd .= ' ' . escapeshellarg($a);
         }
-        $p = @proc_open($cmd, [0 => STDIN, 1 => ['pipe', 'w'], 2 => STDERR], $pipes);
+        $env = getenv();
+        $env[HookAsync::ONESHOT_ENV] = '1';
+        $p = @proc_open($cmd, [0 => STDIN, 1 => ['pipe', 'w'], 2 => STDERR], $pipes, null, $env);
         $output = '';
         $code = 1;
         $started = is_resource($p);

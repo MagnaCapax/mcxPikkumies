@@ -132,7 +132,7 @@ class Generate
                     $hooks[] = $h;
                 }
             }
-            if (self::writeIfChanged("$hooksDir/INDEX.md", HookUnits::renderIndex($hooks)) === null) {
+            if (self::writeIfChanged("$hooksDir/INDEX.md", HookUnits::renderIndex($hooks, Config::load())) === null) { // the intervals as set (ADR-0067)
                 $result['error'] = "cannot write $hooksDir/INDEX.md";
             }
         }

@@ -266,6 +266,10 @@ switch ($cmd) {
             . implode('', array_map(function ($id, $why) {
                 return "; skipped $id: $why";
             }, array_keys($localNotes['problems']), $localNotes['problems']))));
+        $asyncLine = HookAsyncStatus::doctorLine($config); // interval units: their intervals and the last day's runs (ADR-0067)
+        if ($asyncLine !== '') {
+            out($asyncLine);
+        }
         $localNotice = trim((string) @file_get_contents(Config::localDir() . '/' . LocalHooks::NOTICE));
         if ($localNotice !== '') {
             out('note:     ' . $localNotice . ' (at the last start)');
@@ -495,6 +499,9 @@ switch ($cmd) {
         // entirely and keep today's plain passthru.
         if (isset($passArgs[0]) && $passArgs[0] === 'chat' && (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT)) && empty(Config::load()['halt']['disabled'])) {
             exit(HaltRun::run(hermesBin(), $passArgs));
+        }
+        if (isset($passArgs[0]) && $passArgs[0] === 'chat' && (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT))) {
+            putenv(HookAsync::ONESHOT_ENV . '=1'); // one-shot without the halt guard: still no background run at post_llm_call (ADR-0067)
         }
         $args = array_map('escapeshellarg', $passArgs);
         // @: PHP's own warning would print the whole command, the prompt included. -1 means sh itself could not start.

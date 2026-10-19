@@ -31,6 +31,9 @@
  * orchestrator itself, also while loading lib/ (Hermes runs it with display_errors=stdout, HermesConfig).
  * One JSONL line per unit run goes to local/logs/hooks/YYYYMMDD.jsonl (UTC; 7 daily files kept):
  * time, event, unit, milliseconds and outcome, never the payload.
+ * Interval units (event transcript, ADR-0067) are not run here: lib/HookFeed.php records each turn for them, adds what
+ * they left after the other contexts, holds one tool call for a notice when no unit had an opinion, and starts the due
+ * ones in the background (hooks/worker.php) after the answer is printed.
  */
 $hookEvent = isset($argv[1]) ? (string) $argv[1] : '';
 $hookDone = false;
@@ -52,119 +55,12 @@ try {
     require_once dirname(__DIR__) . '/lib/HookNotes.php';
     require_once dirname(__DIR__) . '/lib/HookAnswers.php';
     require_once dirname(__DIR__) . '/lib/AskPolicy.php';
+    require_once dirname(__DIR__) . '/lib/HookSpawn.php';
+    require_once dirname(__DIR__) . '/lib/HookLog.php';
+    require_once dirname(__DIR__) . '/lib/HookFeed.php';
 } catch (\Throwable $e) {
     $hookError = $e->getMessage();
     exit(1);
-}
-
-const HOOK_OUTPUT_MAX = 1048576;          // a unit printing more than this is not giving a hook answer
-const HOOK_LOG_DAYS = 7;
-
-/** Run one unit: ['code' => int|null, 'stdout', 'stderr', 'timedOut' => bool, 'error' => string]. */
-function hookSpawn($script, $stdin, $timeout)
-{
-    $r = ['code' => null, 'stdout' => '', 'stderr' => '', 'timedOut' => false, 'error' => ''];
-    // exec: the shell becomes php, so a timeout kills the hook itself.
-    $p = @proc_open('exec ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-    if (!is_resource($p)) {
-        $r['error'] = 'could not start';
-        return $r;
-    }
-    foreach ($pipes as $pipe) {
-        stream_set_blocking($pipe, false);
-    }
-    $deadline = microtime(true) + $timeout;
-    $written = 0;
-    $open = [0 => true, 1 => true, 2 => true];
-    if ($stdin === '') {
-        fclose($pipes[0]);
-        $open[0] = false;
-    }
-    while ($open[1] || $open[2]) { // the hook closed both outputs: done, whatever it left unread
-        $left = $deadline - microtime(true);
-        if ($left <= 0) {
-            $r['timedOut'] = true;
-            break;
-        }
-        $read = [];
-        foreach ([1, 2] as $i) {
-            if ($open[$i]) {
-                $read[] = $pipes[$i];
-            }
-        }
-        $write = $open[0] ? [$pipes[0]] : [];
-        $except = null;
-        if (@stream_select($read, $write, $except, (int) $left, (int) (($left - (int) $left) * 1000000)) === false) {
-            usleep(10000); // interrupted by a signal; the deadline still holds
-            continue;
-        }
-        if ($write) {
-            $n = @fwrite($pipes[0], substr($stdin, $written, 65536));
-            $written += $n ? $n : 0;
-            if (!$n || $written >= strlen($stdin)) {
-                fclose($pipes[0]); // done, or the hook stopped reading (writable but nothing written: a broken pipe)
-                $open[0] = false;
-            }
-        }
-        foreach ($read as $pipe) {
-            $i = $pipe === $pipes[1] ? 1 : 2;
-            $chunk = fread($pipe, 65536);
-            if ($chunk === false || ($chunk === '' && feof($pipe))) {
-                fclose($pipe);
-                $open[$i] = false;
-                continue;
-            }
-            $key = $i === 1 ? 'stdout' : 'stderr';
-            if (strlen($r[$key]) < HOOK_OUTPUT_MAX) {
-                $r[$key] .= $chunk;
-            }
-        }
-    }
-    // Pipes closed: wait for the exit, still within the deadline.
-    while (!$r['timedOut']) {
-        $status = proc_get_status($p);
-        if (!$status['running']) {
-            $r['code'] = $status['exitcode'];
-            break;
-        }
-        if (microtime(true) >= $deadline) {
-            $r['timedOut'] = true;
-            break;
-        }
-        usleep(5000);
-    }
-    if ($r['timedOut']) {
-        proc_terminate($p, 9);
-    }
-    foreach ($open as $i => $isOpen) {
-        if ($isOpen) {
-            fclose($pipes[$i]);
-        }
-    }
-    proc_close($p);
-    if (strlen($r['stdout']) >= HOOK_OUTPUT_MAX) {
-        $r['stdout'] = 'output too large'; // not a JSON object, so a failClosed unit blocks
-    }
-    return $r;
-}
-
-/** Append one JSONL line; a new day's file prunes all but the newest HOOK_LOG_DAYS files. Never fails the hook. */
-function hookLog($event, $unit, $ms, $outcome)
-{
-    $dir = Config::localDir() . '/logs/hooks';
-    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-        return;
-    }
-    $file = $dir . '/' . gmdate('Ymd') . '.jsonl';
-    $new = !is_file($file);
-    @file_put_contents($file, json_encode(['ts' => gmdate('Y-m-d\TH:i:s\Z'), 'event' => $event, 'unit' => $unit, 'ms' => $ms, 'outcome' => $outcome], JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
-    if ($new) {
-        $files = (array) glob($dir . '/[0-9]*.jsonl');
-        sort($files);
-        foreach (array_slice($files, 0, max(0, count($files) - HOOK_LOG_DAYS)) as $old) {
-            @unlink($old);
-        }
-    }
 }
 
 $stdin = (string) stream_get_contents(STDIN);
@@ -172,6 +68,7 @@ $payload = json_decode($stdin, true, 100000);
 $payload = is_array($payload) ? $payload : [];
 list(, , $callTexts) = HookPayload::read($payload);
 $session = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
+$feed = HookFeed::start($hookEvent, $payload); // null unless an interval unit is on
 $units = HookUnits::forEvent($hookEvent);
 try {
     $local = LocalHooks::scan(dirname(__DIR__));
@@ -201,7 +98,7 @@ foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
         $results[] = $closed
             ? ['action' => 'block', 'message' => "Pikkumies hook $id failed closed: " . implode('; ', $u['errors']) . '. Not run; tell the user this safety check is failing.']
             : null;
-        hookLog($hookEvent, $id, 0, $closed ? 'failed-closed' : 'invalid');
+        HookLog::add($hookEvent, $id, 0, $closed ? 'failed-closed' : 'invalid');
         continue;
     }
     if (!HookPayload::selects($u, $payload, $callTexts)) {
@@ -209,14 +106,14 @@ foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
     }
     if ($isLocal && $start - $started + $u['timeout'] + 2 + $reserve > $budget) {
         // Started now it could outlast the Hermes entry, whose timeout blocks every tool call (fail_closed).
-        hookLog($hookEvent, $id, 0, 'not-started');
+        HookLog::add($hookEvent, $id, 0, 'not-started');
         $notes[] = [$id, "was not started: its {$u['timeout']}s timeout does not fit in what is left of the {$budget}s hook entry; run pikkumies generate", false];
         continue;
     }
     if ($isLocal) {
         $u['failClosed'] = false; // a local unit never blocks by failing (ADR-0054)
     }
-    $run = hookSpawn($u['script'], $stdin, $u['timeout']);
+    $run = HookSpawn::run($u['script'], $stdin, $u['timeout']);
     list($directive, $outcome) = HookAnswers::evaluate($hookEvent, $u, $run);
     if (is_array($directive) && isset($directive['action']) && $directive['action'] === 'modify' && ($isLocal || $u['tool'] !== '')) {
         list($directive, $outcome) = [null, 'modify-ignored']; // only shipped hooks outside hooks/tools/ may change a call
@@ -239,7 +136,7 @@ foreach (array_merge($units, LocalHooks::forEvent($hookEvent, $local)) as $u) {
     } else {
         $results[] = $directive;
     }
-    hookLog($hookEvent, $id, (int) round((microtime(true) - $start) * 1000), $outcome);
+    HookLog::add($hookEvent, $id, (int) round((microtime(true) - $start) * 1000), $outcome);
 }
 if ($hookEvent === 'pre_llm_call') {
     // Shipped context first, then what Pikkumies and hooks noted since the last turn, then local context: the cap cuts from the end.
@@ -258,11 +155,12 @@ if ($hookEvent === 'pre_llm_call') {
     }
     $said[] = HookNotes::drain(Config::localDir(), $session);
     $said = implode("\n", array_filter($said));
-    $answer = HookAnswers::mergeContext(array_merge($results, $said !== '' ? [['context' => $said]] : [], $localResults));
+    $async = HookFeed::contexts($feed); // after Pikkumies' own notes, before local units: the cap cuts it before those notes
+    $answer = HookAnswers::mergeContext(array_merge($results, $said !== '' ? [['context' => $said]] : [], $async !== '' ? [['context' => $async]] : [], $localResults));
 } else {
     foreach ($notes as $n) {
         if (!HookNotes::add(Config::localDir(), $session, $n[0], $n[1], $n[2])) {
-            hookLog($hookEvent, $n[0], 0, 'note-dropped'); // the session's notes are full
+            HookLog::add($hookEvent, $n[0], 0, 'note-dropped'); // the session's notes are full
         }
     }
     $all = array_merge($results, $localResults);
@@ -273,12 +171,15 @@ if ($hookEvent === 'pre_llm_call') {
         list($all, $asked) = AskPolicy::apply($all, isset($payload['tool_name']) ? (string) $payload['tool_name'] : '',
             AskPolicy::evidenceFor($session), (int) floor($budget - ($askStart - $started) - 1));
         if (array_sum($asked) > 0) {
-            hookLog($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked));
+            HookLog::add($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked));
         }
     }
     $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);
     if ($hookEvent === 'pre_tool_call' && is_array($answer) && $answer['action'] === 'approve') {
         $answer = ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED]; // never reached: AskPolicy leaves no approve
+    }
+    if ($hookEvent === 'pre_tool_call' && $answer === null) {
+        $answer = HookFeed::hold($feed, $payload); // an interval unit's notice, only when no unit had an opinion
     }
 }
 if ($answer !== null) {
@@ -289,3 +190,4 @@ if ($answer !== null) {
     echo ($json === false ? '' : $json . "\n");
 }
 $hookDone = true;
+HookFeed::kick($feed); // every lock is released; the worker is detached
