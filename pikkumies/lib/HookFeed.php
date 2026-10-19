@@ -39,15 +39,16 @@ class HookFeed
         }
     }
 
-    /** pre_llm_call: the pending texts as one context ('' when none). */
-    public static function contexts($feed)
+    /** pre_llm_call: the pending texts as one context ('' when none); $payload's conversation verifies quoted requests. */
+    public static function contexts($feed, array $payload = [])
     {
         if ($feed === null) {
             return '';
         }
         try {
             self::prune(Config::localDir(), $feed['config'], $feed['units']);
-            return HookPending::contexts(Config::localDir(), $feed['units'], $feed['hash']);
+            $history = isset($payload['extra']['conversation_history']) && is_array($payload['extra']['conversation_history']) ? $payload['extra']['conversation_history'] : [];
+            return HookPending::contexts(Config::localDir(), $feed['units'], $feed['hash'], $history);
         } catch (\Throwable $e) {
             HookLog::add('pre_llm_call', 'async', 0, 'async-deliver-error');
             return '';

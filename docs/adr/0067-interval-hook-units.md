@@ -43,14 +43,14 @@ Facts this rests on, read in Hermes v0.22.2 (d923a5eb4):
 
 ## Consequences
 - Background checks become one directory each, with the interface above.
-- Every `pre_llm_call`, `post_llm_call` and `post_tool_call` while an interval unit is on costs one append and one flag check per unit (milliseconds). `post_llm_call` gets a Hermes entry of 5 seconds while a unit is on, one more PHP start per turn (about 20-30 ms, ADR-0030). With no interval unit shipped or on, nothing changes: no entry, no file.
+- Every `pre_llm_call`, `post_llm_call` and `post_tool_call` while an interval unit is on costs one append and one flag check per unit (milliseconds). `post_llm_call` gets a Hermes entry of 5 seconds while a unit is on, one more PHP start per turn (about 20-30 ms, ADR-0030). With no interval unit shipped or on, nothing changes: no entry, no file. The first interval units are [ADR-0070](0070-mutation-check.md) and [ADR-0071](0071-goal-review.md).
 - At most two workers per account at once, each living at most its timeout + 10 seconds.
 - A session that goes quiet is not checked again until its next event, and a run's text waits for the next turn. A scheduled run rotated by compression gets a new session id without the `cron_` prefix and is then not marked scheduled.
 - The orchestrator moved its unit runner and hook log into `lib/HookSpawn.php` and `lib/HookLog.php`, unchanged, so the worker uses the same ones.
 - Departures from the reviewed plan, with reasons: the per-unit setting is keyed by the unit's name (above); a skipped run does not set its wake flag again, because that would start a worker on every later tool call until the next real record; tool-unit calls are read with `FileopsClassify::words` rather than the search gate's plain-call parser, which answers only "one plain call or not" and refuses every pipeline; `noticeOn: any` was dropped (no unit needs it).
 
 ## References
-- ADR-0030, ADR-0054, ADR-0044, ADR-0047, ADR-0059, ADR-0022, ADR-0025
+- ADR-0030, ADR-0054, ADR-0044, ADR-0047, ADR-0059, ADR-0022, ADR-0025, ADR-0070, ADR-0071
 - Code: `pikkumies/hooks/orchestrator.php`, `pikkumies/hooks/worker.php`, `lib/HookInterval.php`, `lib/HookRecords.php`, `lib/HookSpool.php`, `lib/HookAsync.php`, `lib/HookRun.php`, `lib/HookPending.php`, `lib/HookFeed.php`, `lib/HookAsyncStatus.php`, `lib/ChangeClassify.php`, `lib/ChangeVerbs.php`, `lib/ChangeUnits.php`, `lib/FileopsClassify.php` (`redirects`), `lib/HermesConfig.php` (`hookEntries`), `lib/HaltRun.php`, `lib/LocalHooks.php`
 - Tests: `tests/OrchestratorAsyncTest.php`, `tests/HookIntervalTest.php`, `tests/HookSpoolTest.php`, `tests/HookNoticeTest.php`, `tests/HookAsyncRunTest.php`, `tests/HookDetachTest.php`, `tests/ChangeClassifyTest.php`, `tests/ChangeFetchTest.php`
 - Hermes Agent v0.22.2 (d923a5eb4): `agent/turn_finalizer.py`, `agent/turn_context.py`, `agent/shell_hooks.py`, `agent/deadline.py`, `agent/conversation_compression.py`, `agent/turn_stop_gates.py`, `hermes_cli/plugins.py`, `model_tools.py`, `cron/scheduler.py`

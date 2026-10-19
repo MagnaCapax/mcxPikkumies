@@ -155,7 +155,7 @@ if ($hookEvent === 'pre_llm_call') {
     }
     $said[] = HookNotes::drain(Config::localDir(), $session);
     $said = implode("\n", array_filter($said));
-    $async = HookFeed::contexts($feed); // after Pikkumies' own notes, before local units: the cap cuts it before those notes
+    $async = HookFeed::contexts($feed, $payload); // after Pikkumies' own notes, before local units: the cap cuts it before those notes
     $answer = HookAnswers::mergeContext(array_merge($results, $said !== '' ? [['context' => $said]] : [], $async !== '' ? [['context' => $async]] : [], $localResults));
 } else {
     foreach ($notes as $n) {

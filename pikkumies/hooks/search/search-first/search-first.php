@@ -19,12 +19,9 @@
  */
 require_once dirname(__DIR__, 3) . '/lib/DocSources.php';
 require_once dirname(__DIR__, 3) . '/lib/HookLlm.php';
-require_once dirname(__DIR__, 3) . '/lib/HaltJudge.php';
+require_once dirname(__DIR__, 3) . '/lib/UserTurn.php';
 
 const SEARCH_FIRST_MAX = 1500;
-// Words that do not make a follow-up a new question ("ok thanks", "yes do it").
-const SEARCH_FIRST_FILLER = ['ok', 'okay', 'thanks', 'thank', 'you', 'yes', 'no', 'yeah', 'yep', 'please', 'sure', 'fine', 'good', 'great', 'nice',
-    'cool', 'done', 'the', 'a', 'an', 'and', 'or', 'it', 'that', 'this', 'is', 'to', 'do', 'go', 'kiitos', 'joo', 'kyllä', 'ei', 'selvä', 'hyvä', 'tee', 'se'];
 const SEARCH_FIRST_QUESTION = ['how', 'what', 'why', 'where', 'when', 'which', 'who', 'can', 'could', 'does', 'do', 'is', 'are', 'should',
     'miten', 'mikä', 'mitä', 'miksi', 'missä', 'milloin', 'kuinka', 'voiko', 'voinko', 'onko'];
 
@@ -105,19 +102,13 @@ if (is_array($message)) {
     $message = $text;
 }
 $message = trim((string) $message);
-$lower = strtolower($message);
-$words = preg_split('/[^\p{L}\p{N}]+/u', $lower, -1, PREG_SPLIT_NO_EMPTY);
-$content = array_diff(is_array($words) ? $words : [], SEARCH_FIRST_FILLER);
+$words = UserTurn::words($message);
 $command = $message !== '' && $message[0] === '/';
-$question = !$command && (strpos($message, '?') !== false || (is_array($words) && $words && in_array($words[0], SEARCH_FIRST_QUESTION, true)));
-// The halt guard's own continue or wrap-up message (ADR-0047) is the same task going on, not a new question: an exact
-// prefix match on its fixed sentences, which are PHP constants, never the model's words.
-$haltMessage = false;
-foreach (array_merge(array_values(HaltJudge::CONTINUE_SENTENCES), [HaltJudge::WRAPUP, HaltDecouple::SENTENCE]) as $fixed) {
-    $haltMessage = $haltMessage || strpos($message, $fixed) === 0;
-}
+$question = !$command && (strpos($message, '?') !== false || ($words && in_array($words[0], SEARCH_FIRST_QUESTION, true)));
 if (!$first) {
-    if ($command || $haltMessage || (count($content) < 4 && strpos($message, '?') === false)) {
+    // A slash command, the halt guard's own continue or wrap-up message (ADR-0047) or a short follow-up is not a new question
+    // (lib/UserTurn.php, shared with the goal review).
+    if (!UserTurn::substantive($message)) {
         exit(0); // a follow-up ("ok thanks", "restart it"): the last search still stands
     }
     if (is_array($payload) && !empty($payload['session_id'])) {

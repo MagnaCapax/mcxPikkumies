@@ -11,10 +11,12 @@
  * Delivery never waits for a lock (LOCK_NB: busy means not now) and never fails a call: it is advisory, never an allow.
  * Caps (over one, that part is dropped and logged): context 4000 characters, notice 900, state 4096 bytes. Text a unit
  * passes on is the unit's to flatten and label as untrusted; the orchestrator cannot tell it from the unit's own words.
+ * A context may come with quotes of the user's requests (lib/HookQuotes.php, ADR-0071), shown only when verified.
  */
 require_once __DIR__ . '/HookAsync.php';
 require_once __DIR__ . '/HookLog.php';
 require_once __DIR__ . '/ChangeClassify.php';
+require_once __DIR__ . '/HookQuotes.php';
 
 class HookPending
 {
@@ -38,7 +40,11 @@ class HookPending
                 continue;
             }
             $holds = isset($out['holdsPerTurn']) && is_int($out['holdsPerTurn']) ? max(1, min(self::HOLDS_MAX, $out['holdsPerTurn'])) : 1;
-            $json = json_encode(['text' => trim($out[$kind]), 'holds' => $holds, 'ts' => time()], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            $item = ['text' => trim($out[$kind]), 'holds' => $holds, 'ts' => time()];
+            if ($kind === 'context' && isset($out['quotes'])) {
+                $item['quotes'] = HookQuotes::clean($out['quotes'], $id);
+            }
+            $json = json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             self::locked($f, true, function () use ($f, $kind, $json) {
                 HookAsync::put("$f.$kind.json", $json);
             });
@@ -54,14 +60,15 @@ class HookPending
     }
 
     /** The session's pending contexts and notices as one text ('' when none), each taken once and labelled with its unit. */
-    public static function contexts($localDir, array $units, $hash)
+    public static function contexts($localDir, array $units, $hash, array $history = [])
     {
         $parts = [];
         foreach ($units as $id => $u) {
             foreach (['context', 'notice'] as $kind) {
                 $p = self::take($localDir, $u, $hash, $kind);
                 if ($p !== null) {
-                    $parts[] = sprintf('Pikkumies %s (background check from session records): %s', $id, $p['text']);
+                    $quoted = isset($p['quotes']) && is_array($p['quotes']) ? HookQuotes::shown($p['quotes'], $history) : '';
+                    $parts[] = sprintf('Pikkumies %s (background check from session records): %s', $id, ($quoted !== '' ? "$quoted\n" : '') . $p['text']);
                     HookLog::add('async', $id, 0, "$kind-shown");
                 }
             }
