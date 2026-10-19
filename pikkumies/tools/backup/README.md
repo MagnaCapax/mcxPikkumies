@@ -2,6 +2,8 @@
 
 Tools for snapshot backups in the user's own repository: `restic` and `borg`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Both have the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the table below.
 
+`remote` is not a snapshot repository: it streams encrypted archives (`tar | pigz | gpg | ssh`) to another machine through a restricted key, with its own verbs (`remote/README.md`, [ADR-0049](../../../docs/adr/0049-backup-remote-over-ssh.md)). The contract test exempts it from the table below by name.
+
 ## Verbs (the same in every unit)
 
 | verb | arguments | changes | what it does |

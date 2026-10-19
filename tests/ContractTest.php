@@ -135,6 +135,8 @@ return [
         }
     },
     'units: every tool of a category has the verbs its category README lists (ADR-0015)' => function () {
+        // Named exemptions only, each with its reason and named in its category README.
+        $exempt = ['backup/remote' => 'ADR-0049: archives streamed over ssh, not a snapshot repository'];
         foreach (Tree::scan(Units::toolsDir(), 'skill.md')['categories'] as $category => $dir) {
             $readme = "$dir/README.md";
             $shared = is_file($readme) ? array_column(Units::verbs((string) file_get_contents($readme)), 'verb') : [];
@@ -142,6 +144,10 @@ return [
                 continue;
             }
             foreach (Units::all() as $u) {
+                if ($u['category'] === $category && isset($exempt[$u['category'] . '/' . $u['name']])) {
+                    check(strpos((string) file_get_contents($readme), "`{$u['name']}`") !== false, "{$u['name']} is exempt but its category README does not say so");
+                    continue;
+                }
                 if ($u['category'] === $category) {
                     $missing = array_diff($shared, array_column($u['verbs'], 'verb'));
                     check(!$missing, $u['name'] . ' lacks the category verbs: ' . implode(', ', $missing));

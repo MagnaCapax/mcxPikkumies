@@ -54,6 +54,11 @@ class Redact
             '/(\bx-api-key\s*:\s*)(\'[^\']*\'|"[^"]*"|[^\s\'"]+)/i',
             '/(\b(?:set-)?cookie\s*:\s*)(\S.*)$/i',
             '/^(\s*(?:-\s+)?["\']?' . $n . '["\']?(?:\s*:\s+|\s+=\s*|=\s+))(\S.*)$/i',
+            // The whole shell word of the value: quoted parts, $'...', backslash escapes and plain characters, so
+            // 'it'\''s' or "a b" is removed in full (ADR-0049); an unclosed quote takes the rest of the line. Same
+            // NAME as the plain line below (so "keyboard=", "bypass=" never match), run first so a multi-segment
+            // word is never partly redacted by the simpler line.
+            '/(' . $n . '=)((?:\$\'(?:[^\'\\\\]|\\\\.)*\'?|\'[^\']*\'?|"(?:[^"\\\\]|\\\\.)*"?|\\\\.|[^\s\'"\\\\;&|<>()])+)/i',
             '/(' . $n . '=)' . $v . '/i',
             '/("' . $n . '"\s*:\s*)("(?:[^"\\\\]|\\\\.)*"|[^\s,}\]]+)/i',
             '/(\b(?:machine|login)\s+\S+.*?\spassword\s+)(\S+)/i',

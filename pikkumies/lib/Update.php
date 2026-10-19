@@ -14,6 +14,8 @@ class Update
     public static $root = null;
     /** @var string test seam: the crontab command */
     public static $crontab = 'crontab';
+    /** @var string|null test seam: where keepLine() records the lines ensureScheduled() restores */
+    public static $keptDir = null;
 
     public static function repoRoot()
     {
@@ -62,10 +64,10 @@ class Update
 
     /**
      * One crontab read/merge/write cycle for one tagged line, shared by the daily auto-update line
-     * and the per-minute cron-tick line (ADR-0025). Nothing is written unless `crontab -l` worked
-     * or said there is no crontab yet. Returns a status line.
+     * and the per-minute cron-tick line (ADR-0025), and by keepLine() for a tool's own line (ADR-0049).
+     * Nothing is written unless `crontab -l` worked or said there is no crontab yet. Returns a status line.
      */
-    private static function installTaggedLine($tag, $line, $onMsg, $offMsg)
+    public static function installTaggedLine($tag, $line, $onMsg, $offMsg)
     {
         list($code, $current, $err) = self::exec([self::$crontab, '-l']);
         if ($code !== 0) {
@@ -152,7 +154,61 @@ class Update
         if ((strpos($before, self::CRON_TICK_TAG) !== false) !== $tickWanted) {
             $msgs[] = 'cron-tick ' . self::scheduleCronTick($config, $rootAvailable, $logFile);
         }
+        foreach (self::keptLines() as $tag => $line) {
+            if (strpos($before, $tag) === false) {
+                $msgs[] = substr($tag, 2) . ' ' . self::installTaggedLine($tag, $line, 'restored', 'off');
+            }
+        }
         return self::readCrontab() === $before ? [] : $msgs;
+    }
+
+    /**
+     * A tool's own tagged line (`backup remote schedule`, ADR-0049), tag `# pikkumies-<name>`: installed now and recorded
+     * in local/secrets/cron/<name>.cron, so ensureScheduled() puts it back after an account move; $line '' removes both.
+     * The record sits under local/secrets, which the delete guard keeps the agent from writing. Returns a status line.
+     */
+    public static function keepLine($name, $line, $onMsg, $offMsg)
+    {
+        $tag = '# pikkumies-' . $name;
+        if (!preg_match('/^[a-z][a-z0-9-]*$/', $name) || ($line !== '' && (strpbrk($line, "%\n\r") !== false
+            || substr($line, -strlen($tag)) !== $tag))) {
+            return 'not changed (a line must be one line without %, ending with ' . $tag . ')';
+        }
+        $msg = self::installTaggedLine($tag, $line, $onMsg, $offMsg);
+        $file = self::keptDir() . "/$name.cron";
+        if (strpos($msg, 'not changed') === 0) {
+            return $msg;
+        }
+        if ($line === '') {
+            @unlink($file);
+        } elseif (!@is_dir(dirname($file)) && !@mkdir(dirname($file), 0700, true) || @file_put_contents($file, $line . "\n") === false) {
+            return $msg . ' (but not recorded for restoring after an account move: ' . dirname($file) . ' is not writable)';
+        }
+        @chmod($file, 0600);
+        return $msg;
+    }
+
+    /** [tag => line] of every line keepLine() recorded; a record that is not this account's regular file is skipped. */
+    private static function keptLines()
+    {
+        $out = [];
+        foreach ((array) glob(self::keptDir() . '/*.cron') as $file) {
+            $tag = '# pikkumies-' . basename($file, '.cron');
+            try {
+                $line = trim((string) SecretFile::read($file, 'run the schedule verb again'));
+            } catch (Exception $e) {
+                continue;
+            }
+            if ($line !== '' && strpbrk($line, "%\n\r") === false && substr($line, -strlen($tag)) === $tag) {
+                $out[$tag] = $line;
+            }
+        }
+        return $out;
+    }
+
+    private static function keptDir()
+    {
+        return self::$keptDir !== null ? self::$keptDir : Config::localDir() . '/secrets/cron';
     }
 
     /** The current crontab text, '' when there is none yet, null when `crontab -l` failed otherwise. */

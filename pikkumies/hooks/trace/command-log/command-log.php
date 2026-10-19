@@ -17,6 +17,8 @@ const COMMAND_LOG_MAX = 4000;
 /** The command with the secrets a shell line carries removed (lib/Redact.php, shared with /feedback). */
 function commandLogRedact($command)
 {
+    // Shared with /feedback (ADR-0056): Cli::cleanString, option/header/variable forms, mysql -p, PEM blocks and common
+    // token forms, plus the whole-shell-word match for *KEY=/*TOKEN=/*SECRET=/*PASSWORD=-style values (ADR-0049).
     return Redact::secrets($command);
 }
 

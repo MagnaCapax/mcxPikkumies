@@ -1,0 +1,107 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Fake ssh, acting as the backup machine: its HOME is $FAKE_DIR/remote and it runs the REAL receiver installed there.
+ * Logs argv and whether the one-time login variable is set (never a value). Three modes, as OpenSSH would behave:
+ * no login method at all (records the host key under accept-new, then "Permission denied"); a password login (asks
+ * $SSH_ASKPASS, then runs the stdin script with sh); a key login (finds the key in the remote authorized_keys and, like
+ * sshd, runs its command= with SSH_ORIGINAL_COMMAND). State: host_key(s), login_sha1, ignore_restrict, truncate_put, die_put, df_kib.
+ */
+require __DIR__ . '/fakelib.php';
+fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false, 'askpass_force' => getenv('SSH_ASKPASS_REQUIRE') === 'force']);
+$a = array_slice($argv, 1);
+$o = [];
+$host = null;
+$cmd = [];
+for ($i = 0; $i < count($a); $i++) {
+    if ($a[$i] === '--') {
+        $host = $a[$i + 1];
+        $cmd = array_slice($a, $i + 2);
+        break;
+    }
+    if ($a[$i] === '-o') {
+        list($k, $v) = explode('=', $a[++$i], 2);
+        $o[$k] = trim($v, '"');
+    } elseif (in_array($a[$i], ['-F', '-p', '-l', '-i'], true)) {
+        $o[$a[$i]] = $a[++$i];
+    }
+}
+$s = fakeState();
+$remote = getenv('FAKE_DIR') . '/remote';
+@mkdir($remote, 0700, true);
+// host_keys: algorithm => key, the first one is what the client negotiates without HostKeyAlgorithms (host_key: one ED25519 key).
+$keys = isset($s['host_keys']) ? $s['host_keys'] : ['ssh-ed25519' => isset($s['host_key']) ? $s['host_key']
+    : 'AAAAC3NzaC1lZDI1NTE5AAAAIHostKeyOfTheFakeBackupMachine0000000'];
+$alg = isset($o['HostKeyAlgorithms']) ? $o['HostKeyAlgorithms'] : array_keys($keys)[0];
+if (!isset($keys[$alg])) {
+    fwrite(STDERR, "Unable to negotiate with $host port 22: no matching host key type found.\n");
+    exit(255);
+}
+$type = $alg === 'rsa-sha2-512' ? 'ssh-rsa' : $alg;
+$kh = $o['UserKnownHostsFile'];
+$line = '';
+foreach (is_file($kh) ? file($kh, FILE_IGNORE_NEW_LINES) : [] as $l) {
+    $line = strpos($l, "$host $type ") === 0 ? $l : $line;
+}
+if ($line === '' && $o['StrictHostKeyChecking'] === 'accept-new') {
+    file_put_contents($kh, "$host $type {$keys[$alg]}\n", FILE_APPEND);
+} elseif ($line === '') {
+    fwrite(STDERR, "No $type host key is known for $host and you have requested strict checking.\nHost key verification failed.\n");
+    exit(255);
+} elseif ($line !== "$host $type {$keys[$alg]}") {
+    fwrite(STDERR, "@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\nIT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\n"
+        . "Offending key in $kh:1\n  remove with:\n  ssh-keygen -f '$kh' -R '$host'\nHost key for $host has changed and you have requested"
+        . " strict checking.\nHost key verification failed.\n");
+    exit(255);
+}
+$sh = function ($command, $stdin, array $env) use ($remote) {
+    $vars = ['HOME' => $remote, 'PATH' => getenv('FAKE_REAL_PATH')] + $env;
+    $p = proc_open('exec ' . escapeshellarg(fakeReal('sh')) . ' -c ' . escapeshellarg($command), [0 => $stdin === null ? STDIN : ['pipe', 'r'],
+        1 => STDOUT, 2 => STDERR], $pipes, $remote, $vars);
+    if ($stdin !== null) {
+        fwrite($pipes[0], $stdin);
+        fclose($pipes[0]);
+    }
+    exit(proc_close($p));
+};
+if (isset($o['PasswordAuthentication']) && $o['PasswordAuthentication'] === 'no' && $o['PubkeyAuthentication'] === 'no') {
+    fwrite(STDERR, "Permission denied (publickey,password).\n");
+    exit(255);
+}
+if (isset($o['PreferredAuthentications']) && strpos($o['PreferredAuthentications'], 'password') !== false) {
+    $typed = getenv('SSH_ASKPASS_REQUIRE') === 'force' ? shell_exec(escapeshellarg(getenv('SSH_ASKPASS')) . ' '
+        . escapeshellarg($o['-l'] . "@$host's password: ")) : '';
+    if (sha1(substr((string) $typed, 0, -1)) !== $s['login_sha1']) {
+        fwrite(STDERR, "Permission denied, please try again.\n");
+        exit(255);
+    }
+    $sh(implode(' ', $cmd), null, []);
+}
+preg_match('/^FAKE-PRIVATE-KEY (\S+)$/m', (string) @file_get_contents($o['-i']), $k);
+$entry = '';
+foreach (is_file("$remote/.ssh/authorized_keys") && $k ? file("$remote/.ssh/authorized_keys", FILE_IGNORE_NEW_LINES) : [] as $l) {
+    $entry = strpos($l, " ssh-ed25519 {$k[1]} ") !== false ? $l : $entry;
+}
+if ($entry === '') {
+    fwrite(STDERR, "Permission denied (publickey).\n");
+    exit(255);
+}
+$words = implode(' ', $cmd);
+if ($words === 'df' && isset($s['df_kib'])) {
+    echo "avail_kib {$s['df_kib']}\n";
+    exit(0);
+}
+$stdin = null;
+if (!empty($s['die_put']) && strpos($words, 'put ') === 0) {
+    fread(STDIN, 100); // the connection drops early in the upload
+    fwrite(STDERR, "client_loop: send disconnect: Connection reset by peer\n");
+    exit(255);
+}
+if (!empty($s['truncate_put']) && strpos($words, 'put ') === 0) {
+    $all = stream_get_contents(STDIN);
+    $stdin = substr($all, 0, (int) (strlen($all) / 2));
+}
+if (!empty($s['ignore_restrict']) || !preg_match('/^restrict,command="([^"]+)" /', $entry, $c)) {
+    $sh($words, $stdin, []);
+}
+$sh($c[1], $stdin, ['SSH_ORIGINAL_COMMAND' => $words]);

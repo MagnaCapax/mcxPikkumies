@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+// Fake crontab: -l prints $FAKE_DIR/crontab ("no crontab for u" when absent); `crontab <file>` replaces it.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+$tab = getenv('FAKE_DIR') . '/crontab';
+if ($argv[1] === '-l') {
+    if (!is_file($tab)) {
+        fwrite(STDERR, "no crontab for u\n");
+        exit(1);
+    }
+    echo file_get_contents($tab);
+    exit(0);
+}
+copy($argv[1], $tab);

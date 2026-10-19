@@ -46,7 +46,7 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - Converting or probing one of your own media files, and speech-to-text transcription (cloud or local): [media](pikkumies/tools/media/README.md)
 - Your own mail over IMAP, POP and SMTP (read, archive, send after you approve, spam rules): [email](pikkumies/tools/email/README.md)
 - Rootless Docker containers: [containers](pikkumies/tools/containers/README.md)
-- Backups with restic and borg: [backup](pikkumies/tools/backup/README.md)
+- Backups with restic and borg, and encrypted archives to another machine over ssh: [backup](pikkumies/tools/backup/README.md)
 - Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)
 - Know-how for the apps on a PMSS seedbox, with the wiki pages to read: [seedbox apps](pikkumies/tools/seedbox/seedbox-apps/README.md)
 - Server administration when it has root: [server admin](pikkumies/tools/server-admin/server-admin/README.md)

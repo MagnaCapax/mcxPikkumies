@@ -4,7 +4,7 @@ Runs after each tool call (`post_tool_call`) and writes one line for every shell
 
 - **Where:** `local/logs/commands/YYYYMMDD.jsonl`, one file per UTC day, next to the hook log `local/logs/hooks/`. The directory is 0700 and the files 0600: only the account can read them.
 - **What one line holds:** `ts`, `session_id`, `tool_call_id`, `cwd`, `tool`, `command`, `background`, `exit_code`, `status`, `duration_ms`, `output_bytes`, and `error` or `truncated` when they apply. The output itself is never logged.
-- **Secrets:** the command is cleaned the way Pikkumies cleans everything it prints (`Cli::cleanString`: URL passwords and tokens) and also loses the value of password, token, key and secret options, `Authorization`/`Cookie` headers, `*_KEY=`/`*_TOKEN=`-style variables and `mysql -p<password>`. A secret in another shape can still land in the line; the files stay on this machine.
+- **Secrets:** the command is cleaned the way Pikkumies cleans everything it prints (`Cli::cleanString`: URL passwords and tokens) and also loses the value of password, token, key and secret options, `Authorization`/`Cookie` headers, `*_KEY=`/`*_TOKEN=`/`*_PASSWORD=`-style variables (the whole shell word, quotes included: `PIKKUMIES_REMOTE_PASSWORD='it'\''s'` loses all of it, [ADR-0049](../../../../docs/adr/0049-backup-remote-over-ssh.md)) and `mysql -p<password>`. A secret in another shape can still land in the line; the files stay on this machine.
 - **How long:** as long as the session history, `sessions.retentionDays` (0 = forever, the default). A new day's file removes files older than that.
 - **Tracing a session:** `grep '"session_id":"<id>"' ~/pikkumies/local/logs/commands/*.jsonl`, or one day's file read as JSON lines.
 

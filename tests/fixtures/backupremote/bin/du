@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+// Fake du: state du_kib prints that total (a home too big to make in a test); otherwise the real GNU du.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv);
+$s = fakeState();
+if (isset($s['du_kib'])) {
+    echo "{$s['du_kib']}\ttotal\n";
+    exit(0);
+}
+fakeExec(array_merge([fakeReal('du')], array_slice($argv, 1)));

@@ -1,0 +1,8 @@
+#!/usr/bin/env php
+<?php
+// Fake tar: logs, runs the real GNU tar, then exits with state tar_code when set (1: "file changed as we read it", 2: fatal).
+require __DIR__ . '/fakelib.php';
+fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false]);
+passthru(implode(' ', array_map('escapeshellarg', array_merge([fakeReal('tar')], array_slice($argv, 1)))), $code);
+$s = fakeState();
+exit(isset($s['tar_code']) ? (int) $s['tar_code'] : $code);

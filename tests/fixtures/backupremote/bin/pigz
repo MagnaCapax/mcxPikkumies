@@ -1,0 +1,18 @@
+#!/usr/bin/env php
+<?php
+// Fake pigz: -c adds a header, -d -c removes it (refuses data without it). State: pigz_fail.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false]);
+$data = stream_get_contents(STDIN);
+if (!empty(fakeState()['pigz_fail'])) {
+    exit(1);
+}
+if (!in_array('-d', $argv, true)) {
+    echo "FAKEPIGZ\n", $data;
+    exit(0);
+}
+if (strpos($data, "FAKEPIGZ\n") !== 0) {
+    fwrite(STDERR, "pigz: not in gzip format\n");
+    exit(1);
+}
+echo substr($data, 9);

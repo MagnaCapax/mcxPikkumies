@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+// Fake ssh-keygen: `-t ed25519 -N '' -C c -f f` writes a fake key pair; `-l -E sha256 -f known_hosts` prints a
+// SHA256 fingerprint per line in the real format ("256 SHA256:<43 base64> host (ED25519)").
+require __DIR__ . '/fakelib.php';
+fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false]);
+$a = array_slice($argv, 1);
+$f = $a[array_search('-f', $a, true) + 1];
+if (in_array('-l', $a, true)) {
+    foreach (is_file($f) ? file($f, FILE_IGNORE_NEW_LINES) : [] as $l) {
+        $p = explode(' ', $l);
+        echo '256 SHA256:' . substr(rtrim(base64_encode(hash('sha256', $p[2], true)), '='), 0, 43) . " {$p[0]} (ED25519)\n";
+    }
+    exit(0);
+}
+$b64 = rtrim(strtr(base64_encode(random_bytes(32)), '+/', 'Aa'), '=');
+file_put_contents($f, "FAKE-PRIVATE-KEY $b64\n");
+chmod($f, 0600);
+file_put_contents("$f.pub", "ssh-ed25519 $b64 " . $a[array_search('-C', $a, true) + 1] . "\n");

@@ -1,0 +1,31 @@
+#!/usr/bin/env php
+<?php
+// Fake gpg --symmetric / --decrypt: "encrypts" as a header naming the passphrase's hash plus the data, and refuses to
+// decrypt with another passphrase. The passphrase is read from --passphrase-file only. State: gpg_fail.
+require __DIR__ . '/fakelib.php';
+fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false]);
+$a = array_slice($argv, 1);
+$pass = trim((string) file_get_contents($a[array_search('--passphrase-file', $a, true) + 1]));
+$data = stream_get_contents(STDIN);
+if (!empty(fakeState()['gpg_fail'])) {
+    fwrite(STDERR, "gpg: fake failure\n");
+    exit(2);
+}
+$head = "FAKEGPG " . sha1($pass) . "\n";
+// Like gpg, a write into a closed pipe is an error (exit 2), so a dead upload shows up here too.
+$put = function ($out) {
+    for ($off = 0; $off < strlen($out); $off += $w) {
+        if (!($w = @fwrite(STDOUT, substr($out, $off)))) {
+            fwrite(STDERR, "gpg: error writing to stdout: Broken pipe\n");
+            exit(2);
+        }
+    }
+};
+if (in_array('--symmetric', $a, true)) {
+    $put($head . $data);
+} elseif (strpos($data, $head) === 0) {
+    $put(substr($data, strlen($head)));
+} else {
+    fwrite(STDERR, "gpg: decryption failed: Bad session key\n");
+    exit(2);
+}
