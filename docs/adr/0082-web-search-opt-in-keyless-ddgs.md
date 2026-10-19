@@ -32,5 +32,5 @@ Facts read in the pinned Hermes source for this change (the earlier draft of thi
 - Not verified on a live host: `hermes pm install --extra ddgs` on an older build, and DuckDuckGo answering the pinned `ddgs` package. Read from source only.
 
 ## References
-- ADR-0021, ADR-0062, ADR-0073, ADR-0059 (tiers), ADR-0077 and ADR-0079 (the verb pattern).
+- ADR-0021, ADR-0062, ADR-0073, [ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md) (tiers), [ADR-0077](0077-isolated-browser-in-a-private-network-namespace.md) and [ADR-0079](0079-the-agents-own-panel-login.md) (the verb pattern).
 - `pikkumies/lib/WebSearch.php`, `Config.php`, `ConfigureTiers.php`, `HermesConfig.php`, `HermesInstall.php`, `Launch.php`; `tests/WebSearchTest.php`.
