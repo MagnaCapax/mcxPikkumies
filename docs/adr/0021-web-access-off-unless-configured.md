@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Corrects the [ADR-0011](0011-documentation-sources-and-search-first.md) context line "Hermes' own web_search and web_extract need a paid gateway or API keys".
+- Status: Accepted. Corrects the [ADR-0011](0011-documentation-sources-and-search-first.md) context line "Hermes' own web_search and web_extract need a paid gateway or API keys". Amended by [ADR-0062](0062-hermes-config-seeded-once-pins-in-hermes-managed-scope.md): a web search backend and its key configured in Hermes now persist across starts.
 
 ## Context
 The request of 2026-10-14 asks whether Hermes comes with deep research tooling, and to decide whether Pikkumies needs its own (a later stage of the tool-unit work, [ADR-0015](0015-tool-units-one-skill-per-tool.md)).

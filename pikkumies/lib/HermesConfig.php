@@ -1,24 +1,46 @@
 <?php
 /**
- * HermesConfig: generates Hermes' home (HERMES_HOME = local/hermes) from the tracked tree.
+ * HermesConfig: generates Hermes' config from the tracked tree, in two layers (ADR-0062).
  *
- * - config.yaml: model provider, skills.external_dirs (the skills generated from the tool units,
- *   ADR-0015), shell hooks.
+ * - local/hermes-managed/ (HERMES_MANAGED_DIR, Hermes' managed scope): config.yaml with the settings Pikkumies
+ *   pins (provider and model, shell hooks, approvals, web fallback, logins, ...), which win over the user's file
+ *   and which `hermes config set` refuses; .env with the provider key (0600). Rebuilt at every start.
+ * - local/hermes/config.yaml (HERMES_HOME): the user's. Written once, at the first start, with every setting
+ *   (skills.external_dirs: the skills generated from the tool units, ADR-0015; the feature defaults, ADR-0024);
+ *   after that only Hermes and the user change it, and Pikkumies edits it only through HermesUserConfig (backed
+ *   up, logged). local/hermes/.env is the user's too. A shipped skill in skills.disabled is not generated at all.
  *   A local skill must not reuse a shipped name: Hermes refuses an ambiguous name (ADR-0007).
- * - .env: provider key (0600). SOUL.md: what this machine allows (from detection), tools' notices + doctrine.
+ * - SOUL.md: what this machine allows (from detection), tools' notices + doctrine.
  * - scripts/pikkumies-docker-check.sh: what the scheduled Docker check runs (ADR-0034).
  * - scripts/pikkumies-performance-sample.sh: what the scheduled performance sampling runs (ADR-0035).
- * Regenerated on install, update and run; hand edits belong in local/config.php, not here.
- * Every file is written to a temporary name and renamed: a full disk leaves the old file, never an
- * empty config without the safety hooks.
+ * Every file Pikkumies rebuilds is written to a temporary name and renamed: a full disk leaves the old file, never
+ * an empty config without the safety hooks.
  */
 require_once __DIR__ . '/Links.php';
+require_once __DIR__ . '/HermesUserConfig.php';
 
 class HermesConfig
 {
     public static function home()
     {
         return Config::localDir() . '/hermes';
+    }
+
+    /** Hermes' managed scope (HERMES_MANAGED_DIR): the settings Pikkumies pins, beside $home (ADR-0062). */
+    public static function managedDir($home = null)
+    {
+        return dirname($home !== null ? $home : self::home()) . '/hermes-managed';
+    }
+
+    /**
+     * The environment every Hermes Pikkumies starts gets: its home, the managed scope beside it, and no
+     * HERMES_RUNTIME_DIR (pm's tool store follows HERMES_HOME, as at install, ADR-0033). A null value removes the
+     * variable. Without HERMES_MANAGED_DIR Hermes would run without the pinned settings and hooks (ADR-0062).
+     */
+    public static function env($home = null)
+    {
+        $home = $home !== null ? $home : self::home();
+        return ['HERMES_HOME' => $home, 'HERMES_MANAGED_DIR' => self::managedDir($home), 'HERMES_RUNTIME_DIR' => null];
     }
 
     public static function write(array $config, array $profile)
@@ -30,10 +52,7 @@ class HermesConfig
         // The light model for hooks (local/llm.json), reusing the /models answer when there was one;
         // also goes under auxiliary.goal_judge below, since /goal already uses an auxiliary judge (ADR-0047).
         $light = Provider::writeLight($prov, $config, $ids);
-
-        self::put($home . '/config.yaml', self::renderYaml($prov, self::skillDirs(), self::hookEntries(), (array) $config['skills']['disabled'], !empty($config['hermes']['lazyInstalls']), $light) . self::sessionsYaml($config));
-        // Key lives only in .env (0600); config.yaml points at it via providers.pikkumies.key_env.
-        self::put($home . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
+        self::writeConfig($home, $prov, $config, $light);
         self::put($home . '/SOUL.md', self::renderSoul($profile, $config));
         foreach ([self::dockerCheckScript($home), self::performanceSampleScript($home)] as $job) {
             list($script, $line) = $job;
@@ -41,6 +60,34 @@ class HermesConfig
             self::put($script, $line, 0700);
         }
         return $home;
+    }
+
+    /** The two config layers (ADR-0062); throws when the managed files cannot be written. */
+    public static function writeConfig($home, array $prov, array $config, $light = '')
+    {
+        $managed = self::managedDir($home);
+        @mkdir($managed, 0700, true);
+        $hooks = self::hookEntries();
+        $lazy = !empty($config['hermes']['lazyInstalls']);
+        // The pins, at every start: a key or setting changed after install reaches Hermes (ADR-0005), and a run
+        // never starts without the hooks, since a failed write throws (ADR-0062).
+        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true) . self::sessionsYaml($config));
+        // Key lives only in the managed .env (0600); config.yaml points at it via providers.pikkumies.key_env.
+        self::put($managed . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
+        // The user's config.yaml: seeded once with everything, then only careful, backed-up, logged edits.
+        HermesUserConfig::apply($home, self::renderYaml($prov, self::skillDirs(), $hooks, $lazy, $light) . self::sessionsYaml($config),
+            Units::generatedDir(), self::hiddenShipped(isset($config['skills']['disabled']) ? (array) $config['skills']['disabled'] : []));
+    }
+
+    /**
+     * The names in skills.disabled that are shipped skills: Generate leaves those out, so they leave Hermes' own list.
+     * Any other name (a skill Hermes ships, say) stays in Hermes' list, where the user's choice already is (ADR-0062).
+     */
+    public static function hiddenShipped(array $disabled)
+    {
+        return $disabled ? array_values(array_intersect($disabled, array_map(function ($u) {
+            return $u['name'];
+        }, Units::all()))) : [];
     }
 
     /** Write through a temporary file and rename; throws when the write fails (the old file stays). */
@@ -95,21 +142,24 @@ class HermesConfig
         return $entries;
     }
 
-    public static function renderYaml(array $prov, array $skillDirs, array $hooks, array $disabledSkills = [], $lazyInstalls = false, $goalJudgeModel = '')
+    /**
+     * The Hermes config. $pinsOnly false: the user's config.yaml as first seeded (every setting). $pinsOnly true:
+     * the managed config.yaml, only the settings Pikkumies pins (ADR-0062): no skills.external_dirs (Hermes' skills
+     * loader reads it from the user's file only), and no feature defaults the user may change (checkpoints,
+     * plugins, background review, curator; pinning plugins.enabled would also refuse every other plugin).
+     */
+    public static function renderYaml(array $prov, array $skillDirs, array $hooks, $lazyInstalls = false, $goalJudgeModel = '', $pinsOnly = false)
     {
-        $y = "# Generated by pikkumies. Edit " . Config::shown(Config::localDir() . "/config.php") . " instead; this file is rewritten.\n";
+        $y = $pinsOnly ? self::managedHeader() : self::seedHeader();
         // A named provider: Hermes reads key_env for entries under providers: (hermes_cli/providers.py);
         // a bare `provider: custom` ignored model.key_env when this was first verified (ADR-0005).
         $y .= "model:\n  provider: \"custom:pikkumies\"\n  default: " . self::q($prov['model']) . "\n";
         $y .= "providers:\n  pikkumies:\n    base_url: " . self::q($prov['endpoint']) . "\n    key_env: PIKKUMIES_API_KEY\n    default_model: " . self::q($prov['model']) . "\n";
-        $y .= "skills:\n  external_dirs:\n";
-        foreach ($skillDirs as $d) {
-            $y .= "    - " . self::q($d) . "\n";
-        }
-        if ($disabledSkills) {
-            $y .= "  disabled:\n";
-            foreach ($disabledSkills as $name) {
-                $y .= "    - " . self::q($name) . "\n";
+        $y .= "skills:\n";
+        if (!$pinsOnly) {
+            $y .= "  external_dirs:\n";
+            foreach ($skillDirs as $d) {
+                $y .= "    - " . self::q($d) . "\n";
             }
         }
         // Agent-written skills get the same static scan as a hub install before they can run
@@ -138,12 +188,12 @@ class HermesConfig
         $y .= "approvals:\n  mode: manual\n";
         // Per-turn working-directory snapshots (/rollback): Hermes defaults this off; the size caps
         // (max_snapshots, max_total_size_mb, max_file_size_mb) stay at Hermes' own values (ADR-0024).
-        $y .= "checkpoints:\n  enabled: true\n";
+        $y .= $pinsOnly ? '' : "checkpoints:\n  enabled: true\n";
         // Opt-in allow-list (ADR-0024): a static scan of file writes, no model call, no cost.
-        $y .= "plugins:\n  enabled:\n    - \"security-guidance\"\n";
+        $y .= $pinsOnly ? '' : "plugins:\n  enabled:\n    - \"security-guidance\"\n";
         // Set on explicitly so a future Hermes default change cannot silently turn off the post-turn
         // self-improvement fork; consolidate (its aux-model cost) is left at Hermes' own off (ADR-0024).
-        $y .= "auxiliary:\n  background_review:\n    enabled: true\n";
+        $y .= $pinsOnly ? ($goalJudgeModel !== '' ? "auxiliary:\n" : '') : "auxiliary:\n  background_review:\n    enabled: true\n";
         // /goal's own judge (hermes_cli/goals.py auxiliary.goal_judge.provider/.model): the light model
         // already decided for hooks, under the one named provider every call here uses (ADR-0047).
         // goals.max_turns stays at Hermes' own default; nothing here was measured to pick a number.
@@ -152,7 +202,7 @@ class HermesConfig
         }
         // Set on explicitly (already Hermes' default): background pruning/archiving of agent-created skills;
         // consolidate stays off, left at Hermes' own default (ADR-0024).
-        $y .= "curator:\n  enabled: true\n";
+        $y .= $pinsOnly ? '' : "curator:\n  enabled: true\n";
         // Hermes would otherwise borrow a codex/other CLI login from this account; two programs
         // sharing one login rotate its refresh token and log each other out (ADR-0026).
         $y .= "auth:\n  adopt_external_logins: false\n";
@@ -174,6 +224,19 @@ class HermesConfig
             }
         }
         return $y;
+    }
+
+    /** Line 1 of the user's config.yaml as seeded; HermesUserConfig replaces the old "rewritten" header with it. */
+    public static function seedHeader()
+    {
+        return "# Written by pikkumies at the first start; yours from then on, Hermes' own edits stay. Settings in "
+            . Config::shown(self::managedDir() . '/config.yaml') . " win over this file; change those in " . Config::shown(Config::localDir() . '/config.php') . ".\n";
+    }
+
+    public static function managedHeader()
+    {
+        return "# Generated by pikkumies at every start: the settings it pins, over " . Config::shown(self::home() . '/config.yaml')
+            . ". Edit " . Config::shown(Config::localDir() . '/config.php') . " instead; this file is rewritten.\n";
     }
 
     /**

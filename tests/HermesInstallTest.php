@@ -51,6 +51,13 @@ if (isset($argv[2]) && $argv[1] === "hooks" && $argv[2] === "test") {
     $o = getenv("PK_FAKE_HOOK_OUT");
     echo $o !== false && $o !== "" ? $o : "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies safety: recursive force delete. Not run.\"}\n";
 }
+// `config set` of a pinned key: what Hermes prints when it refuses one, or the text in PK_FAKE_SET_OUT (exit 0).
+if (isset($argv[2]) && $argv[1] === "config" && $argv[2] === "set") {
+    $o = getenv("PK_FAKE_SET_OUT");
+    if ($o !== false && $o !== "") { echo $o; exit(0); }
+    fwrite(STDERR, "Cannot set " . $argv[3] . ": it is managed by your administrator (" . getenv("HERMES_MANAGED_DIR") . "/config.yaml) and cannot be changed.\n");
+    exit(1);
+}
 ');
     // Fake bootstrap Python: only `-m pm.cli install ...`, which publishes the tree's launcher like pm does.
     hermesTFake("$bin/boot-python", sprintf($logLine, '"pm " . implode(" ", array_slice($argv, 1)) . " | cwd=" . getcwd() . " | HERMES_HOME=" . getenv("HERMES_HOME") . " | RUNTIME_DIR=" . var_export(getenv("HERMES_RUNTIME_DIR"), true)') . '
@@ -72,7 +79,7 @@ exit(0);
 
     $w = "$t/work";
     mkdir("$w/pm", 0700, true);
-    foreach (HermesInstall::CONFIG_FACTS as $fact) {
+    foreach (array_merge(HermesInstall::CONFIG_FACTS, HermesInstall::LAYER_FACTS) as $fact) {
         @mkdir(dirname("$w/{$fact[0]}"), 0700, true);
         file_put_contents("$w/{$fact[0]}", (is_file("$w/{$fact[0]}") ? file_get_contents("$w/{$fact[0]}") : '') . $fact[1] . "\n");
     }
@@ -419,7 +426,7 @@ return [
         }
     },
     'hermes key check: every top-level key HermesConfig writes is in CONFIG_FACTS' => function () {
-        $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], ['pre_tool_call' => ['command' => 'x', 'failClosed' => true, 'timeout' => 5]], ['s'])
+        $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], ['pre_tool_call' => ['command' => 'x', 'failClosed' => true, 'timeout' => 5]], true, 'light')
             . HermesConfig::sessionsYaml(['sessions' => ['retentionDays' => 3]]);
         preg_match_all('/^([a-z_]+):/m', $y, $m);
         $covered = [];

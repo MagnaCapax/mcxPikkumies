@@ -115,15 +115,14 @@ return [
         check(strpos($y, '"/a/skills"') !== false, 'external dir');
         check(strpos($y, "security:\n  allow_lazy_installs: false\n") !== false, 'runtime installs must be off by default (ADR-0021)');
         check(strpos($y, "approvals:\n  mode: manual\n") !== false, 'dangerous commands must ask the user, not a second model (ADR-0020)');
-        $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], [], true);
+        $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], true);
         check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
         // Unapproved shell hooks are silently skipped in a non-interactive run.
         check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n    - command: \"/usr/bin/php /h/orchestrator.php pre_tool_call\"\n      timeout: 12\n") !== false, 'hook with consent');
         $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);
         check(strpos($noHooks, 'hooks_auto_accept') === false, 'no consent line without hooks');
-        check(strpos($noHooks, 'disabled:') === false, 'no disabled list when none set');
-        $off = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], ['seedbox-apps']);
-        check(strpos($off, "skills:\n  external_dirs:\n    - \"/a/skills\"\n  disabled:\n    - \"seedbox-apps\"\n") !== false, 'skills.disabled must render under skills:');
+        // A hidden shipped skill is not generated at all; the user's skills.disabled is theirs (ADR-0062).
+        check(strpos($noHooks, 'disabled:') === false, 'Pikkumies never writes skills.disabled');
         check(strpos($y, 'fail_closed') === false, 'fail_closed stays at the Hermes default for prompt hooks');
         // The shipped units: one orchestrator entry per event; pre_tool_call fails closed because the delete guard does (ADR-0030).
         $entries = HermesConfig::hookEntries();

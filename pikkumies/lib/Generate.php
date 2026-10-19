@@ -5,8 +5,9 @@
  *
  * Runs on install, update and every `pikkumies run`. Under a lock, each file is written only when
  * its content changed, through a temporary file and a rename, so a Hermes session that is running
- * never reads half a file. Skills of removed or disabled units are deleted; nothing outside the
- * generated directory is touched. A unit with problems is skipped and reported; the rest still load.
+ * never reads half a file. Skills of removed or disabled units are deleted, and so is the skill of a unit the user
+ * hid (skills.disabled: the tool stays in the index, Hermes just has no skill by that name, ADR-0007, ADR-0062);
+ * nothing outside the generated directory is touched. A unit with problems is skipped and reported; the rest still load.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Units.php';
@@ -48,8 +49,9 @@ class Generate
     /**
      * Returns ['skills' => n, 'written' => n, 'removed' => n, 'problems' => [unit => [..]], 'error' => '', 'localNotice' => text]:
      * localNotice is what changed in the user's local hooks (ADR-0054), for the caller to print; '' when nothing did.
+     * $hiddenSkills: shipped skill names (skills.disabled) that get no SKILL.md.
      */
-    public static function run(array $disabled, $toolsDir = null, $outDir = null, $indexFile = null)
+    public static function run(array $disabled, $toolsDir = null, $outDir = null, $indexFile = null, array $hiddenSkills = [])
     {
         $toolsDir = $toolsDir ?: Units::toolsDir();
         $outDir = $outDir ?: Units::generatedDir();
@@ -74,7 +76,9 @@ class Generate
                 $result['problems']["{$u['category']}/{$u['name']}"] = $u['errors'];
                 continue;
             }
-            $want["{$u['category']}/{$u['name']}/SKILL.md"] = Units::renderSkill($u);
+            if (!in_array($u['name'], $hiddenSkills, true)) {
+                $want["{$u['category']}/{$u['name']}/SKILL.md"] = Units::renderSkill($u);
+            }
             $listed[] = $u;
         }
         foreach ($want as $rel => $content) {

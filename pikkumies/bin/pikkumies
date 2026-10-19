@@ -7,8 +7,9 @@
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
  * (ADR-0003) and Hermes' own session database and active-session registry are built for
  * concurrent writers; the files pikkumies itself regenerates on every run (skills, tools/INDEX.md,
- * config.yaml, .env, SOUL.md) are written through a lock or an atomic rename, so two instances
- * starting together never see a half-written file (ADR-0022).
+ * the managed Hermes config and .env, SOUL.md) are written through a lock or an atomic rename, so two instances
+ * starting together never see a half-written file (ADR-0022); the user's Hermes config.yaml is seeded once and
+ * then only edited, backed up and logged, under a lock (ADR-0062).
  */
 // Everything we write (config, .env with the key, profile) is private to the user from
 // creation; chmod-after-write would leave a window where a secret is world-readable.
@@ -47,7 +48,7 @@ function profile($refresh = false)
 function generate(array $profile)
 {
     $config = Config::load();
-    $result = Generate::run(Generate::disabledCategories($config));
+    $result = Generate::run(Generate::disabledCategories($config), null, null, null, (array) $config['skills']['disabled']);
     if ($result['error'] !== '') {
         throw new Exception($result['error']);
     }
@@ -278,7 +279,9 @@ switch ($cmd) {
         }
         // One line per Hermes feature pikkumies turns on at generate time (ADR-0024), read back
         // from the actual generated config.yaml rather than assumed, so a write failure shows here too.
-        $yaml = (string) @file_get_contents(HermesConfig::home() . '/config.yaml');
+        // The pins from the managed file, the feature defaults from the user's own (ADR-0062).
+        $yaml = (string) @file_get_contents(HermesConfig::home() . '/config.yaml') . (string) @file_get_contents(HermesConfig::managedDir() . '/config.yaml');
+        out(HermesConfigBackup::doctorLine(Config::localDir()));
         if ($yaml === '') {
             out('features: not generated yet (run `pikkumies generate`)');
         } else {
@@ -431,8 +434,9 @@ switch ($cmd) {
             out('not starting: ' . $x->getMessage());
             exit(1);
         }
-        putenv('HERMES_HOME=' . HermesConfig::home());
-        putenv('HERMES_RUNTIME_DIR'); // pm's tool store follows HERMES_HOME, as at install (ADR-0033)
+        foreach (HermesConfig::env() as $envName => $envValue) { // home, managed settings; no HERMES_RUNTIME_DIR (ADR-0033, ADR-0062)
+            putenv($envValue === null ? $envName : "$envName=$envValue");
+        }
         putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // what the agent starts sees it was started by one (ADR-0020)
         if ($isUpdate) {
             passthru(implode(' ', array_map('escapeshellarg', $updateArgv)), $code);
@@ -508,8 +512,9 @@ switch ($cmd) {
             CronTick::logRefusalOnce(Config::localDir() . '/update.log');
             exit(0);
         }
-        putenv('HERMES_HOME=' . HermesConfig::home());
-        putenv('HERMES_RUNTIME_DIR');
+        foreach (HermesConfig::env() as $envName => $envValue) { // as in run (ADR-0062)
+            putenv($envValue === null ? $envName : "$envName=$envValue");
+        }
         putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // scheduled agents count as agents, as in run (ADR-0020)
         $problems = HermesInstall::checkBeforeStart(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : []);
         if ($problems) {

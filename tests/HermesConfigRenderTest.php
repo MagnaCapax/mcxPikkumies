@@ -110,14 +110,10 @@ return [
         // defect this catches: q()'s str_replace must escape both '"' and "\n" from a model id the
         // custom endpoint returned; skipping either would let a malicious /models reply inject config keys.
     },
-    'hermes yaml: disabled skills render one list line per name, in order, for more than one entry' => function () {
-        $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], [], ['zeta', 'alpha', 'mid']);
-        check(strpos($y, "  disabled:\n    - \"zeta\"\n    - \"alpha\"\n    - \"mid\"\n") !== false, 'disabled skills not rendered one per line in input order: ' . $y);
-    },
     'hermes yaml: all nine install-time feature pins appear exactly once in a single non-trivial render' => function () {
         $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a', '/b'],
             ['pre_tool_call' => ['command' => 'x', 'failClosed' => true, 'timeout' => 5], 'pre_llm_call' => ['command' => 'y', 'failClosed' => false, 'timeout' => 3]],
-            ['one', 'two'], true);
+            true);
         foreach (['web', 'security', 'approvals', 'checkpoints', 'plugins', 'auxiliary', 'curator', 'auth', 'updates'] as $pin) {
             check(substr_count($y, "\n$pin:\n") === 1, "$pin: did not appear exactly once in: " . $y);
         }

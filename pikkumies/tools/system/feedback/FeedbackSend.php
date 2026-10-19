@@ -30,7 +30,7 @@ class FeedbackSend
         }
         try {
             $r = ToolProc::run([$bin, 'sessions', 'export', $dir, '--format', 'md', '--session-id', $sid, '--redact', '--lineage', 'logical'],
-                ['HERMES_HOME' => HermesConfig::home()]);
+                HermesConfig::env());
             $md = glob("$dir/*.md") ?: [];
             if ($r['code'] !== 0 || count($md) !== 1) {
                 throw new CliError('Hermes did not export this conversation', 'add --no-conversation to send the text alone');

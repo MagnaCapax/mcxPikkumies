@@ -77,7 +77,7 @@ $secretPatterns = [
     '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
     // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
     // `credits balance` answers balance questions without it.
-    '#\.(virsilipas|pikkumies)Key\b|hermes/\.env\b|HERMES_HOME\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
+    '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
 ];
 if ($fileTool) {

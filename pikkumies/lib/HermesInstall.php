@@ -33,7 +33,7 @@ class HermesInstall
     const MIRROR_RETRY_CODES = [5, 6, 7, 18, 22, 28, 52, 55, 56];
 
     /**
-     * Each config key HermesConfig writes => [file in the Hermes tree, text that must be in it]. A key
+     * Each config key HermesConfig writes (or HermesUserConfig edits) => [file in the Hermes tree, text that must be in it]. A key
      * whose text is gone means our setting may no longer apply (approvals, logins, web fallback), so a
      * changed checkout with a missing key is refused (verify()). tests/HermesInstallTest.php fails when
      * HermesConfig writes a top-level key that is not listed here.
@@ -64,6 +64,21 @@ class HermesInstall
         'sessions.retention_days' => ['hermes_cli/config_defaults.py', '"retention_days":'],
         'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
     ];
+
+    /**
+     * Hermes' managed scope, which holds the settings Pikkumies pins (ADR-0062): the HERMES_MANAGED_DIR override, the
+     * overlay over config.yaml, its .env (the provider key) and the refusal of `config set` on a pinned key. A changed
+     * checkout without one of them is refused, as for CONFIG_FACTS; verify() also tries the refusal itself.
+     */
+    const LAYER_FACTS = [
+        'HERMES_MANAGED_DIR' => ['hermes_cli/managed_scope.py', 'os.environ.get("HERMES_MANAGED_DIR"'],
+        'managed config.yaml' => ['hermes_cli/managed_scope.py', 'def apply_managed_overlay('],
+        'managed .env' => ['hermes_cli/env_loader.py', 'def _apply_managed_env('],
+        'managed key refusal' => ['hermes_cli/config.py', 'def _exit_if_key_managed('],
+    ];
+    // What Hermes prints when it refuses a pinned key, and when the user's own config.yaml does not parse.
+    const MANAGED_REFUSAL = 'managed by your administrator';
+    const PARSE_ERROR = 'formatting error';
 
     /** Test seams: another pikkumies/ directory, and a local repository instead of GitHub. */
     public static $root = null;
@@ -497,12 +512,12 @@ class HermesInstall
         return ['rev' => $rev, 'sha' => substr(self::head(), 0, 10), 'clean' => $code === 0 && $porcelain === '', 'origin' => $origin, 'official' => self::originOfficial($origin)];
     }
 
-    /** The config keys HermesConfig writes whose text is missing from the installed source (CONFIG_FACTS). */
-    public static function missingConfigKeys($src = null)
+    /** The config keys HermesConfig writes whose text is missing from the installed source (CONFIG_FACTS, or the $facts given). */
+    public static function missingConfigKeys($src = null, array $facts = self::CONFIG_FACTS)
     {
         $src = $src !== null ? $src : self::sourceDir();
         $missing = [];
-        foreach (self::CONFIG_FACTS as $key => $fact) {
+        foreach ($facts as $key => $fact) {
             if (strpos((string) @file_get_contents($src . '/' . $fact[0]), $fact[1]) === false) {
                 $missing[] = $key;
             }
@@ -528,8 +543,8 @@ class HermesInstall
 
     /**
      * The checks a changed checkout must pass before Hermes starts on it: every config key we set still
-     * exists, and the delete guard still blocks `rm -rf` through Hermes' own hook runner. HERMES_HOME
-     * must already point at the generated config. $prefix: e.g. setpriv for an unattended caller.
+     * exists, the managed settings layer is there and refuses a pinned key, and the delete guard still blocks `rm -rf`
+     * through Hermes' own hook runner. HermesConfig::env() must already be in the environment. $prefix: e.g. setpriv for an unattended caller.
      * Returns the problems, [] when it passed.
      */
     public static function verify(array $prefix = [])
@@ -537,6 +552,9 @@ class HermesInstall
         $problems = [];
         foreach (self::missingConfigKeys() as $key) {
             $problems[] = "Hermes no longer has the config key $key";
+        }
+        foreach (self::missingConfigKeys(null, self::LAYER_FACTS) as $what) {
+            $problems[] = "Hermes no longer has the managed settings layer ($what)";
         }
         $bin = self::bin();
         $payload = self::localDir() . '/hook-check-' . getmypid() . '.json';
@@ -553,20 +571,37 @@ class HermesInstall
         if (strpos($text, '"action": "block"') === false || strpos($text, self::GUARD_BLOCK) === false) {
             $problems[] = 'the delete guard did not block rm -rf in `hermes hooks test` (exit ' . $code . ')';
         }
+        // The pins are applied: Hermes refuses to change one. A user config.yaml that does not parse is the user's
+        // file to fix (doctor says where the copies are), not a reason to refuse Hermes (ADR-0062).
+        $out = [];
+        exec(implode(' ', array_map('escapeshellarg', array_merge($prefix, [$bin, 'config', 'set', 'approvals.mode', 'manual']))) . ' 2>&1', $out, $code);
+        $text = implode("\n", $out);
+        if (strpos($text, self::MANAGED_REFUSAL) === false && strpos($text, self::PARSE_ERROR) === false) {
+            $problems[] = 'Hermes did not refuse a change to a setting Pikkumies pins (`hermes config set approvals.mode`, exit ' . $code . '), so the pinned settings are not applied';
+        }
         return $problems;
     }
 
-    /** The commit that last passed verify(), '' for none. */
+    /**
+     * The commit that last passed verify(), '' for none, and '' when the checks themselves changed since: a Pikkumies
+     * update that relies on something new in Hermes (the managed scope, ADR-0062) checks an unchanged checkout once.
+     */
     public static function verifiedCommit()
     {
         $data = json_decode((string) @file_get_contents(self::localDir() . '/hermes-verified.json'), true);
-        return is_array($data) && isset($data['commit']) && is_string($data['commit']) ? $data['commit'] : '';
+        return is_array($data) && isset($data['commit'], $data['checks']) && is_string($data['commit']) && $data['checks'] === self::checksId() ? $data['commit'] : '';
+    }
+
+    /** What verify() checks, as one id. */
+    public static function checksId()
+    {
+        return substr(sha1(json_encode([self::CONFIG_FACTS, self::LAYER_FACTS, self::GUARD_BLOCK, self::MANAGED_REFUSAL])), 0, 12);
     }
 
     public static function markVerified($commit)
     {
         $file = self::localDir() . '/hermes-verified.json';
-        $json = json_encode(['commit' => $commit, 'at' => gmdate('c')]) . "\n";
+        $json = json_encode(['commit' => $commit, 'checks' => self::checksId(), 'at' => gmdate('c')]) . "\n";
         $tmp = $file . '.tmp-' . getmypid();
         if (@file_put_contents($tmp, $json) !== strlen($json) || !@rename($tmp, $file)) {
             @unlink($tmp);

@@ -8,7 +8,7 @@
  * - guard-destructive blocks a command that starts `pikkumies run`, hermes or hermes_cli with a flag that skips
  *   approvals (--yolo; a top-level -z/--oneshot, which turns yolo on by itself), drops the safety hooks (--safe-mode),
  *   the rules or the hook consent, or picks another Hermes home (--profile, -p, `profile use`); a command that sets the
- *   variables doing the same or changes HERMES_HOME or PIKKUMIES_DEPTH; `config set approvals.…`; and the /yolo and
+ *   variables doing the same or changes HERMES_HOME, HERMES_MANAGED_DIR (the pinned settings, ADR-0062) or PIKKUMIES_DEPTH; `config set approvals.…`; and the /yolo and
  *   /approvals off|smart slash commands typed into a session.
  * - In an agent at depth 2 or more the guard blocks what it would otherwise ask: whoever answers there is an agent.
  * - `pikkumies run` refuses the same flags and commands when it is started from inside an agent (depth 1 or more).
@@ -27,7 +27,7 @@ class NestedAgent
     /** Environment variables that switch approvals, hooks, rules or hook consent off when set. */
     const SWITCHES = ['HERMES_YOLO_MODE', 'HERMES_SAFE_MODE', 'HERMES_IGNORE_RULES', 'HERMES_IGNORE_USER_CONFIG', 'HERMES_ACCEPT_HOOKS'];
     /** Variables whose change or removal loses the Pikkumies config and hooks, or the depth. */
-    const HOMES = ['HERMES_HOME', 'PIKKUMIES_DEPTH'];
+    const HOMES = ['HERMES_HOME', 'HERMES_MANAGED_DIR', 'PIKKUMIES_DEPTH'];
     const MAX_DEPTH = 99;
 
     /** The depth this process was started at: 0 when unset; a value that is not a number counts as 1 (inside an agent). */

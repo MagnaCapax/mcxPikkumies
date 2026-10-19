@@ -236,8 +236,9 @@ return [
         $run = strpos($bin, "    case 'run':");
         $refuse = strpos($bin, 'NestedAgent::refusal($passArgs)', (int) $run);
         check($run !== false && $refuse !== false && $refuse < strpos($bin, 'hermesBin()', $run), 'the refusal does not come first in run');
-        $homes = substr_count($bin, "putenv('HERMES_HOME=' . HermesConfig::home());");
-        check($homes === 2 && preg_match_all("/putenv\\('HERMES_HOME=' \\. HermesConfig::home\\(\\)\\);\\s*putenv\\('HERMES_RUNTIME_DIR'\\);[^\\n]*\\n\\s*putenv\\('PIKKUMIES_DEPTH=' \\. NestedAgent::childDepth\\(\\)\\);/", $bin) === 2,
-            'run and cron-tick do not both export PIKKUMIES_DEPTH where they set HERMES_HOME');
+        // HERMES_HOME and HERMES_MANAGED_DIR come from HermesConfig::env() alone (ADR-0062), the depth right after.
+        $homes = substr_count($bin, 'foreach (HermesConfig::env() as $envName => $envValue)');
+        check($homes === 2 && strpos($bin, "putenv('HERMES_HOME") === false && preg_match_all('/foreach \(HermesConfig::env\(\) as \$envName => \$envValue\) \{[^\n]*\n\s*putenv\(\$envValue === null \? \$envName : "\$envName=\$envValue"\);\s*\}\s*putenv\(\'PIKKUMIES_DEPTH=\' \. NestedAgent::childDepth\(\)\);/', $bin) === 2,
+            'run and cron-tick do not both export PIKKUMIES_DEPTH where they set the Hermes environment');
     },
 ];
