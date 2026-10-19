@@ -228,45 +228,45 @@ class DockerCli
     }
 
     /**
-     * The daemon ladder, a pure function of observe(): ['state', 'next_step', 'effect', 'needs_user_ok', 'source',
-     * 'verified'] (source and verified from Host::TABLE when the advice is the provider's). Never advises stopping,
-     * restarting or killing a PMSS daemon as a fix; a wedged daemon's recovery is the provider's page, on the user's yes.
+     * The daemon ladder, a pure function of observe(): ['state', 'next_step', 'effect', 'source', 'verified'] (source
+     * and verified from Host::TABLE when the advice is the provider's). Never advises stopping, restarting or killing a
+     * PMSS daemon as a fix; a wedged daemon's recovery is the provider's page, after a review (ADR-0073: not asked).
      */
     public static function ladder(array $o)
     {
         $facts = !empty($o['pmss']) ? Host::TABLE['pmss']['docker'] : null;
         $src = $facts ? ['source' => $facts['source'], 'verified' => $facts['verified']] : ['source' => null, 'verified' => null];
-        $mk = function ($state, $next, $effect, $ask) use ($src) {
-            return ['state' => $state, 'next_step' => $next, 'effect' => $effect, 'needs_user_ok' => $ask] + $src;
+        $mk = function ($state, $next, $effect) use ($src) {
+            return ['state' => $state, 'next_step' => $next, 'effect' => $effect] + $src;
         };
         if (!empty($o['daemons']) && $o['daemons'] > 1) {
-            return $mk('second-daemon', 'two Docker daemons run for this account; say so to the user and to support; do not stop either', 'containers may be split between two daemons', false);
+            return $mk('second-daemon', 'two Docker daemons run for this account; say so to the user and to support; do not stop either', 'containers may be split between two daemons');
         }
         if (!empty($o['probe_ok'])) {
             if (!empty($o['context_mismatch'])) {
-                return $mk('cli-context-mismatch', 'the daemon answers; the user\'s own `docker` command talks to another address: set DOCKER_HOST=unix://<socket> (PMSS sets it in ~/.bashrc)', 'none', false);
+                return $mk('cli-context-mismatch', 'the daemon answers; the user\'s own `docker` command talks to another address: set DOCKER_HOST=unix://<socket> (PMSS sets it in ~/.bashrc)', 'none');
             }
-            return $mk('healthy', 'none', 'none', false);
+            return $mk('healthy', 'none', 'none');
         }
         if (!empty($o['storage_driver_missing'])) {
             return $mk('storage-driver-missing', !empty($o['pmss'])
                 ? 'the configured storage driver program (fuse-overlayfs) is missing on this server: tell support; the next platform update installs it again'
-                : 'the configured storage driver program (fuse-overlayfs) is missing: ask the server admin to install it', 'the daemon cannot start', false);
+                : 'the configured storage driver program (fuse-overlayfs) is missing: ask the server admin to install it', 'the daemon cannot start');
         }
         if (!empty($o['processes'])) {
             return $mk('wedged', $facts
-                ? 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then follow the platform\'s documented recovery (' . $facts['recovery'] . '); it stops every container and Pikkumies asks the user to approve it; afterwards confirm that no dockerd-rootless process of this account remains'
-                : 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then restart the user\'s own daemon the way it was started (for a systemd user unit: systemctl --user restart docker); it stops every container and Pikkumies asks the user to approve it', 'every container stops during the recovery', true);
+                ? 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then follow the platform\'s documented recovery (' . $facts['recovery'] . '); it stops every container; afterwards confirm that no dockerd-rootless process of this account remains'
+                : 'the daemon\'s processes are alive but it does not answer: review it first (a container started with --rm is deleted when it stops), then restart the user\'s own daemon the way it was started (for a systemd user unit: systemctl --user restart docker); it stops every container', 'every container stops during the recovery');
         }
         if (array_key_exists('docker_enabled', $o) && $o['docker_enabled'] === false) {
-            return $mk('disabled-for-account', 'the platform reports Docker as off for this account (userShowLimits "Docker enabled": false), so nothing starts the daemon: tell the user; support can say why', 'the daemon cannot start', false);
+            return $mk('disabled-for-account', 'the platform reports Docker as off for this account (userShowLimits "Docker enabled": false), so nothing starts the daemon: tell the user; support can say why', 'the daemon cannot start');
         }
         if (array_key_exists('linger', $o) && $o['linger'] === false) {
-            return $mk('linger-missing', 'the daemon is not running and systemd lingering is off for this account, so it stops at logout: ask the server admin to run `loginctl enable-linger <user>`, then `systemctl --user start docker`', 'none until it is started', false);
+            return $mk('linger-missing', 'the daemon is not running and systemd lingering is off for this account, so it stops at logout: ask the server admin to run `loginctl enable-linger <user>`, then `systemctl --user start docker`', 'none until it is started');
         }
         return $mk('down', !empty($o['pmss'])
             ? 'the platform starts the daemon: wait 5 minutes; still down: `systemctl --user start docker.service`; still down: support, saying Docker may be off for this plan'
-            : 'start the user\'s own daemon: `systemctl --user start docker`', 'none', false);
+            : 'start the user\'s own daemon: `systemctl --user start docker`', 'none');
     }
 
     /**

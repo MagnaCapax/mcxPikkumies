@@ -164,7 +164,7 @@ return [
             list($code, $recs, $out) = containersRun($fx, ['diagnose'], ['pmss_dir' => $fx['dir'] . '/pmss']);
             array_pop($recs);
             check($code === 0 && $recs[0]['kind'] === 'daemon' && $recs[0]['state'] === 'down' && $recs[0]['watchdog_processes'] === 1, 'daemon: ' . json_encode($recs));
-            check($recs[1]['kind'] === 'leftover-process' && $recs[1]['needs_user_ok'] === true && strpos($recs[1]['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'leftover: ' . json_encode($recs[1]));
+            check($recs[1]['kind'] === 'leftover-process' && !array_key_exists('needs_user_ok', $recs[1]) && strpos($recs[1]['next_step'], 'asks the user') === false && strpos($recs[1]['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'leftover: ' . json_encode($recs[1]));
             check(!preg_match('/\bpkill\b|\bkillall\b|\bkill -|systemctl --user (stop|restart)/', $out), 'diagnose printed a kill/stop command: ' . $out);
             check(count(containersState($fx)['calls']) === 1, 'no call after the failed probe: ' . json_encode(containersState($fx)['calls']));
         } finally {
@@ -182,7 +182,7 @@ return [
             list($code, $recs, $out) = containersRun($fx, ['diagnose'], ['pmss_dir' => $fx['dir'] . '/pmss', 'budget_seconds' => 2], ['FAKE_SLEEP' => '6']);
             $took = microtime(true) - $t;
             check($took >= 0.9 && $took < 5, 'the probe must run and be cut at 1 s; took ' . round($took, 2) . ' s');
-            check($code === 0 && $recs[0]['state'] === 'wedged' && $recs[0]['needs_user_ok'] === true && strpos($recs[0]['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'wedged: ' . $out);
+            check($code === 0 && $recs[0]['state'] === 'wedged' && !array_key_exists('needs_user_ok', $recs[0]) && strpos($recs[0]['next_step'], 'asks the user') === false && strpos($recs[0]['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'wedged: ' . $out);
             check(!preg_match('/\bpkill\b|\bkillall\b/', $out), 'no kill command');
         } finally {
             containersDone($fx);

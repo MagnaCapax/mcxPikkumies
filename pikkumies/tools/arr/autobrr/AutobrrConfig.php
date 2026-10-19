@@ -98,7 +98,7 @@ class AutobrrConfig
                 'baseFrom' => $c['baseFrom']] + (isset($c['baseNote']) ? ['baseNote' => $c['baseNote']] : []);
             if (!$c['valid'] || $c['port'] === 0 || $c['apiBase'] === '') {
                 throw new CliError("autobrr's config.toml is empty or its port or baseUrl is not usable ({$c['bytes']} bytes, $path)",
-                    $family === 'pmss' ? 'the user reruns `bash ~/install-media-stack.sh`; this tool never edits config.toml'
+                    $family === 'pmss' ? 'copy config.toml aside, then rerun `bash ~/install-media-stack.sh` (`--dry-run` first: a rerun removes ~/.config/jellyfin when it has content); this tool never edits config.toml'
                         : 'check the file; this tool never edits config.toml');
             }
             try {
@@ -116,7 +116,7 @@ class AutobrrConfig
             }
             if ($source === 'pmss' && (file_exists("$home/.autobrrDisable") || is_link("$home/.autobrrDisable"))) {
                 throw new CliError('autobrr is turned off (~/.autobrrDisable exists)',
-                    'the user turned it off in the PMSS panel; only the user turns it back on there');
+                    'it was turned off in the PMSS panel; when the user asked for autobrr to work or to be started, do what the panel\'s Start does: remove ~/.autobrrDisable and run `bash ~/install-media-stack.sh --start-app=autobrr`');
             }
             $port = ArrLocate::ownPort(self::APP, $source, $c['port'], $where, $path, $lenient === true, $tables);
             return $where + ['port' => $port, 'urlBase' => $c['urlBase'], 'apiBase' => $c['apiBase'], 'key' => $key];

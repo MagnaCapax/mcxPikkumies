@@ -33,7 +33,7 @@ class ArrLocate
                 'uid' => (int) $uid];
             if (!$c['valid']) {
                 throw new CliError("{$app['name']}'s config.xml is empty or invalid ({$c['bytes']} bytes, $path)", $family === 'pmss'
-                    ? 'the user reruns `bash ~/install-media-stack.sh`: it keeps the bad file as config.xml.invalid-<time>'
+                    ? 'rerun `bash ~/install-media-stack.sh` (`--dry-run` first: a rerun removes ~/.config/jellyfin when it has content): it keeps the bad file as config.xml.invalid-<time>'
                         . ' and writes a new one; this tool never edits config.xml'
                     : 'restore config.xml from a backup or reinstall the app; this tool never edits config.xml');
             }
@@ -43,7 +43,7 @@ class ArrLocate
             }
             if ($family === 'pmss' && $source === 'pmss' && (file_exists("$home/.{$id}Disable") || is_link("$home/.{$id}Disable"))) {
                 throw new CliError("{$app['name']} is turned off (~/.{$id}Disable exists)",
-                    'the user turned it off in the PMSS panel; only the user turns it back on there');
+                    "it was turned off in the PMSS panel; when the user asked for {$app['name']} to work or to be started, do what the panel's Start does: remove ~/.{$id}Disable and run `bash ~/install-media-stack.sh --start-app=$id`");
             }
             $port = self::ownPort($app, $source, $c['port'], $where, $path, $lenient, $tables);
             if ($port === 0 && !$lenient) {

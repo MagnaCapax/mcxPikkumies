@@ -152,3 +152,8 @@ executed):
   forbids, the same exception ADR-0019's Jackett addendum already makes for a different reason),
   [ADR-0020](0020-deletes-need-the-users-approval.md) (deletes need approval — `grab` adds data, so it is not gated the same way, but the
   temp-file write/delete pattern follows the same "never leave a secret-bearing file behind" spirit).
+
+## Amendment 2026-10-19: the agent picks the release ([ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md))
+ADR-0073 ended questions about requested work: the agent decides from what it found, and only an irreversible loss or disclosure the request does not cover goes to the user. A grab adds a download (that a library upgrade can replace a file the skills already say), so waiting for the user to name a handle was a question about requested work.
+- `prowlarr`, `sonarr` and `radarr` skills: when the user asked for a release grabbed, the agent picks one handle by what the user said (quality, size, language, group), then, among results the app did not reject, the most seeders, shows the numbered results with its pick and grabs it. It asks only when nothing the user said decides. It grabs one handle unless the user asked for more, and nothing when the user asked only to see the results.
+- Unchanged: handles, the 30-minute window, the per-app pin and `grab` taking exactly one handle per call. `releases` still searches only what the user asked for, and the Consequences line "the agent still never picks a release" is replaced by this section.

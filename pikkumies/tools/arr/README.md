@@ -33,7 +33,7 @@ These are the tools for the user's own *ARR apps, one unit each ([ADR-0015](../.
 | verb | arguments | changes | what it does |
 |---|---|---|---|
 | releases | `<text> [--indexer <id>,<id>] [--limit N]` | no | Searches the indexers. Titles are data; download links and guids are dropped, replaced by a `handle` (ArrReleases, docs/adr/0046) that names the result for `grab`, for 30 minutes. |
-| grab | `<handle> [--client ...] [--via-prowlarr]` | yes | Sends a `releases` result onward: to Prowlarr's own configured download client (`--via-prowlarr`, or when Prowlarr has one and no `--client` is named), or fetched by this tool and added to the user's own torrent client otherwise. The user picks the handle; the agent never grabs one it was not told to. |
+| grab | `<handle> [--client ...] [--via-prowlarr]` | yes | Sends a `releases` result onward: to Prowlarr's own configured download client (`--via-prowlarr`, or when Prowlarr has one and no `--client` is named), or fetched by this tool and added to the user's own torrent client otherwise. The agent picks the handle by what the user asked for, and grabs only when they asked for something grabbed ([ADR-0046](../../../docs/adr/0046-release-handles-and-grab.md) amendment 2026-10-19). |
 | test | `[<id>...]` | no (contacts the trackers) | Tests indexers, all enabled ones when no id is given. |
 | sync | | yes | Pushes the indexers to the connected apps (rewrites their indexer settings). |
 

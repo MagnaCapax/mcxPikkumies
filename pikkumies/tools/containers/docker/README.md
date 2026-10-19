@@ -32,7 +32,7 @@ Manages the user's own Docker daemon and its containers: engine facts and space 
 | cli-context-mismatch | the probe answers, but the user's own `docker` would talk to another address | set `DOCKER_HOST` |
 | second-daemon | two `dockerd` of this account | tell the user and support; stop neither |
 | storage-driver-missing | the probe fails and `daemon.json` names `fuse-overlayfs`, which is not installed | support (PMSS reinstalls it on update) |
-| wedged | the probe fails or times out while daemon processes of this account are alive | review first (every container stops; a `--rm` container is deleted), then the provider's documented recovery, which Pikkumies' approval prompt asks the user about; then check that no daemon process is left |
+| wedged | the probe fails or times out while daemon processes of this account are alive | review first (every container stops; a `--rm` container is deleted), then the provider's documented recovery; then check that no daemon process is left |
 | disabled-for-account | down, PMSS, and the account's own `userShowLimits` reports `Docker enabled: false` (read only when the probe fails) | tell the user; support can say why (no self-service switch is claimed) |
 | linger-missing | down, not PMSS, and lingering is off for the account | the admin enables lingering |
 | down | no daemon processes | PMSS: wait 5 minutes, then `systemctl --user start docker.service`, then support; elsewhere start the user's daemon |

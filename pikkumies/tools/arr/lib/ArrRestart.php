@@ -82,12 +82,12 @@ class ArrRestart
         $marker = "$home/.{$id}Disable";
         if (is_link($marker) || file_exists($marker)) {
             throw new CliError("{$app['name']} is turned off (~/.{$id}Disable exists), so it is not restarted",
-                'the user stopped it in the PMSS panel; only the user starts it again there');
+                "it was stopped in the PMSS panel; when the user asked for {$app['name']} to work or to be started, do what the panel's Start does: remove ~/.{$id}Disable and run `bash ~/install-media-stack.sh --start-app=$id`");
         }
         $aliases = "$home/.bashrc.custom";
         if (!is_file($script) || is_link($script) || !is_readable($script) || !is_file($aliases) || is_link($aliases)) {
             throw new CliError('the media-stack installer or its launch aliases are missing (~/install-media-stack.sh, ~/.bashrc.custom)',
-                'the user reruns `bash ~/install-media-stack.sh` once; nothing was stopped');
+                'rerun `bash ~/install-media-stack.sh` once (`--dry-run` first: a rerun removes ~/.config/jellyfin when it has content); nothing was stopped');
         }
         if (@fileowner($script) !== $where['uid']) {
             throw new CliError("~/install-media-stack.sh in $home is not this user's own file (uid {$where['uid']}); not running it",

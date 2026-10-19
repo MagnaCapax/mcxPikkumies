@@ -239,7 +239,7 @@ return [
             check(in_array($l['state'], DockerCli::STATES, true), "{$l['state']} is not a declared state");
         }
         $wedged = DockerCli::ladder(['processes' => 2] + $base);
-        check($wedged['needs_user_ok'] === true && strpos($wedged['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'wedged on PMSS: the user\'s yes and the provider page');
+        check(!array_key_exists('needs_user_ok', $wedged) && strpos($wedged['next_step'], 'asks the user') === false && strpos($wedged['next_step'], Host::TABLE['pmss']['docker']['recovery']) !== false, 'wedged on PMSS: run after a review, no approval question, the provider page');
         check(strpos($wedged['next_step'], 'no dockerd-rootless process') !== false && !preg_match('/\bpkill\b|\bkillall\b/', $wedged['next_step']), 'wedged: check for leftovers, print no kill command');
         check($wedged['source'] === Host::TABLE['pmss']['docker']['source'] && $wedged['verified'] === Host::TABLE['pmss']['docker']['verified'], 'PMSS advice carries source and verified');
         $down = DockerCli::ladder($base);

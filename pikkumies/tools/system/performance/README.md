@@ -2,7 +2,7 @@
 
 Answers "why is it slow" from inside the user's own account, without root ([ADR-0035](../../../../docs/adr/0035-performance-diagnostics.md)). It looks at the account's limits and what uses them, at how busy the server is, at the user's own transfer sessions, at the route to a target and at the disk, and names what it found from a fixed rule table. By default it never stresses the server: load tests run only when the user asks and approves each one.
 
-It reads only your own account: its own processes, its own cgroup directory, its own connections. Nothing it finds is sent anywhere; the probe packets of `net` and the traffic of a `heavy` test the user approved are the only things that leave the machine.
+It reads only your own account: its own processes, its own cgroup directory, its own connections. Nothing it finds is sent anywhere; the probe packets of `net` and the traffic of a `heavy` test the user asked for are the only things that leave the machine.
 
 ## Verbs
 
@@ -50,8 +50,8 @@ The client-area Diagnose button on PMSS checks the account and the server with t
   Why: the tool sees that a cap exists, not why. Selling an upgrade for a problem the plan does not cause costs the user money and fixes nothing; an I/O cap lower than the plan says is a ticket, not an upgrade.
 - Route verdicts come from the hop where loss starts and lasts to the end, never mid-path loss; the home side is measured by the user, never inferred.
   Why: routers answer probes at low priority, so one hop showing loss that later hops do not is that router's rate limit. The user's own line can only be measured from the user's own computer (the wiki procedure runs mtr both ways).
-- Load tests (fio, iperf3, speedtest, big downloads) only via `performance heavy` when the user asked for one (Pikkumies asks them to approve it), never chained or scheduled; results are the share now, not the ceiling.
-  Why: on a shared server a load test takes disk and bandwidth from everyone, and its number is what this account got at that moment, not what the server can do. The guard asks before each one.
+- Load tests (fio, iperf3, speedtest, big downloads) only via `performance heavy` when the user asked for one, never chained or scheduled; results are the share now, not the ceiling.
+  Why: on a shared server a load test takes disk and bandwidth from everyone, and its number is what this account got at that moment, not what the server can do. The user's request is the bound; the guard does not ask ([ADR-0073](../../../../docs/adr/0073-no-questions-no-deferrals-one-reviewed-exception.md): a load test loses and reveals nothing).
 - Never promise what support or the provider will do; no prices.
   Why: the agent cannot commit anyone but itself, and prices change; the client area and the provider's own pages are the source.
 - You run on this server, so it is up while you answer; for "down", "not loading" or a 502, run `system-status health` once and answer from it; a whole-server outage is out of your reach.

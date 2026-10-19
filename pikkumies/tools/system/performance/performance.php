@@ -5,7 +5,7 @@
  *            with a verdict from a fixed rule table (PerfRouter); `--tick` writes one silent sample (PerfSamples)
  *   net      the route to a target with mtr (PerfNet)
  *   disk     a light disk probe: 64 KiB written, up to 256 KiB read (PerfDisk)
- *   heavy    load tests, only on the user's yes through the guard (PerfHeavy)
+ *   heavy    load tests, only when the user asked for one (PerfHeavy)
  *   samples  the samples a scheduled `check --tick` wrote (PerfSamples)
  * This file checks the arguments (a bad one exits 2 before anything runs), takes the one-run-at-a-time lock,
  * removes scratch left by dead runs, and calls the verb's class with the checked parameters. A verb whose class
@@ -31,7 +31,7 @@ usage: php performance.php <verb> [arguments] [--human]
   net --target ssh|IP|HOST [--count N]        route test with mtr; N 1-1000, default 20 (quick), 1000 = the wiki procedure
   disk [--no-read]                            light disk probe: 16 small synced writes, 64 small direct reads
   heavy --test disk-read|disk-write|download --url U|iperf3 --target H|speedtest
-                                              load test; asks the user first; result is your share now, not the ceiling
+                                              load test, when the user asked for one; result is your share now, not the ceiling
   samples [--hours N]                         per-hour medians of the samples; N 1-720, default 24
 Output: JSON Lines; --human for people. See USAGE.md.
 TXT;

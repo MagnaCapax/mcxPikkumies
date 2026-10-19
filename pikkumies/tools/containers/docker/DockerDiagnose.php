@@ -341,9 +341,9 @@ class DockerDiagnose
         }
         $facts = $d->facts();
         if ($d->pmss() && in_array($ladder['state'], ['down', 'linger-missing'], true) && $procs['watchdog_alive'] > 0) {
-            $recs[] = self::finding('leftover-process', ['watchdog_processes' => $procs['watchdog_alive'], 'needs_user_ok' => true,
+            $recs[] = self::finding('leftover-process', ['watchdog_processes' => $procs['watchdog_alive'],
                 'next_step' => 'a process the platform\'s watchdog counts as a running daemon is still alive, so it will not start a new one: review it first (a container started with --rm is deleted when it stops), then follow the platform\'s documented recovery ('
-                    . $facts['recovery'] . '); it stops every container and Pikkumies asks the user to approve it; afterwards run `diagnose` again and check that watchdog_processes is 0',
+                    . $facts['recovery'] . '); it stops every container; afterwards run `diagnose` again and check that watchdog_processes is 0',
                 'source' => $facts['source'], 'verified' => $facts['verified']]);
         }
         if (!$probe['ok']) {

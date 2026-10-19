@@ -147,7 +147,7 @@ class DockerLaunch
             $meta = $ii['code'] === 0 ? self::firstJson($ii) : null;
             if (!$meta) {
                 $blockers[] = $ii['timed_out'] ? "reading image $image timed out" : (stripos($ii['err'], 'no such image') !== false
-                    ? "image $image is not on this machine: the user runs `docker pull $image` first (only images the user named)"
+                    ? "image $image is not on this machine: pull it with `docker pull $image` (only an image the user named), then run launch-plan again"
                     : "image $image could not be read: " . self::firstLine($ii['err']));
             } else {
                 $arch = isset($meta['Architecture']) && is_string($meta['Architecture']) ? $meta['Architecture'] : '';

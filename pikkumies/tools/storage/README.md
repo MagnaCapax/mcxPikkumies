@@ -25,7 +25,7 @@ What the Pulsed Media feature list and wiki offer for storage and backup, and wh
 |---|---|---|
 | Base, burst and bonus quota (features:633-645; `seedbox-storage-quota`) | `storage stats` | |
 | File-count (inode) limit (`seedbox-storage-quota`:39-40) | `storage topdirs --inodes` | `stats` does not show file counts yet: `lib/Quota.php` does not parse the file columns |
-| ncdu, "find what is eating your quota" (features:381-382) | `storage topdirs`, `storage bigfiles` | ncdu stays the user's interactive tool; the skill names `ncdu -x -rr` |
+| ncdu, "find what is eating your quota" (features:381-382) | `storage topdirs`, `storage bigfiles` | ncdu is interactive and the agent cannot read its screen, so the agent drills down with `topdirs --path` and `bigfiles --path` itself |
 | hddquota ruTorrent plugin (features:144, :186) | | Reads the same `~/.quota` as `storage stats` |
 | Usage alert email at 90 % of the disk quota (features:572) | | A panel setting; the skill can tell the user it exists |
 | Torrent configuration backup download and restore (features:572) | | A panel button |

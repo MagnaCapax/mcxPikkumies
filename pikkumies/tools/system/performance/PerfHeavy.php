@@ -1,6 +1,6 @@
 <?php
 /**
- * PerfHeavy: the `heavy` verb, one load test after the user said yes (the guard asks before each run; ADR-0035,
+ * PerfHeavy: the `heavy` verb, one load test when the user asked for one (not asked about: ADR-0073; ADR-0035,
  * README.md "Runner"). Before anything loads the server, in this order:
  *  - the program is installed: fio, iperf3, or the Ookla speedtest binary (speedtest-cli and look-alikes are not
  *    used). Nothing is ever installed or downloaded to run it. A missing one is skipped (a record, exit 0).
