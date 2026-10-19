@@ -64,7 +64,7 @@ rTorrent has no command that deletes data (`d.erase` only takes the download out
 
 ## Tests
 
-`tests/Rtorrent*Test.php` (helpers in `tests/fixtures/rtorrent/helpers.php`) run the unit against a fake rTorrent (`tests/fixtures/rtorrent/server.php`, a PHP SCGI server on a unix socket or a 127.0.0.1 port) with `HOME` in a temporary directory and the torrents of `tests/fixtures/rtorrent/torrents.json`. PMSS and other host families are tested through a small generated script that builds `RtorrentClient` with the family fixed. The one test-only switch is `RtorrentRestart::$proc`, the `/proc` the restart proof reads: `tests/RtorrentRestartProofTest.php` points it at a fake `/proc` that its stand-in PMSS restart script changes the way a real or a no-op restart would.
+`tests/Rtorrent*Test.php` (helpers in `tests/fixtures/rtorrent/helpers.php`) run the unit against a fake rTorrent (`tests/fixtures/rtorrent/server.php`, a PHP SCGI server on a unix socket or a 127.0.0.1 port) with `HOME` in a temporary directory and the torrents of `tests/fixtures/rtorrent/torrents.json`. PMSS and other host families are tested through a small generated script that builds `RtorrentClient` with the family fixed. The one test-only switch is `RtorrentRestart::$proc`, the `/proc` the restart proof reads. Every test points it at a fake `/proc` in the test home (the generated scripts set it, and the helper refuses a `restart` through a script that does not), so a real rTorrent of the account running the suite is never seen; `tests/RtorrentRestartProofTest.php` adds processes there that its stand-in PMSS restart script changes the way a real or a no-op restart would, and checks that no test reads the real `/proc`.
 
 ## Unverified
 

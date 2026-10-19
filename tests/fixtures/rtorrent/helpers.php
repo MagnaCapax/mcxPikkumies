@@ -1,7 +1,9 @@
 <?php
 /**
  * Helpers for the tests/Rtorrent*Test.php files: a temporary $HOME, the fake rTorrent (server.php) on a unix
- * socket or a 127.0.0.1 port, and a wrapper that runs the unit. Nothing real is contacted.
+ * socket or a 127.0.0.1 port, and a wrapper that runs the unit. Nothing real is contacted, and nothing reads the real
+ * /proc: the restart proof (ADR-0064) reads "$h/proc", empty unless a test adds processes, so a real rTorrent of the
+ * account running the suite is never seen.
  */
 function rtorrentHome($rc = "network.scgi.open_local = ~/.rtorrent.socket\n")
 {
@@ -19,9 +21,12 @@ function rtorrentHome($rc = "network.scgi.open_local = ~/.rtorrent.socket\n")
         file_put_contents("$h/.rtorrent.rc", $rc);
     }
     file_put_contents("$h/state.json", str_replace('{HOME}', $h, (string) file_get_contents(__DIR__ . '/torrents.json')));
+    mkdir("$h/proc/self/ns", 0700, true); // the fake /proc of the restart proof: no processes, this namespace
+    symlink('mnt:[1]', "$h/proc/self/ns/mnt");
     $lib = dirname(__DIR__, 3) . '/pikkumies/tools/torrent-clients';
     foreach (['pmss', 'generic', 'ultra'] as $family) { // the same unit with the host family fixed, for the provider-specific paths
         file_put_contents("$h/run-$family.php", '<?php require ' . var_export("$lib/lib/Torrents.php", true) . '; require ' . var_export("$lib/rtorrent/RtorrentClient.php", true) . ";\n"
+            . 'RtorrentRestart::$proc = ' . var_export("$h/proc", true) . ";\n"
             . 'Torrents::run($argv, function () { return new RtorrentClient(' . var_export($family, true) . ', getenv("HOME"), posix_geteuid()); }, "usage");');
     }
     return $h;
@@ -48,6 +53,10 @@ function rtorrentServe($h, $addr = null, $mode = '')
 function rtorrentRun($h, array $args, $script = null)
 {
     $script = $script ?: dirname(__DIR__, 3) . '/pikkumies/tools/torrent-clients/rtorrent/rtorrent.php';
+    if (in_array('restart', $args, true) && strpos((string) @file_get_contents($script), 'RtorrentRestart::$proc = ') === false) {
+        // The restart proof would read the real /proc and see the real rTorrent of the account running the suite.
+        throw new Exception('restart must run through a run-<family>.php of rtorrentHome(), which points RtorrentRestart::$proc at a fake /proc');
+    }
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script);
     foreach ($args as $a) {
         $cmd .= ' ' . escapeshellarg($a);

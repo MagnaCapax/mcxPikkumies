@@ -22,9 +22,7 @@ if (!function_exists('fakeProc')) {
     /** Runs `restart` in this process against the fake rTorrent, with $script as the PMSS restart script; [result|null, error]. */
     function restartWith($h, $script)
     {
-        mkdir("$h/proc/self/ns", 0700, true);
-        symlink('mnt:[1]', "$h/proc/self/ns/mnt");
-        fakeProc("$h/proc", 100, 'rtorrent main', 5000);
+        fakeProc("$h/proc", 100, 'rtorrent main', 5000); // rtorrentHome() made $h/proc with this namespace
         file_put_contents("$h/.rtorrentRestart.php", '<?php if (file_exists("www/.rtorrentRestart")) { unlink("www/.rtorrentRestart"); ' . $script . ' }');
         RtorrentRestart::$proc = "$h/proc";
         try {
@@ -78,6 +76,35 @@ return [
             check($r === null && strpos($err, '2 rTorrent processes') !== false && strpos($err, 'every 2 minutes') !== false, 'a duplicate spawn was reported as a restart: ' . json_encode($r) . $err);
         } finally {
             rtorrentDone($h, $p);
+        }
+    },
+    'rtorrent tests never read the real /proc: every restart goes through the fake one, and a restart that would not is refused' => function () use ($stub) {
+        $h = rtorrentHome();
+        $p = rtorrentServe($h);
+        try {
+            foreach (['pmss', 'generic', 'ultra'] as $family) {
+                check(strpos((string) file_get_contents("$h/run-$family.php"), 'RtorrentRestart::$proc = ' . var_export("$h/proc", true)) !== false, "run-$family.php reads the real /proc");
+            }
+            $refused = '';
+            try {
+                rtorrentRun($h, ['restart']);
+            } catch (Exception $e) {
+                $refused = $e->getMessage();
+            }
+            check(strpos($refused, 'fake /proc') !== false, 'a restart through the plain unit script was run against the real /proc');
+            // Through run-pmss.php the stand-in replaces the fake process: only the fake /proc gives before 1 and after 1. Read
+            // from the real one, an account with a real rTorrent gets "still running" and one without gets before 0.
+            fakeProc("$h/proc", 100, 'rtorrent main', 5000);
+            file_put_contents("$h/.rtorrentRestart.php", '<?php if (file_exists("www/.rtorrentRestart")) { unlink("www/.rtorrentRestart"); ' . $stub
+                . ' exec("rm -rf proc/100"); fakeProc("proc", 200, "rtorrent main", 9000); }');
+            list($code, $out, $l) = rtorrentRun($h, ['restart'], "$h/run-pmss.php");
+            check($code === 0 && $l[0]['processes_before'] === 1 && $l[0]['processes_after'] === 1, 'the restart did not read the fake /proc: ' . $out);
+        } finally {
+            rtorrentDone($h, $p);
+        }
+        foreach (glob(__DIR__ . '/*Test.php') as $f) {
+            $src = (string) file_get_contents($f);
+            check(strpos($src, 'RtorrentRestart::run(') === false || strpos($src, 'RtorrentRestart::$proc = ') !== false, basename($f) . ' runs the restart without pointing RtorrentRestart::$proc at a fake /proc');
         }
     },
     'OwnProcs: exact names only, own uid only, own mount namespace only; a zombie or a missing process has no start time' => function () {
