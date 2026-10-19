@@ -54,6 +54,7 @@ if ($qbitVerb === 'login') {
         if ($api->ep->username === '') {
             throw new CliError('no WebUI\\Username in ~' . QbitEndpoint::CONF, 'set the WebUI username in qBittorrent once (Tools > Options > WebUI)');
         }
+        $api->ep->refuseWithoutPassword();
         $pw = QbitSecret::prompt("qBittorrent WebUI password for {$api->ep->username} (not shown): ");
         try {
             $api->ep->locate();
@@ -62,7 +63,7 @@ if ($qbitVerb === 'login') {
             return ['records' => [['stored' => $secret->path(), 'user' => $api->ep->username, 'verified' => false, 'note' => 'stored without a check: ' . $e->getMessage()]], 'status' => ['verified' => false]];
         }
         if ($api->attempt($pw) === 'fails') {
-            throw new CliError('qBittorrent rejected that password; nothing was stored', 'run login again with the WebUI password (on Pulsed Media the account password, which PMSS copies into qBittorrent); 5 failures ban this address for an hour');
+            throw new CliError('qBittorrent rejected that password; nothing was stored', 'run login again with the WebUI password (on Pulsed Media the account password, which PMSS copies into qBittorrent when it changes, or the separate WebUI password chosen when the panel asked for one); 5 failures ban this address for an hour');
         }
         $secret->save($pw);
         return ['records' => [['stored' => $secret->path(), 'user' => $api->ep->username, 'verified' => true]], 'status' => ['verified' => true]];

@@ -10,6 +10,8 @@
 class QbitEndpoint
 {
     const CONF = '/.config/qBittorrent/qBittorrent.conf';
+    /** The all-zero PBKDF2 value PMSS keeps until a WebUI password is chosen (PMSS scripts/lib/user/qbittorrentWebUiAuth.php). */
+    const NO_PASSWORD = '@ByteArray(AAAAAAAAAAAAAAAAAAAAAA==:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==)';
 
     public $home;
     public $family;
@@ -75,6 +77,32 @@ class QbitEndpoint
                 : 'start it the way this provider documents it, then try again');
         }
         return $this;
+    }
+
+    /**
+     * PMSS only: true when no WebUI password was chosen yet, so no password can log in and an attempt would only
+     * count toward a ban. The panel's own rule (PMSS etc/skel/www/qbittorrentPasswordRequired.php:3-11): no
+     * WebUI\Password_PBKDF2 line, or one holding the placeholder. Then the panel asks for a password on qBittorrent
+     * start or restart (etc/skel/www/qbittorrent.php:14-27), so the next step below holds by construction.
+     */
+    public function passwordMissing()
+    {
+        $conf = is_link($this->conf) ? false : @file_get_contents($this->conf);
+        if ($this->family !== 'pmss' || !is_string($conf)) {
+            return false;
+        }
+        return preg_match('/^WebUI\\\\Password_PBKDF2=/m', $conf) !== 1
+            || preg_match('/^WebUI\\\\Password_PBKDF2=' . preg_quote(self::NO_PASSWORD, '/') . '$/m', $conf) === 1;
+    }
+
+    /** Throws instead of a login attempt that cannot work (passwordMissing()). */
+    public function refuseWithoutPassword()
+    {
+        if (!$this->passwordMissing()) {
+            return;
+        }
+        throw new CliError('qBittorrent has no WebUI password yet (the panel keeps a placeholder until one is chosen), so no login was tried',
+            'the user presses qBittorrent start or restart in the Pulsed Media panel, which asks them to choose a WebUI password; then they run `php ' . __DIR__ . '/qbittorrent.php login` in a terminal with it');
     }
 
     /** A failed Http::request as the cause the user can act on. */

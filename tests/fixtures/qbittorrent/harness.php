@@ -24,7 +24,7 @@ function qbitFixture(array $over = [], $start = true)
     file_put_contents("$data/Beta/x.bin", str_repeat('b', 5000));
     file_put_contents("$data/Beta/sub/y.bin", str_repeat('y', 1000));
     $port = qbitFreePort();
-    file_put_contents("$home/.config/qBittorrent/qBittorrent.conf", "[BitTorrent]\nSession\\Port=51413\n\n[Preferences]\nWebUI\\Address=127.0.0.1\nWebUI\\Port=$port\nWebUI\\Username=alice\n");
+    file_put_contents("$home/.config/qBittorrent/qBittorrent.conf", "[BitTorrent]\nSession\\Port=51413\n\n[Preferences]\nWebUI\\Address=127.0.0.1\nWebUI\\Port=$port\nWebUI\\Username=alice\nWebUI\\Password_PBKDF2=@ByteArray(c2FsdHNhbHRzYWx0c2FsdA==:aGFzaGhhc2hoYXNoaGFzaA==)\n");
     file_put_contents("$home/.qbittorrentPort", "$port\n");
     touch("$home/.qbittorrentEnable");
     file_put_contents("$dir/secrets/qbittorrent", json_encode(['password' => 'right-one', 'rejected' => false]));

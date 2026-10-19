@@ -38,6 +38,7 @@ class QbitApi
         $this->ep->locate();
         $r = $this->raw('GET', 'app/webapiVersion', [], null, [], self::PROBE_TIMEOUT);
         if ($r['code'] === 403) {
+            $this->ep->refuseWithoutPassword();
             $status = $this->attempt($this->secret->usable());
             if ($status === 'fails') {
                 $this->secret->reject();
