@@ -113,7 +113,7 @@ $question = !$command && (strpos($message, '?') !== false || (is_array($words) &
 // The halt guard's own continue or wrap-up message (ADR-0047) is the same task going on, not a new question: an exact
 // prefix match on its fixed sentences, which are PHP constants, never the model's words.
 $haltMessage = false;
-foreach (array_merge(array_values(HaltJudge::CONTINUE_SENTENCES), [HaltJudge::WRAPUP]) as $fixed) {
+foreach (array_merge(array_values(HaltJudge::CONTINUE_SENTENCES), [HaltJudge::WRAPUP, HaltDecouple::SENTENCE]) as $fixed) {
     $haltMessage = $haltMessage || strpos($message, $fixed) === 0;
 }
 if (!$first) {

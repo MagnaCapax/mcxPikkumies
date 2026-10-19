@@ -10,6 +10,7 @@
  * into what the agent is told next.
  */
 require_once __DIR__ . '/HookLlm.php';
+require_once __DIR__ . '/HaltDecouple.php'; // the separate truth-seeking criterion (ADR-0069)
 
 class HaltJudge
 {
@@ -156,8 +157,9 @@ class HaltJudge
         foreach (self::QUESTIONS as $n => $q) {
             $lines[] = "$n. $q";
         }
+        $lines[] = HaltDecouple::promptLine(); // ADR-0069: labelled D1, answered on its own line after the Qn lines
         $system = 'You judge whether an AI agent\'s turn in a server-management session is finished. ' . self::DATA_NOTICE
-            . ' Reply with exactly ' . count(self::QUESTIONS) . ' lines, one per question in order, each "Qn: yes", "Qn: no" or "Qn: unsure", and nothing else: no explanation.';
+            . ' Reply with exactly ' . (count(self::QUESTIONS) + 1) . ' lines, one per question in order, each "Qn: yes", "Qn: no" or "Qn: unsure" (the last question with ' . HaltDecouple::LABEL . ' in place of Qn), and nothing else: no explanation.';
         $user = "===EVIDENCE===\n$evidenceText\n===END EVIDENCE===\n\n"
             . "===FINAL ANSWER===\n" . self::text($finalResponse) . "\n===END FINAL ANSWER===\n\n"
             . "===TRANSCRIPT TAIL===\n$tail\n===END TRANSCRIPT TAIL===\n\n"
@@ -237,6 +239,6 @@ class HaltJudge
         if (trim((string) $reply) === '') {
             return ['verdict' => 'failopen', 'message' => null, 'answers' => []];
         }
-        return self::decide(self::parse($reply), self::lessonSavedInEvidence($evidence));
+        return HaltDecouple::apply(self::decide(self::parse($reply), self::lessonSavedInEvidence($evidence)), $reply, $userMessage);
     }
 }
