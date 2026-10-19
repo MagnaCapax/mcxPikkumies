@@ -1,7 +1,7 @@
 <?php
 /**
  * The guard's email rules (hooks/guard/guard-destructive/GuardMail.php, ADR-0053, R15): send-draft is asked with what
- * the draft holds and rule_key pikkumies-mail:<sha>; a missing or changed draft is blocked; smtp commands with shell
+ * the draft holds and rule_key pikkumies-mail:<sha>:<command id>; a missing or changed draft is blocked; smtp commands with shell
  * expansion are blocked; email logins are blocked; imap and pop deletes and smtp test are asked; reads stay silent.
  */
 require_once __DIR__ . '/fixtures/email/harness.php';
@@ -31,7 +31,7 @@ return [
             $sha = SmtpDraft::write($outbox, $spec);
             $S = '/home/u/pikkumies/tools/email/smtp/smtp.php';
             $d = emGuard("php $S send-draft $sha", $outbox);
-            check($d !== null && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-mail:$sha", 'send-draft not asked: ' . json_encode($d));
+            check($d !== null && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-mail:$sha:" . substr(sha1("php $S send-draft $sha"), 0, 16), 'send-draft not asked: ' . json_encode($d));
             $m = $d['message'];
             foreach (['From: me@example.org', 'To (1): a@example.com', 'Subject: Hithere', '/home/u/docs/q3.pdf (12345 bytes)', 'short body', "send-draft $sha"] as $want) {
                 check(strpos($m, $want) !== false, "the question lacks '$want': $m");
@@ -61,7 +61,7 @@ return [
             $sha = SmtpDraft::write($outbox, $spec);
             $S = '/home/u/pikkumies/tools/email/smtp/smtp.php';
             $d = emGuard("php $S send-draft $sha", $outbox);
-            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-mail:$sha", 'a long draft was refused instead of shortened: ' . json_encode($d));
+            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-mail:$sha:" . substr(sha1("php $S send-draft $sha"), 0, 16), 'a long draft was refused instead of shortened: ' . json_encode($d));
             $m = $d['message'];
             check(strlen($m) <= HookUnits::APPROVE_SHOWN, 'the shortened message is still over the cap: ' . strlen($m) . ': ' . $m);
             foreach (['From: me@example.org', 'To (2): a@example.com, b@example.com', 'Subject: Report', '/home/u/docs/q3.pdf (12345 bytes)', 'Body (' . strlen($body) . ' bytes)', "send-draft $sha"] as $want) {

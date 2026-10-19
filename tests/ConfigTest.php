@@ -213,8 +213,26 @@ return [
         putenv('HOME=');
         check(Config::shown('/home/fixtureuser/x') === '/home/fixtureuser/x', 'no HOME must leave the path as it is');
         putenv($old === false ? 'HOME' : "HOME=$old");
-        $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Update.php') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php');
-        check(preg_match('#[\'"][^\'"\n]*\(?(see|log:|in) local/[a-z]#', $src) === 0, 'a user-facing message still prints a bare local/ path');
+        // Comments stripped (token-based, as actStripComments in ArchitectureTest.php): a doc comment's apostrophe
+        // ("the user's local units...") reads as a quote to the regex below and must not count as a string.
+        $stripComments = function ($path) {
+            $out = '';
+            foreach (token_get_all((string) file_get_contents($path)) as $t) {
+                if (is_array($t) && ($t[0] === T_COMMENT || $t[0] === T_DOC_COMMENT)) {
+                    continue;
+                }
+                $out .= is_array($t) ? $t[1] : $t;
+            }
+            return $out;
+        };
+        $src = $stripComments(dirname(__DIR__) . '/pikkumies/bin/pikkumies') . $stripComments(dirname(__DIR__) . '/pikkumies/lib/Update.php')
+            . $stripComments(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php') . $stripComments(dirname(__DIR__) . '/pikkumies/lib/HermesConfig.php')
+            . $stripComments(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/ConfigureSettings.php')
+            . $stripComments(dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php');
+        // Widened past (see|log:|in) local/ (which missed "(local/secrets/)", "local/state/..." with no lead word): any
+        // quoted text with a bare local/ fragment, excluding a regex pattern's own #local/...# delimiter, ~/.local/
+        // (XDG, a real absolute path once ~ is read back) and an already-anchored .../pikkumies/local/... path.
+        check(preg_match('~[\'"](?!#)[^\'"\n]*(?<!\.)(?<!pikkumies/)\blocal/[a-z]~', $src) === 0, 'a user-facing message still prints a bare local/ path');
     },
     'settings: Config::set rejects sessions.retentionDays over DAYS_MAX, the upper boundary Config::set itself enforces (the lower bound is already covered above)' => function () {
         $file = settingsFile('days-upper');

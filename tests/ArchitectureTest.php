@@ -220,6 +220,30 @@ return [
             }
         }
     },
+    'architecture: no new tests/*Test.php fixture names a /home/<name> of 8 characters or fewer (a real PMSS account name can be that short; fixtureuser/fixtureuserx and other 9+ character reserved-looking names do not collide, e93a91e)' => function () {
+        // Allowed by FILE, not by line number (same reasoning as the model/vendor allowlist above): pre-existing
+        // debt from before this lesson landed, each file left for a dedicated rename pass, not this lint's job.
+        // New tests/*Test.php files are held to the 9+ character rule from the day they are added.
+        $allowed = array_flip([
+            'BackupBorgTest.php', 'BackupCheckTest.php', 'BackupFilesTest.php', 'BackupTest.php', 'CliHumanKindsTest.php',
+            'CommandLogTest.php', 'ConfigChangeHookTest.php', 'ConfigureTiersTest.php', 'ContainersDiagnoseTest.php',
+            'ContainersOpsTest.php', 'CreditsLineTest.php', 'DocsTest.php', 'EmailGuardTest.php', 'FeedbackPromptTest.php',
+            'FeedbackTest.php', 'FileopsCheckTest.php', 'GenerateTest.php', 'HermesInstallTest.php', 'HermesManagedScopeTest.php',
+            'HermesUserConfigTest.php', 'HookGuardContainersTest.php', 'HookGuardCoverageTest.php', 'HookGuardEdgeTest.php',
+            'HookGuardKeyTest.php', 'HookGuardLocalTest.php', 'HookGuardPatchTest.php', 'HookSearchTest.php', 'MediaEdgeTest.php', 'MutationCheckTest.php',
+            'NoQuestionsGuardTest.php', 'OrchestratorTest.php', 'PathInstallEdgeTest.php', 'PathInstallTest.php',
+            'QuestionSuiteRun3ChecksTest.php', 'QuestionSuiteTabCheckTest.php', 'SshConnectHookTest.php', 'StatusLineTest.php',
+            'StorageTest.php', 'ToolHooksTest.php', 'ToolsTest.php', 'TorrentsEdgeTest.php',
+        ]);
+        $short = '#/home/[a-z][a-zA-Z0-9_-]{0,7}\b#';
+        foreach (glob(__DIR__ . '/*Test.php') as $f) {
+            $base = basename($f);
+            if (isset($allowed[$base])) {
+                continue;
+            }
+            check(!preg_match($short, actStripComments($f), $m), "$base: new short /home/<name> fixture (" . (isset($m[0]) ? $m[0] : '') . "); use a 9+ character reserved-looking name such as fixtureuser");
+        }
+    },
     'architecture: every real shipped tool-unit script starts with <?php or a shebang, never a missing opening tag' => function () {
         $checked = 0;
         foreach (Units::all() as $u) {

@@ -15,9 +15,9 @@ if (!function_exists('guardToolAnswer')) {
 function guardMediaAnswer($tool, array $input, $cwd = '')
 {
     $dir = sys_get_temp_dir() . '/pk-gmc-' . getmypid();
-    @mkdir("$dir/home/sub", 0700, true);
+    @mkdir("$dir/home/subfolder", 0700, true);
     touch("$dir/home/.media-stack-" . 'credentials.txt');
-    touch("$dir/home/sub/notes.txt");
+    touch("$dir/home/subfolder/notes.txt");
     $old = getenv('HOME');
     putenv("HOME=$dir/home");
     try {
@@ -35,17 +35,17 @@ return [
         $f = '.media-stack-' . 'credentials.txt';
         $rows = [
             ['terminal', ['command' => "cat ~/$f"]],
-            ['terminal', ['command' => "grep SONARR /home/u/$f"]],
+            ['terminal', ['command' => "grep SONARR /home/fixtureuser/$f"]],
             ['terminal', ['command' => 'sed -n 1p ~/.media-stack-cred*']],
             ['terminal', ['command' => "cp ~/$f /tmp/x && cat /tmp/x"]],
             ['terminal', ['command' => "c\"at\" ~/'$f'"]],
-            ['execute_code', ['code' => "print(open('/home/u/$f').read())"]],
+            ['execute_code', ['code' => "print(open('/home/fixtureuser/$f').read())"]],
             ['process_manage', ['action' => 'submit', 'session_id' => 'p1', 'data' => "less ~/$f"]],
             ['read_file', ['path' => "~/$f"]],
-            ['read_file', ['path' => "/home/u//$f"]],
-            ['search_files', ['pattern' => 'PASSWORD', 'path' => "/home/u/$f"]],
+            ['read_file', ['path' => "/home/fixtureuser//$f"]],
+            ['search_files', ['pattern' => 'PASSWORD', 'path' => "/home/fixtureuser/$f"]],
             ['write_file', ['path' => "~/$f", 'content' => 'X = y']],
-            ['patch', ['patch' => "*** Begin Patch\n*** Update File: /home/u/$f\n@@\n-a\n+b\n*** End Patch"]],
+            ['patch', ['patch' => "*** Begin Patch\n*** Update File: /home/fixtureuser/$f\n@@\n-a\n+b\n*** End Patch"]],
         ];
         foreach ($rows as $r) {
             $d = guardToolAnswer($r[0], $r[1]);
@@ -73,8 +73,8 @@ return [
             ['cat ~/.media*', 'block'], ['cat ~/.media-stack-c*', 'block'], ['cat ~/.m?dia-stack-credentials.txt', 'block'],
             ['head $HOME/.[m]edia*', 'block'], ['cat ${HOME}/.m*', 'block'], ['tar czf /tmp/x.tgz ~/.*', 'block'],
             ['cat ~/.media-stack-{cred,x}*', 'block'], ['cat .m*', 'block', 'home'], ['cd ~ && cat .me*', 'block'],
-            ['ls ~/*', 'none'], ['cat ~/sub/.media*', 'none'], ['cat .m*', 'none', '/tmp'], ["grep 'a.*' ~/sub/notes.txt", 'none'],
-            ['ls ~/sub/*.txt', 'none'],
+            ['ls ~/*', 'none'], ['cat ~/subfolder/.media*', 'none'], ['cat .m*', 'none', '/tmp'], ["grep 'a.*' ~/subfolder/notes.txt", 'none'],
+            ['ls ~/subfolder/*.txt', 'none'],
         ];
         foreach ($rows as $r) {
             $got = guardMediaAnswer('terminal', ['command' => $r[0]], isset($r[2]) ? $r[2] : '');
@@ -88,8 +88,8 @@ return [
             ['rg password ~', 'block'], ['ag password ~', 'block'], ['find ~ -type f -exec grep -l pass {} +', 'block'],
             ['find ~ -type f | xargs grep pass', 'block'], ['cd ~ && grep -r pass .', 'block'], ['grep -r pass', 'block', 'home'],
             ['rg pass', 'block', 'home'],
-            ['grep -r password ~/sub', 'none'], ['rg password ~/sub', 'none'], ['find ~ -name "*.log"', 'none'],
-            ['find ~/sub -type f -exec grep pass {} +', 'none'], ['grep password ~/sub/notes.txt', 'none'], ['grep -r pass .', 'none', '/tmp'],
+            ['grep -r password ~/subfolder', 'none'], ['rg password ~/subfolder', 'none'], ['find ~ -name "*.log"', 'none'],
+            ['find ~/subfolder -type f -exec grep pass {} +', 'none'], ['grep password ~/subfolder/notes.txt', 'none'], ['grep -r pass .', 'none', '/tmp'],
             ["grep -r pass ~ --exclude='.media-stack-*'", 'none'], ["rg pass ~ -g '!.media-stack-*'", 'none'], ['ag pass ~ --ignore .media-stack-*', 'none'],
             ["find ~ -type f ! -name '.media-stack-*' -exec grep pass {} +", 'none'], ["rg pass ~ -g '*.log'", 'block'],
         ];
@@ -99,7 +99,7 @@ return [
         }
         foreach ([[['pattern' => 'pass', 'path' => '~'], 'block'], [['pattern' => 'pass', 'path' => '$HOME'], 'block'],
             [['pattern' => 'pass', 'path' => '.'], 'block', 'home'], [['pattern' => 'pass', 'path' => '~', 'target' => 'files'], 'none'],
-            [['pattern' => 'pass', 'path' => '~', 'file_glob' => '*.log'], 'none'], [['pattern' => 'pass', 'path' => '~/sub'], 'none'],
+            [['pattern' => 'pass', 'path' => '~', 'file_glob' => '*.log'], 'none'], [['pattern' => 'pass', 'path' => '~/subfolder'], 'none'],
             [['pattern' => 'pass', 'path' => '.'], 'none', '/tmp']] as $r) {
             $got = guardMediaAnswer('search_files', $r[0], isset($r[2]) ? $r[2] : '');
             check($got === $r[1], 'search_files ' . json_encode($r[0]) . ": expected {$r[1]}, got $got");

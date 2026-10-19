@@ -107,5 +107,5 @@ function guardMail($command, array $texts)
             $hi = $mid - 1;
         }
     }
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $sha, 'message' => $best !== null ? $best : $headOnly, 'kind' => 'mail'];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-mail:' . $sha . ':' . $id, 'message' => $best !== null ? $best : $headOnly, 'kind' => 'mail'];
 }

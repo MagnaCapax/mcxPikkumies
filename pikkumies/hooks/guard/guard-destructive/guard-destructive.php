@@ -79,13 +79,13 @@ $lh = '(127\.[0-9.]+|localhost|0\.0\.0\.0|\[::1?\])';
 
 // Stored passwords and the AI key: checked for every tool above, file tools included.
 $secretPatterns = [
-    '#local/secrets\b#'                             => 'a command on stored passwords (local/secrets/); what the agent reads goes to the model',
+    '#local/secrets\b#'                             => 'a command on stored passwords (~/pikkumies/local/secrets/); what the agent reads goes to the model',
     // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
     // `credits balance` answers balance questions without it.
     '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
     // The halt snapshot holds what the user wrote, the only evidence the ask review trusts (ADR-0073): the agent never touches it.
-    '#state/+halt\b#' => 'a command on the halt guard\'s state (local/state/halt/), which records what the user asked; the agent never needs it',
+    '#state/+halt\b#' => 'a command on the halt guard\'s state (~/pikkumies/local/state/halt/), which records what the user asked; the agent never needs it',
 ];
 if ($fileTool) {
     // A V4A patch has no path: each file its headers name, both sides of a Move, is checked like a path (ADR-0020).
@@ -182,10 +182,11 @@ if (NestedAgent::guardCommand($texts)) {
     exit(0);
 }
 
-// Email (ADR-0053): logins blocked, smtp commands without shell expansion, send-draft and test asked with what they send.
+// Email (ADR-0053): an email login, or an smtp command with shell expansion or chaining, is blocked here, before the
+// approve list below can ask about it as a delete; the email approves wait until after that list.
 require __DIR__ . '/GuardMail.php';
 $mail = guardMail($command, $texts);
-if ($mail !== null) {
+if ($mail !== null && $mail['action'] === 'block') {
     guardSay($mail);
 }
 
@@ -342,6 +343,13 @@ foreach ($approve as $re => $rule) {
         }
         guardSay(['action' => 'approve', 'rule_key' => $key, 'message' => $approveMessage, 'kind' => $kind]); // kind: for the ask policy (ADR-0073)
     }
+}
+
+// Email (ADR-0053): send-draft and test asked with what they send. After the blocks and the delete/exposure/stop/
+// load/send approve list above, so a command that also matches one of those (e.g. it deletes files) is caught by
+// the specific rule instead of being mislabeled as mail. Email blocks were said above.
+if ($mail !== null) {
+    guardSay($mail);
 }
 // Writes to local hooks and notes (ADR-0054), when no rule above asked already.
 $local = guardLocal($callKind, $tool, $input, $command, $texts);

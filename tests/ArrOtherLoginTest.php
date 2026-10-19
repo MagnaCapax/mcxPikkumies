@@ -40,7 +40,7 @@ function otherBazarrSettings($type = 'form')
     return ['general' => ['debug' => false, 'page_size' => 25, 'ip' => '127.0.0.1', 'postprocessing_cmd' => '', 'enabled_providers' => ['a']],
         'auth' => ['apikey' => ARR_KEY, 'type' => $type, 'username' => 'exampleuser', 'password' => md5(ARR_LOGIN)],
         'sonarr' => ['ip' => '127.0.0.1', 'apikey' => ARR_DECOY], 'anticaptcha' => ['anti_captcha_key' => 'cap' . 'tcha' . 'Key0042'],
-        'addic7ed' => ['cookies' => 'sess' . 'Cookie0043', 'username' => 'x'], 'backup' => ['folder' => '/home/u/.config/bazarr/backup', 'retention' => 31]];
+        'addic7ed' => ['cookies' => 'sess' . 'Cookie0043', 'username' => 'x'], 'backup' => ['folder' => '/home/fixtureuser/.config/bazarr/backup', 'retention' => 31]];
 }
 
 return [

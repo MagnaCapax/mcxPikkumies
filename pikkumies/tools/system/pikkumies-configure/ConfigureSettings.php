@@ -11,7 +11,7 @@ class ConfigureSettings
     /** The settings, in display order, with one line each for `review`. */
     const INFO = [
         'agent.name' => 'What the agent calls itself. Empty: "Pikkumies", the default; never asked, renamed when the person tells the agent ("call yourself X") or with configure.',
-        'privacy.perfLogging' => 'Whether Pikkumies keeps performance logs, on this machine only and never sent: today the time and result counts of each memory search (per tier, and per documentation source by name), its words only when it found no lesson, and the time of each lesson save (local/state/memory-metrics/). Off stops new lines; files already written stay until deleted. With sessions.retentionDays above 0, lines older than that are pruned.',
+        'privacy.perfLogging' => 'Whether Pikkumies keeps performance logs, on this machine only and never sent: today the time and result counts of each memory search (per tier, and per documentation source by name), its words only when it found no lesson, and the time of each lesson save (~/pikkumies/local/state/memory-metrics/). Off stops new lines; files already written stay until deleted. With sessions.retentionDays above 0, lines older than that are pruned.',
         'privacy.telemetry' => 'Whether Pikkumies may send performance telemetry. A setting only: nothing is sent yet, no sender exists.',
         'sessions.retentionDays' => 'Days of ended Hermes sessions to keep; older ones are pruned at start. 0 keeps them forever.',
         'update.channel' => 'What `pikkumies update` follows: release (the newest release, the default) or git/<branch> (every change on that branch as it lands, for example git/main).',
@@ -122,7 +122,7 @@ class ConfigureSettings
         $v = ConfigureChange::value($config, $key);
         if ($key === 'sessions.retentionDays' && $v === 0) {
             $size = $stateDb !== null && is_file($stateDb) ? ' (now ' . round(filesize($stateDb) / 1048576, 1) . ' MB)' : '';
-            return 'sessions are kept forever, so Hermes\' session store local/hermes/state.db' . $size . ' keeps growing and counts against the disk quota; a number of days lets Hermes prune old ended sessions';
+            return 'sessions are kept forever, so Hermes\' session store ~/pikkumies/local/hermes/state.db' . $size . ' keeps growing and counts against the disk quota; a number of days lets Hermes prune old ended sessions';
         }
         if ($key === 'terms.accepted' && $v !== true) {
             return 'not accepted yet; the next interactive session asks the person';
