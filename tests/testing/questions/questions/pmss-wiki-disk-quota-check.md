@@ -1,5 +1,6 @@
 ---
 tags: source:pm-wiki, docs
+found: pm-wiki
 family: pmss
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: quota -s | du -hsc

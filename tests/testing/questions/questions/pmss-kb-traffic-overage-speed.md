@@ -1,5 +1,6 @@
 ---
 tags: source:pm-kb, docs
+found: pm-kb
 family: pmss
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: 100Mbps | 100 Mbps

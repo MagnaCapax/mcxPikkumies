@@ -4,12 +4,14 @@
  * --- lines, one `key: value` per line (a key may repeat; repeats collect into a list), then the question itself.
  * Checks grades a run against them.
  */
+require_once __DIR__ . '/Coverage.php';
+
 class Questions
 {
     /** Every key a question file may use. source and note are for people only and are never checked. */
-    const KEYS = ['tags', 'family', 'setup', 'calls', 'first_call', 'not_calls', 'max_calls', 'contains', 'contains_any', 'not_contains', 'judge', 'source', 'note'];
+    const KEYS = ['tags', 'family', 'setup', 'calls', 'first_call', 'not_calls', 'max_calls', 'found', 'contains', 'contains_any', 'not_contains', 'judge', 'source', 'note'];
     const SINGLE = ['family', 'setup', 'first_call', 'max_calls'];
-    const CHECKS = ['calls', 'first_call', 'not_calls', 'max_calls', 'contains', 'contains_any', 'not_contains', 'judge'];
+    const CHECKS = ['calls', 'first_call', 'not_calls', 'max_calls', 'found', 'contains', 'contains_any', 'not_contains', 'judge'];
     /** The search-first gate, whose list of read-only tools first_call uses as it is. */
     const GATE = '/pikkumies/hooks/search/search-first-gate/search-first-gate.php';
     private static $readOnly = null;
@@ -37,12 +39,18 @@ class Questions
 
     /**
      * Stale-fact guard: for a question tagged source:<name>, each contains value must still be in the downloaded copy
-     * of that source (local/docs-cache/<name>/ of the install, any case). Returns the missing facts, [] when all are there.
+     * of that source (local/docs-cache/<name>/ of the install, any case). A `found` source with no page on disk is stale
+     * too: no search can hit it (ADR-0039 amended 2026-10-19). Returns what is missing, [] when all is there.
      */
     public static function stale(array $q, $docsCache)
     {
         $facts = self::values($q, 'contains');
         $missing = [];
+        foreach (self::values($q, 'found') as $name) {
+            if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $name) && !glob(rtrim($docsCache, '/') . "/$name/*.md")) {
+                $missing[] = "found source $name has no downloaded page";
+            }
+        }
         foreach ($facts ? $q['tags'] : [] as $tag) {
             $name = substr($tag, 0, 7) === 'source:' ? substr($tag, 7) : '';
             if ($name === '' || !preg_match('/^[A-Za-z0-9._-]+$/', $name) || strpos($name, '..') !== false) {
@@ -137,12 +145,14 @@ class Questions
                     $problems[] = "$key is not a valid regular expression: $v";
                 } elseif ($key === 'max_calls' && !preg_match('/^[1-9][0-9]*$/', $v)) {
                     $problems[] = "max_calls is not a whole number above 0: $v";
+                } elseif ($key === 'found' && !preg_match(Coverage::FOUND, $v)) {
+                    $problems[] = "found is not a source name or tier:1, tier:2, tier:3: $v";
                 }
             }
             $checks += in_array($key, self::CHECKS, true) ? count($values) : 0;
         }
         if ($checks === 0) {
-            $problems[] = 'no check (calls, first_call, not_calls, contains, contains_any, not_contains or judge)';
+            $problems[] = 'no check (calls, first_call, not_calls, found, contains, contains_any, not_contains or judge)';
         }
         if (isset($q['meta']['setup'][0]) && !is_dir(rtrim($fixturesDir, '/') . '/' . $q['meta']['setup'][0])) {
             $problems[] = 'setup directory not found under fixtures/: ' . $q['meta']['setup'][0];

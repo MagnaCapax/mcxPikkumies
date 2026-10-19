@@ -1,5 +1,6 @@
 ---
 tags: source:seedhost-kb, docs
+found: seedhost-kb
 family: seedhost
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: 30 Mbps | 30Mbps

@@ -1,5 +1,6 @@
 ---
 tags: source:quickbox-docs, docs
+found: quickbox-docs
 family: quickbox
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: stable is the default | defaults to stable | stable channel

@@ -4,6 +4,8 @@
  * line per question and target), transcripts/<target>/<id>.jsonl (the agent's stream) and the scorecard printed
  * at the end. Every key of every target and of the judge is masked in everything written.
  */
+require_once __DIR__ . '/Coverage.php';
+
 class Report
 {
     public $dir;
@@ -37,6 +39,16 @@ class Report
         $dir = $this->dir . '/transcripts/' . $target;
         @mkdir($dir, 0700, true);
         $this->write("$dir/$id.jsonl", $this->mask(is_file($rawFile) ? (string) file_get_contents($rawFile) : ''), false);
+    }
+
+    /** Lines of one question's evidence (search-log, hook-log) into <sub>/<target>/<id>.jsonl, masked; nothing when there are none. */
+    public function evidence($sub, $target, $id, array $lines)
+    {
+        if ($lines) {
+            $dir = $this->dir . "/$sub/" . $target;
+            @mkdir($dir, 0700, true);
+            $this->write("$dir/$id.jsonl", $this->mask(implode("\n", $lines)) . "\n", false);
+        }
     }
 
     /** One result line. */
@@ -74,7 +86,7 @@ class Report
             'code_pass' => $missing ? 0 : count(array_filter(array_column($checks, 'pass'))), 'code_total' => $missing ? 0 : count($checks),
             'judge_yes' => count(array_filter(array_column($judge['verdicts'], 'yes'))), 'judge_total' => count($judge['verdicts']),
             'judge' => $judge['verdicts'], 'judge_error' => $judge['error'], 'tokens' => (int) $rec['tokens'] + (int) $judge['tokens'],
-            'seconds' => isset($rec['seconds']) ? (int) $rec['seconds'] : 0, 'error' => (string) $rec['error']];
+            'seconds' => isset($rec['seconds']) ? (int) $rec['seconds'] : 0, 'error' => (string) $rec['error']] + Coverage::columns($rec);
         $row['status'] = $missing ? 'stale' : ($row['error'] === '' && $row['code_pass'] === $row['code_total'] ? 'pass' : 'fail');
         return $row;
     }
@@ -105,9 +117,10 @@ class Report
             $missing = $docsCache !== '' ? Questions::stale($q, $docsCache) : [];
             $wasStale = isset($old['status']) && $old['status'] === 'stale';
             $rec = Asker::parseStream("$dir/transcripts/" . basename($old['target']) . '/' . basename($old['question']) . '.jsonl');
+            $rec['searches'] = Coverage::readLog("$dir/search-log/" . basename($old['target']) . '/' . basename($old['question']) . '.jsonl');
             $judge = ['verdicts' => isset($old['judge']) ? $old['judge'] : [], 'tokens' => 0, 'error' => isset($old['judge_error']) ? $old['judge_error'] : ''];
             $row = $wasStale && !$missing ? $old : self::row($q, $old['target'], $old, Checks::check($q, $rec), ['tokens' => $old['tokens'],
-                'seconds' => $old['seconds'], 'error' => $old['error']], $judge, $missing);
+                'seconds' => $old['seconds'], 'error' => $old['error'], 'tools' => $rec['tools'], 'searches' => $rec['searches']], $judge, $missing);
             $report->add($row);
         }
         return $report->rows;
@@ -144,6 +157,6 @@ class Report
             $out .= sprintf("%-16s %-20s %6d %8d %9s %9s %9d %8d %6d %5d\n", $target, $tag, count($rs), $count('status', 'pass'),
                 $sum('code_pass') . '/' . $sum('code_total'), $judge, $sum('tokens'), $sum('seconds'), $count('error', ''), $count('status', 'stale'));
         }
-        return $out;
+        return $out . Coverage::scorecardLine($rows);
     }
 }

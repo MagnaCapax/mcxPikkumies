@@ -1,5 +1,6 @@
 ---
 tags: source:rtorrent-handbook, docs, app
+found: rtorrent-handbook
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: rtorrent-handbook | Scripting Guide | XMLRPC

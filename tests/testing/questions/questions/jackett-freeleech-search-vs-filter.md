@@ -1,5 +1,6 @@
 ---
 tags: source:jackett-wiki, docs, app
+found: jackett-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: regular search | after the results | afterwards | once results

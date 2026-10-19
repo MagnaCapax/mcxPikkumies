@@ -1,0 +1,10 @@
+{
+  "about": "found: no memory search of the question hit pm-kb (the searches are metrics lines as the memory search writes them, ADR-0041; hits counted by hand)",
+  "fails": "found",
+  "question": {"found": "pm-kb"},
+  "bad": {"tools": [{"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search traffic limit"}}], "text": "See the wiki.",
+    "searches": [{"ts": 1792390000, "tiers": [1, 2, 3], "hits": {"1": 0, "2": 2, "3": 0}, "sources": {"pm-wiki": {"hits": 2, "tier": 2}, "pm-kb": {"hits": 0, "tier": 2}}, "pages_per_tier": {"1": 0, "2": 900, "3": 0}}]},
+  "good": {"tools": [{"name": "terminal", "input": {"command": "php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search traffic limit"}}], "text": "See the knowledge base.",
+    "searches": [{"ts": 1792390000, "tiers": [1, 2, 3], "hits": {"1": 0, "2": 1, "3": 0}, "sources": {"rtorrent-wiki": {"hits": 1, "tier": 2}}, "pages_per_tier": {"1": 0, "2": 900, "3": 0}},
+      {"ts": 1792390060, "tiers": [1, 2, 3], "hits": {"1": 0, "2": 3, "3": 0}, "sources": {"pm-wiki": {"hits": 2, "tier": 2}, "pm-kb": {"hits": 1, "tier": 2}}, "pages_per_tier": {"1": 0, "2": 900, "3": 0}}]}
+}

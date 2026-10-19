@@ -1,0 +1,9 @@
+{
+  "about": "found: tier:3 - no memory search returned another provider's page (pages on disk in tier 3 are not hits; hits counted by hand)",
+  "fails": "found",
+  "question": {"found": "tier:3"},
+  "bad": {"tools": [], "text": "",
+    "searches": [{"ts": 1792390000, "tiers": [1, 2, 3], "hits": {"1": 1, "2": 5, "3": 0}, "sources": {"lessons": {"hits": 1, "tier": 1}, "pm-wiki": {"hits": 5, "tier": 2}}, "pages_per_tier": {"1": 4, "2": 900, "3": 1200}}]},
+  "good": {"tools": [], "text": "",
+    "searches": [{"ts": 1792390000, "tiers": [1, 2, 3], "hits": {"1": 0, "2": 0, "3": 2}, "sources": {"whatbox-wiki": {"hits": 2, "tier": 3}}, "pages_per_tier": {"1": 0, "2": 900, "3": 1200}}]}
+}

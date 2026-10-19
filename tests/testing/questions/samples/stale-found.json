@@ -1,0 +1,7 @@
+{
+  "about": "stale: a question whose found source has no page in the downloaded copy is not asked: no search could hit it (docs: the fake docs-cache under samples/)",
+  "fails": "stale",
+  "docs": "docs-cache",
+  "bad": {"tags": "docs", "found": ["fake-kb"]},
+  "good": {"tags": "docs", "found": ["fake-wiki", "tier:3"]}
+}

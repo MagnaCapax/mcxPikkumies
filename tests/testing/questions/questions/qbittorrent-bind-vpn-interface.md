@@ -1,5 +1,6 @@
 ---
 tags: source:qbittorrent-wiki, docs, app
+found: qbittorrent-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: Network Interface

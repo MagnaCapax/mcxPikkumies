@@ -1,5 +1,6 @@
 ---
 tags: source:restic-docs, docs, app
+found: restic-docs
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: prune

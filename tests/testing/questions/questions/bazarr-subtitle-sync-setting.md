@@ -1,5 +1,6 @@
 ---
 tags: source:bazarr-wiki, docs, app
+found: bazarr-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 judge: Cites bazarr-wiki as the source of any specific claim about a Bazarr sync or upgrade setting, or says it could not find that in the documentation here, rather than describing a setting from general knowledge.

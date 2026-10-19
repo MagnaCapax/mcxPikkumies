@@ -1,5 +1,6 @@
 ---
 tags: source:servarr-wiki, docs, app
+found: servarr-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: .recover

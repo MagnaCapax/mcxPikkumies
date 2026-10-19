@@ -1,5 +1,6 @@
 ---
 tags: source:rutorrent-wiki, docs, app
+found: rutorrent-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: scgi_port

@@ -1,5 +1,6 @@
 ---
 tags: source:rtorrent-wiki, docs, app
+found: rtorrent-wiki
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: directory.watch.added

@@ -11,7 +11,8 @@ umask(0077);
 $repo = dirname(__DIR__, 3);
 $here = __DIR__;
 require_once "$repo/pikkumies/lib/Provider.php";
-foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report', 'CrontabGuard', 'CommandLogCheck'] as $lib) {
+require_once "$repo/pikkumies/lib/Host.php";
+foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report', 'CrontabGuard', 'CommandLogCheck', 'Coverage', 'Corpus'] as $lib) {
     require_once "$here/lib/$lib.php";
 }
 $o = ['targets' => (string) getenv('PIKKUMIES_QA_TARGETS'), 'target' => '', 'only' => '', 'tag' => '', 'regrade' => '', 'token-budget' => null, 'max-tokens' => null,
@@ -106,9 +107,7 @@ try {
             throw new Exception("the real crontab changed during install; see $out/crontab-after-install.txt");
         }
     }
-    $box->snapshot(); // the base every reset goes back to; the documentation each family downloads is added below
     $runLogCounts = CommandLogCheck::counts(CommandLogCheck::dir($box->root)); // a reused install keeps earlier runs' lines
-    $snapped = true;
     // Before any token is spent: a login shell in the sandbox must resolve crontab to the fake, or every terminal
     // command Hermes runs risks the account's real crontab (2026-10-18 RCA: a login bash re-reads /etc/profile).
     list($checkCode) = Asker::run($box, ['bash', '-lc', 'command -v crontab'], '', $box->root . '/crontab-check.out', $box->root . '/crontab-check.err', 10);
@@ -119,7 +118,10 @@ try {
             . 'fix the sandbox login PATH (Sandbox::ensureBashProfile) before spending tokens');
     }
     $meta = ['hermes_version' => Asker::hermesVersion($box), 'pikkumies_commit' => $commit];
-    $refreshed = [];
+    Corpus::refresh($box, reset($targets), $guard, $out); // every family's documentation, before the first question
+    $box->snapshot(); // the base every reset goes back to: the install and every family's documentation
+    $snapped = true;
+    Corpus::record($box, $out);
     foreach ($targets as $name => $s) {
         foreach ($questions as $q) {
             if ((int) $o['token-budget'] > 0 && $used >= (int) $o['token-budget']) {
@@ -128,16 +130,6 @@ try {
             }
             $family = implode('', Questions::values($q, 'family')) ?: (isset($s['family']) ? (string) $s['family'] : '');
             $overlay = Targets::overlay($box, Targets::settings($s, $family));
-            if (!isset($refreshed[$family])) { // the family's documentation, downloaded once per run, is part of the snapshot
-                $box->reset();
-                list($code) = Asker::refresh($box, $overlay);
-                echo $code === 0 ? '' : "documentation refresh for family '$family' exited $code (see {$box->root}/refresh.out); asking anyway\n";
-                if ($guard->check("refresh:$family", $name)) {
-                    break 2;
-                }
-                $box->snapshot();
-                $refreshed[$family] = true;
-            }
             $box->reset();
             $judge = ['verdicts' => [], 'tokens' => 0, 'error' => ''];
             $missing = Questions::stale($q, "{$box->root}/checkout/pikkumies/local/docs-cache"); // a fact the source no longer states: not asked
@@ -148,7 +140,13 @@ try {
             }
             $error = isset($q['meta']['setup'][0]) && !Asker::setup($box, "$here/fixtures/" . $q['meta']['setup'][0]) ? 'setup copy failed' : '';
             $logCounts = CommandLogCheck::counts(CommandLogCheck::dir($box->root));
+            $searchCounts = CommandLogCheck::counts(Coverage::metricsDir($box->root));
+            $hookDir = $box->root . '/checkout/pikkumies/local/logs/hooks'; // unit, event, outcome per hook run; never the payload (ADR-0030)
+            $hookCounts = CommandLogCheck::counts($hookDir);
             $rec = Asker::ask($box, $q['body'], $overlay, $o['max-turns'], (int) $o['timeout']);
+            $rec['searches'] = Coverage::newSearches(Coverage::metricsDir($box->root), $searchCounts);
+            $report->evidence('search-log', $name, $q['id'], array_map('json_encode', $rec['searches']));
+            $report->evidence('hook-log', $name, $q['id'], CommandLogCheck::newLines($hookDir, $hookCounts));
             $rec['error'] = $error ?: $rec['error'];
             if (Questions::values($q, 'judge')) {
                 $judge = isset($t['judge']) ? Judge::ask($t['judge'], $t['keys']['judge'], Questions::values($q, 'judge'), $rec['text'])

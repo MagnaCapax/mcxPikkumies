@@ -1,5 +1,6 @@
 ---
 tags: source:autobrr-docs, docs, app
+found: autobrr-docs
 family: generic
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains: Exec action

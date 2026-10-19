@@ -1,5 +1,6 @@
 ---
 tags: source:swizzin-docs, docs
+found: swizzin-docs
 family: swizzin
 first_call: tools/memory/pikkumies/pikkumies\.php.* search
 contains_any: box install panel | sudo box install panel

@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/Questions.php';
 require_once __DIR__ . '/Judge.php';
+require_once __DIR__ . '/Coverage.php';
 
 class Checks
 {
@@ -52,6 +53,11 @@ class Checks
         // Every tool call counts, read-only ones too: each is a model round, which is what the budget is about.
         foreach (Questions::values($q, 'max_calls') as $n) {
             $add("max_calls: $n", count($calls) <= (int) $n, count($calls) . ' tool calls: ' . implode(' | ', $calls));
+        }
+        // Some memory search returned a hit from this source or tier: from the search's own metrics line, not the stream.
+        $searches = isset($record['searches']) ? $record['searches'] : [];
+        foreach (Questions::values($q, 'found') as $want) {
+            $add("found: $want", Coverage::found($searches, $want), count($searches) . ' memory searches recorded; sources hit: ' . (implode(', ', Coverage::sourcesHit($searches)) ?: 'none'));
         }
         foreach (Questions::values($q, 'contains') as $s) {
             $add("contains: $s", Questions::has($text, $s), 'not in the final text');
