@@ -63,4 +63,32 @@ return [
         check(Launch::isTty(null) === false, 'null must be "not a terminal", not a fatal error');
         check(Launch::isTty('not-a-stream') === false, 'a plain string must be "not a terminal", not a fatal error');
     },
+    'launch: install --name without "=" is never dispatched as install; the whole line becomes a prompt (D134)' => function () {
+        // --name only ever takes the --key=value form (installFlags() #49 above already proves the
+        // parser rejects a bare --name); this confirms the OTHER layer: route() itself never even
+        // reaches installFlags() for this case, because allFlags() sees "Helper" as a non-flag word
+        // after "--name" and falls through to a plain prompt instead of the install subcommand.
+        list($cmd, $args) = Launch::route(['pikkumies', 'install', '--name', 'Helper']);
+        check($cmd === 'run' && $args === ['chat', '--query=install --name Helper'], 'a bare --name followed by its value must stay a prompt, not install: ' . json_encode([$cmd, $args]));
+        // Contrast: the documented --name=value form keeps install (already covered in LaunchTest.php);
+        // confirmed here only to show the two forms take different routing branches for the same intent.
+        list($cmd2, $args2) = Launch::route(['pikkumies', 'install', '--name=Helper']);
+        check($cmd2 === 'install' && $args2 === ['--name=Helper'], 'the --name=value form must still dispatch to install: ' . json_encode([$cmd2, $args2]));
+    },
+    'install layout: ~/pikkumies is a symlink to Config::root(), created only when missing, never a copy (D145)' => function () {
+        // Config::root() cannot be test-seamed (it is dirname(__DIR__) of the real lib/Config.php),
+        // and a dynamic install run would also start the real background docs-fill fetch over the
+        // network (bin/pikkumies's own startDocsFill()) and write the real pikkumies/local/config.php
+        // of whichever checkout runs the test — both unsafe for a hermetic, no-network test. The
+        // static check below reads the exact source bin/pikkumies install dispatches to.
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(preg_match("/\n    case 'install':(.*?)\n        break;/s", $bin, $m) === 1, 'install case not found in bin/pikkumies');
+        $install = $m[1];
+        check(strpos($install, "\$link = \$home . '/pikkumies';") !== false, 'the ~/pikkumies link path must be derived from $home: ' . $install);
+        check(preg_match('/if \(!file_exists\(\$link\)\) \{\s*@symlink\(Config::root\(\), \$link\);\s*\}/', $install) === 1,
+            'the layout step must be exactly "if not already there, symlink to Config::root()": ' . $install);
+        foreach (['copy(', 'rename(', 'mkdir($link'] as $op) {
+            check(strpos($install, $op) === false, "the ~/pikkumies layout step must never $op (a copy, not a symlink): " . $install);
+        }
+    },
 ];

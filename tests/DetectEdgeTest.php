@@ -105,6 +105,24 @@ return [
         check(strpos($body, 'self::uidMapIsIdentity() && $capEff !== null && self::capsAreFull($capEff)') !== false,
             'the three real-root conditions must be combined with && in source, not ||: ' . $body);
     },
+    'detect: rootAccess() for a non-sudo-group uid never execs sudo at all (inSudoGroup() gates the exec; no "not in sudoers" mail side-effect)' => function () {
+        $dir = sys_get_temp_dir() . '/pk-rootnosudo-' . getmypid() . '-' . mt_rand();
+        deFakeBin($dir, 'id', "echo 'alice users'"); // -Gn output with no sudo/wheel/admin group
+        $marker = "$dir/sudo-was-executed";
+        @unlink($marker);
+        deFakeBin($dir, 'sudo', 'touch ' . escapeshellarg($marker) . "\nexit 0");
+        $path = getenv('PATH');
+        putenv("PATH=$dir");
+        try {
+            check(Detect::inSudoGroup() === false, 'the fake id -Gn output must not be read as sudo-group membership');
+            $r = Detect::rootAccess(1000);
+            check($r['available'] === false && $r['via'] === 'none' && $r['capEff'] === null, 'a non-sudo-group uid must report unavailable: ' . json_encode($r));
+            check(!file_exists($marker), 'rootAccess() executed sudo for a non-sudo-group uid: it must only check is_executable()-style group membership, never probe sudo for a non-member');
+        } finally {
+            putenv("PATH=$path");
+            exec('rm -rf ' . escapeshellarg($dir));
+        }
+    },
     'detect: primaryIp() parses `src` from a real-shaped `ip route get` line, and is null on a nonzero exit or a missing src token' => function () {
         $dir = sys_get_temp_dir() . '/pk-deip-' . getmypid() . '-' . mt_rand();
         $old = getenv('PATH');

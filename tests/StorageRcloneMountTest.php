@@ -36,4 +36,19 @@ return [
             stDone($fx);
         }
     },
+    'rclone unmount: a FUSE mount this account owns (matching uid) but outside the home is still refused' => function () {
+        $fx = rcFixture();
+        try {
+            $uid = stUid();
+            $outside = $fx['dir'] . '/outside-mnt'; // this account's own uid, but not under $fx['home']
+            mkdir($outside, 0700, true);
+            file_put_contents($fx['mountinfo'],
+                "22 1 8:1 / / rw - ext4 /dev/sda1 rw\n90 22 0:50 / $outside rw,nosuid - fuse.rclone gdrive: rw,user_id=$uid,group_id=$uid\n");
+            list($code, $l, $out) = rcRun($fx, ['unmount', $outside]);
+            check($code === 1 && !stCalls($fx, 'fusermount3'), 'a same-uid mount outside the home was unmounted: ' . $out);
+            check(strpos(end($l)['error'], 'not a FUSE mount of this account inside the home') !== false, 'wrong refusal reason: ' . $out);
+        } finally {
+            stDone($fx);
+        }
+    },
 ];

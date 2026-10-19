@@ -234,6 +234,46 @@ return [
             testRmTree($w['t']);
         }
     },
+    'hermes install log: "build started" and "ready" both land in local/install.log, in order, in the same unwritten-over file (D140/D169)' => function () {
+        $w = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w) {
+                $msg = HermesInstall::ensure();
+                check(strpos($msg, 'building v0.10.0 in the background') === 0, 'ensure: ' . $msg);
+                hermesTWaitReady($w);
+                $log = (string) file_get_contents($w['root'] . '/local/install.log');
+                $started = strpos($log, 'hermes v0.10.0: build started ');
+                $ready = strpos($log, 'hermes v0.10.0: ready ');
+                check($started === 0, 'the log must start with "build started": ' . $log);
+                check($ready !== false && $ready > $started, '"ready" must still be in the same file, after "build started": nothing truncated it away in between: ' . $log);
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
+    'hermes install log: a failed build (bad sha256) never writes ": ready" to local/install.log, even though the file exists (D140 negative case)' => function () {
+        $w = hermesTWorld(true);
+        try {
+            hermesTIn($w, function () use ($w) {
+                $msg = HermesInstall::ensure();
+                check(strpos($msg, 'building v0.10.0 in the background') === 0, 'ensure: ' . $msg);
+                $log = $w['root'] . '/local/install.log';
+                for ($i = 0; $i < 300; $i++) {
+                    clearstatcache();
+                    if (is_file($log) && strpos((string) file_get_contents($log), 'failed:') !== false) {
+                        break;
+                    }
+                    usleep(100000);
+                }
+                $text = (string) @file_get_contents($log);
+                check(strpos($text, 'failed: sha256 mismatch') !== false, 'the background build must log its failure: ' . $text);
+                check(strpos($text, ': ready') === false, 'a failed build must never log ": ready", checksum verification failed first: ' . $text);
+                check(!is_file($w['root'] . '/include/.hermes-ready'), 'no marker on a failed build');
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
     'hermes install: hermes.lazyInstalls keeps the optional tools; a failing pm install leaves no marker; the staged uv is reused' => function () {
         $w = hermesTWorld();
         try {

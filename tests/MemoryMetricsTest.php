@@ -201,6 +201,28 @@ return [
             testRmTree($tree);
         }
     },
+    // D106: the "stats" CLI verb's --days default (30) and override live only in pikkumies.php's
+    // own option parsing; every existing MemoryStats::compute() test calls it directly with an
+    // explicit $days, so the CLI default/override was never exercised end to end.
+    'memory stats CLI: "stats" with no --days defaults to 30; "stats --days 5" honours the given window' => function () {
+        $tree = memMetricsTree(true);
+        try {
+            $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+            $dir = "$tree/pikkumies/local/state/memory-metrics";
+            @mkdir($dir, 0700, true);
+            $now = time();
+            file_put_contents("$dir/searches-" . gmdate('Ym', $now) . '.jsonl',
+                json_encode(['ts' => $now - 6 * 86400, 'words' => 'old miss', 'hits' => [1 => 0, 2 => 0, 3 => 0]]) . "\n");
+            list($code, $out) = runPhp($tool, ['stats']);
+            $l = cliLines($out);
+            check($code === 0 && $l[0]['days'] === 30 && $l[0]['searches'] === 1, 'default --days must be 30 and include a 6-day-old search: ' . $out);
+            list($code2, $out2) = runPhp($tool, ['stats', '--days', '5']);
+            $l2 = cliLines($out2);
+            check($code2 === 0 && $l2[0]['days'] === 5 && $l2[0]['searches'] === 0, '--days 5 must exclude the 6-day-old search: ' . $out2);
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'deep-research skill: part 1 searches wide and checks twice (4 children, 3 rounds, always a lesson) before the web' => function () {
         $text = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/research/deep-research/skill.md');
         $p1 = strpos($text, '## Part 1: search wide, check twice');

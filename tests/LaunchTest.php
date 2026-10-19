@@ -214,4 +214,17 @@ return [
         check($set !== false && $use !== false && $set < $use, 'the banner must use the -m model');
         check(RunFlags::model(Launch::route(['pikkumies', '-m', 'X', 'hi'])[1]) === 'X', 'the model the banner reads is the routed one');
     },
+    'launch: `pikkumies tmux` with no number defaults to window 1, the same as `tmux 1`' => function () {
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(preg_match("/\n    case 'tmux':(.*?)exit\(\\\$code\);/s", $bin, $m) === 1, 'tmux case missing');
+        check(strpos($m[1], "\$n = isset(\$passArgs[0]) ? \$passArgs[0] : '1';") !== false, "tmux with no number must default \$n to '1': " . $m[1]);
+        check(Launch::route(['pikkumies', 'tmux']) === ['tmux', []] && Launch::route(['pikkumies', 'tmux', '1']) === ['tmux', ['1']],
+            'bare tmux carries no number for bin/pikkumies to default itself');
+    },
+    'launch: `pikkumies tmux` rejects a window number outside 1-9 with exit 2, before any real tmux call' => function () {
+        foreach (['0', '10', '99'] as $n) {
+            list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/bin/pikkumies', ['tmux', $n]);
+            check($code === 2 && trim($out) === 'usage: pikkumies tmux [1-9]', "tmux $n must be refused before any tmux call: $code $out");
+        }
+    },
 ];

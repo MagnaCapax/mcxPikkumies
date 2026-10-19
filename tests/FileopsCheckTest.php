@@ -235,4 +235,101 @@ return [
             testRmTree($tree);
         }
     },
+    'fileops: a relative target is resolved against tool_input.workdir only; a payload-level cwd next to it is not read' => function () {
+        $tree = fileopsTree();
+        try {
+            $payload = fileopsPayload('chmod -R 700 data', 's9', 'c1');
+            $payload['cwd'] = "$tree/home"; // the hook payload's own cwd; must not stand in for tool_input.workdir
+            $d = fileopsAnswer($tree, $payload);
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'use absolute paths') !== false,
+                'a payload-level cwd resolved a relative target: ' . json_encode($d));
+            check(!is_file(fileopsListFile($tree, 'c1')), 'a relative target with only a payload cwd must list nothing');
+            $payload['tool_input']['workdir'] = "$tree/home";
+            $payload['extra']['tool_call_id'] = 'c2';
+            fileopsAnswer($tree, $payload);
+            $lines = fileopsListLines(fileopsListFile($tree, 'c2'));
+            check($lines[0]['targets'] === ["$tree/home/data"], 'tool_input.workdir must resolve the relative target: ' . json_encode($lines));
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'fileops: a recursive chown or chgrp blocks once with the matching reason, then the identical command passes within 10 minutes' => function () {
+        $tree = fileopsTree();
+        try {
+            foreach ([['chown', 'changes owners'], ['chgrp', 'changes groups']] as $row) {
+                list($verb, $what) = $row;
+                $cmd = "$verb -R u $tree/home/data";
+                list($d, $raw) = fileopsRun($tree, fileopsPayload($cmd, "s-$verb", 'c1'));
+                check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], "$verb -R $what") !== false,
+                    "$verb -R first run must block with its own reason: " . $raw);
+                list($d, $raw) = fileopsRun($tree, fileopsPayload($cmd, "s-$verb", 'c2'));
+                check($d === null && trim($raw) === '', "$verb -R identical command within 10 minutes must run unasked, got $raw");
+            }
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'fileops: two sources with the same basename landing in one directory ask the user, even when nothing is there yet' => function () {
+        $tree = fileopsTree();
+        try {
+            $home = "$tree/home";
+            @mkdir("$tree/src1", 0700, true);
+            @mkdir("$tree/src2", 0700, true);
+            file_put_contents("$tree/src1/same.txt", '1');
+            file_put_contents("$tree/src2/same.txt", '2');
+            check(!file_exists("$home/data/same.txt"), 'the target must not already exist for this case');
+            $cmd = "mv -t $home/data $tree/src1/same.txt $tree/src2/same.txt";
+            $d = fileopsAnswer($tree, fileopsPayload($cmd));
+            check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], 'mv replaces ~/data/same.txt') !== false,
+                'two sources landing on one name must ask even without a pre-existing file: ' . json_encode($d));
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'fileops: the walk\'s default limits are 50000 entries and 2.0 seconds, and context() without args uses them' => function () {
+        check(FileopsList::CAP === 50000 && FileopsList::SECONDS === 2.0, 'defaults changed: cap=' . FileopsList::CAP . ' seconds=' . FileopsList::SECONDS);
+        $ctx = FileopsList::context();
+        check($ctx['cap'] === 50000, 'context() without arguments must default to CAP: ' . json_encode($ctx));
+    },
+    'fileops: lsattr flags are recorded for chattr regardless of count, and for other verbs only up to 200 entries' => function () {
+        if (trim((string) @shell_exec('command -v lsattr 2>/dev/null')) === '') {
+            skip('lsattr not installed');
+        }
+        $tree = fileopsTree();
+        try {
+            fileopsAnswer($tree, fileopsPayload("chattr -R +i $tree/home/data", 's1', 'c1'));
+            $lines = fileopsListLines(fileopsListFile($tree, 'c1'));
+            check(isset($lines[1]['a']), 'chattr entries must carry lsattr flags: ' . json_encode($lines));
+            fileopsAnswer($tree, fileopsPayload("chmod -R 700 $tree/home/data", 's1', 'c2'));
+            $lines = fileopsListLines(fileopsListFile($tree, 'c2'));
+            check(isset($lines[1]['a']), 'a small (<=200 entries) chmod listing must still carry lsattr flags: ' . json_encode($lines));
+            for ($i = 0; $i < 205; $i++) {
+                file_put_contents("$tree/home/data/f$i", 'x');
+            }
+            fileopsAnswer($tree, fileopsPayload("chmod -R 700 $tree/home/data", 's1', 'c3'));
+            $lines = fileopsListLines(fileopsListFile($tree, 'c3'));
+            check(count($lines) - 1 > 200, 'fixture must exceed 200 entries: ' . (count($lines) - 1));
+            check(!isset($lines[1]['a']), 'over 200 entries must skip lsattr: ' . json_encode($lines[1]));
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'fileops: list retention keeps the directory at or under 50 MiB, removing the oldest files first' => function () {
+        $dir = testTempDir('pk-fileops-retain');
+        try {
+            foreach ([0, 1, 2] as $i) {
+                $f = "$dir/old$i.jsonl.gz";
+                file_put_contents($f, str_repeat('x', 20 * 1024 * 1024)); // 3 x 20 MiB = 60 MiB, over the 50 MiB cap
+                touch($f, time() - (3 - $i) * 100); // old0 oldest .. old2 newest
+            }
+            FileopsList::prune($dir, 0, FileopsList::MAX_BYTES);
+            $left = array_map('basename', glob("$dir/*.jsonl.gz"));
+            sort($left);
+            check($left === ['old1.jsonl.gz', 'old2.jsonl.gz'], 'the oldest file must be removed first: ' . json_encode($left));
+            $total = array_sum(array_map('filesize', glob("$dir/*.jsonl.gz")));
+            check($total <= FileopsList::MAX_BYTES, "directory still over the cap after pruning: $total");
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];

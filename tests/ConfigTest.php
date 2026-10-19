@@ -216,4 +216,42 @@ return [
         $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Update.php') . file_get_contents(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php');
         check(preg_match('#[\'"][^\'"\n]*\(?(see|log:|in) local/[a-z]#', $src) === 0, 'a user-facing message still prints a bare local/ path');
     },
+    'settings: Config::set rejects sessions.retentionDays over DAYS_MAX, the upper boundary Config::set itself enforces (the lower bound is already covered above)' => function () {
+        $file = settingsFile('days-upper');
+        $threw = false;
+        try {
+            Config::set('sessions.retentionDays', Config::DAYS_MAX + 1, $file);
+        } catch (InvalidArgumentException $x) {
+            $threw = true;
+        }
+        check($threw, 'Config::set accepted DAYS_MAX + 1');
+        check(!is_file($file), 'a refused set must not create the file');
+    },
+    'settings: Config::parse accepts on, yes, 1 and true as the same boolean true' => function () {
+        foreach (['on', 'yes', '1', 'true', 'ON', 'Yes'] as $word) {
+            check(Config::parse('privacy.telemetry', $word) === true, "'$word' must parse as true");
+        }
+    },
+    'settings: PIKKUMIES_CONFIG overlay is refused when only group-writable, not only when world-writable too (ADR-0038)' => function () {
+        $dir = sys_get_temp_dir() . '/pk-overlay-group-' . getmypid();
+        @mkdir($dir, 0700, true);
+        file_put_contents("$dir/run.php", "<?php\nreturn ['provider' => ['model' => 'group-write-forced']];\n");
+        chmod("$dir/run.php", 0620); // group-writable, not world-writable: still inside the 0022 mask
+        $plain = Config::load();
+        $result = testWithEnv(['PIKKUMIES_CONFIG' => "$dir/run.php"], function () {
+            return [Config::load(), Config::overlayPath()];
+        });
+        check($result[0] == $plain && $result[1] === '', 'an overlay writable by its group alone must be refused: ' . json_encode([$result[0]['provider'], $result[1]]));
+        exec('rm -rf ' . escapeshellarg($dir));
+    },
+    'settings: packs.enabled and packs.auto no longer exist and are silently ignored wherever set (ADR-0006, superseded by tools.disabled/ADR-0015)' => function () {
+        $withPacks = Config::merge(Config::defaults(), ['packs' => ['enabled' => true, 'auto' => true]]);
+        check(Generate::disabledCategories($withPacks) === Generate::disabledCategories(Config::defaults()), 'packs.enabled/auto must change nothing in Generate::disabledCategories: ' . json_encode(Generate::disabledCategories($withPacks)));
+        foreach (['pikkumies/lib/Generate.php', 'pikkumies/lib/Units.php', 'pikkumies/lib/HermesConfig.php', 'pikkumies/lib/Config.php'] as $rel) {
+            $src = (string) file_get_contents(dirname(__DIR__) . '/' . $rel);
+            check(strpos($src, "packs']['enabled']") === false && strpos($src, "packs']['auto']") === false, "$rel must never read packs.enabled/auto: removed by ADR-0006, superseded by tools.disabled (ADR-0015)");
+        }
+        // packs.disabled is a different, still-read key (bin/pikkumies doctor note, ADR-0015) - confirms the grep above is meaningful, not a stale key name.
+        check(strpos((string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies'), "packs']['disabled']") !== false, 'packs.disabled note must still exist (ADR-0015)');
+    },
 ];

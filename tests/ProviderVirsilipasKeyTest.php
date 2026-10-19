@@ -77,4 +77,26 @@ http_response_code(404); echo "{}";');
             exec('rm -rf ' . escapeshellarg($dir));
         }
     },
+    'provider: resolve() combines a configured endpoint with a key read only from ~/.virsilipasKey (key never comes from local/config.php); PIKKUMIES_ENDPOINT/PIKKUMIES_KEY env still wins over all of it' => function () {
+        $dir = testTempDir('pk-pvcombo');
+        try {
+            $p = ['endpoint' => 'https://config-endpoint.example/v1', 'model' => '', 'keyFile' => "$dir/.pikkumiesKey", 'virsilipasKeyFile' => "$dir/.virsilipasKey"];
+            file_put_contents("$dir/.virsilipasKey", "endpoint=https://proxy.example/v1\nkey=vsk-platform-key-0002\n");
+            $r = testWithEnv(['PIKKUMIES_ENDPOINT' => null, 'PIKKUMIES_KEY' => null], function () use ($p) {
+                return Provider::resolve(['provider' => $p]);
+            });
+            check($r['endpoint'] === 'https://config-endpoint.example/v1', 'the configured endpoint must win over the key file\'s own endpoint: ' . json_encode($r));
+            check($r['key'] === 'vsk-platform-key-0002', 'the key must still come from the virsilipas file when ~/.pikkumiesKey has no key and config has no key field at all: ' . json_encode($r));
+            $r2 = testWithEnv(['PIKKUMIES_ENDPOINT' => 'https://env-endpoint.example/v1', 'PIKKUMIES_KEY' => 'env-key-0001'], function () use ($p) {
+                return Provider::resolve(['provider' => $p]);
+            });
+            check($r2['endpoint'] === 'https://env-endpoint.example/v1' && $r2['key'] === 'env-key-0001', 'env vars must win over both the configured endpoint and every key file: ' . json_encode($r2));
+        } finally {
+            testRmTree($dir);
+        }
+        // defect this catches: resolve()'s endpoint fallback chain (env -> config -> file) and its key
+        // fallback chain (env -> file only, config never supplies a key) are two different chains sharing
+        // one $file read; conflating them (e.g. letting a configured endpoint also suppress the file's key)
+        // would silently drop a working key whenever only the endpoint, not the key, was ever configured.
+    },
 ];

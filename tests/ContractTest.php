@@ -155,6 +155,52 @@ return [
             }
         }
     },
+    'units: the shared-verb check above is gated by whether the category README documents a verbs table, never by how many tools the category has' => function () {
+        $dir = testTempDir('pk-contract-verbshare');
+        try {
+            // One tool, but its own category README documents a verbs table the tool does not match:
+            // being the only tool in the category must not exempt it.
+            $solo = "$dir/tools/solo/onlyone";
+            mkdir($solo, 0700, true);
+            file_put_contents("$solo/skill.md", "---\nname: onlyone\ndescription: d\n---\nBody.\n");
+            file_put_contents("$solo/USAGE.md", "# x\n\n| verb | arguments | changes | what it does |\n|---|---|---|---|\n| show | a | no | Shows. |\n");
+            file_put_contents("$solo/README.md", "# x\n");
+            file_put_contents("$dir/tools/solo/README.md", "# solo\n\n| verb | arguments | changes | what it does |\n|---|---|---|---|\n| list | a | no | Lists, not shown by onlyone. |\n");
+            // Two tools, but the category README documents no verbs table at all: both must be exempt.
+            foreach (['alpha', 'beta'] as $name) {
+                $u = "$dir/tools/pair/$name";
+                mkdir($u, 0700, true);
+                file_put_contents("$u/skill.md", "---\nname: $name\ndescription: d\n---\nBody.\n");
+                file_put_contents("$u/USAGE.md", "# x\n\n| verb | arguments | changes | what it does |\n|---|---|---|---|\n| $name-only | a | no | Only on $name. |\n");
+                file_put_contents("$u/README.md", "# x\n");
+            }
+            file_put_contents("$dir/tools/pair/README.md", "# pair\n\nNo shared verb table here.\n");
+            $units = Units::all("$dir/tools");
+            $failures = [];
+            foreach (Tree::scan("$dir/tools", 'skill.md')['categories'] as $category => $catDir) {
+                $readme = "$catDir/README.md";
+                $shared = is_file($readme) ? array_column(Units::verbs((string) file_get_contents($readme)), 'verb') : [];
+                if (!$shared) {
+                    continue;
+                }
+                foreach ($units as $u) {
+                    if ($u['category'] === $category) {
+                        $missing = array_diff($shared, array_column($u['verbs'], 'verb'));
+                        if ($missing) {
+                            $failures[] = $u['name'] . ' lacks: ' . implode(',', $missing);
+                        }
+                    }
+                }
+            }
+            check($failures === ['onlyone lacks: list'], 'the single-tool category with a documented verbs table must still be held to it, and the two-tool category with no README verb table must be exempt: ' . json_encode($failures));
+        } finally {
+            testRmTree($dir);
+        }
+        // defect this catches: ADR-0015's shared-verb contract is gated on the category README actually
+        // documenting a verbs table (`if (!$shared) continue`), never on the tool count; conflating the
+        // two would wrongly exempt a single-tool category that DOES document shared verbs, or wrongly
+        // demand a shared table from a multi-tool category that documents none.
+    },
     'units: removed commands are not mentioned in units, doctrine or docs' => function () {
         $root = dirname(__DIR__);
         $unitFiles = [];

@@ -235,4 +235,38 @@ return [
         $r = Detect::applyOverride($profile, ['host' => ['root' => ['available' => true]]]);
         check($r['root']['available'] === true && $r['stack'] === 'none', 'a nested override must merge, not replace the whole profile');
     },
+    'detect: a hand-edited host.json claiming root is read back as-is by cached() (it is only a hint), but rootAccess() takes no file input at all, so no cache content can ever change a real privileged check (ADR-0004 addendum)' => function () {
+        $dir = sys_get_temp_dir() . '/pk-roothint-' . getmypid() . '-' . mt_rand();
+        @mkdir($dir, 0700, true);
+        $file = "$dir/host.json";
+        $log = "$dir/update.log";
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        // Simulate a user (or anything with the account's own access) hand-editing host.json to claim root.
+        file_put_contents($file, json_encode([
+            'schema' => Detect::SCHEMA, 'fingerprint' => Detect::fingerprint($uid), 'uid' => $uid,
+            'family' => 'generic', 'stack' => 'none', 'tier' => 'medium',
+            'root' => ['available' => true, 'via' => 'sudo', 'capEff' => null],
+            'limits' => ['cpuQuota' => ['value' => null, 'source' => null], 'memMb' => ['value' => null, 'source' => null],
+                'disk' => ['value' => null, 'source' => null], 'cpuset' => ['value' => null, 'source' => null]],
+        ]));
+        chmod($file, 0600);
+        try {
+            $cached = Detect::cached(false, $file, $log);
+            check($cached['root']['available'] === true, 'cached() must return the cache content verbatim: it is a hint, not something it validates');
+            // The structural guarantee: rootAccess() is the real check every privileged action relies on, and
+            // it takes only a uid. There is no parameter, global or file read through which host.json's
+            // claim could reach it, so a false "yes" in the cache buys no privilege.
+            $r = new ReflectionMethod('Detect', 'rootAccess');
+            check(count($r->getParameters()) === 1 && $r->getParameters()[0]->getName() === 'uid', 'rootAccess() must take only the uid: no cache/profile input can reach the real check');
+            $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Detect.php');
+            $start = strpos($src, 'function rootAccess(');
+            $next = strpos($src, 'function ', $start + 10);
+            $body = $next === false ? substr($src, $start) : substr($src, $start, $next - $start);
+            check($start !== false && strpos($body, 'host.json') === false && strpos($body, '$file') === false, 'rootAccess() source must never reference a cache file: ' . $body);
+        } finally {
+            @unlink($file);
+            @unlink($log);
+            @rmdir($dir);
+        }
+    },
 ];

@@ -98,4 +98,8 @@ return [
         check(RunFlags::model(['chat', '--query=-m X']) === '', 'a prompt is never a flag');
         check(RunFlags::model(['sessions', '-m', 'A']) === '' && RunFlags::model([]) === '', 'not a chat run');
     },
+    'launch: a leading --reasoning with its value space-separated, and no -m, still seeds the chat with free text (ADR-0052)' => function () {
+        check(Launch::route(['pikkumies', '--reasoning', 'low', 'fix', 'it']) === ['run', ['chat', '--reasoning', 'low', '--query=fix it']],
+            '--reasoning low + text, no -m: ' . json_encode(Launch::route(['pikkumies', '--reasoning', 'low', 'fix', 'it'])));
+    },
 ];

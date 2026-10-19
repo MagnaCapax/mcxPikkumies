@@ -157,4 +157,13 @@ return [
         check($a2 === ['abc'] && $o2['with-data'] === true && $o2['expect'] === '1GiB', 'a declared flag took the next word');
         check($args === ['--not-an-option'], 'args after -- misparsed');
     },
+    'cli: cleanString strips a token query parameter from a URL, leaving an unrelated parameter alone' => function () {
+        check(Cli::cleanString('https://x.example/announce?token=0123456789abcdef&page=2') === 'https://x.example/announce?token=REDACTED&page=2',
+            'a ?token= query value was not redacted: ' . Cli::cleanString('https://x.example/announce?token=0123456789abcdef&page=2'));
+        check(Cli::cleanString('https://x.example/a?page=2') === 'https://x.example/a?page=2', 'an unrelated query parameter was changed');
+    },
+    'cli: clean drops fields literally named passkey or cookie, not only password/token/authorization (already covered elsewhere)' => function () {
+        $r = Cli::clean(['passkey' => 'SECRETPASSKEY1', 'cookie' => 'sid=abc', 'name' => 'kept']);
+        check(!isset($r['passkey']) && !isset($r['cookie']) && $r['name'] === 'kept', 'a passkey or cookie field was not dropped: ' . json_encode($r));
+    },
 ];

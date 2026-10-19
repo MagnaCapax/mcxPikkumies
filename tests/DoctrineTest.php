@@ -63,6 +63,20 @@ return [
         $core = HermesConfig::renderSoul($p, Config::defaults(), false);
         check(strpos($core, '## Tool doctrine') === false && strpos($s, rtrim($core)) === 0, 'core SOUL must be the start of the full SOUL');
     },
+    // D146: every enabled category with a non-empty DOCTRINE.md must appear exactly once. The
+    // "capabilities, static doctrine, then tool doctrine" test above only checks presence
+    // (strpos), which a bug duplicating a category's section would still pass.
+    'doctrine: each enabled category with a non-empty DOCTRINE.md produces exactly one ### block in SOUL.md, never duplicated' => function () {
+        $p = soulProfiles()['pmss+root'];
+        Generate::$dockerPresentOverride = true;
+        $s = HermesConfig::renderSoul($p, Config::defaults());
+        Generate::$dockerPresentOverride = null;
+        $cats = array_keys(Units::doctrines());
+        check(count($cats) >= 2, 'expected at least two doctrine categories to check: ' . implode(',', $cats));
+        foreach ($cats as $cat) {
+            check(substr_count($s, "\n### $cat\n") === 1, "$cat doctrine block must appear exactly once in SOUL.md, found " . substr_count($s, "\n### $cat\n"));
+        }
+    },
     'doctrine: SOUL.md and the generated SKILL.md files carry no relative .md link; an ADR link in the copied text becomes plain ADR-NNNN (ADR-0060)' => function () {
         $relative = function ($text) {
             return array_values(array_filter(Links::targets($text), function ($t) {

@@ -86,6 +86,40 @@ return [
             && $d['rule_key'] === 'pikkumies-delete:' . substr(sha1($cmd), 0, 16), 'unrelated --expect not asked: ' . json_encode($d));
         guardEdgeExpect(['./anything --expect=1', 'node tool.js "--expect" 5'], 'approve', 'deletes data through a Pikkumies tool');
     },
+    'guard: --with-data and --delete-files are asked without any "php" in the command (ADR-0020: the tool rule no longer needs a literal .php)' => function () {
+        guardEdgeExpect(['./remove-tool --with-data', 'node x.js --delete-files', '--with-data'], 'approve', 'deletes data through a Pikkumies tool');
+    },
+    'guard: a regex engine error in the approve rules asks the user (never lets the command through); over 4000 characters it blocks instead' => function () {
+        // A low pcre.backtrack_limit (set only for this call, via a throwaway php.ini) makes the
+        // approve-tier rclone pattern (.* then the verb) fail the same way a pathological command
+        // would in production; the earlier block-tier patterns still resolve normally at this limit.
+        $ini = testTempDir('pk-guard-bt') . '/php.ini';
+        $run = function ($cmd, $backtrackLimit) use ($ini) {
+            file_put_contents($ini, "pcre.backtrack_limit=$backtrackLimit\n");
+            $p = proc_open(escapeshellarg(PHP_BINARY) . ' -c ' . escapeshellarg($ini) . ' '
+                . escapeshellarg(dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php'),
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            fwrite($pipes[0], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+            fclose($pipes[0]);
+            $out = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($p);
+            return json_decode($out, true);
+        };
+        try {
+            $short = 'rclone ' . str_repeat('a', 50) . ' sync';
+            $d = $run($short, 100);
+            check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], 'a command too long or complex to check') !== false,
+                'a short command whose approve-rule regex fails must ask, never allow: ' . json_encode($d));
+            $long = 'rclone ' . str_repeat('a', 4100) . ' sync';
+            $d = $run($long, 5000);
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'too long to show the user in full') !== false,
+                'a too-long command whose approve-rule regex fails must block, not approve: ' . json_encode($d));
+        } finally {
+            testRmTree(dirname($ini));
+        }
+    },
     'guard: a payload too deep or broken to decode blocks; empty input and other tools get no answer' => function () {
         $deep = '{"tool_name":"terminal","tool_input":{"command":"rm -rf /home/x","x":' . str_repeat('[', 600) . str_repeat(']', 600) . '}}';
         list($code, $d, $raw) = guardEdgeRun($deep);

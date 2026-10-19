@@ -126,4 +126,36 @@ return [
         // defect this catches: in_array(strtolower($changes), ['', 'no', '-'], true) is an allow-list for
         // "safe"; any looser check (e.g. matching only the literal string 'yes') would under-mark danger.
     },
+    'units all()/Generate::run(): a skill.md with no frontmatter block at all is flagged with errors and excluded, while a valid sibling unit still generates (Hermes still starts)' => function () {
+        $dir = testTempDir('pk-units-nofm');
+        try {
+            $broken = "$dir/tools/cat/broken";
+            mkdir($broken, 0700, true);
+            file_put_contents("$broken/skill.md", "Just plain text, no frontmatter delimiters at all.\n");
+            file_put_contents("$broken/USAGE.md", "# x\n\nNo verbs.\n");
+            file_put_contents("$broken/README.md", "# x\n");
+            $good = "$dir/tools/cat/good";
+            mkdir($good, 0700, true);
+            file_put_contents("$good/skill.md", "---\nname: good\ndescription: d\n---\nBody.\n");
+            file_put_contents("$good/USAGE.md", "# x\n\nNo verbs.\n");
+            file_put_contents("$good/README.md", "# x\n");
+            $byName = [];
+            foreach (Units::all("$dir/tools") as $u) {
+                $byName[$u['name']] = $u;
+            }
+            check($byName['broken']['errors'] !== [], 'a skill.md with no frontmatter block must be flagged, not silently accepted: ' . json_encode($byName['broken']));
+            check($byName['good']['errors'] === [], 'the valid sibling unit must stay error-free: ' . json_encode($byName['good']));
+            $r = Generate::run([], "$dir/tools", "$dir/out", "$dir/tools/INDEX.md");
+            check($r['error'] === '' && $r['skills'] === 1, 'Generate::run() must still succeed and write the one valid skill: ' . json_encode($r));
+            check(isset($r['problems']['cat/broken']), 'the frontmatter-less unit must be named in problems: ' . json_encode($r['problems']));
+            check(is_file("$dir/out/cat/good/SKILL.md"), 'the valid unit must still be generated');
+            check(!is_file("$dir/out/cat/broken/SKILL.md"), 'the broken unit must not have a generated skill');
+        } finally {
+            testRmTree($dir);
+        }
+        // defect this catches: GenerateTest.php's existing "broken unit" fixture uses a name MISMATCH
+        // (frontmatter parses, just disagrees with the directory); this is the other failure shape, no
+        // "---" delimiters at all, parsed by Units::frontmatter() into empty meta — distinct code path,
+        // same required outcome: reported and skipped, never a fatal error that would block the run.
+    },
 ];

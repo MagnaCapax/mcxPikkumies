@@ -3,6 +3,22 @@
 require_once __DIR__ . '/fixtures/arr/jackett.php';
 
 return [
+    'jackett: the apikey travels only inside Http::request\'s curl handle, never through a shell command or a logged line' => function () {
+        // ArrClient::send puts Jackett's key into the query string, then hands the whole URL to Http::request
+        // (lib/Http.php), which uses the PHP curl EXTENSION (curl_init/curl_exec) in-process: no OS process is
+        // spawned, so the URL (and its apikey) never appears on a command line `ps` could see, and the shared
+        // command-log hook (hooks/trace/command-log) only records `terminal` tool calls, never an in-process HTTP
+        // call -- so the key can never reach local/logs/commands either. If any of these files start shelling out
+        // to run curl (or anything else) that URL would land on a real command line; confirm none of them do.
+        $root = dirname(__DIR__) . '/pikkumies';
+        foreach (['tools/arr/jackett/jackett.php', 'tools/arr/jackett/JackettRun.php', 'tools/arr/jackett/JackettIndexers.php',
+            'tools/arr/jackett/JackettConfig.php', 'tools/arr/lib/ArrClient.php', 'lib/Http.php'] as $rel) {
+            $file = "$root/$rel";
+            $src = (string) file_get_contents($file);
+            check($src !== '', "could not read $file");
+            check(!preg_match('/\b(shell_exec|exec|system|passthru|popen|proc_open)\s*\(/', $src), "$rel spawns a process; the apikey could reach a command line or process list");
+        }
+    },
     'jackett: ServerConfig.json gives Port, BasePathOverride and APIKey only; empty, foreign or keyless files are named' => function () {
         $tmp = sys_get_temp_dir() . '/pk-jk-' . getmypid() . '-' . mt_rand() . '.json';
         file_put_contents($tmp, arrJackettConfig(9117));

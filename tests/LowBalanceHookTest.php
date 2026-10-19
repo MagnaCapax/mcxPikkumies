@@ -87,6 +87,23 @@ return [
             testRmTree($tree);
         }
     },
+    'low-balance: silent on a cache for a different key, or a different model, even with a matching endpoint' => function () {
+        $ep = 'http://127.0.0.1:9/v1';
+        $tree = lowBalanceTree($ep);
+        try {
+            @mkdir("$tree/pikkumies/local/state/credits", 0700, true);
+            // Same endpoint, but the cache was written for a different key (key_sha256 does not match).
+            file_put_contents("$tree/pikkumies/local/state/credits/line.json", json_encode(['at' => time() - 30, 'endpoint' => $ep,
+                'key_sha256' => substr(hash('sha256', 'a-different-key'), 0, 12), 'model' => '', 'record' => lowBalanceRecord(5, 50000)]));
+            check(lowBalanceRun($tree, 'sess-key')[0] === '', 'a cache written for another key must be silent');
+            // Same endpoint and key, but for a different model than this provider is configured with ('').
+            file_put_contents("$tree/pikkumies/local/state/credits/line.json", json_encode(['at' => time() - 30, 'endpoint' => $ep,
+                'key_sha256' => substr(hash('sha256', LOW_BALANCE_TEST_KEY), 0, 12), 'model' => 'some-other-model', 'record' => lowBalanceRecord(5, 50000)]));
+            check(lowBalanceRun($tree, 'sess-model')[0] === '', 'a cache written for another model must be silent');
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'low-balance: below the threshold it speaks once per session, with the numbers, and again for a new session' => function () {
         $ep = 'http://127.0.0.1:' . testFreePort() . '/v1'; // a closed port: any request would fail, none is made
         $tree = lowBalanceTree($ep);

@@ -457,4 +457,51 @@ return [
             exec('rm -rf ' . escapeshellarg($tree));
         }
     },
+    // D105: the "sources" verb's in_scope must be true ONLY for a source whose scope actually
+    // matches the detected host, never merely present as a key. The existing scope-filter test
+    // ("search tiers: sources are filtered by scope...") checked only that the `in_scope` key
+    // exists on one record, not that its boolean value is correct for an in-scope vs. an
+    // out-of-scope (peer) source, including a `link`-type source.
+    'docs: the sources verb reports in_scope true only for a source whose scope matches this host, false for an out-of-scope peer source (downloadable or link)' => function () {
+        $tree = docsTierTree();
+        file_put_contents("$tree/pikkumies/local/config.php", "<?php return ['host' => ['family' => 'pmss', 'stack' => 'pmss']];\n");
+        try {
+            $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+            list($code, $out) = runPhp($tool, ['sources']);
+            $byName = [];
+            foreach (cliLines($out) as $l) {
+                if (isset($l['name'])) {
+                    $byName[$l['name']] = $l;
+                }
+            }
+            check($code === 0, 'sources failed: ' . $out);
+            check($byName['own-kb']['in_scope'] === true, 'own-kb (scope: pmss) must be in_scope on a pmss host: ' . json_encode($byName['own-kb']));
+            check($byName['app-handbook']['in_scope'] === true, 'app-handbook (scope: all) must always be in_scope: ' . json_encode($byName['app-handbook']));
+            check($byName['peer-wiki']['in_scope'] === false, 'peer-wiki (scope: feral) must not be in_scope on a pmss host: ' . json_encode($byName['peer-wiki']));
+            check($byName['peer-kb']['in_scope'] === false, 'peer-kb (scope: whatbox) must not be in_scope on a pmss host: ' . json_encode($byName['peer-kb']));
+            check($byName['peer-link']['in_scope'] === false, 'peer-link (type: link, scope: feral) must not be in_scope on a pmss host: ' . json_encode($byName['peer-link']));
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    // D112: fetchMediawiki() must stop and throw once MAX_REQUESTS (40) requests have been made,
+    // never loop forever on a wiki whose "continue" cursor never runs out. No existing test drives
+    // this past a single page of continuation (only "docs: mediawiki follows continue..." which
+    // stops after exactly 2 requests on purpose).
+    'docs: fetchMediawiki() stops after exactly MAX_REQUESTS requests and throws, never looping forever when "continue" never ends' => function () {
+        $requests = 0;
+        DocSources::$fetcher = function ($url) use (&$requests) {
+            $requests++;
+            return json_encode(['continue' => ['gapcontinue' => "p$requests"], 'query' => ['pages' => []]]);
+        };
+        try {
+            DocSources::fetchMediawiki('https://wiki.example.org/api.php');
+            check(false, 'fetchMediawiki() must throw when continue never stops');
+        } catch (Exception $e) {
+            check($requests === DocSources::MAX_REQUESTS, "requests made: $requests, expected " . DocSources::MAX_REQUESTS);
+            check(strpos($e->getMessage(), (string) DocSources::MAX_REQUESTS) !== false, 'message must name the request cap: ' . $e->getMessage());
+        } finally {
+            DocSources::$fetcher = null;
+        }
+    },
 ];
