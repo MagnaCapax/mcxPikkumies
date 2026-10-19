@@ -43,6 +43,8 @@ class Config
             'terms' => ['accepted' => false],        // set only by the person: the first interactive run or install --accept-terms
             // Where the agent may connect over SSH (ADR-0068): host patterns; deny wins; blockUnknown refuses a host on neither list.
             'ssh' => ['allow' => [], 'deny' => [], 'blockUnknown' => false],
+            // search: Hermes web_search through ddgs (DuckDuckGo, keyless), off until the person runs `pikkumies websearch on` (ADR-0082).
+            'web' => ['search' => false],
         ];
     }
 
@@ -77,6 +79,7 @@ class Config
         'ssh.allow' => 'hosts',
         'ssh.deny' => 'hosts',
         'ssh.blockUnknown' => 'bool',
+        'web.search' => 'bool',
     ];
     /** Settable keys by pattern: an *arr app's config file (tools/arr/README.md), an absolute path or '' for none. */
     const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path', '/^hooks\.every\.[a-z0-9][a-z0-9-]{0,63}\z/' => 'seconds'];
@@ -221,6 +224,15 @@ class Config
             throw new InvalidArgumentException("$key: wrong value " . var_export($value, true));
         }
         return self::write($key, $value, $file, true);
+    }
+
+    /**
+     * The person turns web search on or off (ADR-0082): only the `pikkumies websearch on|off` verb calls this. Turning it on is
+     * the person's (ConfigureTiers), so Config::set refuses it for every caller, the agent's configure tool too.
+     */
+    public static function setWebSearch($on, $file = null)
+    {
+        return self::write('web.search', (bool) $on, $file);
     }
 
     /** The person accepted the terms of service and privacy policy: only the TTY prompt and install --accept-terms call this. */

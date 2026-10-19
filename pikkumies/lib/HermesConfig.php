@@ -75,9 +75,10 @@ class HermesConfig
         @mkdir($managed, 0700, true);
         $hooks = self::hookEntries();
         $lazy = !empty($config['hermes']['lazyInstalls']);
+        $web = !empty($config['web']['search']);
         // The pins, at every start: a key or setting changed after install reaches Hermes (ADR-0005), and a run
         // never starts without the hooks, since a failed write throws (ADR-0062).
-        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true) . self::sessionsYaml($config, true));
+        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true, $web) . self::sessionsYaml($config, true));
         // Key lives only in the managed .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($managed . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         // The skin display.skin names (StatusTheme), rebuilt like the managed files, before the seed can name it.
@@ -169,7 +170,7 @@ class HermesConfig
      * loader reads it from the user's file only), and no feature defaults the user may change (checkpoints,
      * plugins, background review, curator; pinning plugins.enabled would also refuse every other plugin).
      */
-    public static function renderYaml(array $prov, array $skillDirs, array $hooks, $lazyInstalls = false, $goalJudgeModel = '', $pinsOnly = false)
+    public static function renderYaml(array $prov, array $skillDirs, array $hooks, $lazyInstalls = false, $goalJudgeModel = '', $pinsOnly = false, $webSearch = false)
     {
         $y = $pinsOnly ? self::managedHeader() : self::seedHeader();
         // A named provider: Hermes reads key_env for entries under providers: (hermes_cli/providers.py);
@@ -197,7 +198,10 @@ class HermesConfig
         // Hermes web_search/web_extract fall back to outside free search services when no backend is
         // configured (keyless_fallback, hermes_cli/config_defaults.py). AGENTS.md: nothing leaves the
         // machine unasked, so both are off; a user who wants web search configures a backend (ADR-0021).
-        $y .= "web:\n  keyless_fallback: false\n  keyless_rescue: false\n";
+        // web.search on (the person's `pikkumies websearch on`, ADR-0082): ddgs, Hermes' one keyless provider (DuckDuckGo),
+        // pinned in the managed layer only, so it leaves again at the next start after `off`. Off: no backend is named,
+        // and a backend the user set up in Hermes themselves stays theirs (ADR-0062). The seed never names one.
+        $y .= "web:\n  keyless_fallback: false\n  keyless_rescue: false\n" . ($pinsOnly && $webSearch ? "  search_backend: \"ddgs\"\n" : '');
         // Hermes would otherwise pip-install optional packages (unpinned, from PyPI) and download a browser
         // at runtime (tools/lazy_deps.py), which costs every account on a shared server the download.
         // Off unless the user sets hermes.lazyInstalls (ADR-0021), which also decides whether the install
@@ -392,6 +396,10 @@ class HermesConfig
             . (empty($config['cron']['disabled']) && !CronTick::refuses(!empty($profile['root']['available']))
                 ? "\n- Cron jobs run from crontab; ignore \"gateway is not running\", never start the gateway"
                 : '')
+            // Opt-in (ADR-0082): off, the one question is the person's own command; the agent never turns it on.
+            . (!empty($config['web']['search'])
+                ? "\n- Web search: on; each web_search sends its query to DuckDuckGo"
+                : "\n- Web search: off. Asked to search the web, say it is off and that the user's command `pikkumies websearch on` turns it on; never turn it on yourself")
             . implode('', array_map(function ($n) {
                 return "\n- Notice from " . $n['from'] . ': ' . $n['text'];
             }, self::notices()))

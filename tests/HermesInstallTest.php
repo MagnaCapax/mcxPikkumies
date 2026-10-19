@@ -205,6 +205,8 @@ return [
                 $cfg = " | PYDIR=$home/bootstrap-python | CACHE=$home/cache/uv | NOCONFIG=1";
                 check(strpos($log, "uv python install --no-bin --no-registry 3.14$cfg\n") !== false && strpos($log, "uv python find --managed-python 3.14$cfg\n") !== false, 'uv bootstrap steps: ' . $log);
                 check(substr_count($log, "pm -m pm.cli install --without agent-browser --without cua-driver | cwd=$tree | HERMES_HOME=$home | RUNTIME_DIR=false\n") === 1, 'pm.cli install once, in the tree, our HERMES_HOME, no inherited HERMES_RUNTIME_DIR: ' . $log);
+                check(substr_count($log, "pm -m pm.cli install --extra ddgs | cwd=$tree | HERMES_HOME=$home | RUNTIME_DIR=false\n") === 1, 'the ddgs package joins the venv as its own call (ADR-0082): ' . $log);
+                check(strpos($log, 'install --extra ddgs') > strpos($log, 'install --without agent-browser'), 'the ddgs extra runs after the full default closure: ' . $log);
                 check(strpos($log, 'SETUP SCRIPT RAN') === false, 'upstream setup-hermes.sh must never run');
                 check(!file_exists("$tree/venv") && is_file($w['root'] . '/include/.hermes-ready') && !file_exists("$tree/.hermes-ready"), 'no venv; the marker lives outside the tree');
                 check(HermesInstall::isComplete() && HermesInstall::bin() === "$tree/.hermes/bin/hermes" && HermesInstall::sourceDir() === $tree, 'complete install not recognised');

@@ -10,4 +10,4 @@ php ~/pikkumies/tools/memory/pikkumies/pikkumies.php save --kind research --topi
     --title "<the question>" --sources "<url 1; url 2>" --body-file /tmp/x/answer.md
 ```
 
-Changes: saves one research note to `memory/research/` at the end. Web search works only when the user configured a backend ([ADR-0021](../../../../docs/adr/0021-web-access-off-unless-configured.md)).
+Changes: saves one research note to `memory/research/` at the end. Web search works only when the user turned it on with `pikkumies websearch on` or configured a backend in Hermes ([ADR-0021](../../../../docs/adr/0021-web-access-off-unless-configured.md), [ADR-0082](../../../../docs/adr/0082-web-search-opt-in-keyless-ddgs.md)).

@@ -54,6 +54,8 @@ class ConfigureTiers
         'ssh.allow' => ['list', 'approve', 'free'],
         'ssh.deny' => ['list', 'free', 'person'],
         'ssh.blockUnknown' => ['bool', 'free', 'approve'],
+        // On sends each search query to DuckDuckGo: the person's own `pikkumies websearch on`, never the agent (ADR-0082).
+        'web.search' => ['bool', 'person', 'free'],
     ];
     /** Keys by pattern: host.* overrides what detection found; arr.<app>.config only names where an app keeps its config. */
     const PATTERNS = ['/^host\./' => ['any', 'person'], '/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => ['any', 'free']];

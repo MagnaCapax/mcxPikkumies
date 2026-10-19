@@ -29,6 +29,10 @@ class HermesInstall
     // pm records the choice, so `hermes update` keeps them out too (pm/defaults.py). Left out unless
     // hermes.lazyInstalls is on (ADR-0021).
     const OPTIONAL_TOOLS = ['agent-browser', 'cua-driver'];
+    // The ddgs Python package (DuckDuckGo search, keyless), built in so `pikkumies websearch on` works at once (ADR-0082). The
+    // package alone sends nothing: Hermes names it only while the person has web.search on. Its own `pm.cli install --extra`
+    // call, after the full one: extras union into the installed venv (pm/install.py), so the default closure is unchanged.
+    const WEB_SEARCH_EXTRA = 'ddgs';
     // curl exit codes for which upstream retries the identical bytes from its mirror (setup-hermes.sh fetch_pinned).
     const MIRROR_RETRY_CODES = [5, 6, 7, 18, 22, 28, 52, 55, 56];
 
@@ -50,6 +54,7 @@ class HermesInstall
         'updates.check' => ['hermes_cli/config_defaults.py', '"check":'],
         'web.keyless_fallback' => ['hermes_cli/config_defaults.py', '"keyless_fallback":'],
         'web.keyless_rescue' => ['hermes_cli/config_defaults.py', '"keyless_rescue":'],
+        'web.search_backend' => ['hermes_cli/config_defaults.py', '"search_backend":'],
         'security.allow_lazy_installs' => ['hermes_cli/config_defaults.py', '"allow_lazy_installs":'],
         'approvals.mode' => ['tools/approval_context.py', '_VALID_MODES = ("manual", "smart", "off")'],
         'approvals.destructive_slash_confirm' => ['hermes_cli/config_defaults.py', '"destructive_slash_confirm":'],
@@ -237,6 +242,24 @@ class HermesInstall
         return ['HERMES_HOME' => $home, 'UV_NO_CONFIG' => '1', 'UV_PYTHON_INSTALL_DIR' => $home . '/bootstrap-python', 'UV_CACHE_DIR' => $home . '/cache/uv'];
     }
 
+    /**
+     * Join one optional Python package to a complete install's venv: `hermes pm install --extra NAME`, additive (pm unions
+     * extras into the installed state), output to the install log. For a build from before WEB_SEARCH_EXTRA was built in
+     * (ADR-0082); false when Hermes is not complete or the call failed.
+     */
+    public static function addExtra($name)
+    {
+        $bin = self::bin();
+        if ($bin === '') {
+            return false;
+        }
+        @mkdir(self::localDir(), 0700, true);
+        ob_start();
+        $code = self::run([$bin, 'pm', 'install', '--extra', $name], self::bootstrapEnv(), self::treeDir());
+        @file_put_contents(self::localDir() . '/install.log', ob_get_clean(), FILE_APPEND);
+        return $code === 0;
+    }
+
     /** Run argv (with env and cwd), output to this process's stdout (the install log); returns the exit code. */
     private static function run(array $argv, array $env = [], $cwd = null, &$out = null)
     {
@@ -349,6 +372,11 @@ class HermesInstall
         }
         if (self::run($pm, $env, $tree) !== 0) {
             return $fail('pm install');
+        }
+        // A second, separate call (ADR-0082): `--extra` alone installs no default closure, so it runs only after the full
+        // install above has built the venv it unions into.
+        if (self::run([$boot, '-m', 'pm.cli', 'install', '--extra', self::WEB_SEARCH_EXTRA], $env, $tree) !== 0) {
+            return $fail('pm install --extra ' . self::WEB_SEARCH_EXTRA);
         }
         if (!is_executable($tree . '/.hermes/bin/hermes')) {
             return $fail('pm install wrote no .hermes/bin/hermes');

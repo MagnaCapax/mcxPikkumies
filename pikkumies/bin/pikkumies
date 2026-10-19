@@ -575,6 +575,17 @@ switch ($cmd) {
         out('panel access: ' . $what);
         exit($ok ? 0 : 1);
 
+    case 'websearch': // web search through ddgs (DuckDuckGo), off until the person turns it on (lib/WebSearch.php, ADR-0082)
+        if ($passArgs[0] !== 'status') {
+            list($ok, $what) = WebSearch::turn($passArgs[0] === 'on');
+            out('web search: ' . $what);
+            if (!$ok) {
+                exit(1);
+            }
+        }
+        out(WebSearch::status(Config::load()));
+        exit(0);
+
     case 'tmux': // window pmN of the tmux session "pikkumies", running pikkumies (ADR-0032)
         $n = isset($passArgs[0]) ? $passArgs[0] : '1';
         if (!preg_match('/^[1-9]$/', $n)) {
@@ -639,5 +650,6 @@ switch ($cmd) {
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
         out('       pikkumies browse up|down|status            the isolated browser the agent uses (starts and stops by itself)');
         out('       pikkumies access status|rotate|remove      the agent\'s own panel login (made by itself where the panel accepts it)');
+        out('       pikkumies websearch on|off|status          web search (DuckDuckGo); off until you turn it on, nothing is searched online before');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }
