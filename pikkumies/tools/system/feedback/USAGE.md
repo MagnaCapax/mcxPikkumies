@@ -17,6 +17,8 @@ php /home/USER/pikkumies/pikkumies/tools/system/feedback/feedback.php send 01234
 ```
 
 - The send path must be absolute (as in the last line, with your own home directory) or start with `~/`, and point at this Pikkumies' own tool with no symlink in it; any other form is blocked.
-- The conversation comes from the session Hermes runs this command in (`HERMES_SESSION_ID`). A command can set that variable too, so the draft and the approval prompt show the session id and title: check they are the conversation you mean. It is exported into a private directory under `local/state/feedback/` and deleted after reading.
+- The conversation comes from the session Hermes runs this command in (`HERMES_SESSION_ID`). A command can set that variable too, so the draft record and the draft file show the session id and title: check they are the conversation you mean. (The approval prompt has room for where it goes, what goes, the size, the file and the start of the text only; the session is in the record and the file.) It is exported into a private directory under `local/state/feedback/` and deleted after reading.
 - Drafts stay until you remove them (`rm ~/pikkumies/local/state/feedback/<id>.json`; Pikkumies asks before a delete).
 - Pulsed Media keeps what is sent until you ask for it to be deleted; the Pulsed Media privacy policy says who reads it and how.
+- With approvals off (`HERMES_YOLO_MODE`, set by `--yolo`) or at `PIKKUMIES_DEPTH` 2 or more, the agent's `send` is blocked: nobody would be asked. Run the send yourself in your own terminal. A prompt that would not fit the approval panel whole is blocked the same way.
+- `feedback.ask` (off by default) lets Pikkumies now and then ask, at the end of an answer, whether you want to send feedback; the question sends nothing ([hook](../../../hooks/system/feedback-ask/), README).

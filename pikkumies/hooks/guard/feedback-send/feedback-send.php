@@ -2,7 +2,9 @@
 /**
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): the approval gate for /feedback (ADR-0056).
  * `php <this Pikkumies' tools/system/feedback/feedback.php> send <id>` alone in the terminal, the path absolute (or ~/)
- * and canonical, gets Hermes' approval prompt, built from the draft file itself. Blocked: a feedback path followed by
+ * and canonical, gets Hermes' approval prompt, built from the draft file itself (FeedbackPrompt: where it goes and what
+ * goes first, within what the panel is sure to show); with approvals off (HERMES_YOLO_MODE) or at depth 2 or more it is
+ * blocked and the person runs it in their own terminal (ADR-0056 amendment 2026-10-19). Blocked: a feedback path followed by
  * `send`, the sender's class names with the word send, and a feedback path with shell expansion and the word send, in a
  * terminal command, code, process input, a file written or patched, or a scheduled job. A safety prompt that catches the
  * agent's own and casual sends, not a security boundary: an agent steered by text it reads can still run the sender
@@ -62,6 +64,13 @@ if ($tool === 'terminal' && preg_match('/^\s*php[^\S\n]+(\S+)[^\S\n]+send[^\S\n]
         $block("run the feedback send on its own, exactly $plain, with nothing before or after it.");
     }
     $id = $m[2];
+    // Approvals off (--yolo) or an agent started by an agent: Hermes would let the send through with nobody asked, so the
+    // person runs it in their own terminal instead (ADR-0056 amendment 2026-10-19, an exception to ADR-0020's yolo rule).
+    require_once dirname(__DIR__, 3) . '/lib/NestedAgent.php';
+    if (NestedAgent::approvalsOff() || NestedAgent::unattended()) {
+        $block('approvals are off in this session, or this agent was started by another agent, so nobody would be asked before '
+            . "this feedback leaves the machine. Tell the user to run it themselves in their own terminal: php $own send $id");
+    }
 } else {
     $verb = $hit('/' . $ref . '\S+\s+[\[("\',]*(?:' . $sendWord . '|[^\s]*[$`])/i'); // the word after the tool path
     $classes = $hit('/feedback(?:send|draft)/i') && $hit('/' . $sendWord . '/i');
@@ -75,27 +84,20 @@ if ($tool === 'terminal' && preg_match('/^\s*php[^\S\n]+(\S+)[^\S\n]+send[^\S\n]
 // Loaded only for a feedback send: every other tool call costs nothing, also in a tree without the feedback unit.
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
+require_once dirname(__DIR__, 3) . '/lib/HookUnits.php';
 require_once dirname(__DIR__, 3) . '/tools/system/feedback/FeedbackDraft.php';
+require_once dirname(__DIR__, 3) . '/tools/system/feedback/FeedbackPrompt.php';
 try {
     list($json, $draft) = FeedbackDraft::load($id);
 } catch (CliError $e) {
     $block($e->getMessage() . '; ' . $e->hint . '.');
 }
-$s = FeedbackDraft::summary($draft, strlen($json));
-/** One line, quotes escaped: model-written text cannot add lines or close the quote it is shown in. */
-$quote = function ($t) {
-    return '"' . str_replace('"', '\\"', (string) preg_replace('/\s+/u', ' ', Cli::cleanString((string) $t))) . '"';
-};
-$conversation = $s['conversation']
-    ? 'yes, session ' . $quote($s['session_id']) . ($s['session_title'] !== '' ? ' titled ' . $quote($s['session_title']) : '')
-        . ', ' . $s['conversation_bytes'] . ' bytes with common password and key forms removed'
-        . ($s['older_part_left_out'] ? ', the older part left out to fit' : '') . "; it also carries that session's model, provider and working directory"
-    : 'no';
-// At most ~400 bytes of text and 120 of title plus fixed parts: always under the guard's 4000-character rule.
-$message = 'Pikkumies: sends feedback to Pulsed Media (pikkumies.mcx.fi), locked on this machine so only Pulsed Media can read it, '
-    . "linked to your Pulsed Media account through your AI key. Draft $id, {$s['bytes']} bytes, with the Pikkumies, Hermes and PMSS "
-    . "version numbers. Your conversation included: $conversation. Everything that would be sent is in " . FeedbackDraft::path($id)
-    . ", read it before you answer. Command [$id]: " . trim($text) . '. The text, written by the agent from what you said, starts: '
-    . $quote($s['text_start']);
+// What goes and where first, then the size, the file and the start of the text, all within what the panel is sure to
+// show (HookUnits::approveShown, ADR-0020 2026-10-19). The text is one line with quotes escaped, so it cannot add lines
+// or close its quote. The session id and title are in the draft record the agent shows and in the file.
+$message = FeedbackPrompt::message(FeedbackDraft::summary($draft, strlen($json)), FeedbackDraft::path($id), getenv('HOME'));
+if ($message === null || !HookUnits::approveShown($message)) {
+    $block("the question for this send is too long to show in full. Tell the user to read the draft and run it themselves in their own terminal: php $own send $id");
+}
 echo json_encode(['action' => 'approve', 'rule_key' => 'pikkumies-send:' . $id, 'message' => $message], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 exit(0);

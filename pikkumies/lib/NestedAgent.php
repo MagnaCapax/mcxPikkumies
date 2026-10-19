@@ -55,6 +55,17 @@ class NestedAgent
         return self::depth($depth) >= 2;
     }
 
+    /**
+     * True when this Hermes was started with approvals off by HERMES_YOLO_MODE (--yolo sets it; Hermes reads it once at
+     * start with its truthy set 1/true/yes/on, tools/approval.py, utils.py). A /yolo typed inside a session is in-process
+     * state no hook can see (ADR-0020).
+     */
+    public static function approvalsOff($raw = null)
+    {
+        $raw = strtolower(trim((string) ($raw === null ? getenv('HERMES_YOLO_MODE') : $raw)));
+        return in_array($raw, ['1', 'true', 'yes', 'on'], true);
+    }
+
     /** Every accepted spelling of the long flags in $flags, for a regex alternation. */
     public static function spellings(array $flags)
     {

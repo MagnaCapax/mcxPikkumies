@@ -1,6 +1,6 @@
 ---
 name: pikkumies-configure
-description: Show, review and change Pikkumies' own settings (the agent's name, also "from now on call yourself X", performance logging, telemetry, session history retention, which version updates follow, the model, the hooks, tool categories, skills).
+description: Show, review and change Pikkumies' own settings (the agent's name, also "from now on call yourself X", performance logging, telemetry, the occasional feedback question, session history retention, which version updates follow, the model, the hooks, tool categories, skills).
 ---
 
 # Configure Pikkumies

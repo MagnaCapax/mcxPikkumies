@@ -43,6 +43,19 @@ if (!function_exists('cfgHookTree')) {
 }
 
 return [
+    'config hook: the agent turning feedback.ask on asks the person with the reason, within the panel; turning it off is free' => function () {
+        $tree = cfgHookTree();
+        try {
+            $d = cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask on')]);
+            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === cfgHookKey('feedback.ask', false, true)
+                && strpos($d['message'], 'the question itself sends nothing') !== false && HookUnits::approveShown($d['message']), json_encode($d));
+            check(cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask on')], '2')['action'] === 'block', 'an agent started by an agent turned it on');
+            file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['feedback' => ['ask' => true]], true) . ";\n");
+            check(cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask off')]) === null, 'turning it off must need no question');
+        } finally {
+            testRmTree($tree);
+        }
+    },
     'config hook: a free change and the person\'s own get no opinion; an asked one gets approve keyed to that exact change' => function () {
         $tree = cfgHookTree(['root' => ['disabled' => true]]);
         try {

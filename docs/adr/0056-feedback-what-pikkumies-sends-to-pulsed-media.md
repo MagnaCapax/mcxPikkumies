@@ -46,3 +46,29 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - ADR-0015 (tool units), ADR-0020 (approval gate), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (hook units), ADR-0032 (telemetry setting), ADR-0033 (vanilla Hermes), [ADR-0044](0044-every-shell-command-is-logged.md) (command log)
 - Code: `pikkumies/tools/system/feedback/`, `pikkumies/hooks/guard/feedback-send/`, `pikkumies/lib/Redact.php`, `pikkumies/config/feedback-public-key.txt`
 - Tests: `tests/FeedbackTest.php`, `tests/GuardUsageContractTest.php`, `tests/CommandLogTest.php`
+
+## Amendment 2026-10-19: the occasional question, opt-in, and a prompt that says what goes
+**Context.** The operator's request of 2026-10-19: "virsilipas now has feedback option ... a feedback skill to be used, [like a coding agent named in the request,] randomly asking if you'd like to give feedback etc. and then confirms if you truly want to send that feedback saying that transcript will be sent to virsilipas, full transcript and system information ... honor our privacy policy and privacy first, fully opt in only". The feedback option is the intake at pikkumies.mcx.fi above; the account link is the AI credits (Virsilipas) key. Two facts shaped this: Hermes shows only about `HookUnits::APPROVE_SHOWN` (350) characters of an approve message for sure on a 24x80 terminal, and this guard's message used to spend them on the draft id and the account link before saying what the conversation part was; and with approvals off (`--yolo`, `HERMES_YOLO_MODE`) Hermes lets an approve through with nobody asked (ADR-0020).
+
+**Options considered.**
+- Gate the question on `privacy.telemetry`: it defaults on (ADR-0032), so the question would be opt-out. Rejected.
+- Ask in a `pre_verify` nudge: it forces an extra model turn, on the user's credits. Rejected.
+- Ask on the terminal after Hermes exits: a second send path outside this guard. Rejected.
+- Name the destination "Virsilipas" in the prompt: the privacy policy says the credit service never stores prompt text; the feedback goes to Pulsed Media's feedback service at pikkumies.mcx.fi, linked through the AI credits key. Rejected for the prompt.
+- Leave sends under `--yolo` as they were: the operator asked for a confirmation before anything leaves. Rejected.
+- The coding agent the operator pointed to asks for session feedback by default and lets users turn it off; this one is off until the person turns it on.
+
+**Decision.**
+- A setting `feedback.ask`, default off (`lib/Config.php`). Turning it on is asked ([ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md) tier `approve`: Hermes asks the person when the agent changes it); turning it off is free.
+- At the first interactive start on a terminal, one question offers to turn it on (`FeedbackAsk::offerOnce`, called from `bin/pikkumies` after the terms). Enter, any other answer or end of input is no; a marker under `local/state/feedback-ask/` is claimed before asking, so it is asked once ever.
+- Hook unit `hooks/system/feedback-ask` (`pre_llm_call`, fails open, 2 s): when the setting is on, in a session on Hermes platform `cli` or `tui`, at `PIKKUMIES_DEPTH` 1 or less, without `HERMES_YOLO_MODE`, with at least 4 user messages, for about 1 session in 5 (the first 16 bits of the session id's sha256, mod 100, under 20) and at most once in 7 days, it writes the marker `local/state/feedback-ask/asked` and then gives the turn one sentence: ask once, in one line, at the end of the answer. No marker written, no sentence. The rate, the 7 days and the 4 messages are starting values, not measurements.
+- The send prompt (`tools/system/feedback/FeedbackPrompt.php`) opens with where it goes and what goes: the user's text, the conversation transcript (whole, its newest 1.5 MB, or none) and system information (model, provider, folder, versions), to Pulsed Media at pikkumies.mcx.fi, locked, linked to the account; then the size, the file holding all of it and the start of the text, cut to fit. The whole message passes `HookUnits::approveShown()` (at most `APPROVE_SHOWN` characters, the check every unit uses since ADR-0020's amendment of the same day); one that cannot fit is a block. The draft id is in the file path; the session id and title, and the command, moved out of the prompt (the draft record and the file still show the session). What the draft holds is unchanged (`FeedbackDraft::FIELDS`).
+- The plain send is blocked, not asked, when `HERMES_YOLO_MODE` is set (`NestedAgent::approvalsOff`, Hermes' truthy set) or at `PIKKUMIES_DEPTH` 2 or more; the message gives the command for the person to run in their own terminal. This is an exception to ADR-0020's "in that session (depth 1) yolo still lets the guard's questions through", for this guard only.
+- The feedback skill: act on the question only after the user's yes; ask once; a no ends it; "never ask again" turns the setting off; never offer to turn it on unasked; when showing a draft, say what sending gives Pulsed Media and where.
+
+**Consequences.**
+- Nothing is asked unless the person turned it on, and the question sends nothing; every send still goes through this guard.
+- A `/yolo` typed inside a session is in-process state no hook can see: there the question can be asked and the send goes through unasked, as Hermes skips every question; the skill's disclosure is the only notice. A one-shot run resumed from a long session can carry the question at the end of its answer.
+- Users who run `--yolo` and use `/feedback` now run the send command themselves.
+- About 70 tokens in each turn that asks, on the user's credits.
+- Code: `pikkumies/hooks/system/feedback-ask/`, `pikkumies/tools/system/feedback/FeedbackAsk.php`, `pikkumies/tools/system/feedback/FeedbackPrompt.php`, `pikkumies/lib/NestedAgent.php`; tests `tests/FeedbackAskTest.php`, `tests/FeedbackPromptTest.php`.

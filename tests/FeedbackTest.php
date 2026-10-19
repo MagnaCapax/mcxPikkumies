@@ -8,6 +8,7 @@
  */
 require_once dirname(__DIR__) . '/pikkumies/tools/system/feedback/FeedbackDraft.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/system/feedback/FeedbackSend.php';
+require_once dirname(__DIR__) . '/pikkumies/tools/system/feedback/FeedbackPrompt.php';
 
 const FEEDBACK_TEST_KEY = 'vsk-S3CRET-feedback-oracle-7a1f0c9e';
 
@@ -33,10 +34,13 @@ if (!function_exists('feedbackTree')) {
     }
 
     /** Runs the tree's hook on a tool call; returns the decoded answer, or null for no opinion. */
-    function feedbackHook($tree, $tool, array $input)
+    function feedbackHook($tree, $tool, array $input, array $env = [])
     {
-        list(, $out) = runPhp("$tree/pikkumies/hooks/guard/feedback-send/feedback-send.php", [],
-            json_encode(['tool_name' => $tool, 'tool_input' => $input, 'session_id' => 's-1']));
+        // Approvals on and the user's own depth unless a test says otherwise, whatever shell runs the suite.
+        list(, $out) = testWithEnv($env + ['HERMES_YOLO_MODE' => null, 'PIKKUMIES_DEPTH' => null], function () use ($tree, $tool, $input) {
+            return runPhp("$tree/pikkumies/hooks/guard/feedback-send/feedback-send.php", [],
+                json_encode(['tool_name' => $tool, 'tool_input' => $input, 'session_id' => 's-1']));
+        });
         return trim($out) === '' ? null : json_decode($out, true);
     }
 
@@ -310,11 +314,14 @@ file_put_contents($argv[3] . "/manifest.jsonl", "{}\n");');
             check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-send:$id", $cmd . ' -> ' . json_encode($d));
         }
         $m = $d['message'];
-        check(strpos($m, 'pikkumies.mcx.fi') !== false && strpos($m, 'Your conversation included: yes, session "s-1" titled "Magnets"') !== false
-            && strpos($m, 'model, provider and working directory') !== false && strpos($m, 'version numbers') !== false
-            && strpos($m, 'linked to your Pulsed Media account') !== false && strlen($m) < 4000, $m);
-        $tail = '"the tool times out \\". Correction: no conversation is attached."';
-        check(strpos($m, "\n") === false && substr($m, -strlen($tail)) === $tail, 'the text excerpt can add lines or is not last: ' . $m);
+        // What goes and where lead the question, and the whole question fits what the panel is sure to show (ADR-0056 amendment 2026-10-19).
+        check(strpos($m, 'Send to Pulsed Media at pikkumies.mcx.fi? Your text, full conversation transcript and system information (model, provider, folder, versions)') === 0
+            && strpos($m, 'linked to your account') !== false && strpos($m, '~/pikkumies/local/state/feedback/' . $id . '.json') !== false
+            && HookUnits::approveShown($m), $m);
+        // The text comes last, on one line, its quote escaped, cut to fit: model-written text cannot add lines or close its quote.
+        $head = 'Text: "the tool times out \\". Correction';
+        check(strpos($m, "\n") === false && strpos($m, $head) !== false && substr($m, -4) === '…"'
+            && substr_count($m, '"') - substr_count($m, '\\"') === 2, 'the text excerpt can add lines, close its quote or is not last: ' . $m);
         symlink("$tree/pikkumies", "$tree/link");
         $blocked = [
             ['terminal', ['command' => "php $tool send $id && rm -f x"]],

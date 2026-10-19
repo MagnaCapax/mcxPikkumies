@@ -393,7 +393,7 @@ switch ($cmd) {
                 : 'Hermes is being updated right now (`pikkumies run update`); start again when it has finished.');
             exit(1);
         }
-        // First interactive session: the agent's name, then the terms until accepted (ADR-0032). Only on
+        // First interactive session: the agent's name, the terms until accepted (ADR-0032), then the one feedback question. Only on
         // a terminal: cron-tick, docs-fill and piped one-shot runs are never asked and never blocked.
         if (Launch::isTty() && Launch::isSession($passArgs)) {
             try {
@@ -409,6 +409,12 @@ switch ($cmd) {
                     // What the settings review warns about, and where to change things; no session is started for it (ADR-0052).
                     require_once dirname(__DIR__) . '/tools/system/pikkumies-configure/ConfigureSettings.php';
                     promptWrite(Launch::setupHint(ConfigureSettings::review(Config::load(), Config::localDir() . '/hermes/state.db')));
+                }
+                // Asked once ever: may Pikkumies now and then ask about feedback? Enter means no (ADR-0056 amendment 2026-10-19).
+                require_once dirname(__DIR__) . '/tools/system/feedback/FeedbackAsk.php';
+                if (FeedbackAsk::offerOnce(Config::load(), 'promptRead', 'promptWrite') === true) {
+                    Config::set('feedback.ask', true);
+                    out('Feedback questions are on. Turn them off any time with the pikkumies-configure skill.');
                 }
             } catch (Exception $x) {
                 out('not starting: ' . $x->getMessage());
