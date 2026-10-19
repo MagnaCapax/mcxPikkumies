@@ -15,6 +15,7 @@ require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
 require_once __DIR__ . '/Lessons.php';
 require_once __DIR__ . '/MemoryStats.php';
+require_once __DIR__ . '/MemoryLinks.php';
 
 const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing else, ask the user; then save what you learn with `save`';
 const SAVE_NEXT = 'no lesson matched: when the task is done, save what you learned, or what you searched and why it did not settle it: ';
@@ -84,6 +85,15 @@ Cli::run($argv, [
     'append' => function ($args, $opt) {
         return Lessons::append(isset($opt['path']) ? (string) $opt['path'] : '', Lessons::body($opt));
     },
+    'links' => function ($args, $opt) {
+        if (!empty($opt['broken'])) {
+            return MemoryLinks::broken();
+        }
+        if (!$args) {
+            throw new CliError('links needs a path, or --broken', 'php pikkumies.php links <a path printed by search>');
+        }
+        return MemoryLinks::links($args[0]);
+    },
     'list' => function ($args, $opt) {
         return DocSources::listPages($args, DocSources::active(), 'see: pikkumies.php sources');
     },
@@ -114,4 +124,4 @@ Cli::run($argv, [
         }
         return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },
-], "usage: pikkumies.php search|save|append|stats|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path', 'days']);
+], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'path', 'days']);

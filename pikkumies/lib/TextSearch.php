@@ -7,6 +7,8 @@
  * files that already matched.
  * Deterministic and local: nothing leaves the machine.
  */
+require_once __DIR__ . '/Links.php';
+
 class TextSearch
 {
     const STOPWORDS = ['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'is', 'it', 'how', 'what', 'why', 'do', 'does', 'with', 'my', 'i'];
@@ -54,8 +56,9 @@ class TextSearch
     /**
      * Ranked paths, best first. $share null: all terms (a quarter may miss at 5+ terms), for a
      * query someone typed as keywords. A share such as 0.5: that fraction of the terms, for free text.
+     * $bases: where a link in a file under one of them may also be relative to (the memory root, for memory files).
      */
-    public static function rank(array $files, $query, $limit, $share = null)
+    public static function rank(array $files, $query, $limit, $share = null, array $bases = [])
     {
         $want = self::terms($query);
         if (!$want) {
@@ -105,15 +108,15 @@ class TextSearch
                 $scores[$f] = $sum / sqrt(max(1, str_word_count($text)));
             }
         }
-        // Link boost: matched files linked from other matched files rank higher.
+        // Link boost: matched files linked from other matched files rank higher (Links, ADR-0060).
         foreach ($scores as $f => $s) {
-            if (preg_match_all('/\]\(([^)]+\.md)\)/', $files[$f], $m)) {
-                foreach ($m[1] as $target) {
-                    // An absolute target (the path a memory search prints, as USAGE.md tells the agent to link) as is.
-                    $abs = realpath($target[0] === '/' ? $target : dirname($f) . '/' . $target);
-                    if ($abs !== false && isset($scores[$abs])) {
-                        $scores[$abs] += 0.25 * $s;
-                    }
+            $own = array_filter($bases, function ($b) use ($f) {
+                return strpos($f, "$b/") === 0; // a base applies only to the files under it: the memory root to memory
+            });
+            foreach (Links::targets($files[$f]) as $target) {
+                $abs = substr($target, -3) === '.md' ? Links::resolve($target, $f, $own) : false;
+                if ($abs !== false && isset($scores[$abs])) {
+                    $scores[$abs] += 0.25 * $s;
                 }
             }
         }

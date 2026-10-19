@@ -117,24 +117,26 @@ return [
             }
         }
     },
-    'architecture: README.md and docs/*.md relative links resolve to a real file' => function () {
+    'architecture: every relative link in tracked markdown resolves to a file or directory, relative to its own file (ADR-0036, ADR-0060)' => function () {
         $root = dirname(__DIR__);
-        $pages = array_merge(["$root/README.md"], (array) glob("$root/docs/*.md"));
-        check(count($pages) >= 5, 'expected the README and the docs/ pages (ADR-0036); found ' . count($pages));
-        foreach ($pages as $page) {
-            $name = substr($page, strlen($root) + 1);
-            $text = (string) file_get_contents($page);
-            check(preg_match_all('/\]\(([^)]+)\)/', $text, $m) > 0, "no links found in $name; this check would be vacuous");
-            $checked = 0;
-            foreach ($m[1] as $link) {
-                if (strpos($link, '://') !== false || $link === '' || $link[0] === '#') {
-                    continue; // external or anchor-only
-                }
-                $checked++;
-                check(is_file(dirname($page) . "/$link"), "$name links to '$link', which does not exist");
-            }
-            check($checked >= 1, "no relative links were found to check in $name (it may have changed shape)");
+        $pages = [];
+        exec('cd ' . escapeshellarg($root) . ' && git ls-files "*.md" 2>/dev/null', $pages, $code);
+        if ($code !== 0) {
+            skip('git cannot list the tracked markdown here (no git, or not a checkout); CI runs this check');
         }
+        check(count($pages) >= 200, 'expected every tracked .md file from git ls-files; found ' . count($pages));
+        $checked = array_fill_keys(array_merge(['README.md'], array_map('basename', (array) glob("$root/docs/*.md"))), 0);
+        foreach ($pages as $name) {
+            foreach (Links::targets((string) file_get_contents("$root/$name")) as $link) { // code, front matter, web links skipped
+                $key = $name === 'README.md' ? $name : (dirname($name) === 'docs' ? basename($name) : 'rest');
+                $checked[$key] = (isset($checked[$key]) ? $checked[$key] : 0) + 1;
+                check($link[0] !== '/' && Links::resolve($link, "$root/$name") !== false, "$name links to '$link', which is absolute or does not exist");
+            }
+        }
+        foreach ($checked as $key => $n) {
+            check($n >= 1, "no relative links were found to check in $key (it may have changed shape)"); // the README and every docs/ page link
+        }
+        check(count($checked) >= 6 && array_sum($checked) >= 48, 'only ' . array_sum($checked) . ' links were checked; this check may have become vacuous');
     },
     'architecture: the README\'s first code block is the one-line install (ADR-0036)' => function () {
         $root = dirname(__DIR__);

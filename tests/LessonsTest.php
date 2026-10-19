@@ -246,21 +246,84 @@ return [
             lessonsCloseTree($tmp);
         }
     },
-    'lessons: memoryLinks() resolves a link relative to $dir first, then to the memory root, rejects a path-traversal target that resolves outside memory/, rejects README.md, and de-duplicates a repeated target' => function () {
+    'lessons: relink() resolves a link relative to the file first, then to the memory root, rejects a path-traversal target that resolves outside memory/, rejects README.md, de-duplicates a repeated target, and writes each accepted link relative to the file' => function () {
         $tmp = lessonsFreshTree();
         try {
             mkdir("$tmp/memory/lessons/rtorrent", 0700, true);
             mkdir("$tmp/memory/reference", 0700, true);
-            $dirRelative = "$tmp/memory/lessons/rtorrent/sibling.md"; // resolved relative to $dir
+            file_put_contents("$tmp/memory/README.md", "# memory\n");
+            $dirRelative = "$tmp/memory/lessons/rtorrent/sibling.md"; // resolved relative to the file
             file_put_contents($dirRelative, "# Sibling\n\nx\n");
             $rootRelative = "$tmp/memory/reference/x.md"; // resolved relative to the memory root
             file_put_contents($rootRelative, "# X\n\nx\n");
-            $body = 'see [a](sibling.md) and [b](reference/x.md) and [bad](../../../../etc/passwd.md) and [a-again](sibling.md)' . "\n";
-            $links = Lessons::memoryLinks($body, "$tmp/memory/lessons/rtorrent");
-            sort($links);
-            $expect = [realpath($dirRelative), realpath($rootRelative)];
-            sort($expect);
-            check($links === $expect, 'links: ' . json_encode($links));
+            $body = 'see [a](sibling.md) and [b](reference/x.md) and [bad](../../../../etc/passwd.md) and [readme](README.md) and [a-again](sibling.md)' . "\n";
+            list($out, $links) = Lessons::relink($body, realpath("$tmp/memory/lessons/rtorrent") . '/new.md');
+            check($links === [realpath($dirRelative), realpath($rootRelative)], 'links: ' . json_encode($links));
+            check($out === 'see [a](sibling.md) and [b](../../reference/x.md) and [bad](../../../../etc/passwd.md) and [readme](README.md) and [a-again](sibling.md)' . "\n", 'body: ' . $out);
+        } finally {
+            lessonsCloseTree($tmp);
+        }
+    },
+    'lessons: save() accepts every link form it accepted before ADR-0060 (absolute, relative to the current directory, to the topic directory, to the memory root, root-relative with a leading slash) and writes each one relative to the new file; a target outside memory/ and README.md are still refused' => function () {
+        $tmp = lessonsFreshTree();
+        $cwd = getcwd();
+        try {
+            $mem = realpath("$tmp/memory");
+            mkdir("$mem/lessons/rtorrent", 0700, true);
+            mkdir("$mem/reference", 0700, true);
+            file_put_contents("$mem/README.md", "# memory\n");
+            file_put_contents("$mem/lessons/rtorrent/topic.md", "# T\n");
+            file_put_contents("$mem/reference/ref.md", "# R\n");
+            file_put_contents("$tmp/outside.md", "# O\n");
+            chdir("$mem/reference");
+            $forms = ['absolute' => ["$mem/reference/ref.md", '../../reference/ref.md'], 'current directory' => ['ref.md', '../../reference/ref.md'],
+                'topic directory' => ['topic.md', 'topic.md'], 'memory root' => ['reference/ref.md', '../../reference/ref.md'],
+                'leading slash' => ['/lessons/rtorrent/topic.md', 'topic.md']];
+            foreach ($forms as $form => $pair) {
+                list($target, $written) = $pair;
+                $r = Lessons::save(['topic' => 'rtorrent', 'title' => "link form $form", 'sources' => 'test'], "see [it]($target).\n");
+                $saved = (string) file_get_contents($r['records'][0]['path']);
+                check(count($r['records'][0]['links']) === 1 && strpos($saved, "see [it]($written).\n") !== false, "$form: " . json_encode($r['records'][0]['links']) . ' ' . $saved);
+            }
+            foreach (['absolute outside' => "$tmp/outside.md", 'relative outside' => '../../../outside.md', 'README' => 'README.md', 'root README' => '../../README.md'] as $form => $target) {
+                try {
+                    Lessons::save(['topic' => 'rtorrent', 'title' => "refused $form", 'sources' => 'test'], "see [it]($target).\n");
+                    check(false, "$form must be refused");
+                } catch (CliError $e) {
+                    check($e->getMessage() === 'a lesson must link to at least one related memory file', "$form: " . $e->getMessage());
+                }
+            }
+        } finally {
+            chdir($cwd);
+            lessonsCloseTree($tmp);
+        }
+    },
+    'lessons: save() treats a --- block at the start of the body as text, not front matter: its link counts and is written relative to the file, and the block is kept' => function () {
+        $tmp = lessonsFreshTree();
+        try {
+            mkdir("$tmp/memory/reference", 0700, true);
+            file_put_contents("$tmp/memory/reference/ref.md", "# R\n");
+            $r = Lessons::save(['topic' => 'rtorrent', 'title' => 'body starting with a rule', 'sources' => 'test'], "---\nsee [it](reference/ref.md).\n---\nmore.\n");
+            $saved = (string) file_get_contents($r['records'][0]['path']);
+            check(count($r['records'][0]['links']) === 1 && strpos($saved, "\n\n---\nsee [it](../../reference/ref.md).\n---\nmore.\n") !== false, 'saved: ' . $saved);
+        } finally {
+            lessonsCloseTree($tmp);
+        }
+    },
+    'lessons: append() writes the links of the new text relative to the file and leaves every byte already in the file, absolute links included, unchanged' => function () {
+        $tmp = lessonsFreshTree();
+        try {
+            $mem = realpath("$tmp/memory");
+            mkdir("$mem/lessons/rtorrent", 0700, true);
+            mkdir("$mem/reference", 0700, true);
+            file_put_contents("$mem/reference/ref.md", "# R\n");
+            $path = "$mem/lessons/rtorrent/20261001-old.md";
+            $before = "# Old\n\nan old absolute link: [r]($mem/reference/ref.md)\n";
+            file_put_contents($path, $before);
+            Lessons::append($path, "a new one: [r]($mem/reference/ref.md) and [gone](gone.md)\n");
+            $after = (string) file_get_contents($path);
+            check(strpos($after, $before) === 0, 'existing bytes changed: ' . $after);
+            check(substr($after, strlen($before)) === "\n## Update " . gmdate('Y-m-d') . "\n\na new one: [r](../../reference/ref.md) and [gone](gone.md)\n", 'appended: ' . $after);
         } finally {
             lessonsCloseTree($tmp);
         }

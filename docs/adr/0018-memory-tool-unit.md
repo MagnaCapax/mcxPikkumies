@@ -45,3 +45,6 @@ Today lessons are saved by `tools/memory/memory.php save` and searched, together
 
 ## Amendment 2026-10-17
 The wiki and the knowledge base are also tool units of their own (ADR-0037): `tools/documentation/wiki` and `tools/documentation/kb` search and list only those sources. This unit is unchanged: its search still covers the lessons and every source, and it keeps `refresh` and `sources`.
+
+## Amendment 2026-10-18
+Save and append write each link to a memory file in the new text relative to the file written, and the unit gains a read-only `links` verb (ADR-0060). Every link form save accepted still counts (a link in code no longer does; one with a fragment or a title now does); what is already in a memory file is never rewritten.

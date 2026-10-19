@@ -244,6 +244,27 @@ return [
             siteDone($tree);
         }
     },
+    'docsite: a downloaded documentation page (tier 2) with a link written like a memory-root link does not boost a memory file; the memory root is a base for memory files only (ADR-0060)' => function () {
+        $tree = siteTree();
+        siteSetup($tree);
+        try {
+            file_put_contents("$tree/pikkumies/local/documentationSources.md", "## d-docs\n- type: site\n- url: https://d.example.org/sitemap.xml\n- trust: official\n- scope: all\n");
+            DocSources::$host = ['family' => 'generic', 'stack' => 'none'];
+            $mem = realpath("$tree/pikkumies/memory");
+            mkdir("$mem/lessons/a", 0700, true);
+            file_put_contents("$mem/lessons/a/B.md", "# B page\n\nlighthouse mention here only once in this short page.\n");
+            file_put_contents("$mem/lessons/a/M.md", "# M\n\nlighthouse appears briefly somewhere here now.\n");
+            mkdir("$tree/pikkumies/local/docs-cache/d-docs", 0700, true);
+            file_put_contents("$tree/pikkumies/local/docs-cache/d-docs/D.md", "# Lighthouse guide\n\nlighthouse keeper story continues. [see B](lessons/a/B.md)\n");
+            list($hits) = DocSources::search('lighthouse', 10, true);
+            $paths = array_column($hits, 0);
+            $tiers = array_column($hits, 5);
+            check(in_array(2, $tiers, true), 'fixture: the documentation page must be a tier-2 hit: ' . json_encode($hits));
+            check(array_search("$mem/lessons/a/M.md", $paths, true) < array_search("$mem/lessons/a/B.md", $paths, true), 'a documentation page must not boost a memory file: ' . json_encode($paths));
+        } finally {
+            siteDone($tree);
+        }
+    },
     'docsite: sources are filtered by scope against the host; link sources are never downloaded and are offered when nothing matches' => function () {
         $tree = siteTree();
         siteSetup($tree);

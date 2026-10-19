@@ -160,4 +160,26 @@ return [
             testRmTree($dir);
         }
     },
+    'textsearch: the memory search\'s link boost also follows a link relative to the memory root, the form save accepts (ADR-0060), and rank() follows it only when that base is given' => function () {
+        $tmp = testTempDir('pk-ts-rootlink');
+        try {
+            $mem = realpath($tmp) . '/memory';
+            mkdir("$mem/lessons/a", 0700, true);
+            file_put_contents("$mem/lessons/a/A.md", "# Lighthouse notes\n\nlighthouse keeper story continues. [see B](lessons/a/B.md)\n");
+            file_put_contents("$mem/lessons/a/B.md", "# B page\n\nlighthouse mention here only once in this short page.\n");
+            file_put_contents("$mem/lessons/a/M.md", "# M\n\nlighthouse appears briefly somewhere here now.\n");
+            $files = TextSearch::readDirs(["$mem/lessons/a"]);
+            $plain = TextSearch::rank($files, 'lighthouse', 10);
+            check(array_search("$mem/lessons/a/M.md", $plain, true) < array_search("$mem/lessons/a/B.md", $plain, true), 'fixture: without the base B must rank behind M: ' . json_encode($plain));
+            DocSources::$root = realpath($tmp);
+            DocSources::$host = ['family' => 'generic', 'stack' => 'none'];
+            list($hits) = DocSources::search('lighthouse', 10, true);
+            $paths = array_column($hits, 0);
+            check(array_search("$mem/lessons/a/B.md", $paths, true) < array_search("$mem/lessons/a/M.md", $paths, true), 'a memory-root link must boost B ahead of M: ' . json_encode($paths));
+        } finally {
+            DocSources::$root = null;
+            DocSources::$host = null;
+            testRmTree($tmp);
+        }
+    },
 ];

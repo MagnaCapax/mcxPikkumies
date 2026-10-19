@@ -632,7 +632,8 @@ class DocSources
         }
         $files = TextSearch::readDirs(array_keys($dirs));
         $byTier = [1 => [], 2 => [], 3 => []];
-        foreach (TextSearch::rank($files, $query, max(1, count($files)), $share) as $p) {
+        // A memory link may be relative to the memory root (ADR-0018 save accepts it), so search follows that form too.
+        foreach (TextSearch::rank($files, $query, max(1, count($files)), $share, [self::root() . '/memory']) as $p) {
             list($source, $trust, $tier) = $dirs[dirname($p)];
             if (count($byTier[$tier]) < $limit) {
                 list($title, $url) = self::pageInfo($p);

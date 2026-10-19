@@ -7,6 +7,7 @@
  * many were followed by at least one save within MemoryMetrics::SAVE_WINDOW (each search once).
  */
 require_once __DIR__ . '/MemoryMetrics.php';
+require_once __DIR__ . '/MemoryLinks.php';
 
 class MemoryStats
 {
@@ -135,11 +136,13 @@ class MemoryStats
         return strlen($t) > 76 ? substr($t, 0, 75) . '…' : $t;
     }
 
-    /** `memory: N lessons · M searches in 30 days · P% found something · K found nothing · L found no lesson, S then saved`; no search part without metrics. */
+    /** `memory: N lessons [· B broken links] · M searches in 30 days · P% found something · K found nothing · L found no lesson, S then saved`; no search part without metrics. */
     public static function doctorLine()
     {
         $s = self::compute(30);
         $line = 'memory:   ' . $s['lessons_on_disk'] . ' lessons';
+        $broken = MemoryLinks::brokenCount(); // ADR-0060: only when there are any
+        $line .= $broken > 0 ? " · $broken broken links (links --broken)" : '';
         if ($s['metrics'] === 'on' && MemoryMetrics::hasSearchMetrics()) {
             $line .= ' · ' . $s['searches'] . ' searches in 30 days';
             if ($s['searches'] > 0) {

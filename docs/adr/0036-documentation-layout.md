@@ -40,3 +40,6 @@ Facts read for this decision:
 ## References
 - PMSS README (one-line install, docs/ links); PMSS ADR 0090 (the skel installer).
 - ADR-0010, ADR-0032 (sections that moved).
+
+## Amendment 2026-10-18
+The link test covers every tracked `.md` file, not only the README and `docs/*.md`: each relative link resolves to a file or directory relative to its own file, with fragments dropped and code skipped (ADR-0060).

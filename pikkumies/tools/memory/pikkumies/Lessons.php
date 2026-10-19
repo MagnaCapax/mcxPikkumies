@@ -3,7 +3,8 @@
  * Lessons: the save/append side of the memory unit (ADR-0018). Lessons live in
  * pikkumies/memory/lessons/<topic>/YYYYMMDD-slug.md with frontmatter date, topic and sources.
  * A new lesson must link to at least one related memory file (or say why none is related), so the
- * lessons form a web that search can follow. Memory files are only ever appended to.
+ * lessons form a web that search can follow. Memory files are only ever appended to; the links in the new text are
+ * written relative to the file, so they work in any markdown viewer (ADR-0060).
  * With privacy.perfLogging on, each save is also counted in the memory metrics (ADR-0041).
  */
 class Lessons
@@ -50,7 +51,9 @@ class Lessons
                 $related[] = $h[0];
             }
         }
-        $links = self::memoryLinks($body, $dir);
+        // Links are written relative to the new file's directory under the real root; that directory may not exist yet.
+        $real = realpath(self::root());
+        list($body, $links) = self::relink($body, ($real !== false ? $real . substr($dir, strlen(self::root())) : $dir) . '/new.md');
         $why = isset($opt['no-related']) && is_string($opt['no-related']) ? trim($opt['no-related']) : '';
         if (!$links && $why === '') {
             throw new CliError('a lesson must link to at least one related memory file',
@@ -93,6 +96,7 @@ class Lessons
             throw new CliError('append works only on an existing memory file', 'pass --path <a path printed by search or save>');
         }
         $before = filesize($real);
+        list($body) = self::relink($body, $real);
         $add = "\n## Update " . gmdate('Y-m-d') . "\n\n" . $body;
         if (@file_put_contents($real, $add, FILE_APPEND | LOCK_EX) !== strlen($add)) {
             throw new CliError("could not append to $real", 'is the disk full?');
@@ -101,22 +105,30 @@ class Lessons
         return ['records' => [['path' => $real]], 'status' => ['verified' => filesize($real) === $before + strlen($add)]];
     }
 
-    /** Markdown links in $body that point at existing memory files (absolute, or relative to $dir). */
-    public static function memoryLinks($body, $dir)
+    /**
+     * [$body with each link to a memory file written relative to $fromFile, the real paths it links to]. A link
+     * counts when it names an existing .md file in memory other than README.md: absolute, relative to $fromFile,
+     * relative to the memory root, or as written (relative to the current directory), the forms save has
+     * always accepted (ADR-0060). Other links, and links in code or front matter, stay as they are.
+     */
+    public static function relink($body, $fromFile)
     {
         $root = realpath(self::root());
-        $out = [];
-        preg_match_all('/\]\(([^)\s]+\.md)\)/', $body, $m);
-        foreach ($m[1] as $target) {
-            foreach ([$target, "$dir/$target", self::root() . "/$target"] as $candidate) {
-                $real = realpath($candidate);
-                if ($real !== false && $root !== false && strpos($real, $root . '/') === 0 && basename($real) !== 'README.md') {
-                    $out[] = $real;
-                    break;
-                }
+        $accept = function ($real) use ($root) {
+            return $root !== false && strpos($real, $root . '/') === 0 && basename($real) !== 'README.md';
+        };
+        $links = [];
+        // The body follows the frontmatter and title in the file, so a --- block at its start is text, not front
+        // matter: a leading newline keeps Links from skipping it, and is taken off again below.
+        $body = Links::rewrite("\n" . $body, function ($target) use ($fromFile, $accept, &$links) {
+            $real = substr($target, -3) === '.md' ? Links::resolve($target, $fromFile, [self::root(), ''], $accept) : false;
+            if ($real === false) {
+                return null;
             }
-        }
-        return array_values(array_unique($out));
+            $links[] = $real;
+            return Links::relative($fromFile, $real);
+        });
+        return [(string) substr($body, 1), array_values(array_unique(array_reverse($links)))]; // rewrite walks the text from the end
     }
 
     /** The paragraph of $path that contains the most search words, at most EXCERPT bytes (TextSearch::excerpt). */

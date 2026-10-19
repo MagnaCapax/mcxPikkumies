@@ -12,6 +12,7 @@ description: "Memory, not the built-in memory tool: search first, save and appen
 3. **Trust:** this machine now (live) beats the provider's official documentation, which beats lessons, then research notes (verify them), then an app's own docs, then community pages, then your own recall (never a fact). For policies, prices and terms the official source decides. Say which source and trust level each fact came from.
 4. **Save at once** when you learned something worth finding next time, and always after a search that found no lesson, settled or not (a reminder comes once if you forget): `save` with the topic, a title someone would search for, and where the knowledge came from. Link related lessons inside the text; the tool lists candidates.
 5. **Append, never rewrite:** to add to a lesson, use `append`.
-6. **Never store** passwords, keys, tokens, or other people's data in memory.
+6. **Follow links:** `links <path>` lists what a lesson links to and what links to it; `links --broken` lists links that point at nothing.
+7. **Never store** passwords, keys, tokens, or other people's data in memory.
 
 Use Hermes' built-in memory only for the user's own preferences; lessons go here.
