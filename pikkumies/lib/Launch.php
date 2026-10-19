@@ -10,7 +10,7 @@
  * word after it is a flag (`pikkumies detect --refresh`): a prompt such as "update my plex" stays a
  * prompt instead of starting a self-update. `pikkumies -- <text>` always forces a prompt.
  * `pikkumies tmux [N]` opens window pmN of the tmux session "pikkumies" (ADR-0032).
- * Leading `-m <model>` / `--reasoning <level>` pairs pick the model or reasoning for one session (RunFlags, ADR-0052);
+ * Leading `-m <model>` / `--reasoning <level>` / `--resume <id>` / `--prompt-file <file|->` pairs set them for one session (RunFlags, ADR-0052);
  * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052). `pikkumies configure undo`, the
  * person's own, shows the last settings change and sets it back after they answer y (ADR-0059).
  *
@@ -33,7 +33,7 @@ class Launch
 
     /**
      * [cmd, passArgs]: cmd is one of SUBCOMMANDS, 'help', or 'error' with passArgs [one line for the person]. For 'run',
-     * passArgs is [] for a plain interactive session, or ['chat', (-m model, --reasoning level,) '--query=text']. $argv is the
+     * passArgs is [] for a plain interactive session, or ['chat', (RunFlags::peel's args,) '--query=text']. $argv is the
      * script's own argv (index 0 is the script path, same shape PHP gives bin/pikkumies).
      */
     public static function route(array $argv)
@@ -47,7 +47,7 @@ class Launch
         if ($argv[1] === '--') {
             return ['run', self::promptArgs(array_slice($argv, 2))];
         }
-        // Leading -m/--model/--reasoning pairs: everything after them is prompt text, a subcommand name too; `--` may end them.
+        // Leading RunFlags pairs: everything after them is prompt text, a subcommand name too; `--` may end them. With a prompt file, no words.
         if (RunFlags::isFlag($argv[1])) {
             list($flags, $words, $error) = RunFlags::peel(array_slice($argv, 1));
             if ($error !== '') {

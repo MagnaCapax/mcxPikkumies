@@ -229,6 +229,7 @@ return [
             'tools/tool_output_limits.py' => ['DEFAULT_MAX_BYTES = 50_000'],                                 // ADR-0016: our budget stays below
             'tools/approval_context.py' => ['_VALID_MODES = ("manual", "smart", "off")'],                    // ADR-0020: we set manual
             'hermes_cli/config.py' => ['def _deep_merge('],                                                   // ADR-0020: approvals.mode alone keeps the other defaults
+            'hermes_cli/_parser.py' => ['_query_group.add_argument("--query-file"'],                          // ADR-0052: the launcher's --prompt-file is chat's --query-file
         ];
         foreach ($facts as $file => $needles) {
             $text = (string) @file_get_contents($src . '/' . $file);

@@ -466,7 +466,12 @@ switch ($cmd) {
             exit(HaltRun::run(hermesBin(), $passArgs));
         }
         $args = array_map('escapeshellarg', $passArgs);
-        passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+        // @: PHP's own warning would print the whole command, the prompt included. -1 means sh itself could not start.
+        @passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+        if ($code === -1) {
+            fwrite(STDERR, HaltRun::START_FAILED);
+            exit(1);
+        }
         exit($code);
 
     case 'cron-tick': // internal: the crontab line Update::scheduleCronTick installs, once a minute
@@ -544,6 +549,8 @@ switch ($cmd) {
         out('       pikkumies <free text>                      start a session with that as the first prompt');
         out('       pikkumies -- <free text>                   force a prompt even if it starts with a subcommand name');
         out('       pikkumies -m <model> [free text]           a session with that model (also --model, and --reasoning <level>)');
+        out('       pikkumies --prompt-file FILE|-             the first prompt from a file, or from stdin with - (for long prompts)');
+        out('       pikkumies --resume <session id> [text]     continue that session');
         out('       pikkumies configure                        review your settings and change them with the agent');
         out('       pikkumies configure undo                   show the last settings change and set it back after you answer y');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');

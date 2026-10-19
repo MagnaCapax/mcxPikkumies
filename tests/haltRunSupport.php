@@ -17,7 +17,12 @@ if (!function_exists('haltRunTree')) {
         return $tmp;
     }
 
-    /** A fixture "hermes": refuses --usage-file after chat (exit 2, as Hermes v0.22.2 does), prints plan.json[call index] "output" (last entry repeats) plus a stream-json result event with its "session_id", exits its "code". Every call is logged to calls.jsonl. */
+    /**
+     * A fixture "hermes": refuses --usage-file after chat (exit 2, as Hermes v0.22.2 does); reads --query-file (a path, or "-"
+     * for stdin) into the logged call's "query_file_text" and, like Hermes, exits 2 when --query is given too or the text is
+     * empty; prints plan.json[call index] "output" (last entry repeats) plus a stream-json result event with its "session_id",
+     * exits its "code". Every call is logged to calls.jsonl.
+     */
     function haltRunFakeHermes($tree)
     {
         $path = "$tree/fake-hermes";
@@ -28,7 +33,12 @@ if (!function_exists('haltRunTree')) {
             . '$plan = json_decode((string) @file_get_contents("$dir/plan.json"), true);' . "\n"
             . '$plan = is_array($plan) ? $plan : [];' . "\n"
             . '$step = isset($plan[$n]) ? $plan[$n] : ($plan ? end($plan) : ["output" => "", "code" => 0, "session_id" => "fakesess"]);' . "\n"
-            . 'file_put_contents($callsFile, json_encode(["argv" => array_slice($argv, 1)]) . "\n", FILE_APPEND);' . "\n"
+            . '$qf = null; $hasQuery = false;' . "\n"
+            . 'foreach (array_slice($argv, 1) as $k => $a) { if (strpos($a, "--query-file=") === 0) { $qf = substr($a, 13); } elseif ($a === "--query-file") { $qf = (string) $argv[$k + 2]; } elseif (strpos($a, "--query=") === 0) { $hasQuery = true; } }' . "\n"
+            . '$qfText = $qf === null ? null : ($qf === "-" ? stream_get_contents(STDIN) : (string) @file_get_contents($qf));' . "\n"
+            . 'file_put_contents($callsFile, json_encode(["argv" => array_slice($argv, 1), "query_file_text" => $qfText]) . "\n", FILE_APPEND);' . "\n"
+            . 'if ($qf !== null && $hasQuery) { fwrite(STDERR, "hermes chat: error: argument --query-file: not allowed with argument -q/--query\n"); exit(2); }' . "\n"
+            . 'if ($qf !== null && trim($qfText) === "") { fwrite(STDERR, "Error: --query-file $qf is empty\n"); exit(2); }' . "\n"
             // Like Hermes v0.22.2: after the `chat` subcommand an option chat does not define is an argparse error.
             . '$chatAt = array_search("chat", $argv, true);' . "\n"
             . 'if ($chatAt !== false) {' . "\n"
@@ -79,8 +89,8 @@ echo json_encode(["choices" => [["message" => ["role" => "assistant", "content" 
         throw new Exception('fake model did not start');
     }
 
-    /** Seeds the halt-snapshot HaltRun::run() will read, optionally pre-marking it as already judged, then runs HaltRun::run() in a subprocess. [code, stdout]. */
-    function haltRunDrive($tree, $hermesBin, $sessionId, $alreadyJudged = false, array $passArgs = ['chat', '--query=please fix the thing'])
+    /** Seeds the halt-snapshot HaltRun::run() will read, optionally pre-marking it as already judged, then runs HaltRun::run() in a subprocess with $stdin. [code, stdout]. */
+    function haltRunDrive($tree, $hermesBin, $sessionId, $alreadyJudged = false, array $passArgs = ['chat', '--query=please fix the thing'], $stdin = '')
     {
         $script = "$tree/driver-" . mt_rand() . '.php';
         $body = "<?php\nrequire " . var_export("$tree/pikkumies/lib/HaltState.php", true) . ";\nrequire " . var_export("$tree/pikkumies/lib/HaltRun.php", true) . ";\n"
@@ -92,7 +102,7 @@ echo json_encode(["choices" => [["message" => ["role" => "assistant", "content" 
         $body .= '$code = HaltRun::run(' . var_export($hermesBin, true) . ', ' . var_export($passArgs, true) . ");\n"
             . 'fwrite(STDOUT, "\nHALT_EXIT:" . $code . "\n");' . "\n";
         file_put_contents($script, $body);
-        list(, $out) = runPhp($script, []);
+        list(, $out) = runPhp($script, [], $stdin);
         return [(int) (preg_match('/HALT_EXIT:(-?\d+)/', $out, $m) ? $m[1] : -999), $out];
     }
 

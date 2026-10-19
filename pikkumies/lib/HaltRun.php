@@ -17,6 +17,9 @@ class HaltRun
 {
     const MAX_CONTINUES = 3;         // mirrors Hermes' own agent.max_verify_nudges default (ADR-0047 verified facts)
     const CAPTURE_MAX = 40000;       // bytes of printed output kept as the judged "final answer"
+    /** Printed when Hermes could not be started at all. Not a claimed cause: a process or memory limit fails the same way. */
+    const START_FAILED = 'Could not start Hermes. If the prompt is long (over about 128 KB), it does not fit on a command line:'
+        . " put it in a file, `pikkumies --prompt-file FILE`, or send it on stdin with `pikkumies --prompt-file -`.\n";
 
     /** Runs $hermesBin with $passArgs (['chat', '--query=...']), judging and resuming as needed; returns the exit code. */
     public static function run($hermesBin, array $passArgs)
@@ -70,7 +73,8 @@ class HaltRun
         $p = @proc_open($cmd, [0 => STDIN, 1 => ['pipe', 'w'], 2 => STDERR], $pipes);
         $output = '';
         $code = 1;
-        if (is_resource($p)) {
+        $started = is_resource($p);
+        if ($started) {
             while (!feof($pipes[1])) {
                 $chunk = fread($pipes[1], 65536);
                 if ($chunk === false || $chunk === '') {
@@ -87,6 +91,10 @@ class HaltRun
             }
             fclose($pipes[1]);
             $code = proc_close($p);
+        }
+        // Not started: proc_open fails (PHP 8.3+, posix_spawn), or the forked child cannot exec sh and exits 127 silently (older PHP).
+        if (!$started || ($code === 127 && $output === '')) {
+            fwrite(STDERR, self::START_FAILED);
         }
         $output = strlen($output) > self::CAPTURE_MAX ? substr($output, -self::CAPTURE_MAX) : $output;
         return [$code, $output, self::streamSessionId($output)];
