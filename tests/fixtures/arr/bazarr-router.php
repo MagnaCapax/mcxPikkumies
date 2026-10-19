@@ -40,6 +40,16 @@ if (!empty($s['sleep'])) {
 if ($rel === null) {
     $send(404, 'Not Found');
 }
+// The login (api/system/account.py:15-50) needs no key: 204, 403 refused, 500 when auth.type is neither form nor basic.
+$cfg = isset($s['settings']) ? $s['settings'] : ['general' => ['debug' => false], 'auth' => ['type' => null, 'username' => '', 'password' => '']];
+if ($method === 'POST' && $rel === 'system/account') {
+    if (!in_array($cfg['auth']['type'], ['form', 'basic'], true)) {
+        $send(500, 'Unknown authentication type define in config');
+    }
+    $ok = isset($form['action'], $form['username'], $form['password']) && $form['action'] === 'login'
+        && $form['username'] === $cfg['auth']['username'] && md5($form['password']) === $cfg['auth']['password'];
+    $send($ok ? 204 : 403, 'Authentication failed');
+}
 if ((isset($_SERVER['HTTP_X_API_KEY']) ? $_SERVER['HTTP_X_API_KEY'] : '') !== $s['key']) {
     $send(401, ['message' => 'The server could not verify that you are authorized to access the URL requested.']);
 }
@@ -94,5 +104,32 @@ if ($method === 'PATCH' && in_array($rel, ['series', 'movies'], true)) {
 }
 if ($rel === 'system') {
     $s['violations'][] = 'the restart/shutdown route was called';
+}
+// Settings (api/system/settings.py:24-130, app/config.py save_settings :690-): a text that is a whole number becomes one
+// unless the key is in str_keys, 'true'/'false' become booleans, settings-auth-password is stored as its md5. Knobs:
+// settingsFail (406 that echoes the value), settingsIgnore (204, nothing stored).
+if ($method === 'GET' && $rel === 'system/settings') {
+    $send(200, $cfg + ['notifications' => ['providers' => []]]);
+}
+if ($method === 'POST' && $rel === 'system/settings') {
+    if (!empty($s['settingsFail'])) {
+        $send(406, 'invalid values: ' . implode(', ', $form));
+    }
+    foreach ($form as $k => $v) {
+        if (!preg_match('/^settings-([a-z0-9_]+)-([a-z0-9_]+)$/', $k, $m)) {
+            $s['violations'][] = "settings form key $k";
+            continue;
+        }
+        $v = $m[2] === 'password' ? md5($v) : (preg_match('/^-?[0-9]+$/', $v) ? (int) $v : ($v === 'true' ? true : ($v === 'false' ? false : $v)));
+        if (empty($s['settingsIgnore'])) {
+            $cfg[$m[1]][$m[2]] = $v;
+        }
+    }
+    $s['settings'] = $cfg;
+    if (!empty($s['settingsHang'])) { // stored (unless settingsIgnore), then no answer within the test's 2 s timeout
+        file_put_contents($file, json_encode($s));
+        sleep(3);
+    }
+    $send(204, null);
 }
 $send(404, ['message' => "NotFound: $method $rel"]);

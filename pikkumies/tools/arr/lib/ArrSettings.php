@@ -97,13 +97,14 @@ class ArrSettings
         return $cfg;
     }
 
-    private static function secret($f)
+    /** True for a field whose name looks secret (Cli::SECRET_KEY_RE) or is a password confirmation; shared with jellyfin and bazarr config. */
+    public static function secret($f)
     {
         return (bool) preg_match(Cli::SECRET_KEY_RE, strtolower($f)) || $f === 'passwordConfirmation';
     }
 
-    /** $raw as the type of $now: true/false, a whole number, or one line of text. */
-    private static function typed($now, $raw, $name)
+    /** $raw as the type of $now: true/false, a whole number, or one line of text (shared with jellyfin and bazarr config). */
+    public static function typed($now, $raw, $name)
     {
         if (is_bool($now)) {
             if (!in_array($raw, ['true', 'false'], true)) {

@@ -34,7 +34,7 @@ class Cli
      * answer. A habit prompt for the agent reading the line, not a control (ADR-0065).
      */
     const STOP = 'this refusal is the answer: tell the user the error and the hint, or do what the hint says; do not read this tool\'s code or work around it';
-    const SECRET_KEY_RE = '/(pass|passwd|password|passkey|secret|token|apikey|api[-_]key|cookie|credentials?|authorization|private[-_]?key)$|^(sid|auth)$/';
+    const SECRET_KEY_RE = '/(pass|passwd|password|passkey|secret|token|apikey|api[-_]key|cookies?|credentials?|authorization|private[-_]?key)$|^(sid|auth)$/';
 
     /**
      * argv -> [verb|null, positional args, options]; accepts --name value, --name=value and --flag.

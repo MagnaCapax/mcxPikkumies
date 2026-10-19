@@ -3,7 +3,7 @@
  * JackettConfig: where this user's Jackett keeps ServerConfig.json, and the three settings the tool reads from it:
  * Port, BasePathOverride and APIKey (Jackett.Common/Models/Config/ServerConfig.cs:35,39,45 at the commit in
  * README.md). Read with json_decode, PHP's own parser (nothing in the file is run), never written. Every other
- * setting (AdminPassword, ProxyPassword, OmdbApiKey) is never read.
+ * setting (ProxyPassword, OmdbApiKey) is never read; JackettLogin reads only whether AdminPassword and AllowExternal are set.
  */
 class JackettConfig
 {

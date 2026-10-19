@@ -100,4 +100,44 @@ return [
             testRmTree($home);
         }
     },
+    'media-stack credentials: a symlinked or foreign lock file is refused before anything is opened, created or written' => function () use ($mscFile) {
+        $home = testTempDir('pk-msc');
+        try {
+            $f = "$home/.media-stack-credentials.txt";
+            file_put_contents($f, $mscFile);
+            chmod($f, 0600);
+            $before = file_get_contents($f);
+            file_put_contents("$home/elsewhere", 'keep');
+            chmod("$home/elsewhere", 0644);
+            foreach (["$home/elsewhere", "$home/not-yet-there"] as $target) {
+                @unlink("$f.lock");
+                symlink($target, "$f.lock");
+                $err = '';
+                try {
+                    MediaStackCredentials::set($home, ['SONARR_PASSWORD' => 'New-Value-0003']);
+                } catch (CliError $e) {
+                    $err = $e->getMessage();
+                }
+                clearstatcache();
+                check(strpos($err, 'refusing ~/.media-stack-credentials.txt.lock') === 0, "link to $target: " . $err);
+                check(file_get_contents($f) === $before && !file_exists("$home/not-yet-there") && file_get_contents("$home/elsewhere") === 'keep'
+                    && (fileperms("$home/elsewhere") & 0777) === 0644, "link to $target: something was written or followed");
+            }
+            unlink("$f.lock");
+            mkdir("$f.lock");
+            try {
+                MediaStackCredentials::set($home, ['SONARR_PASSWORD' => 'New-Value-0003']);
+                check(false, 'a folder in place of the lock file was used');
+            } catch (CliError $e) {
+                check(strpos($e->getMessage(), 'refusing') === 0 && file_get_contents($f) === $before, 'folder lock: ' . $e->getMessage());
+            }
+            rmdir("$f.lock");
+            MediaStackCredentials::set($home, ['SONARR_PASSWORD' => 'New-Value-0003']);
+            clearstatcache();
+            check(MediaStackCredentials::read($home)['SONARR_PASSWORD'] === 'New-Value-0003' && is_file("$f.lock") && !is_link("$f.lock")
+                && (fileperms("$f.lock") & 0777) === 0600, 'a plain lock file works and is 0600');
+        } finally {
+            testRmTree($home);
+        }
+    },
 ];

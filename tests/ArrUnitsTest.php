@@ -1,5 +1,17 @@
 <?php
 /** The phase-2 *ARR units against the category contract: USAGE.md verbs, the README's first table, the skill rules. */
+
+/** The cause names of the `| cause |` table under $heading, up to the next `## ` heading. */
+function arrCauseTable($readme, $heading)
+{
+    $c = strpos($readme, $heading);
+    if ($c === false) {
+        return [];
+    }
+    $end = strpos($readme, "\n## ", $c);
+    preg_match_all('/^\| ([a-z-]+) \|/m', substr($readme, $c, $end === false ? null : $end - $c), $m);
+    return array_values(array_diff($m[1], ['cause']));
+}
 return [
     'arr units: lidarr, readarr, bazarr, autobrr, whisparr and jackett answer exactly their USAGE.md verbs, and every category verb' => function () {
         $dir = dirname(__DIR__) . '/pikkumies/tools/arr';
@@ -36,19 +48,31 @@ return [
         check($p !== false, 'README lacks the Servarr login and settings section');
         $sub = array_column(Units::verbs(substr($readme, $p)), 'verb');
         check($sub === ['login-check', 'set-login', 'repair', 'config'], 'Servarr sub-table: ' . implode(',', $sub));
+        // The other apps have the login verbs their upstream allows ("Login of the other apps"); readarr has none, and only the Servarr apps repair.
+        $other = ['readarr' => [], 'bazarr' => ['login-check', 'set-login', 'config'], 'autobrr' => ['login-check', 'set-login'], 'jackett' => ['login-check']];
         foreach (['sonarr', 'radarr', 'lidarr', 'prowlarr', 'whisparr', 'readarr', 'bazarr', 'autobrr', 'jackett'] as $u) {
             list(, $out) = runPhp("$dir/$u/$u.php", ['--verbs']);
             $code = array_values(array_filter(explode("\n", trim($out)), 'strlen'));
             $on = in_array($u, ArrAuth::APPS, true);
-            check($on ? !array_diff($sub, $code) : !array_intersect($sub, $code), "$u: login verbs " . ($on ? 'missing' : 'present') . ': ' . implode(',', $code));
+            check($on ? !array_diff($sub, $code) : array_values(array_intersect($sub, $code)) === $other[$u], "$u: login verbs: " . implode(',', $code));
             $skill = (string) file_get_contents("$dir/$u/skill.md");
-            check(!$on || (strpos($skill, 'run `login-check` and do its `next`') !== false && strpos($skill, 'never print the password') !== false
+            check($u === 'readarr' || (strpos($skill, 'run `login-check` and do its `next`') !== false && strpos($skill, 'never print the password') !== false
                 && strpos($skill, '`~/.media-stack-credentials.txt`') !== false), "$u/skill.md lacks the login-check pointer");
         }
-        $c = strpos($readme, '### Why a login fails');
-        preg_match_all('/^\| ([a-z-]+) \|/m', substr($readme, $c, strpos($readme, "\n## ", $c) - $c), $m);
-        $causes = array_values(array_diff($m[1], ['cause']));
-        check($c !== false && $causes === array_keys(ArrLoginCheck::CAUSES), 'README causes ' . implode(',', $causes) . ' but the code has '
-            . implode(',', array_keys(ArrLoginCheck::CAUSES)));
+        check(arrCauseTable($readme, '### Why a login fails') === array_keys(ArrLoginCheck::CAUSES), 'README causes ' . implode(',', arrCauseTable($readme, '### Why a login fails'))
+            . ' but the code has ' . implode(',', array_keys(ArrLoginCheck::CAUSES)));
+    },
+    'arr units: each other app\'s README cause table mirrors its CAUSES in code, and the category README names every one of them' => function () {
+        $dir = dirname(__DIR__) . '/pikkumies/tools/arr';
+        require_once "$dir/lib/Arr.php";
+        foreach (['bazarr' => ['BazarrLogin', 'Bazarr'], 'autobrr' => ['AutobrrLogin', 'autobrr'], 'jackett' => ['JackettLogin', 'Jackett']] as $u => $c) {
+            require_once "$dir/$u/{$c[0]}.php";
+            $heading = '### Why a' . ($u === 'autobrr' ? 'n' : '') . " {$c[1]} login fails";
+            $doc = arrCauseTable((string) file_get_contents("$dir/$u/README.md"), $heading);
+            check($doc === array_keys(constant($c[0] . '::CAUSES')), "$u README causes " . implode(',', $doc) . ' but the code has '
+                . implode(',', array_keys(constant($c[0] . '::CAUSES'))));
+        }
+        $readme = (string) file_get_contents("$dir/README.md");
+        check(strpos($readme, '## Login of the other apps (bazarr, autobrr, jackett)') !== false, 'the category README lacks the other apps\' login section');
     },
 ];

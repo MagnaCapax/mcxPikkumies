@@ -319,6 +319,21 @@ class Host
     }
 
     /**
+     * This uid's home folder: $HOME when it is a folder this uid owns (as it always is when nobody changed it),
+     * else the passwd entry (posix_getpwuid). An injected HOME=/home/other is never used: that folder is not ours.
+     * The *ARR units (ArrLocate::home), jellyfin and the guard share this rule.
+     */
+    public static function home($uid, $env = null)
+    {
+        $env = rtrim((string) ($env === null ? getenv('HOME') : $env), '/');
+        if ($env !== '' && @is_dir($env) && @fileowner($env) === (int) $uid) {
+            return $env;
+        }
+        $pw = function_exists('posix_getpwuid') ? @posix_getpwuid((int) $uid) : false;
+        return is_array($pw) && isset($pw['dir']) && is_string($pw['dir']) ? rtrim($pw['dir'], '/') : '';
+    }
+
+    /**
      * The user's own Docker daemon socket: DOCKER_HOST when it is unix:// and the socket is this user's, else
      * the first of dockerSocketCandidates() that is this user's. '' otherwise: tcp:// and a daemon run by root or
      * another account are never used. The *ARR, media and containers units share this rule. $candidates (test

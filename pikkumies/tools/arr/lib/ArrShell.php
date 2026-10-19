@@ -7,8 +7,11 @@
  */
 class ArrShell
 {
-    /** [exit code, stdout, stderr]; $env adds variables to this process's own environment. */
-    public static function run(array $argv, array $env = [], $cwd = null)
+    /**
+     * [exit code, stdout, stderr]; $env adds variables to this process's own environment. $stdin: text written to the
+     * program's standard input, then closed (a password for autobrrctl: never in argv or the environment); null: /dev/null.
+     */
+    public static function run(array $argv, array $env = [], $cwd = null, $stdin = null)
     {
         $full = null;
         if ($env) {
@@ -17,15 +20,53 @@ class ArrShell
                 $full[$k] = $v;
             }
         }
-        $p = @proc_open(implode(' ', array_map('escapeshellarg', $argv)), [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd, $full);
+        $in = $stdin === null ? ['file', '/dev/null', 'r'] : ['pipe', 'r'];
+        $p = @proc_open(implode(' ', array_map('escapeshellarg', $argv)), [0 => $in, 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd, $full);
         if (!is_resource($p)) {
             return [127, '', 'could not start ' . $argv[0]];
         }
-        $out = (string) stream_get_contents($pipes[1]);
-        $err = (string) stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
+        if ($stdin !== null) {
+            @fwrite($pipes[0], (string) $stdin);
+            fclose($pipes[0]);
+        }
+        list($out, $err) = self::drain($pipes[1], $pipes[2]);
         return [proc_close($p), $out, $err];
+    }
+
+    /**
+     * stdout and stderr read together with stream_select until both end, so a program that fills one pipe (64 KiB) while
+     * this reads the other cannot block both sides. Each pipe is closed here.
+     */
+    private static function drain($stdout, $stderr)
+    {
+        $got = [(int) $stdout => '', (int) $stderr => ''];
+        $open = [$stdout, $stderr];
+        foreach ($open as $pipe) {
+            stream_set_blocking($pipe, false);
+        }
+        while ($open) {
+            $read = $open;
+            $write = null;
+            $except = null;
+            if (@stream_select($read, $write, $except, 60) === false) {
+                break;
+            }
+            foreach ($read as $pipe) {
+                $chunk = fread($pipe, 65536);
+                if (is_string($chunk) && $chunk !== '') {
+                    $got[(int) $pipe] .= $chunk;
+                } elseif (feof($pipe)) {
+                    fclose($pipe);
+                    $open = array_values(array_filter($open, function ($o) use ($pipe) {
+                        return $o !== $pipe;
+                    }));
+                }
+            }
+        }
+        foreach ($open as $pipe) {
+            fclose($pipe);
+        }
+        return [$got[(int) $stdout], $got[(int) $stderr]];
     }
 
     /** True when $name is an executable file in PATH (looked at, never run). */

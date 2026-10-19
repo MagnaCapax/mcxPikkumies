@@ -8,7 +8,7 @@
  */
 require_once dirname(__DIR__) . '/lib/Arr.php';
 require_once dirname(__DIR__, 3) . '/lib/SecretFile.php';
-foreach (['AutobrrSecret', 'AutobrrConfig', 'AutobrrVerbs', 'AutobrrChange', 'AutobrrRun'] as $autobrrClass) {
+foreach (['AutobrrSecret', 'AutobrrConfig', 'AutobrrVerbs', 'AutobrrChange', 'AutobrrLogin', 'AutobrrRun'] as $autobrrClass) {
     require_once __DIR__ . "/$autobrrClass.php";
 }
 
@@ -16,6 +16,7 @@ $usage = 'usage: php autobrr.php <verb> [arguments] [--human]
 verbs: list [--search T] [--limit N] | show <id>... | stats | health | history [--limit N] | restart
        toggle <id>... --on|--off
        login             (the user types an API key made in autobrr, Settings, API keys, at a terminal; stored for this tool)
+       login-check | set-login   (the autobrr web login: why it fails; a new one through autobrrctl, kept in ~/.media-stack-credentials.txt)
 ids: the filter ids `list` prints. See USAGE.md.';
 
 $autobrrSecretDir = isset($autobrrSecretDir) ? $autobrrSecretDir : Config::localDir() . '/secrets';

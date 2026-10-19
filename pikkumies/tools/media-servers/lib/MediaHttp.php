@@ -9,6 +9,11 @@ class MediaAuthRejected extends CliError
 {
 }
 
+/** No HTTP answer at all (timeout, connection refused): whether a sent change took effect is unknown (jellyfin set-login). */
+class MediaNoAnswer extends CliError
+{
+}
+
 class MediaHttp
 {
     /** Query names that are never sent: overwrite flags (rule 6) and credentials in the URL (rule 1). */
@@ -123,10 +128,10 @@ class MediaHttp
         if ($r['code'] === 0) {
             $e = $r['error'];
             if (stripos($e, 'timed out') !== false) {
-                throw new CliError($this->clean("{$this->name} did not answer within $t s: busy, state unknown (not down)"),
+                throw new MediaNoAnswer($this->clean("{$this->name} did not answer within $t s: busy, state unknown (not down)"),
                     'try again in a minute');
             }
-            throw new CliError($this->clean("cannot reach {$this->name} on port {$this->port}: $e"), 'check that it is running: `stats`');
+            throw new MediaNoAnswer($this->clean("cannot reach {$this->name} on port {$this->port}: $e"), 'check that it is running: `stats`');
         }
         return $r;
     }

@@ -37,16 +37,43 @@ The PMSS media-stack installer does not install or manage Bazarr (`etc/skel/inst
 
 Never used: `POST system` (restart or shutdown, `api/system/system.py:11-30`), the other PATCH actions, and every DELETE.
 
+## Login and settings
+
+`login-check`, `set-login` and `config` (`BazarrLogin.php`, `BazarrSettings.php`; tools/arr/README.md "Login of the other apps"):
+
+| verb | call | source |
+|---|---|---|
+| login-check, set-login, config | `GET system/settings`: every section of fields, read raw and never printed whole (it holds the key and the md5 of the login) | `api/system/settings.py:24-41`, `app/config.py:651-667` |
+| set-login | `POST system/settings`, header `X-API-KEY`, form `settings-auth-type=form`, `settings-auth-username`, `settings-auth-password` (sent plain over loopback; Bazarr stores its md5) | `api/system/settings.py:43-130`, `app/config.py:690`, `:768-770`, `api/utils.py:100-115` |
+| config set | `POST system/settings` with the one form field `settings-<section>-<field>` | the same |
+| login-check, set-login | `POST system/account`, form `action=login`, `username`, `password`, no key: 204, 403 refused, 500 when auth.type is neither form nor basic | `api/system/account.py:15-50`, `utilities/helper.py:17-30` |
+
+Bazarr turns a form value that is a whole number into a number unless its key is one of `str_keys` (`app/config.py:604, 726-731`), so `set-login` refuses a user name made of digits only, and `config set` reports a text it could not read back. `config set` never touches the sections `auth`, `cors`, `proxy` and `postgresql`, nor the fields listed in `BazarrSettings::NEVER` (addresses, ports, base URLs, keys, update and permission settings, the post-processing command, webhooks, certificate checks); lists are not set at all.
+
+When the settings call gets no answer at all, one login with the new pair comes first: it works, `set-login` goes on; refused, the old line comes back; no answer either, the file keeps both (`BAZARR_PASSWORD` the new one, `BAZARR_PASSWORD_PREVIOUS` the old one). `config set` also never sets a path-valued field (`backup.folder`, `general.subfolder`, `general.subfolder_custom`, `general.path_mappings`, `general.path_mappings_movie`: `app/config.py:93, 117, 148-149, 195`).
+
+### Why a Bazarr login fails
+
+| cause | what it means | next |
+|---|---|---|
+| not-installed | No config.yaml was found. | The error's hint. |
+| config-invalid | config.yaml is empty or not Bazarr's. | The error's hint. |
+| not-answering | Bazarr does not answer its API (stopped, busy, another account's port). | The error's hint, usually `restart` |
+| auth-not-configured | auth.type is neither form nor basic: the web page is open to anyone on this machine. | `set-login` |
+| credentials-missing | `~/.media-stack-credentials.txt` has no `BAZARR_PASSWORD` line (or there is no file). | `set-login` |
+| credentials-placeholder | The line holds a `[...]` placeholder, not a usable value. | `set-login` |
+| password-rejected | Bazarr refused the user name with the one in the file. | `set-login` |
+
 ## Restart
 
 Docker: `docker restart bazarr` against the user's own daemon, then `GET system/status` until `start_time` changes, up to 60 s. Anywhere else, PMSS included, the tool refuses with a hint: no PMSS installer manages Bazarr. Bazarr's own restart route is not used, for the same reason as `POST system/restart` on the Servarr apps: it is the provider's process, not the tool's.
 
 ## Tests
 
-`tests/ArrBazarrTest.php` against `tests/fixtures/arr/bazarr-router.php` (`php -S`), helpers in `tests/fixtures/arr/phase2.php`.
+`tests/ArrBazarrTest.php` against `tests/fixtures/arr/bazarr-router.php` (`php -S`), helpers in `tests/fixtures/arr/phase2.php`. The login and settings verbs: `tests/ArrOtherLoginTest.php`.
 
 ## Unverified
 
-- [UNVERIFIED] Nothing was run against a live Bazarr.
+- [UNVERIFIED] Nothing was run against a live Bazarr, `set-login` and `config set` included; their calls are read from the source at the commit above.
 - [UNVERIFIED] The `parsed_timestamp` text is `%x %X` in Bazarr's locale; `event_at` is filled only when PHP's `strtotime` reads it, and is 0 otherwise.
 - [UNVERIFIED] How Flask-RESTX's request parser treats a PATCH without a form body; the tool always sends the form, as Bazarr's page does.

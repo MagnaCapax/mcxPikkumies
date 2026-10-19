@@ -37,6 +37,14 @@ if ($rel === 'healthz/liveness') {
 if ($rel === 'healthz/readiness') {
     $send($s['ready'] ? 200 : 500, $s['ready'] ? 'OK' : 'Unhealthy. Database unreachable', true);
 }
+// The web login needs no key (auth.go:56-59): onboard answers 200 only while no user exists, login 204 or 403.
+if ($rel === 'auth/onboard' && $method === 'GET') {
+    $send(isset($s['abUser']) ? 503 : 200, ['message' => 'onboarding unavailable: user already registered']);
+}
+if ($rel === 'auth/login' && $method === 'POST') {
+    $ok = is_array($body) && isset($s['abUser']) && $body['username'] === $s['abUser'] && $body['password'] === $s['abPassword'];
+    $send($ok ? 204 : 403, ['message' => 'could not login: bad credentials']);
+}
 if ((isset($_SERVER['HTTP_X_API_TOKEN']) ? $_SERVER['HTTP_X_API_TOKEN'] : '') !== $s['key']) {
     $send(isset($_SERVER['HTTP_X_API_TOKEN']) ? 401 : 403, 'Unauthorized', true);
 }

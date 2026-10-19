@@ -78,7 +78,13 @@ class ArrLoginCheck
 
     private static function cause($cause, $detail, $hint = null)
     {
-        $next = self::CAUSES[$cause];
+        return self::named(self::CAUSES, $cause, $detail, $hint);
+    }
+
+    /** One cause record from a unit's CAUSES table: 'installer' and 'restart' become the error's hint when there is one. */
+    public static function named(array $causes, $cause, $detail, $hint = null)
+    {
+        $next = $causes[$cause];
         return ['cause' => $cause, 'detail' => $detail, 'next' => in_array($next, ['installer', 'restart'], true) && $hint ? $hint : $next];
     }
 
@@ -108,8 +114,8 @@ class ArrLoginCheck
         return '';
     }
 
-    /** One record per cause (or one `login: works` record); status `next` is the first cause's step. */
-    private static function out($id, array $found, $file, $works = '')
+    /** One record per cause (or one `login: works` record); status `next` is the first cause's step. Shared by every login-check. */
+    public static function out($id, array $found, $file, $works = '')
     {
         $records = $found;
         if ($works !== '') {

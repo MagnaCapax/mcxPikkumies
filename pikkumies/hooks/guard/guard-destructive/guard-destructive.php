@@ -34,6 +34,11 @@ if (!is_array($payload) && trim($stdin) !== '') {
 // and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
 require_once dirname(__DIR__, 3) . '/lib/HookPayload.php';
 require __DIR__ . '/GuardLocal.php';
+// The media apps' logins in plain text (ADR-0078): named, globbed or swept up by a search from the home folder.
+require __DIR__ . '/GuardMediaCreds.php';
+require_once dirname(__DIR__, 3) . '/lib/Host.php';
+$mediaHome = Host::home(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());
+$mediaCwd = isset($payload['cwd']) && is_string($payload['cwd']) ? $payload['cwd'] : '';
 $payload = is_array($payload) ? $payload : [];
 list($callKind, $command, $texts) = HookPayload::read($payload);
 $tool = isset($payload['tool_name']) ? $payload['tool_name'] : '';
@@ -91,6 +96,11 @@ if ($fileTool) {
         exit(0);
     }
     foreach (array_merge([$command], $named) as $target) {
+        $media = GuardMediaCreds::check($tool, $input, guardTexts($target), $mediaCwd, $mediaHome);
+        if ($media !== null) {
+            echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $media. Not run."]) . "\n";
+            exit(0);
+        }
         foreach ($secretPatterns as $re => $why) {
             if (guardMatch($re, guardTexts($target)) !== 0) { // a regex engine error (false) blocks too
                 echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Not run."]) . "\n";
@@ -159,6 +169,12 @@ foreach ($patterns as $re => $why) {
         echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
         exit(0);
     }
+}
+// The media apps' logins after the stored-password and AI-key rules above, so those keep their own reason.
+$media = GuardMediaCreds::check($tool, $input, $texts, $mediaCwd, $mediaHome);
+if ($media !== null) {
+    echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $media. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
+    exit(0);
 }
 // A Hermes command line read word by word: -z anywhere, --oneshot before the subcommand, -p, profile use (ADR-0020).
 if (NestedAgent::guardCommand($texts)) {

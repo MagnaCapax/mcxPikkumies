@@ -89,6 +89,15 @@ class BazarrRun
             'search' => function ($args, $opt) use ($c) {
                 return BazarrSearch::run($c(), BazarrVerbs::resolve($c(), $args));
             },
+            'login-check' => function ($args, $opt) use ($c, $locate) {
+                return BazarrLogin::check($locate, $c, Arr::timeout());
+            },
+            'set-login' => function ($args, $opt) use ($c, $locate) {
+                return [BazarrLogin::set($locate, $c(), Arr::timeout())];
+            },
+            'config' => function ($args, $opt) use ($c) {
+                return BazarrSettings::run($c(), $args);
+            },
         ];
     }
 

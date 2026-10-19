@@ -42,6 +42,31 @@ Never used: any DELETE, any POST, `GET irc/network/{id}/restart` (a GET that res
 
 Filters, indexers, IRC networks and releases carry tracker settings, IRC passwords and SASL logins, proxy logins, action commands, webhook addresses and download links (`domain/indexer.go:37`, `domain/irc.go:212-215`, `domain/action.go:12-24`, `domain/release.go:55`). autobrr itself masks some of them (secret indexer settings and the IRC `pass`: `domain/indexer.go:60-80`, `domain/irc.go:124-133`), but the tool does not rely on that: every record is built from a list of allowed fields (`AutobrrVerbs.php`), so none of those fields can reach the output, and lib/Cli.php still drops secret-named fields and redacts keys in URLs.
 
+## Login
+
+`login-check` and `set-login` (`AutobrrLogin.php`; tools/arr/README.md "Login of the other apps"). Neither needs the API key.
+
+| verb | call | source |
+|---|---|---|
+| login-check | `GET <baseUrl>api/auth/onboard`: 200 only while no user exists (the first-user page is then open to anyone on this machine), 503 after | `internal/http/auth.go:56-59, 137-168` |
+| login-check, set-login | `POST <baseUrl>api/auth/login` `{"username", "password"}`: 204, or 403 on bad credentials | `auth.go:75-111` |
+| set-login | `autobrrctl --config <folder of config.toml> change-password <user>`, run as an argument list with the new one written to its standard input (`readPassword` reads stdin when it is not a terminal); exit 0, or 1 with the reason (`log.Fatalf`) | `cmd/autobrrctl/main.go:173-235, 401-430` |
+
+autobrrctl is taken from `~/.bin/autobrr/autobrrctl` (where the PMSS installer puts it, `install-media-stack.sh:2309`) when that is a regular file this account owns, else from PATH; a Docker copy is not changed (its container and paths are [UNVERIFIED]), and `login-check` names the command for the user. autobrr reads the user from its database on every login (`internal/auth/service.go:39-61`), so the change counts at once, with autobrr running; its SQLite database waits up to 10 s for a lock (`internal/database/sqlite.go:33`).
+
+### Why an autobrr login fails
+
+| cause | what it means | next |
+|---|---|---|
+| not-installed | No config.toml was found. | The error's hint. |
+| config-invalid | config.toml is empty or its port or baseUrl is not usable. | The error's hint. |
+| not-answering | autobrr does not answer (stopped, turned off in the panel, busy, another account's port). | The error's hint, usually `restart` |
+| no-user | autobrr has no user yet. | On PMSS `bash ~/install-media-stack.sh --secure-app=autobrr`; elsewhere the user makes the login in autobrr's page now |
+| credentials-missing | `~/.media-stack-credentials.txt` has no `AUTOBRR_PASSWORD` line (or there is no file). | `set-login` |
+| credentials-placeholder | The line holds the installer's `[...]` placeholder: it kept a login it did not know. | `set-login` |
+| password-rejected | autobrr refused the user name with the one in the file. | `set-login` |
+| ctl-missing | set-login would be next, but no autobrrctl was found. | The `autobrrctl ... change-password` command, for the user's own terminal |
+
 ## Restart
 
 - PMSS: refused while `~/.autobrrDisable` exists (the panel's Stop marker; its restart refuses the same way, `etc/skel/www/mediaStack.php:80-89`); otherwise `/bin/bash ~/install-media-stack.sh --stop-app=autobrr`, then `--start-app=autobrr`, exactly the panel's restart (`mediaStack.php:97-98`; autobrr is one of the installer's apps, `install-media-stack.sh:258-263`). The installer must be this uid's own file.
@@ -50,9 +75,10 @@ Filters, indexers, IRC networks and releases carry tracker settings, IRC passwor
 
 ## Tests
 
-`tests/ArrAutobrrTest.php` against `tests/fixtures/arr/autobrr-router.php` (`php -S`), run through `tests/fixtures/arr/autobrr-wrapper.php`, which sets the two test seams (`$autobrrSecretDir`, `$autobrrPrompt`). The restart test's fake installer really stops the fake server and starts a new one on the same port.
+`tests/ArrAutobrrTest.php` against `tests/fixtures/arr/autobrr-router.php` (`php -S`), run through `tests/fixtures/arr/autobrr-wrapper.php`, which sets the two test seams (`$autobrrSecretDir`, `$autobrrPrompt`). The restart test's fake installer really stops the fake server and starts a new one on the same port. The login verbs: `tests/ArrOtherLoginTest.php`, with a fake autobrrctl (`tests/fixtures/arr/autobrrctl.php`) that records its arguments.
 
 ## Unverified
 
 - [UNVERIFIED] Nothing was run against a live autobrr; field names come from the Go struct tags at the commit above.
 - [UNVERIFIED] Docker discovery (step 4 above).
+- [UNVERIFIED] `set-login` was run against the fake and a fake autobrrctl only, never a live autobrr; the autobrrctl behaviour is read from its source at commit `c6b78bdd`.

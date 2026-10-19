@@ -49,7 +49,7 @@ if (trim((string) @file_get_contents("$dir/power")) !== 'up') {
     $out(503, 'starting');
 }
 if ($m === 'GET' && $path === '/System/Info/Public') {
-    $out(200, ['ServerName' => 'fake', 'Version' => $s['version'], 'Id' => 'abc', 'StartupWizardCompleted' => true]);
+    $out(200, ['ServerName' => 'fake', 'Version' => $s['version'], 'Id' => 'abc', 'StartupWizardCompleted' => empty($s['wizard_open'])]);
 }
 if ($m === 'POST' && $path === '/Users/AuthenticateByName') {
     $s['logins']++;
@@ -141,6 +141,37 @@ if ($m === 'POST' && preg_match('#^/Sessions/([^/]+)/(Playing/Stop|Message)$#', 
     }
     if ($x[2] === 'Playing/Stop' && !in_array($x[1], isset($s['stop_ignored']) ? $s['stop_ignored'] : [], true)) {
         unset($s['sessions'][$x[1]]);
+    }
+    $out(204);
+}
+// Jellyfin login and settings (UserController.cs:270-319, ConfigurationController.cs:49-69 at v12.2): the current one is
+// checked when userId is the session's own user; knobs `pw_fail` (500), `pw_ignore` (204, nothing changed), `cfg_ignore`.
+if ($route === 'POST /Users/Password') {
+    $b = json_decode($body, true);
+    if ($p('userId') !== 'u1' || !isset($b['CurrentPw']) || $b['CurrentPw'] !== $s['password']) {
+        $out(403, 'Invalid user or password entered.');
+    }
+    if (!empty($s['pw_fail'])) {
+        $out(500, 'Error processing request: ' . $b['NewPw']); // a server that echoes the value must not leak it
+    }
+    if (empty($s['pw_ignore'])) {
+        $s['password'] = $b['NewPw'];
+    }
+    if (!empty($s['pw_hang'])) { // the client gives up first (its timeout is shorter); `pw_down`: answers 503 from then on
+        if (!empty($s['pw_down'])) {
+            file_put_contents("$dir/power", 'down');
+        }
+        file_put_contents("$dir/state.json", json_encode($s));
+        sleep(3); // a margin over the 2 s timeout the test uses, so the login that follows is answered in time
+    }
+    $out(204);
+}
+if ($route === 'GET /System/Configuration') {
+    $out(200, isset($s['config_raw']) ? $s['config_raw'] : '{"ServerName":"fake"}');
+}
+if ($route === 'POST /System/Configuration') {
+    if (empty($s['cfg_ignore'])) {
+        $s['config_raw'] = $body;
     }
     $out(204);
 }

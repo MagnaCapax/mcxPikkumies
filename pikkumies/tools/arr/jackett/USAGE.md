@@ -11,6 +11,7 @@ The user's own Jackett through its API on 127.0.0.1 (under BasePathOverride from
 | history | | no | Not available: Jackett keeps no history. The call ends `ok:false` and says so. |
 | restart | | yes | Docker: `docker restart jackett` against the user's own daemon, then waits up to 60 s for a newer container start time (`answered`). Anywhere else the tool refuses and says how. |
 | test | `[<id>...]` | no (contacts the trackers) | An empty search on each named indexer, or on every configured one: `id`, `name`, `valid`, `results`, `elapsed_ms`, `error`. No results counts as a failure, as in Jackett's own test. |
+| login-check | | no | Why the user cannot log in to Jackett's dashboard: whether Jackett answers, whether it listens on every address (`AllowExternal`, outside Docker), and whether an admin password is set (read as set or not, never its value). Changes nothing: Jackett sets its dashboard login only after a sign-in, so there is no `set-login`. Causes: README.md "Why a Jackett login fails". |
 
 ```sh
 J=~/pikkumies/tools/arr/jackett/jackett.php

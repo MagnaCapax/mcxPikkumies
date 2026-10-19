@@ -68,18 +68,10 @@ class ArrLocate
             . ' not used' : '';
     }
 
-    /**
-     * This uid's home folder: $HOME when it is a folder this uid owns (as it always is when nobody changed it),
-     * else the passwd entry (posix_getpwuid). An injected HOME=/home/other is never used: that folder is not ours.
-     */
+    /** This uid's home folder (Host::home: $HOME only when this uid owns it, else the passwd entry). */
     public static function home($uid, $env = null)
     {
-        $env = rtrim((string) ($env === null ? getenv('HOME') : $env), '/');
-        if ($env !== '' && @is_dir($env) && @fileowner($env) === (int) $uid) {
-            return $env;
-        }
-        $pw = function_exists('posix_getpwuid') ? @posix_getpwuid((int) $uid) : false;
-        return is_array($pw) && isset($pw['dir']) && is_string($pw['dir']) ? rtrim($pw['dir'], '/') : '';
+        return Host::home($uid, $env);
     }
 
     /**

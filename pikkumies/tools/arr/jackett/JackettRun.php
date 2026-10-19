@@ -73,6 +73,9 @@ class JackettRun
                 return ['records' => JackettIndexers::test($c(), JackettIndexers::all($c()), $args),
                     'status' => ['note' => 'each indexer ran an empty search; an answer can come from Jackett\'s result cache']];
             },
+            'login-check' => function ($args, $opt) use ($locate, $timeout) {
+                return JackettLogin::check($locate, $timeout);
+            },
         ];
     }
 

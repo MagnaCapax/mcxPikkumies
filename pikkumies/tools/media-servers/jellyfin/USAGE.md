@@ -13,6 +13,9 @@ The user's own Jellyfin through its HTTP API. Same verbs and records as the othe
 | logs | `[--lines N] [--addresses]` | no | `file` and its last `lines` (default 50): the log file for a PMSS install, else the newest log the API lists. |
 | restart | | yes | PMSS: the installer's `--stop-app=jellyfin`, then `--start-app=jellyfin`; a container on the user's own rootless Docker: `docker restart`; waits up to 90 s for an answer. Elsewhere it refuses and prints the provider's way. |
 | login | | yes | The user types an API key at a terminal; it is checked once and stored in `local/secrets/jellyfin`. |
+| login-check | | no | Why the user cannot log in: whether Jellyfin answers and its setup wizard is finished, then one login with `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD` from `~/.media-stack-credentials.txt` (works: says where it is, keeps the session, stops), else one record per cause (`cause`, `detail`, `next`). A refused one is marked and not tried again. Causes: README.md "Why a Jellyfin login fails". |
+| set-login | | yes | A new random password for that user: written to `~/.media-stack-credentials.txt` first, then set through Jellyfin's own password endpoint with the current one from the file; a refused change restores the file. Checked by a real login with the new pair. Jellyfin signs out the user's other sessions (`other_sessions`). Never printed: `password_file` and `password_line` say where it is. |
+| config | `show [<field>]` \| `set <field> <value>` | yes (`show`: no) | Jellyfin's server configuration (`/System/Configuration`). `show` hides secret-named values and skips lists and objects; `set` changes one field, keeps its type, posts the rest back as it was and reads it back. Never set here: the login and its methods, the startup wizard, the network, the data folders, Jellyfin's internal flags. |
 
 ```sh
 J=~/pikkumies/tools/media-servers/jellyfin/jellyfin.php
@@ -25,6 +28,10 @@ php $J end-stream 6f1c0e2a9b7d4c3e8f5a1b2c3d4e5f60 --reason "Server maintenance"
 php $J recent --limit 10
 php $J logs --lines 100
 php $J restart
+php $J login-check
+php $J set-login
+php $J config show
+php $J config set MinResumePct 5
 php $J stats --url http://127.0.0.1:8096/jellyfin
 ```
 

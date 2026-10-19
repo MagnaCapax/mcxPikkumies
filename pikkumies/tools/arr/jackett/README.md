@@ -26,7 +26,7 @@ The PMSS media-stack installer does not manage Jackett (`etc/skel/install-media-
 2. Jackett's default: `~/.config/Jackett/ServerConfig.json` (the data folder is ApplicationData plus "Jackett" on Linux, `Jackett.Common/Models/Config/RuntimeSettings.cs:29-47`; the file is `<type name>.json`, `Jackett.Common/Services/ConfigurationService.cs:161,182`). [UNVERIFIED: that .NET maps ApplicationData to `~/.config` on Linux.]
 3. Docker: `~/docker/jackett/config/Jackett/ServerConfig.json`: the image sets `XDG_CONFIG_HOME=/config` (docker-jackett `Dockerfile:13-14`), so the data folder is `/config/Jackett`. The host port comes from `docker port jackett <Port>/tcp` against the user's own daemon.
 
-From the file only `Port` (default 9117), `BasePathOverride` and `APIKey` are read (`Jackett.Common/Models/Config/ServerConfig.cs:17,35,39,45`), with `json_decode`, PHP's own parser; the admin password hash, proxy password and other keys in the file are never read. Jackett generates a 32-character key on its first start (`ConfigurationService.cs:287-288`). The base path is normalized as Jackett does (`Jackett.Server/Services/ServerService.cs:64-74`, used by `Startup.cs:138-142`).
+From the file only `Port` (default 9117), `BasePathOverride` and `APIKey` are read (`Jackett.Common/Models/Config/ServerConfig.cs:17,35,39,45`), with `json_decode`, PHP's own parser; the proxy password and the other keys in the file are never read, and of the admin password hash `login-check` reads only whether it is set ("Login" below). Jackett generates a 32-character key on its first start (`ConfigurationService.cs:287-288`). The base path is normalized as Jackett does (`Jackett.Server/Services/ServerService.cs:64-74`, used by `Startup.cs:138-142`).
 
 ## Jackett calls
 
@@ -50,6 +50,21 @@ Jackett's own Test button runs the same empty search and calls zero results a fa
 
 No delete, add, remove or configuration verbs: v1 only reads, tests and restarts.
 
+## Login
+
+`login-check` only (`JackettLogin.php`; tools/arr/README.md "Login of the other apps"). There is no `set-login`: `POST api/v2.0/server/AdminPassword` (`Controllers/ServerConfigurationController.cs:50-64` at commit `cbf1fa3f`) sits under the filter that requires a signed-in user on every controller (`Startup.cs:83-86`), whose only scheme is the dashboard cookie (`Startup.cs:51-59`); the API key is checked only by the Torznab and results routes (`ResultsController.cs:33-49`). `login-check` calls `/health` without a key and reads two facts from ServerConfig.json, never a value: whether `AdminPassword` holds anything (with nothing, `CheckAuthorised` lets anyone in, `Services/SecurityService.cs:15-24`, and the login page signs them in, `UIController.cs:29-45`), and, outside Docker, whether `AllowExternal` is on (Jackett then listens on every address, `Jackett.Common/Models/Config/ServerConfig.cs:105-121`). Jackett keeps only a salted SHA-512 of the password (`SecurityService.cs:26-38`), so the tool can neither check nor recover it; the skill gives the user's own step.
+
+### Why a Jackett login fails
+
+| cause | what it means | next |
+|---|---|---|
+| not-installed | No ServerConfig.json was found. | The error's hint. |
+| config-invalid | ServerConfig.json is empty or not Jackett's. | The error's hint. |
+| not-answering | `/health` does not answer (stopped, busy, another account's port). | The error's hint, usually `restart` (Docker) |
+| no-admin-password | No admin password is set: the dashboard opens for anyone on this machine. | The user sets one in the dashboard now |
+| external-access | `AllowExternal` is on: Jackett listens on every address. | The user unticks External access in the dashboard and restarts it |
+| password-unknown | An admin password is set; the tool cannot check it. | The user's own step (skill) |
+
 ## Restart
 
 - Docker: `docker restart jackett` against the user's own daemon, then waits until `/health` answers and the container's start time (`docker inspect`) is newer, up to 60 s.
@@ -60,3 +75,4 @@ No delete, add, remove or configuration verbs: v1 only reads, tests and restarts
 - Live run 2026-10-14, read only, against a throwaway `lscr.io/linuxserver/jackett` container (`v0.24.2830-ls3`) on 127.0.0.1 with no indexers configured: `stats`, `list`, `health`, `history`, `test`, `show`, `restart` (refused outside Docker) in JSON Lines and `--human`; the list parser read all 649 indexers of Jackett's full Torznab list (every entity decoded); a wrong key gave the code-100 error, a stopped Jackett "not running", the key in no output. No indexer was configured, so no tracker was contacted: `test` against real indexers is checked against the fake only.
 - [UNVERIFIED] .NET's ApplicationData folder on Linux (discovery step 2).
 - [UNVERIFIED] That ASP.NET reads the URL-encoded `Tracker%5B%5D` query name as `Tracker[]`, and that `Status` comes as a number (the tool also takes the text `OK`).
+- [UNVERIFIED] `login-check` was run against the fake only; the routes and the settings it reads are taken from the source at commit `cbf1fa3f`.

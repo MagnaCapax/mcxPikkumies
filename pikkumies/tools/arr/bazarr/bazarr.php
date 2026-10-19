@@ -9,11 +9,14 @@ require_once dirname(__DIR__) . '/lib/Arr.php';
 require_once __DIR__ . '/BazarrConfig.php';
 require_once __DIR__ . '/BazarrVerbs.php';
 require_once __DIR__ . '/BazarrSearch.php';
+require_once __DIR__ . '/BazarrLogin.php';
+require_once __DIR__ . '/BazarrSettings.php';
 require_once __DIR__ . '/BazarrRun.php';
 
 $usage = 'usage: php bazarr.php <verb> [arguments] [--human]
 verbs: list [--search T] [--limit N] | show <id>... | stats | health | history [--limit N] | restart
        wanted [--limit N] | search <id>...
+       login-check | set-login | config show [<section>] | config set <section> <field> <value>
 ids: series:<n> or movie:<n>, as `list` prints them (the Sonarr series or Radarr movie id). See USAGE.md.';
 
 BazarrRun::run($argv, $usage);

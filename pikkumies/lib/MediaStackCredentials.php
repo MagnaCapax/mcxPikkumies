@@ -74,11 +74,7 @@ class MediaStackCredentials
             }
         }
         $file = self::path($home);
-        $lock = @fopen("$file.lock", 'c');
-        if ($lock === false || !flock($lock, LOCK_EX)) {
-            throw new CliError('cannot lock ~/' . self::FILE . '.lock', 'check that the home folder is writable; nothing was written');
-        }
-        @chmod("$file.lock", 0600);
+        $lock = self::lock("$file.lock");
         try {
             $text = self::current($file);
             $old = [];
@@ -92,6 +88,41 @@ class MediaStackCredentials
             flock($lock, LOCK_UN);
             fclose($lock);
         }
+    }
+
+    /**
+     * The lock file, opened and locked. A link, a non-regular file or another account's file is refused before it is
+     * opened ('c' would follow a link and could create its target), and again after: the opened handle (fstat) must be
+     * the regular file this account owns at that path (lstat), so a link put in its place between the two is refused.
+     * PHP has no fchmod, so the mode is set by path only after that check (a remaining window of a few instructions).
+     */
+    private static function lock($path)
+    {
+        $refuse = new CliError('refusing ~/' . self::FILE . '.lock: it is a link, not a regular file, or not this account\'s own', 'nothing was written');
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        clearstatcache(true, $path);
+        $before = @lstat($path);
+        if ($before !== false && (($before['mode'] & 0170000) !== 0100000 || (int) $before['uid'] !== (int) $uid)) {
+            throw $refuse;
+        }
+        $lock = @fopen($path, 'c');
+        if ($lock === false) {
+            throw new CliError('cannot open ~/' . self::FILE . '.lock', 'check that the home folder is writable; nothing was written');
+        }
+        clearstatcache(true, $path);
+        $open = fstat($lock);
+        $now = @lstat($path);
+        if ($open === false || $now === false || ($now['mode'] & 0170000) !== 0100000 || (int) $now['uid'] !== (int) $uid
+            || $now['ino'] !== $open['ino'] || $now['dev'] !== $open['dev']) {
+            fclose($lock);
+            throw $refuse;
+        }
+        if (!flock($lock, LOCK_EX)) {
+            fclose($lock);
+            throw new CliError('cannot lock ~/' . self::FILE . '.lock', 'nothing was written');
+        }
+        @chmod($path, 0600);
+        return $lock;
     }
 
     /** The file's text (null: there is none), refusing a link, a non-regular file or another account's file. */

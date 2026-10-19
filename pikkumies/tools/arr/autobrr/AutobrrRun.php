@@ -70,6 +70,12 @@ class AutobrrRun
             'login' => function ($args, $opt) use ($locate, $secret, $prompt, $timeout) {
                 return AutobrrChange::login($locate, $secret, $prompt, $timeout);
             },
+            'login-check' => function ($args, $opt) use ($locate, $timeout) {
+                return AutobrrLogin::check($locate, $timeout);
+            },
+            'set-login' => function ($args, $opt) use ($locate, $timeout) {
+                return [AutobrrLogin::set($locate, $timeout)];
+            },
         ];
         Cli::run($argv, $verbs, $usage, ['on', 'off'], ['search']);
     }

@@ -24,9 +24,10 @@ class MediaServers
     /**
      * $connect: fn(array $opt, bool $auth) => MediaServer, called only when a verb needs the server; $auth false
      * (restart) loads no credential and sends none. $login: the unit's login verb. $options: the unit's own options that
-     * take a value (plex: --log), which its $connect reads from $opt.
+     * take a value (plex: --log), which its $connect reads from $opt. $extra: verbs only this unit has (jellyfin: login-check,
+     * set-login, config; README.md of this category, "Jellyfin only").
      */
-    public static function run(array $argv, callable $connect, callable $login, $usage, array $options = [])
+    public static function run(array $argv, callable $connect, callable $login, $usage, array $options = [], array $extra = [])
     {
         $server = null;
         $s = function ($opt, $auth = true) use (&$server, $connect) {
@@ -95,7 +96,7 @@ class MediaServers
                 return $scrub([$s($opt, false)->restart()]); // public status and the platform's own restart: no credential
             },
             'login' => $login,
-        ], $usage, ['all', 'addresses'], array_merge(['reason', 'lines', 'url'], $options));
+        ] + $extra, $usage, ['all', 'addresses'], array_merge(['reason', 'lines', 'url'], $options));
     }
 
     /**

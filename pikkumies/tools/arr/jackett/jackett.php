@@ -8,10 +8,11 @@
 require_once dirname(__DIR__) . '/lib/Arr.php';
 require_once __DIR__ . '/JackettConfig.php';
 require_once __DIR__ . '/JackettIndexers.php';
+require_once __DIR__ . '/JackettLogin.php';
 require_once __DIR__ . '/JackettRun.php';
 
 $usage = 'usage: php jackett.php <verb> [arguments] [--human]
-verbs: list [--search T] [--limit N] | show <id>... | stats | health | history | restart | test [<id>...]
+verbs: list [--search T] [--limit N] | show <id>... | stats | health | history | restart | test [<id>...] | login-check
 ids: the indexer ids `list` prints (Jackett\'s own names, like 1337x). history: Jackett keeps none. See USAGE.md.';
 
 JackettRun::run($argv, $usage);
