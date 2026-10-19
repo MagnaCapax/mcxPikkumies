@@ -4,7 +4,7 @@ return [
     'change: shell commands are a change, a read or unknown, by verb, flag, redirect and wrapper' => function () {
         $writes = [
             'cat a > /etc/x', 'echo hi >> ~/.bashrc', 'cmd>out', 'ls &>file', 'echo x >|f', 'echo 1>f', 'sudo rm a', 'ls | xargs rm', 'env X=1 rm f',
-            'timeout 5 cp a b', 'nice -n 19 mv a b', 'sudo -u bob rm x', 'for f in *; do rm $f; done', 'sed -i s/a/b/ f', 'perl -pi -e s/a/b/ f',
+            'timeout 5 cp a b', 'nice -n 19 mv a b', 'sudo -u exampleuser rm x', 'for f in *; do rm $f; done', 'sed -i s/a/b/ f', 'perl -pi -e s/a/b/ f',
             'sort -o out in', 'echo x | tee f', 'git commit -m x', 'git branch -D old', 'systemctl --user restart x', 'docker rm c', 'apt-get install x',
             'find . -delete', 'find . -exec rm {} \;', 'tar xzf a.tgz', 'crontab -r', 'kill 123', 'mkdir -p d', 'rsync -a a/ b/',
         ];

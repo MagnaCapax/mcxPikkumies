@@ -89,7 +89,7 @@ return [
     },
     'ssh reader: wrappers, sh -c, su -c, eval, watch, substitutions, text fed to a shell and a nested remote ssh all count' => function () {
         sshReadTable([
-            'sudo -u bob ssh nas' => ['nas'], 'timeout 10 ssh nas' => ['nas'], 'env A=1 ssh nas' => ['nas'], 'nice -n 5 ssh nas' => ['nas'],
+            'sudo -u exampleuser ssh nas' => ['nas'], 'timeout 10 ssh nas' => ['nas'], 'env A=1 ssh nas' => ['nas'], 'nice -n 5 ssh nas' => ['nas'],
             'nohup ssh nas &' => ['nas'], 'watch -n 5 ssh nas uptime' => ['nas'], 'sshpass -p x ssh nas' => ['nas'], "env -S 'ssh -p 2' nas" => ['nas'],
             "bash -c 'ssh nas'" => ['nas'], 'sh -lc "ssh nas"' => ['nas'], "su -c 'ssh evil' bob" => ['evil'], 'eval "ssh evil"' => ['evil'],
             "echo 'ssh evil' | sh" => ['evil'], 'bash <<< "ssh evil"' => ['evil'], "ssh nas 'ssh evil'" => ['nas', 'evil'],
