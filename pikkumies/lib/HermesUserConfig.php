@@ -10,6 +10,7 @@
  * - skills dir: the generated skills directory goes back into skills.external_dirs when it is missing.
  * - telemetry answer: Hermes' shared-metrics "No thanks" goes back in when it is gone (HermesTelemetry, ADR-0072).
  * - skin: once per install, display.skin gets the Pikkumies skin when the file names no skin (StatusTheme, ADR-0061).
+ * - browser: once per install, browser.restrict_evaluate becomes true when the file does not name it (ADR-0077).
  * The edits of single keys go through Hermes' own `config get/set`, which keeps every other entry and the file's comments, so
  * they wait until Hermes is built. A failed edit is logged and noted on stderr, the start goes on (the pins and hooks
  * are in the managed file), and the next start tries again. Hermes keeps copies too (HERMES_HOME/backups/config/).
@@ -32,7 +33,7 @@ class HermesUserConfig
         $local = dirname($home);
         $cfg = "$home/config.yaml";
         $offer = HermesTelemetry::offerVersion();
-        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir) && HermesTelemetry::isOff($cfg, $offer) && is_file(self::skinMarker($local))) {
+        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir) && HermesTelemetry::isOff($cfg, $offer) && is_file(self::skinMarker($local)) && is_file(self::browseMarker($local))) {
             return; // the usual start: no lock, no Hermes process
         }
         @mkdir("$local/state", 0700, true);
@@ -63,6 +64,9 @@ class HermesUserConfig
             if (!is_file(self::skinMarker($local))) {
                 self::offerSkin($home);
             }
+            if (!is_file(self::browseMarker($local))) {
+                self::offerBrowse($home);
+            }
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
@@ -89,6 +93,32 @@ class HermesUserConfig
         }
         try {
             HermesConfig::put(self::skinMarker($local), json_encode(['skin' => StatusTheme::SKIN, 'at' => gmdate('c')]) . "\n");
+        } catch (Exception $x) {
+            return HermesConfigBackup::fail($local, 'state', null, $x->getMessage());
+        }
+        return true;
+    }
+
+    public static function browseMarker($local)
+    {
+        return "$local/state/hermes-browser.json";
+    }
+
+    /**
+     * browser.restrict_evaluate true, once, for an install seeded before the browse unit (ADR-0077): only when the user's file
+     * does not name the key (a value there is the user's and stays; the browser stays off while it is not true). Waits
+     * for a built Hermes; the marker only when done. Backed up and logged as browser-restrict-evaluate.
+     */
+    public static function offerBrowse($home)
+    {
+        $local = dirname($home);
+        if (!preg_match('/^\s+restrict_evaluate\s*:/m', (string) @file_get_contents("$home/config.yaml"))) {
+            if (self::bin() === '' || !self::setValue($home, 'browser.restrict_evaluate', 'true', 'browser-restrict-evaluate', 'browser.restrict_evaluate true')) {
+                return false;
+            }
+        }
+        try {
+            HermesConfig::put(self::browseMarker($local), json_encode(['restrict_evaluate' => true, 'at' => gmdate('c')]) . "\n");
         } catch (Exception $x) {
             return HermesConfigBackup::fail($local, 'state', null, $x->getMessage());
         }

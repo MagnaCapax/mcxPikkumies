@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-15
-- Status: Accepted
+- Status: Accepted. Amended by [ADR-0077](0077-isolated-browser-in-a-private-network-namespace.md): the seed sets one browser key, `browser.restrict_evaluate`.
 
 ## Context
 The operator's request of 2026-10-15: "make sure all the hermes cool shit is enabled upon install". The pinned Hermes v2026.9.24 ships a self-improvement loop (skills written from experience, a background review fork, a curator that prunes/archives them) and a few opt-in safety/quality features that Pikkumies' generated `config.yaml` left unset, so every install ran at Hermes' own out-of-the-box defaults rather than a deliberate choice.

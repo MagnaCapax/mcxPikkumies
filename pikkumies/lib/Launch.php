@@ -21,7 +21,7 @@
 class Launch
 {
     /** Subcommands bin/pikkumies dispatches on its own. */
-    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'configure', 'status-line'];
+    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'browse', 'configure', 'status-line'];
     const HELP = ['help', '--help', '-h'];
     /** `pikkumies configure` on a terminal: a session with the configure skill loaded and this first prompt (ADR-0052). */
     const CONFIGURE_ARGS = ['chat', '-s', 'pikkumies-configure', '--query=Review my setup and help me configure Pikkumies'];
@@ -62,6 +62,10 @@ class Launch
         // `tmux` or `tmux <number>`; "tmux kill my session" is a prompt.
         if ($argv[1] === 'tmux') {
             return $rest === [] || (count($rest) === 1 && ctype_digit($rest[0])) ? ['tmux', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+        }
+        // `browse up|down|status`: the isolated browser (tools/system/browse); "browse the web for X" is a prompt.
+        if ($argv[1] === 'browse') {
+            return count($rest) === 1 && in_array($rest[0], ['up', 'down', 'status'], true) ? ['browse', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
         }
         // `configure undo`: the person's own undo of the last settings change, no session (ADR-0059); other words after configure are a prompt.
         if ($argv[1] === 'configure' && $rest === ['undo']) {

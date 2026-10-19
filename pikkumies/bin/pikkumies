@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | configure | run [args...]
+ * pikkumies: install [flags] | update | detect | doctor | generate | cron-tick | tmux [N] | browse up|down|status | configure | run [args...]
  *            | [-m <model>] [--reasoning <level>] <free text prompt>
  *
  * Any number of instances may run at once in one account: HERMES_HOME is shared on purpose
@@ -240,6 +240,8 @@ switch ($cmd) {
         } else {
             out('hermes:   not installed' . (HermesInstall::building() ? ' (building, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . ')' : (file_exists(HermesInstall::treeDir()) ? ' (incomplete build, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . '; `pikkumies install` builds again)' : '')));
         }
+        require_once dirname(__DIR__) . '/tools/system/browse/browse.inc.php';
+        out(BrowseCheck::doctorLine(BrowseState::running())); // the isolated browser: ready with versions, or the failing check (ADR-0077)
         $units = Units::all();
         $bad = array_filter($units, function ($u) {
             return $u['errors'];
@@ -458,6 +460,10 @@ switch ($cmd) {
             putenv($envValue === null ? $envName : "$envName=$envValue");
         }
         putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // what the agent starts sees it was started by one (ADR-0020)
+        require_once dirname(__DIR__) . '/tools/system/browse/browse.inc.php';
+        foreach (BrowseCheck::hermesEnv() as $envName => $envValue) { // the isolated browser on Hermes' PATH, only when every check passes (ADR-0077)
+            putenv("$envName=$envValue");
+        }
         if ($isUpdate) {
             passthru(implode(' ', array_map('escapeshellarg', $updateArgv)), $code);
             // The same checks every start makes, right away, so a broken update is reported here.
@@ -539,6 +545,10 @@ switch ($cmd) {
             putenv($envValue === null ? $envName : "$envName=$envValue");
         }
         putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // scheduled agents count as agents, as in run (ADR-0020)
+        require_once dirname(__DIR__) . '/tools/system/browse/browse.inc.php';
+        foreach (BrowseCheck::hermesEnv() as $envName => $envValue) { // the isolated browser on Hermes' PATH, only when every check passes (ADR-0077)
+            putenv("$envName=$envValue");
+        }
         $problems = HermesInstall::checkBeforeStart(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : []);
         if ($problems) {
             CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', 3, 'not run: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems));
@@ -548,6 +558,10 @@ switch ($cmd) {
         exec(implode(' ', array_map('escapeshellarg', CronTick::lowPriority($tickArgv))) . ' 2>&1', $tickOut, $tickCode);
         CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/cron-tick.state', $tickCode, implode("\n", $tickOut));
         exit($tickCode);
+
+    case 'browse': // the isolated browser: start, stop, state (tools/system/browse, ADR-0077)
+        passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/browse/browse.php') . ' ' . escapeshellarg($passArgs[0]) . ' --human', $code);
+        exit($code);
 
     case 'tmux': // window pmN of the tmux session "pikkumies", running pikkumies (ADR-0032)
         $n = isset($passArgs[0]) ? $passArgs[0] : '1';
@@ -611,5 +625,6 @@ switch ($cmd) {
         out('       pikkumies configure                        review your settings and change them with the agent');
         out('       pikkumies configure undo                   set the last settings change back (asks y/N only for a change you would be asked about)');
         out('       pikkumies tmux [1-9]                       a session in window pmN of the tmux session "pikkumies"');
+        out('       pikkumies browse up|down|status            the isolated browser the agent uses (starts and stops by itself)');
         out('       pikkumies install [--name=<name>] [--accept-terms] [--telemetry=on|off] [--perf-logging=on|off] [--retention-days=N] [--channel=release|git/<branch>]');
 }

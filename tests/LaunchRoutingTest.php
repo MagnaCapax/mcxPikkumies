@@ -111,4 +111,11 @@ return [
         check(preg_match_all("#~/pikkumies/bin/pikkumies ([^'\n]*)'#", $skill, $m) === 2 && strpos($skill, 'q=$(cat)') === false, 'the skill must make exactly these two calls, the question never in argv: ' . json_encode($m[1]));
         check(str_replace('"$id"', 'S1', $m[1]) === ['run chat --query-file -', 'run chat --resume S1 --query-file -'], 'the skill\'s calls: ' . json_encode($m[1]));
     },
+    'launch: `browse up|down|status` routes to the browse unit; any other words after browse are a prompt (ADR-0077)' => function () {
+        foreach (['up', 'down', 'status'] as $verb) {
+            check(Launch::route(['pikkumies', 'browse', $verb]) === ['browse', [$verb]], $verb);
+        }
+        check(Launch::route(['pikkumies', 'browse', 'the', 'web', 'for', 'cats']) === ['run', ['chat', '--query=browse the web for cats']], 'a prompt');
+        check(Launch::route(['pikkumies', 'browse']) === ['run', ['chat', '--query=browse']], 'browse alone is a prompt too');
+    },
 ];

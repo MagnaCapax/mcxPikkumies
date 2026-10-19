@@ -26,6 +26,7 @@ function telemetryInstalled(array $w, $telemetry)
     @mkdir($w['local'] . '/state', 0700);
     HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");
     HermesConfig::put(HermesUserConfig::skinMarker($w['local']), "{}\n"); // the skin step already ran (ADR-0061)
+    HermesConfig::put(HermesUserConfig::browseMarker($w['local']), "{}\n"); // so did the browser step (ADR-0077)
     file_put_contents($w['home'] . '/config.yaml', HermesConfig::seedHeader() . "skills:\n  external_dirs:\n    - " . HermesConfig::q(Units::generatedDir()) . "\n" . $telemetry);
 }
 

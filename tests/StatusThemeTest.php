@@ -41,6 +41,7 @@ function themeInstalled(array $w, $extra = '')
 {
     @mkdir($w['local'] . '/state', 0700);
     HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");
+    HermesConfig::put(HermesUserConfig::browseMarker($w['local']), "{}\n"); // the browser step already ran (ADR-0077)
     file_put_contents($w['home'] . '/config.yaml', HermesConfig::seedHeader() . "skills:\n  external_dirs:\n    - " . HermesConfig::q(Units::generatedDir()) . "\n"
         . HermesTelemetry::seedYaml(2) . $extra);
 }

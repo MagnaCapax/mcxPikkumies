@@ -90,6 +90,7 @@ return [
             @mkdir($w['local'] . '/state', 0700);
             HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");
             HermesConfig::put(HermesUserConfig::skinMarker($w['local']), "{}\n"); // the skin step already ran (ADR-0061)
+            HermesConfig::put(HermesUserConfig::browseMarker($w['local']), "{}\n"); // so did the browser step (ADR-0077)
             userCfgIn($w, $w['bin'], '["/home/u/more-skills"]', function () use ($w, $before) {
                 HermesUserConfig::apply($w['home'], 'seed', '/gen/skills', []);
                 $log = (string) file_get_contents($w['log']);
@@ -217,6 +218,31 @@ return [
             });
         } finally {
             testRmTree($w['t']);
+        }
+    },
+    'hermes user config: an install from before gets browser.restrict_evaluate once through config set; a value the user wrote stays (ADR-0077)' => function () {
+        foreach (['' => true, "browser:\n  restrict_evaluate: false\n" => false] as $extra => $expectSet) {
+            $w = userCfgWorld();
+            try {
+                file_put_contents($w['home'] . '/config.yaml', "skills:\n  external_dirs:\n    - /gen/skills\n" . HermesTelemetry::seedYaml(HermesTelemetry::DEFAULT_OFFER_VERSION) . $extra);
+                @mkdir($w['local'] . '/state', 0700);
+                HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");
+                HermesConfig::put(HermesUserConfig::skinMarker($w['local']), "{}\n");
+                userCfgIn($w, '', '', function () use ($w, $expectSet) {
+                    HermesUserConfig::apply($w['home'], 'seed', '/gen/skills', []);
+                    check(!is_file($w['log']) && is_file(HermesUserConfig::browseMarker($w['local'])) !== $expectSet, 'Hermes not built: a missing key waits (no marker); a value of the user\'s needs no Hermes');
+                });
+                userCfgIn($w, $w['bin'], '', function () use ($w, $expectSet) {
+                    HermesUserConfig::apply($w['home'], 'seed', '/gen/skills', []);
+                    $log = (string) @file_get_contents($w['log']);
+                    check($expectSet ? $log === 'config set browser.restrict_evaluate true | managed=' . $w['local'] . "/hermes-managed\n" : $log === '', "log: $log");
+                    check(is_file(HermesUserConfig::browseMarker($w['local'])), 'marker written');
+                    HermesUserConfig::apply($w['home'], 'seed', '/gen/skills', []);
+                    check(substr_count((string) @file_get_contents($w['log']), 'restrict_evaluate') === ($expectSet ? 1 : 0), 'once only');
+                });
+            } finally {
+                testRmTree($w['t']);
+            }
         }
     },
 ];

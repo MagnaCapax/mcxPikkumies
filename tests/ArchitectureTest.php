@@ -239,10 +239,11 @@ return [
         $n = count(file(dirname(__DIR__) . '/pikkumies/lib/Cli.php'));
         check($n <= 216 + 80, "Cli.php has grown to $n lines, past the 216+80 soft ceiling measured this session");
     },
-    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php, rtorrent/Scgi.php and email/lib/MailTransport.php' => function () {
+    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php, rtorrent/Scgi.php, email/lib/MailTransport.php and browse/CdpSocket.php' => function () {
         // MailTransport is the one mail connection (ADR-0053): imaps, pop3s and smtp(s) over TLS, which Http (http/https only) does not speak.
+        // CdpSocket is the web guard's one WebSocket to the browser's DevTools port on loopback, which Http does not speak either.
         $allowed = [dirname(__DIR__) . '/pikkumies/lib/Http.php', dirname(__DIR__) . '/pikkumies/tools/torrent-clients/rtorrent/Scgi.php',
-            dirname(__DIR__) . '/pikkumies/tools/email/lib/MailTransport.php'];
+            dirname(__DIR__) . '/pikkumies/tools/email/lib/MailTransport.php', dirname(__DIR__) . '/pikkumies/tools/system/browse/CdpSocket.php'];
         foreach (actTrackedPhp() as $f) {
             if (in_array($f, $allowed, true)) {
                 continue;
@@ -260,7 +261,7 @@ return [
     'php73: no 7.4+ arrow function, PHP8 match statement, ??=, ?->, str_contains family or typed property exists (comment-stripped)' => function () {
         foreach (actTrackedPhp() as $f) {
             $code = actStripComments($f);
-            check(!preg_match('/\bfn\s*\(/', $code), basename($f) . ': a 7.4+ arrow function (fn(...) =>) would parse-error under PHP 7.3');
+            check(!preg_match('/(?<!\$)\bfn\s*\(/', $code), basename($f) . ': a 7.4+ arrow function (fn(...) =>) would parse-error under PHP 7.3');
             check(!preg_match('/(?<![a-zA-Z0-9_])match\s*\(/', $code), basename($f) . ': a PHP8 match(...) {} statement would parse-error under PHP 7.3');
             check(strpos($code, '??=') === false, basename($f) . ': the 7.4+ null-coalescing assignment ??= would parse-error under PHP 7.3');
             check(strpos($code, '?->') === false, basename($f) . ': the PHP8 nullsafe operator ?-> would parse-error under PHP 7.3');

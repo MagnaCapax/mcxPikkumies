@@ -236,6 +236,10 @@ class HermesConfig
         // The seed only, so the look stays the user's (/skin): the Pikkumies skin, written beside this file by writeConfig;
         // an install from before gets it once through HermesUserConfig (ADR-0061, 2026-10-19 section).
         $y .= $pinsOnly ? '' : "display:\n  skin: " . self::q(StatusTheme::SKIN) . "\n";
+        // The seed only (Hermes reads browser.* from the user's own file, read_raw_config, so it cannot be pinned): the
+        // denylist for sensitive JavaScript in the browser (tools/browser_tool_eval_policy.py). The browse unit offers the
+        // browser only while this is true and allow_private_urls and use_real_profile are not on (ADR-0077).
+        $y .= $pinsOnly ? '' : "browser:\n  restrict_evaluate: true\n";
         // Set on explicitly (already Hermes' default): background pruning/archiving of agent-created skills;
         // consolidate stays off, left at Hermes' own default (ADR-0024).
         $y .= $pinsOnly ? '' : "curator:\n  enabled: true\n";

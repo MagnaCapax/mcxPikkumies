@@ -74,6 +74,8 @@ class HermesInstall
         'telemetry.shared_metrics.offer_version' => ['hermes_cli/observability/shared_metrics_consent.py', 'section["offer_version"] = OFFER_VERSION'],
         // The skin the seed selects; its file is read from HERMES_HOME/skins (skin_engine.py load_skin) (ADR-0061).
         'display.skin' => ['hermes_cli/skin_engine.py', 'display.get("skin", "default")'],
+        // The browser's JavaScript denylist, seeded and set once on older installs (HermesUserConfig::offerBrowse, ADR-0077).
+        'browser.restrict_evaluate' => ['tools/browser_tool_eval_policy.py', '_browser_eval_flag("restrict_evaluate")'],
     ];
 
     /**

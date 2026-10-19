@@ -155,7 +155,8 @@ return [
         check(strpos($y, 'consolidate') === false, 'curator.consolidate must stay at the Hermes default');
         check(strpos($y, 'allow_agent_scheduling') === false, 'cron.allow_agent_scheduling must stay at the Hermes default (false)');
         check(strpos($y, "\nmodels:") === false, 'no extra model-selection key beyond the existing provider block');
-        check(strpos($y, 'browser') === false, 'no browser key: ADR-0021 already covers it');
+        // The one browser key is the seed's JavaScript denylist (ADR-0077); nothing else about the browser is configured here.
+        check(substr_count($y, 'browser') === 1 && strpos($y, "browser:\n  restrict_evaluate: true\n") !== false, 'only browser.restrict_evaluate is seeded');
     },
     'yaml quoting escapes quotes and backslashes' => function () {
         check(HermesConfig::q('a"b\\c') === '"a\\"b\\\\c"', 'bad quoting');
