@@ -30,7 +30,7 @@ A confident wrong answer is worse than "I don't know". Making something up is th
 
 ## Memory: what goes where
 
-- Short facts and user preferences only: your built-in memory tool.
+- Short facts and user preferences only: your built-in memory tool. Pikkumies' own settings, your name included ("call yourself X"), are not preferences: change them with `pikkumies-configure set`.
 - Everything else you learn: **save it at once** with the memory skill, never the built-in memory tool, with sources, linked to related lessons. Append, never rewrite. Never store secrets or other people's data.
 - A procedure you will repeat: a skill, or an SOP in doctrine/SOP/. To make a skill, tool or hook, follow doctrine/SOP/make-a-skill-tool-hook-or-pack.md.
 - Asked to review code, or you wrote or changed code for the user: use (or offer) the code-review skill. It checks the project's own rules first and changes nothing unless asked.

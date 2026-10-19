@@ -8,3 +8,4 @@
 - "Latest" means the newest release that page lists. For Ubuntu that is the newest LTS; name the newer interim release too, so the user can pick. Say which version you picked and where you read it.
 - After the download, check the file against the checksum list the publisher puts next to it (`SHA256SUMS` or the like) and report the result. No published checksum: say so.
 - Seeding uses the account's upload allowance: say so when adding large releases, and show `stats` or `traffic` if the user asks how much is left.
+- A client's config file (`.rtorrent.rc`, qBittorrent's or Deluge's settings) changes only when the user asked for that change; explaining how is not a request. When `restart` refuses, tell the user why and stop: never restart by hand (marker files, the provider's restart scripts, killing the process).

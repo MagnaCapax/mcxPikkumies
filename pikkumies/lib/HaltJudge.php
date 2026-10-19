@@ -20,25 +20,26 @@ class HaltJudge
 
     /** The fixed question battery, in order; Q8 is used only to decide whether a finished turn still needs a wrap-up. */
     const QUESTIONS = [
-        1 => 'Is the latest user message only chat, a greeting, thanks, or a question that needs no action on the system?',
-        2 => 'Did the user ask for something to be done (a change, a fix, an install, a check that needs commands)?',
+        1 => 'Is the latest user message only chat, a greeting, thanks, or a question about how something works or what to do, with no request to change the system?',
+        2 => 'Did the user ask for something to be done (a change, a fix, an install, a check that needs commands)? A polite request to do something ("can you check ...", "please restart ...") is a request; a question about how something works or how it could be done ("how do I ...?", "can you tell me how ...?", "can you explain ...?") is not.',
         3 => 'Does the evidence (commands and their exit codes, changed files) show the requested work was carried out?',
-        4 => 'Did the final answer say it will do something later, or ask permission for a step it could do itself right now?',
+        4 => 'Did the final answer say it will do later something the user asked for, or ask permission for a step of that requested work it could do itself right now? Offering a change the user did not ask for is not such a step; a change the requested work needs counts as asked for, and a polite request to do something ("can you check ...", "please restart ...") is a request.',
         5 => 'Is there a failed command (non-zero exit) that the final answer does not address?',
-        6 => 'Does the final answer list next steps the agent could take itself without the user?',
-        7 => 'Is the agent waiting on something only the user can give (a password, a choice between options, approval for something destructive or paid)?',
+        6 => 'Does the final answer list next steps of the requested work that the agent could take itself without the user?',
+        7 => 'Is the agent waiting on something only the user can give (a password, a choice between options, approval for something destructive or paid, or a yes to a change to their own config, services or data that they did not ask for; a change the requested work needs counts as asked for, and a polite request to do something ("can you check ...", "please restart ...") is a request)?',
         8 => 'Did the final answer already offer an idea or a topic to the user?',
     ];
 
     /** Fixed sentences for the questions that can trigger CONTINUE, keyed by question number. */
     const CONTINUE_SENTENCES = [
         3 => 'The evidence does not show the requested work was carried out: finish it before stopping.',
-        4 => 'The answer said it will do something later, or asked permission for a step it could do itself: do that step now instead of asking or deferring.',
+        4 => 'The answer said it will do something later, or asked permission for a step of the requested work it could do itself: do that step now instead of asking or deferring.',
         5 => 'A command failed and the answer does not address it: fix it, or explain why it cannot be fixed.',
-        6 => 'The answer listed next steps the agent could take itself: take them now instead of listing them.',
+        6 => 'The answer listed next steps of the requested work the agent could take itself: take them now instead of listing them.',
     ];
 
-    const CONTINUE_RULE = 'Do only what is still missing; do not repeat steps that already succeeded.';
+    // An offer the user did not take up is not missing work: the continue message itself says so, whatever the answers were.
+    const CONTINUE_RULE = 'Do only what is still missing from what the user asked for; do not repeat steps that already succeeded, and do not change the user\'s config, services or data beyond that request.';
 
     const WRAPUP = 'Before you finish: if this task taught you something worth keeping, save it as a lesson in memory. '
         . 'Then end with one short idea that could help the user with their setup; if nothing useful comes to mind, offer one light, fun topic to talk about. Keep both brief.';

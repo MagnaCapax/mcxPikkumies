@@ -3,7 +3,7 @@
  * Hook unit (pre_llm_call, run by hooks/orchestrator.php, ADR-0030; the Hermes counterpart of UserPromptSubmit; runs once per turn).
  * First turn: tells the agent to search lessons and documentation before acting, and lists the
  * local matches for the user's message. Later turns: only when the message asks something new
- * (4+ content words or a question mark, not a slash command) it re-arms hooks/search/search-first-gate/ for
+ * (4+ content words or a question mark, not a slash command, not the halt guard's own message) it re-arms hooks/search/search-first-gate/ for
  * this session and lists the local matches; silent when there are none.
  * Matches are titles, trust and paths only (titles cleaned of control characters, 120 characters),
  * at most 1500 bytes, never page text.
@@ -19,6 +19,7 @@
  */
 require_once dirname(__DIR__, 3) . '/lib/DocSources.php';
 require_once dirname(__DIR__, 3) . '/lib/HookLlm.php';
+require_once dirname(__DIR__, 3) . '/lib/HaltJudge.php';
 
 const SEARCH_FIRST_MAX = 1500;
 // Words that do not make a follow-up a new question ("ok thanks", "yes do it").
@@ -109,8 +110,14 @@ $words = preg_split('/[^\p{L}\p{N}]+/u', $lower, -1, PREG_SPLIT_NO_EMPTY);
 $content = array_diff(is_array($words) ? $words : [], SEARCH_FIRST_FILLER);
 $command = $message !== '' && $message[0] === '/';
 $question = !$command && (strpos($message, '?') !== false || (is_array($words) && $words && in_array($words[0], SEARCH_FIRST_QUESTION, true)));
+// The halt guard's own continue or wrap-up message (ADR-0047) is the same task going on, not a new question: an exact
+// prefix match on its fixed sentences, which are PHP constants, never the model's words.
+$haltMessage = false;
+foreach (array_merge(array_values(HaltJudge::CONTINUE_SENTENCES), [HaltJudge::WRAPUP]) as $fixed) {
+    $haltMessage = $haltMessage || strpos($message, $fixed) === 0;
+}
 if (!$first) {
-    if ($command || (count($content) < 4 && strpos($message, '?') === false)) {
+    if ($command || $haltMessage || (count($content) < 4 && strpos($message, '?') === false)) {
         exit(0); // a follow-up ("ok thanks", "restart it"): the last search still stands
     }
     if (is_array($payload) && !empty($payload['session_id'])) {

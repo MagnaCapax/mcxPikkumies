@@ -11,7 +11,7 @@ umask(0077);
 $repo = dirname(__DIR__, 3);
 $here = __DIR__;
 require_once "$repo/pikkumies/lib/Provider.php";
-foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report', 'CrontabGuard'] as $lib) {
+foreach (['Questions', 'Checks', 'Judge', 'Targets', 'Sandbox', 'Asker', 'Report', 'CrontabGuard', 'CommandLogCheck'] as $lib) {
     require_once "$here/lib/$lib.php";
 }
 $o = ['targets' => (string) getenv('PIKKUMIES_QA_TARGETS'), 'target' => '', 'only' => '', 'tag' => '', 'regrade' => '', 'token-budget' => null, 'max-tokens' => null,
@@ -86,7 +86,7 @@ $out = $o['out'] !== '' ? $o['out'] : sys_get_temp_dir() . '/pikkumies-questions
 $report = new Report($out, $t['keys']);
 $guard = new CrontabGuard($out, $report, $realHome, $account);
 $tabBefore = $guard->prev;
-file_put_contents("$out/crontab-before.txt", $tabBefore . "\n");
+file_put_contents("$out/crontab-before.txt", $tabBefore . "\n"); // verbatim: the only copy to restore the account's crontab from
 $box = $o['install'] !== '' ? Sandbox::reuse($o['install']) : Sandbox::create($repo);
 $commit = trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' rev-parse --short HEAD'))
     . (trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' status --porcelain --untracked-files=no')) !== '' ? '+changes' : '');
@@ -103,6 +103,7 @@ try {
         }
     }
     $box->snapshot(); // the base every reset goes back to; the documentation each family downloads is added below
+    $runLogCounts = CommandLogCheck::counts(CommandLogCheck::dir($box->root)); // a reused install keeps earlier runs' lines
     $snapped = true;
     // Before any token is spent: a login shell in the sandbox must resolve crontab to the fake, or every terminal
     // command Hermes runs risks the account's real crontab (2026-10-18 RCA: a login bash re-reads /etc/profile).
@@ -142,13 +143,15 @@ try {
                 continue;
             }
             $error = isset($q['meta']['setup'][0]) && !Asker::setup($box, "$here/fixtures/" . $q['meta']['setup'][0]) ? 'setup copy failed' : '';
+            $logCounts = CommandLogCheck::counts(CommandLogCheck::dir($box->root));
             $rec = Asker::ask($box, $q['body'], $overlay, $o['max-turns'], (int) $o['timeout']);
             $rec['error'] = $error ?: $rec['error'];
             if (Questions::values($q, 'judge')) {
                 $judge = isset($t['judge']) ? Judge::ask($t['judge'], $t['keys']['judge'], Questions::values($q, 'judge'), $rec['text'])
                     : ['verdicts' => [], 'tokens' => 0, 'error' => 'no judge in the targets file'];
             }
-            $row = Report::row($q, $name, $meta, Checks::check($q, $rec), $rec, $judge);
+            $log = CommandLogCheck::grade(CommandLogCheck::newLines(CommandLogCheck::dir($box->root), $logCounts), CommandLogCheck::sessionId("{$box->root}/raw.jsonl"));
+            $row = Report::row($q, $name, $meta, array_merge(Checks::check($q, $rec), CommandLogCheck::checks($rec, $log)), $rec, $judge) + $log;
             $used += $row['tokens'];
             $report->transcript($name, $q['id'], "{$box->root}/raw.jsonl");
             $report->add($row);
@@ -164,14 +167,22 @@ try {
     $o['keep'] = true;
 } finally {
     Asker::killStray($box->home);
+    // Evidence: this run's lines of the sandbox's own command log, before the install goes. Keys are masked as in the
+    // transcripts; paths stay as written, so the sandbox home (~) and the account's real home stay distinct.
+    foreach (isset($runLogCounts) ? CommandLogCheck::newLinesByDay(CommandLogCheck::dir($box->root), $runLogCounts) : [] as $day => $lines) {
+        @mkdir("$out/command-log", 0700);
+        file_put_contents("$out/command-log/$day", $report->mask(implode("\n", $lines)) . "\n");
+        chmod("$out/command-log/$day", 0600);
+    }
     if ($snapped) {
         $box->reset(); // a kept sandbox is clean for the next --install
     }
     $o['keep'] || $o['install'] !== '' ? print("sandbox kept: {$box->root}\n") : $box->remove();
     echo Report::scorecard($report->rows) . "results: $out/results.jsonl, tokens used: $used\n";
     $tabFinal = CrontabGuard::realTab();
-    file_put_contents("$out/crontab-after.txt", $guard->mask($tabFinal) . "\n");
+    file_put_contents("$out/crontab-after.txt", $tabFinal . "\n"); // verbatim, like crontab-before.txt, so the two diff cleanly
     if ($tabFinal !== $tabBefore || $guard->changedBy) {
+        fwrite(STDERR, implode("\n", $guard->maskedDiff($tabBefore, $tabFinal)) . "\n"); // what changed, masked like every other diff
         fail("!!! THE ACCOUNT'S REAL CRONTAB CHANGED DURING THIS RUN (during: " . implode(', ', $guard->changedBy ?: ['(after the last check)'])
             . "). Compare it with the copy in $out/crontab-before.txt and repair it. !!!", 3);
     }

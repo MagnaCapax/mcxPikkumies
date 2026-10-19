@@ -25,6 +25,7 @@ class HaltRun
         if ($sessionId === '') {
             return $code; // no session id in the output (plain text answer): nothing to judge against
         }
+        $resumeTail = self::formatArgs($passArgs); // a stream-json caller keeps getting stream-json on the resumes
         $continuesLeft = self::MAX_CONTINUES;
         $wrappedUp = false;
         while (true) {
@@ -40,12 +41,12 @@ class HaltRun
             HaltState::logDecision($sessionId, 'oneshot', 0, $verdict);
             if ($verdict['verdict'] === 'continue' && $continuesLeft > 0) {
                 $continuesLeft--;
-                list($code, $output) = self::exec($hermesBin, ['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']]);
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
                 continue;
             }
             if ($verdict['verdict'] === 'done-wrapup' && !$wrappedUp) {
                 $wrappedUp = true;
-                list($code, $output) = self::exec($hermesBin, ['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']]);
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
             }
             return $code;
@@ -89,6 +90,34 @@ class HaltRun
         }
         $output = strlen($output) > self::CAPTURE_MAX ? substr($output, -self::CAPTURE_MAX) : $output;
         return [$code, $output, self::streamSessionId($output)];
+    }
+
+    /** `hermes chat` options that take the next word as their value (Hermes v0.22.2 hermes_cli/_parser.py): that word is never read as an option. */
+    const VALUE_OPTIONS = ['-q', '--query', '--query-file', '-m', '--model', '-t', '--toolsets', '--reasoning', '-s', '--skills',
+        '--provider', '-r', '--resume', '--in', '--image', '--max-turns', '--run-budget', '--source'];
+
+    /**
+     * The caller's format for the resumes, as ['--format=<value>'], or [] when none was given. Read the way Hermes'
+     * argparse reads it: `--format x`, `--format=x`, or an abbreviation down to `--f` (no other chat option starts
+     * with f); the word after an option that takes a value is skipped, never read as the format. A call argparse would
+     * reject (`-q --format`, which it reads as a missing query) never prints a session id, so it is never resumed.
+     */
+    public static function formatArgs(array $passArgs)
+    {
+        $format = [];
+        for ($i = 0, $n = count($passArgs); $i < $n; $i++) {
+            $a = (string) $passArgs[$i];
+            if (preg_match('/^--f(o(r(m(at?)?)?)?)?(=(.*))?$/s', $a, $m)) {
+                if (isset($m[5]) && $m[5] !== '') { // the =value form
+                    $format = ['--format=' . $m[6]];
+                } elseif ($i + 1 < $n) {
+                    $format = ['--format=' . $passArgs[++$i]];
+                }
+            } elseif (in_array($a, self::VALUE_OPTIONS, true)) {
+                $i++; // its value, whatever it looks like
+            }
+        }
+        return $format; // the last one wins, as in argparse
     }
 
     /** The session id from the last stream-json event that carries one; '' for plain text output. */

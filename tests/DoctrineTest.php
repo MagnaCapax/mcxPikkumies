@@ -157,4 +157,16 @@ return [
         }
         check(!preg_match('/\bpkill\b|\bkillall\b/', $rules), 'the containers doctrine must name the recovery outcome, never a kill command');
     },
+    'doctrine: the QA run 3 rules reach SOUL.md: a client\'s config only on request and no restart by hand; settings and the name through pikkumies-configure, not the built-in memory' => function () {
+        $s = HermesConfig::renderSoul(soulProfiles()['pmss shared, no root'], Config::defaults());
+        check(strpos($s, "\n### torrent-clients\n") !== false, 'the torrent-clients category must be in SOUL.md');
+        $torrents = substr($s, (int) strpos($s, "\n### torrent-clients\n"));
+        check(strpos($torrents, 'changes only when the user asked for that change') !== false && strpos($torrents, 'never restart by hand') !== false,
+            'the torrent-clients doctrine must limit config changes to the request and forbid restarting by hand');
+        // The line that sent "call yourself Kalle" to the built-in memory itself says that settings are not preferences, in the
+        // core doctrine every profile gets, not in a category section.
+        $core = HermesConfig::renderSoul(soulProfiles()['generic, no root'], Config::defaults(), false);
+        check(preg_match('/^- Short facts and user preferences only: your built-in memory tool\. Pikkumies\' own settings, your name included \("call yourself X"\), are not preferences: change them with `pikkumies-configure set`\.$/m', $core) === 1,
+            'the core memory line must exclude settings and the agent\'s name');
+    },
 ];

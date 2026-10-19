@@ -84,4 +84,25 @@ return [
             testRmTree($out);
         }
     },
+    'questions: run.php keeps crontab-before.txt and crontab-after.txt verbatim and shows their difference through the mask (QA run 3)' => function () {
+        // run.php is the top-level runner (it needs keys and a QA account), so its writes are checked in its source.
+        $src = (string) file_get_contents(dirname(__DIR__) . '/tests/testing/questions/run.php');
+        check(preg_match('#file_put_contents\("\$out/crontab-before\.txt",\s*\$tabBefore \. "\\\\n"\)#', $src) === 1, 'crontab-before.txt must be the verbatim restore copy');
+        check(preg_match('#file_put_contents\("\$out/crontab-after\.txt",\s*\$tabFinal \. "\\\\n"\)#', $src) === 1, 'crontab-after.txt must be verbatim like crontab-before.txt');
+        check(strpos($src, '$guard->maskedDiff($tabBefore, $tabFinal)') !== false, 'the final difference must be shown through the mask');
+    },
+    'questions: CrontabGuard::maskedDiff() lists removed and added lines through the mask, unchanged lines not at all' => function () {
+        $out = testTempDir('pk-tabguard');
+        try {
+            $guard = new CrontabGuard($out, new Report($out, ['SECRETKEY123']), '/home/qa', 'qa', function () {
+                return "0\n";
+            });
+            $d = $guard->maskedDiff("0\nkept\n* * * * * /home/qa/old KEY=SECRETKEY123", "0\nkept\n* * * * * /home/qa/new --as=qa");
+            check(count($d) === 2 && strpos($d[0], '- ') === 0 && strpos($d[1], '+ ') === 0, 'one removed and one added line: ' . json_encode($d));
+            check(strpos(implode("\n", $d), '/home/qa') === false && strpos(implode("\n", $d), 'SECRETKEY123') === false && strpos($d[1], '--as=USER') !== false,
+                'the diff must be masked: ' . json_encode($d));
+        } finally {
+            testRmTree($out);
+        }
+    },
 ];

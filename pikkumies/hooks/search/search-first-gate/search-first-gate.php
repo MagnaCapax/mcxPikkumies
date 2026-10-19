@@ -14,6 +14,7 @@
  */
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 
+const SEARCH_FIRST_MAX_COMMAND = 4096; // bytes; a longer terminal command is never a plain call
 const SEARCH_FIRST_READ_ONLY = ['read_file', 'search_files', 'skill_view', 'skills_list', 'memory', 'clarify', 'todo', 'todo_list', 'session_search', 'read_terminal'];
 
 $payload = json_decode((string) stream_get_contents(STDIN), true);
@@ -47,11 +48,17 @@ $command = $tool === 'terminal' && isset($payload['tool_input']['command']) ? (s
  * the shell quotes it: single-quoted text is literal and may hold anything; outside it a backslash or a
  * command substitution ($( ` ${) anywhere, the cd argument and double quotes included, is no match, and so
  * is anything chained after the call (; & | a redirect, a newline). So `echo <search command>; rm -rf x`
- * neither opens the gate nor passes as a read. The script path may start with ./, ~/pikkumies/,
- * $HOME/pikkumies/, /home/<name>/pikkumies/ or this install's directory, not any other directory.
+ * neither opens the gate nor passes as a read. One output suffix may follow, since it changes what is shown,
+ * never what runs: `2>&1` or `2>/dev/null`, then or instead one pipe into `head` or `tail` (bare, `-n N` or `-N`, N at
+ * least 1). A command longer than SEARCH_FIRST_MAX_COMMAND is no match.
+ * The script path may start with ./, ~/pikkumies/, $HOME/pikkumies/, /home/<name>/pikkumies/ or this install's
+ * directory, not any other directory.
  */
 function searchFirstPlainCall($command, $path, $verbs)
 {
+    if (strlen($command) > SEARCH_FIRST_MAX_COMMAND) {
+        return false; // a real search is short; a padded command must not cost the hook its timeout (it fails open)
+    }
     $bare = '';
     $quote = '';
     for ($i = 0, $n = strlen($command); $i < $n; $i++) {
@@ -74,6 +81,9 @@ function searchFirstPlainCall($command, $path, $verbs)
         return false; // unterminated quote
     }
     $bare = preg_replace('#^\s*cd\s+[^\s;&|<>]+\s*&&\s*#', '', $bare, 1);
+    // The output suffix, only at the end and joined by spaces or tabs only: a newline, or anything after the suffix, stays in
+    // $bare and fails the check below. A line count of 0 would show nothing, so N is at least 1.
+    $bare = preg_replace('#([ \t]+2>(&1|/dev/null))?([ \t]*\|[ \t]*(head|tail)([ \t]+-n[ \t]*0*[1-9][0-9]*|[ \t]+-0*[1-9][0-9]*)?)?[ \t]*$#D', '', $bare, 1);
     if (preg_match('#[;&|<>\r\n\x0B\x0C]#', $bare)) { // vertical tab and form feed: \s below would read them as spaces, the shell does not
         return false;
     }
@@ -102,6 +112,9 @@ if (!$docs && (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlain
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';
-echo json_encode(['action' => 'block', 'message' => "Pikkumies search first: " . ($docs ? 'lessons before documentation' : 'before acting')
+// A memory search the gate did not count (chained, redirected into a file, piped elsewhere, another path): say so, or the agent retries the same shape.
+$notCounted = preg_match('#pikkumies\.php(\s+--?[a-z][a-z-]*)*\s+search(\s|$)#', $command)
+    ? "This memory search was not counted. Run it plain, on its own, with the path below: nothing may follow it but 2>&1 or 2>/dev/null first, then one | head or | tail (bare, -n N or -N).\n" : '';
+echo json_encode(['action' => 'block', 'message' => $notCounted . "Pikkumies search first: " . ($docs ? 'lessons before documentation' : 'before acting')
     . ", search the lessons and documentation for this task:\n"
     . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading other files and asking the user are allowed meanwhile.)"]) . "\n";

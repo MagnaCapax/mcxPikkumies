@@ -77,4 +77,25 @@ return [
             exec('rm -rf ' . escapeshellarg($dir));
         }
     },
+    'Asker::parseStream grades every turn of a halt-guard resume: texts joined, tokens summed, exit from the last turn' => function () {
+        $dir = sys_get_temp_dir() . '/pk-asker-' . getmypid() . '-' . mt_rand();
+        mkdir($dir, 0700, true);
+        try {
+            $init = json_encode(['type' => 'system', 'subtype' => 'init', 'session_id' => 's1']);
+            $turn1 = [$init, json_encode(['type' => 'text', 'text' => 'Set up pubscript in the client.']),
+                json_encode(['type' => 'result', 'text' => 'Set up pubscript in the client.', 'exit_code' => 0, 'tokens' => ['total' => 100]])];
+            $turn2 = [$init, json_encode(['type' => 'result', 'text' => 'Lesson saved.', 'exit_code' => 0, 'tokens' => ['total' => 30]])];
+            file_put_contents("$dir/raw.jsonl", implode("\n", array_merge($turn1, $turn2)) . "\n");
+            $r = Asker::parseStream("$dir/raw.jsonl");
+            check(strpos($r['text'], 'pubscript') !== false && strpos($r['text'], 'Lesson saved.') !== false, 'every turn\'s text must be graded: ' . $r['text']);
+            check($r['tokens'] === 130, 'tokens must be summed over the turns: ' . $r['tokens']);
+            check($r['exit'] === 0 && $r['error'] === '', 'exit and error come from the last turn: ' . json_encode($r));
+            // A second turn cut off before its result: its text still counts, and the run is reported as cut off.
+            file_put_contents("$dir/raw2.jsonl", implode("\n", array_merge($turn1, [$init, json_encode(['type' => 'text', 'text' => 'partial'])])) . "\n");
+            $r2 = Asker::parseStream("$dir/raw2.jsonl");
+            check(strpos($r2['text'], 'partial') !== false && strpos($r2['error'], 'no result record') === 0, 'a cut-off last turn: ' . json_encode($r2));
+        } finally {
+            exec('rm -rf ' . escapeshellarg($dir));
+        }
+    },
 ];

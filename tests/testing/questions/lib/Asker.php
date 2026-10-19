@@ -119,7 +119,11 @@ class Asker
             $r['error'] = 'no stream-json from Hermes; first line: ' . ($lines ? substr($lines[0], 0, 200) : '(none)');
             return $r;
         }
+        // A halt-guard resume adds a whole init..result stream per extra turn (HaltRun passes --format to each). Every
+        // turn's answer is graded together and every turn's tokens count (each turn is its own Hermes run, whose
+        // result reports that run's total_tokens); exit and error come from the last turn.
         $deltas = '';
+        $texts = [];
         $result = null;
         foreach ($lines as $line) {
             $j = json_decode($line, true);
@@ -130,15 +134,19 @@ class Asker
                 $deltas .= $j['text'];
             } elseif ($type === 'result') {
                 $result = $j;
+                $texts[] = isset($j['text']) && $j['text'] !== '' ? (string) $j['text'] : $deltas;
+                $r['tokens'] += isset($j['tokens']['total']) ? (int) $j['tokens']['total'] : 0;
+                $deltas = '';
             }
         }
-        if ($result === null) {
-            $r['text'] = $deltas;
+        if ($deltas !== '') {
+            $texts[] = $deltas;   // text after the last result: a turn that was cut off
+        }
+        $r['text'] = implode("\n\n", $texts);
+        if ($result === null || $deltas !== '') {
             $r['error'] = 'no result record: the run was cut off';
             return $r;
         }
-        $r['text'] = isset($result['text']) && $result['text'] !== '' ? (string) $result['text'] : $deltas;
-        $r['tokens'] = isset($result['tokens']['total']) ? (int) $result['tokens']['total'] : 0;
         $r['exit'] = isset($result['exit_code']) ? (int) $result['exit_code'] : null;
         $r['error'] = isset($result['error']) ? (string) $result['error'] : '';
         return $r;

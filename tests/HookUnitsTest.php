@@ -3,9 +3,7 @@
  * lib/HookUnits.php (reading hook.md, ordering, the index), HermesConfig::hookEntries, and the edges of
  * the search-first units (ADR-0028, ADR-0030).
  */
-if (!function_exists('hookSearchTree')) {
-    require __DIR__ . '/HookSearchTest.php';
-}
+require_once __DIR__ . '/hookSearchSupport.php';
 if (!function_exists('hookUnitsAdd')) {
     /** hook.md text for $name; $over replaces or (with null) drops frontmatter lines, extra keys are appended. */
     function hookUnitsMd($name, array $over = [])

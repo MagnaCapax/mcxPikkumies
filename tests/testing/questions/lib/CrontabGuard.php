@@ -55,18 +55,26 @@ class CrontabGuard
             return false;
         }
         file_put_contents("{$this->out}/crontab-after-$label.txt", $now . "\n");
-        $before = explode("\n", $this->prev);
-        $after = explode("\n", $now);
+        $where = $label . ($target !== '' ? " ($target)" : '');
+        fwrite(STDERR, "!!! real crontab changed during $where !!!\n" . implode("\n", $this->maskedDiff($this->prev, $now)) . "\n");
+        $this->changedBy[] = $where;
+        $this->prev = $now;
+        return true;
+    }
+
+    /**
+     * The lines of $before missing from $after ("- ") and the lines added ("+ "), each through mask(): what is shown of a
+     * change. The copies on disk stay verbatim, because crontab-before.txt is the only copy to restore from.
+     */
+    public function maskedDiff($before, $after)
+    {
+        $before = explode("\n", $before);
+        $after = explode("\n", $after);
         $diff = array_merge(array_map(function ($l) {
             return "- $l";
         }, array_diff($before, $after)), array_map(function ($l) {
             return "+ $l";
         }, array_diff($after, $before)));
-        $masked = array_map([$this, 'mask'], $diff);
-        $where = $label . ($target !== '' ? " ($target)" : '');
-        fwrite(STDERR, "!!! real crontab changed during $where !!!\n" . implode("\n", $masked) . "\n");
-        $this->changedBy[] = $where;
-        $this->prev = $now;
-        return true;
+        return array_map([$this, 'mask'], $diff);
     }
 }
