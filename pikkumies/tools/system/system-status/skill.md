@@ -1,9 +1,11 @@
 ---
 name: system-status
-description: "This account's own figures (disk space left, quota, memory, traffic, limits; levytila, kiintiö, muisti, liikenne, rajat) and a machine snapshot (OS, host, root, own running apps) before diagnosing anything; slowness and whether the server is busy go to performance."
+description: "Is the seedbox down: web panel or ruTorrent not loading, 502, a torrent client not running (seedbox ei toimi, ei aukea); this account's own figures (disk space left, quota, memory, traffic, limits; levytila, kiintiö, muisti, liikenne, rajat) and a machine snapshot (OS, host, root, own running apps) before diagnosing anything; slowness and whether the server is busy go to performance."
 ---
 
 # System status
+
+**Down, not loading, 502, "seedbox ei toimi"**: run `health` once and answer from its `summary` and `findings`; each finding's `next_step` (and `doc` when given) is what the user does. You are running on this server, so it is up; `not_shown` is what this check cannot see (the user's own network). A client that `started ... while the machine kept running` restarted on its own; the server did not.
 
 **How much is left** (disk, quota, memory, traffic, processes, CPU; in Finnish levytila, kiintiö, muisti, liikenne, rajat): run `account` once and answer from it. On PMSS it is the platform's own live figures for this account (userShowLimits): `disk` (`used`, `soft` quota, `hard` ceiling, `left` to the soft quota, files, `age_s` of the quota snapshot), `memory` (`used` against `limit`, pressure, OOM kills), `traffic` (upload in the last 30 days against `limit`, `left`, inbound, bonus, `cap_mbit`), `processes`, `cpu`, PMSS and Debian versions, bonus, own running apps. These are live figures: no memory search first, and never `df`, `free`, `du` or a wiki page for them. A key listed in `unlimited` has no limit; any other null is unknown, so say so. Convert bytes for the user (1 GiB = 1073741824 bytes). The user's own view of the same figures is the Info tab of their panel (`panel` gives the address as a template; never fill in a name you have not been given). Off PMSS every figure is null: read `limits` from `show` instead.
 

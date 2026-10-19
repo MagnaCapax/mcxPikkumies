@@ -7,7 +7,7 @@ description: Check, restart and set up the user's seedbox apps (torrent clients,
 
 For an app in a Docker container this skill gives the wiki page and the app's own settings; the container itself (list, logs, start, stop, launch, diagnose) goes through the docker skill.
 
-1. Run the system-status skill. If `pmss` is false, stop: this skill does not apply on this machine. Otherwise `apps` shows which apps are running for this user.
+1. Web UI or panel does not load, "down", 502: run `system-status health` first and answer from it; the steps below are for what it does not cover. Run the system-status skill. If `pmss` is false, stop: this skill does not apply on this machine. Otherwise `apps` shows which apps are running for this user.
 2. Find the wiki page for the app in the quick list below and read it: `php ~/pikkumies/tools/memory/pikkumies/pikkumies.php search "<page title>"`, then read the path it prints. It says how the app is meant to run on this platform. If the app is not listed, `php ~/pikkumies/tools/documentation/wiki/wiki.php list --search <app>` lists every wiki page whose title names it.
 3. Check the free space first (`quota_free_bytes` in any torrent `stats`, or `system-status`): a full quota is the most common reason a torrent client stops. The filesystem's free space (`df`, `fs_free_bytes`) is the whole server, not the user's share.
 4. Read the app's own log (in the app's config directory under the home directory), limited with `tail -n 100`.

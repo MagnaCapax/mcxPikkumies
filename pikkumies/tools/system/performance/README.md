@@ -54,6 +54,8 @@ The client-area Diagnose button on PMSS checks the account and the server with t
   Why: on a shared server a load test takes disk and bandwidth from everyone, and its number is what this account got at that moment, not what the server can do. The guard asks before each one.
 - Never promise what support or the provider will do; no prices.
   Why: the agent cannot commit anyone but itself, and prices change; the client area and the provider's own pages are the source.
+- You run on this server, so it is up while you answer; for "down", "not loading" or a 502, run `system-status health` once and answer from it; a whole-server outage is out of your reach.
+  Why: a user who says "my seedbox is down" often means one client crashed or the web panel shows an error. One `health` call says which ([ADR-0066](../../../../docs/adr/0066-system-status-health-one-answer-to-is-it-down.md)); a search, logs and per-client stats take many rounds. When the whole server is down this agent is not running, so that case only ever reaches the user's own browser and the provider.
 
 Never-claims (the router's text is checked against them): hardware failing or degraded; another account's activity, identity or count; a cap called deliberate or a bug; a route verdict from loss that does not persist; a home or ISP cause inferred; load average as CPU use; PSI some as saturation; "oversold"; promises of support or provider action; cancel, refund or "move elsewhere"; prices or product names; the disk type from the rotational flag; a benchmark result as the hardware ceiling; failure counters or peak usage as memory pressure.
 

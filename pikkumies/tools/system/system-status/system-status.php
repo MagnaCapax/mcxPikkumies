@@ -14,11 +14,13 @@ require_once dirname(__DIR__, 3) . '/lib/Config.php'; // Detect.php already requ
 require dirname(__DIR__, 3) . '/lib/Cli.php';
 require dirname(__DIR__, 3) . '/lib/CliHuman.php';
 require_once __DIR__ . '/StatusAccount.php';
+require_once __DIR__ . '/StatusHealth.php';
 
 // Test seams: a test may set these before including the file. Nothing is read from the environment.
 $systemStatusLocalDir = isset($systemStatusLocalDir) ? $systemStatusLocalDir : Config::localDir();
 $systemStatusProcDir = isset($systemStatusProcDir) ? $systemStatusProcDir : '/proc';
 $systemStatusUid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+$systemStatusPanelBase = isset($systemStatusPanelBase) ? $systemStatusPanelBase : 'http://localhost'; // PMSS agentDiagnostics.php:133 probes the same path
 
 Cli::run($argv, [
     'show' => function () use ($systemStatusLocalDir, $systemStatusProcDir, $systemStatusUid) {
@@ -45,6 +47,16 @@ Cli::run($argv, [
         // Only on PMSS, the same rule Detect::limits() follows: another host's ~/bin/userShowLimits is not this tool.
         $usl = $profile['family'] === 'pmss' ? Detect::userShowLimitsData((string) getenv('HOME')) : null;
         return [StatusAccount::record($usl, $profile['family'], Detect::runningApps($systemStatusUid, $systemStatusProcDir))];
+    },
+    // One answer to "is it down?" (StatusHealth, ADR-0066); the panel probe only on PMSS, where /user-<name>/ is the account's own.
+    'health' => function () use ($systemStatusLocalDir, $systemStatusProcDir, $systemStatusUid, $systemStatusPanelBase) {
+        $profile = Detect::cached(false, $systemStatusLocalDir . '/host.json', $systemStatusLocalDir . '/update.log');
+        $home = (string) getenv('HOME');
+        $pw = function_exists('posix_getpwuid') ? posix_getpwuid($systemStatusUid) : false;
+        $pmss = $profile['family'] === 'pmss';
+        return [StatusHealth::record(['family' => $profile['family'], 'home' => $home, 'uid' => $systemStatusUid, 'proc' => $systemStatusProcDir,
+            'panel_url' => $pmss && is_array($pw) ? $systemStatusPanelBase . '/user-' . rawurlencode($pw['name']) . '/' : null,
+            'usl' => $pmss ? Detect::userShowLimitsData($home) : null])];
     },
     // The account's own log files this host family/stack is known to keep (Host::TABLE logGlobs,
     // ADR-0023), optionally searched. Only files under $HOME that this account owns, after
@@ -85,4 +97,4 @@ Cli::run($argv, [
         }
         return $records;
     },
-], "usage: system-status.php show|account|logs [--grep TEXT] [--human]\n  show     one record: cached classification (host family, stack, tier, root access), own running apps (live), live limits (CPU, memory, disk), load, the server totals (labelled)\n  account  one record of this account's own figures, live: disk quota, memory, upload traffic, processes, CPU quota, versions, bonus, own apps (PMSS userShowLimits; null elsewhere)\n  logs     this account's own log files known for this host (path relative to HOME, size, modified); --grep TEXT returns matching lines (last 1 MiB of each file, 50 lines in all)", [], ['grep']);
+], "usage: system-status.php show|account|health|logs [--grep TEXT] [--human]\n  show     one record: cached classification (host family, stack, tier, root access), own running apps (live), live limits (CPU, memory, disk), load, the server totals (labelled)\n  account  one record of this account's own figures, live: disk quota, memory, upload traffic, processes, CPU quota, versions, bonus, own apps (PMSS userShowLimits; null elsewhere)\n  health   one record for \"is it down?\": the machine is up, the web panel answers or the platform's reason (PMSS), each torrent client reachable or why not and when it started, quota and memory state, and a summary\n  logs     this account's own log files known for this host (path relative to HOME, size, modified); --grep TEXT returns matching lines (last 1 MiB of each file, 50 lines in all)", [], ['grep']);

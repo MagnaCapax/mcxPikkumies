@@ -91,14 +91,14 @@ return [
             && !hookSearchGateBlocks($tree, 'docs6', 'terminal', 'php ~/pikkumies/tools/documentation/kb/kb.php search x'), 'documentation still blocked after the search');
         exec('rm -rf ' . escapeshellarg($tree));
     },
-    'search-first gate: a plain system-status show or account call passes while armed and opens nothing; logs, a chain or a substitution waits (ADR-0058)' => function () use ($hookPages) {
+    'search-first gate: a plain system-status show, account or health call passes while armed and opens nothing; logs, a chain or a substitution waits (ADR-0058, ADR-0066)' => function () use ($hookPages) {
         $tree = hookSearchTree($hookPages);
         $dir = "$tree/pikkumies/local/state/search-first";
         @mkdir($dir, 0700, true);
         touch("$dir/" . sha1('st1'), time() - 20); // searched on an earlier turn,
         touch("$dir/" . sha1('st1') . '.armed', time() - 5); // then a new question re-armed the gate
         $st = '~/pikkumies/tools/system/system-status/system-status.php';
-        foreach (["php $st account", "php $st show", "php $st --human account", "cd ~ && php $st account", "php $st account --human"] as $cmd) {
+        foreach (["php $st account", "php $st show", "php $st --human account", "cd ~ && php $st account", "php $st account --human", "php $st health"] as $cmd) {
             check(!hookSearchGateBlocks($tree, 'st1', 'terminal', $cmd), 'a plain status call was blocked while armed: ' . $cmd);
             check(!hookSearchGateBlocks($tree, 'fresh', 'terminal', $cmd), 'a plain status call was blocked before any search: ' . $cmd);
         }
@@ -114,6 +114,9 @@ return [
             "php $st logs",
             "php $st logs --grep error",
             "php $st account\nrm -rf /tmp/x",
+            "php $st health; ls",
+            "php $st health | sh",
+            "php $st health \"\$(id)\"",
             'php /tmp/evil/tools/system/system-status/system-status.php account',
             "echo $st account",
         ];

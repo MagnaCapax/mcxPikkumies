@@ -109,11 +109,11 @@ if (searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'search')) {
 $path = isset($payload['tool_input']['path']) ? str_replace('\\', '/', (string) $payload['tool_input']['path']) : '';
 $docs = (in_array($tool, ['read_file', 'search_files'], true) && preg_match('#(^|/)docs-cache(/|$)#', $path))
     || searchFirstPlainCall($command, 'tools/documentation/wiki/wiki\.php', 'search|list') || searchFirstPlainCall($command, 'tools/documentation/kb/kb\.php', 'search|list');
-// The account's own live figures (ADR-0058): a plain show or account call is the source a search would point at, so it
-// does not wait for one. Only these two read-only verbs, only as one plain call; logs and anything chained still wait.
+// The account's own live figures (ADR-0058) and its health (ADR-0066): a plain show, account or health call is the source a
+// search would point at, so it does not wait for one. Only these read-only verbs, only as one plain call; logs and anything chained still wait.
 const SEARCH_FIRST_STATUS = 'tools/system/system-status/system-status\.php';
 if (!$docs && (in_array($tool, SEARCH_FIRST_READ_ONLY, true) || searchFirstPlainCall($command, SEARCH_FIRST_TOOL, 'list|sources')
-    || searchFirstPlainCall($command, SEARCH_FIRST_STATUS, 'show|account'))) {
+    || searchFirstPlainCall($command, SEARCH_FIRST_STATUS, 'show|account|health'))) {
     exit(0);
 }
 $tool = Config::root() . '/tools/memory/pikkumies/pikkumies.php';

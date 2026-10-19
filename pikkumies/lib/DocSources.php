@@ -752,6 +752,24 @@ class DocSources
         return $parts ? 'support pages for this host, to give the user to open when nothing here answers (never fetch them yourself): ' . implode('; ', $parts) : '';
     }
 
+    /**
+     * The address of the page titled $title (any case) in the downloaded copy of an active wiki or kb source, or null:
+     * never a guessed address, never a download (the copy is looked up by the file name refreshAll() gives the title).
+     */
+    public static function pageUrl($title)
+    {
+        foreach (self::active() as $name => $src) {
+            $p = self::cacheRoot() . "/$name/" . substr(TextSearch::slug($title, 'page'), 0, 100) . '.md';
+            if (in_array(self::kind($src), ['wiki', 'kb'], true) && is_file($p)) {
+                list($t, $url) = self::pageInfo($p);
+                if (strcasecmp($t, $title) === 0 && preg_match('#^https?://#', $url)) {
+                    return $url;
+                }
+            }
+        }
+        return null;
+    }
+
     /** [title, url] of a cached page or lesson, from its first lines. */
     public static function pageInfo($path)
     {
