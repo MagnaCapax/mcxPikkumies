@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted
+- Status: Accepted; amended 2026-10-19 twice (the occasional question; approvals off, see the amendments at the end)
 
 ## Context
 The operator's request of 2026-10-18: "We should probably have feedback API option ... Basicly integrated with pikkumies, so people can /feedback and that sends us crucial information + transcript and we store it for later analysis ... private secure storage, only for us", and on the place: "should we do it separately a pikkumies.mcx.fi domain for functions like this? I think we will regardless need to create one so we can upsell power functionality".
@@ -72,3 +72,10 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - Users who run `--yolo` and use `/feedback` now run the send command themselves.
 - About 70 tokens in each turn that asks, on the user's credits.
 - Code: `pikkumies/hooks/system/feedback-ask/`, `pikkumies/tools/system/feedback/FeedbackAsk.php`, `pikkumies/tools/system/feedback/FeedbackPrompt.php`, `pikkumies/lib/NestedAgent.php`; tests `tests/FeedbackAskTest.php`, `tests/FeedbackPromptTest.php`.
+
+## Amendment 2026-10-19: approvals off, the send confirmed in the chat
+**Context.** [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md)'s amendment of the same day pins `approvals.mode: "off"`, under which Hermes approves this guard's `approve` with nobody asked, as it does under `--yolo` (`tools/approval.py` `_run_approval_gate`). Left as it was, a feedback send would leave the machine without the person's yes.
+
+**Decision.** The send no longer depends on Hermes' prompt. The orchestrator's ask policy never passes the `approve` on: it reviews the call against the user's own recent messages with R2 forced to yes, so only the user's explicit yes to this send (R1 "yes", R3 "no") lets a re-run through; until then the call is blocked with a fixed message telling the agent to say in one line what would be sent and to run the command again after the user says yes. Where no yes can be checked (a messaging gateway, a scheduled run, an agent started by an agent, `halt.disabled`, or no review answer) the send stays blocked and the agent gives the command for the person to run. `NestedAgent::approvalsOff()` still reads only `HERMES_YOLO_MODE`, so under `--yolo` the guard keeps refusing the send outright; reading the pinned mode there too would refuse every send in every session.
+
+**Consequences.** A `/yolo` typed in a session no longer lets the send through unasked. The question `feedback.ask` adds is unchanged. Not verified live: how a real light model judges a plain "yes" after the agent's one-line description of the send. Test: `tests/ApprovalsOffTest.php`, `tests/HookMergeTest.php` (the shipped send through every shipped unit, with no session, is a block).

@@ -49,16 +49,16 @@ $sayLH = function (array $answer) {
     return 'echo ' . var_export(json_encode($answer), true) . ';';
 };
 return [
-    'local hooks: run after every shipped unit; a local approve next to a guarded rm keeps the guard\'s question' => function () use ($sayLH) {
+    'local hooks: run after every shipped unit; a local approve next to a guarded rm blocks the call when no yes can be checked' => function () use ($sayLH) {
         $tree = orchestratorTree();
         localHookUnit($tree, 'mine/aaa', 'pre_tool_call', false, 5, $sayLH(['action' => 'approve', 'message' => 'local asks', 'rule_key' => 'lk']));
         localHookStart($tree);
         try {
             list($d, $raw) = localHookRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm f']]);
-            check(is_array($d) && strpos($d['message'], 'deletes or empties files, which cannot be undone') !== false && strpos($d['message'], 'local asks') !== false
-                && $d['rule_key'] !== 'lk' && strpos($d['rule_key'], 'pikkumies-multi:') === 0, 'the local approve replaced the guard: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'no session: the delete and the local question must block (ADR-0073): ' . $raw);
             $log = hookFailOutcomes($tree);
-            check(end($log) === 'local/mine/aaa=approve' && count($log) > 1, 'the local unit did not run last, under local/: ' . json_encode($log));
+            $policy = array_pop($log);
+            check(end($log) === 'local/mine/aaa=approve' && count($log) > 1 && strpos($policy, 'ask-policy=') === 0, 'the local unit did not run last, under local/, before the ask policy: ' . json_encode($log));
         } finally {
             testRmTree($tree);
         }

@@ -20,7 +20,7 @@ Any command that deletes, overwrites, moves, renames, truncates, re-permissions,
 - Review it adversarially, as if another person wrote it and you are looking for the way it goes wrong: what exactly does it touch (list or count it first; use a dry run when the tool has one), can it be undone and how, and is there a copy?
 - Take a backup first whenever that is feasible and sensible: a copy of the file, the config or a database dump, kept where the change cannot reach it. With a copy, or when the change can be undone, do it: no question.
 - No copy and no undo (no space, too large, not yours to copy): run it only when the user asked for exactly this change and the review found nothing they would not want; otherwise say what it would destroy and ask once.
-- When Pikkumies' approval prompt asks about the command, that is the one question: put what it touches in your message first, and never ask again in the chat.
+- When a Pikkumies safety check stops the command until the user says yes, that is the one question: finish the rest of the task, say in one line what the command would destroy or send, and run the same command again only after the user's yes.
 - Change the smallest set that does the job, then check the result.
 
 Deleting, overwriting or truncating user data follows the Never rule above.

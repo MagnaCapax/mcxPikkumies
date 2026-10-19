@@ -114,7 +114,7 @@ return [
         check(strpos($y, 'secret') === false, 'key leaked into config.yaml');
         check(strpos($y, '"/a/skills"') !== false, 'external dir');
         check(strpos($y, "security:\n  allow_lazy_installs: false\n") !== false, 'runtime installs must be off by default (ADR-0021)');
-        check(strpos($y, "approvals:\n  mode: smart\n") !== false, 'Hermes\' dangerous list goes to its guardian first, the user only on a deny (ADR-0073)');
+        check(strpos($y, "approvals:\n  mode: \"off\"\n") !== false, 'approvals off: Hermes never shows its approval prompt, hook questions are decided by the ask policy (ADR-0073)');
         $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], true);
         check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
         // Unapproved shell hooks are silently skipped in a non-interactive run.

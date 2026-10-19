@@ -61,7 +61,9 @@ return [
         $tree = orchestratorTree(['fx/ask' => ['pre_tool_call', false, 5, $echo('{"action":"approve","rule_key":"k9","message":"  "}')]]);
         try {
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $tool);
-            check($d === ['action' => 'approve', 'rule_key' => 'k9'] && strpos($raw, 'message') === false, 'approve without a message: ' . $raw);
+            check($d === null, 'a question of no kind with no yes to check: the call runs (ADR-0073): ' . $raw);
+            $merged = HookAnswers::mergePreToolCall([HookAnswers::parse('pre_tool_call', '{"action":"approve","rule_key":"k9","message":"  "}')]);
+            check($merged === ['action' => 'approve', 'rule_key' => 'k9'], 'approve without a message: ' . json_encode($merged));
         } finally {
             testRmTree($tree);
         }
@@ -110,10 +112,10 @@ return [
         }
     },
     'orchestrator: a fail-open unit exiting 7 still has its answer read; empty modifies give no answer' => function () use ($tool, $echo) {
-        $tree = orchestratorTree(['fx/seven' => ['pre_tool_call', false, 5, $echo('{"action":"approve","message":"ask"}') . ' exit(7);']]);
+        $tree = orchestratorTree(['fx/seven' => ['pre_tool_call', false, 5, $echo('{"action":"block","message":"stop"}') . ' exit(7);']]);
         try {
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $tool);
-            check($d === ['action' => 'approve', 'message' => 'ask'] && hookFailOutcomes($tree) === ['fx/seven=approve'], 'exit 7 dropped the answer: ' . $raw);
+            check($d === ['action' => 'block', 'message' => 'stop'] && hookFailOutcomes($tree) === ['fx/seven=block'], 'exit 7 dropped the answer: ' . $raw);
         } finally {
             testRmTree($tree);
         }

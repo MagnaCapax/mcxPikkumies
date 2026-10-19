@@ -3,13 +3,14 @@
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030/ADR-0048): a second look before commands that change
  * permissions, owners, attributes or names in bulk, and a quick list of what was there first. For `terminal` commands
  * and `execute_code` code (lib/FileopsClassify.php):
- * - asks the user (approve, rule_key pikkumies-fileops:<hash of the command>): mv onto an existing file under the home
+ * - a question for the orchestrator's ask policy (approve, rule_key pikkumies-fileops:<hash of the command>; kind delete
+ *   for an mv that replaces a file, ADR-0073): mv onto an existing file under the home
  *   (or two sources colliding in one directory), a recursive change on the home itself, ~/.ssh or the pikkumies
  *   directory, and targets holding more entries than the list can take;
- * - blocks once with a fixed message asking the agent to tell the user what the command changes: recursive
+ * - blocks once with a fixed message telling the agent to say what the command changes and run it again: recursive
  *   chmod/chown/chgrp, find -exec of them or mv, chattr, rename, setfacl. The identical command in the same session
  *   within 10 minutes then passes (marker local/state/fileops/<sha1 of session id NUL command>). No valid session id,
- *   or a marker that cannot be written, asks the user instead. The ask tier never reads the marker.
+ *   or a marker that cannot be written, is a question instead. The ask tier never reads the marker.
  * Before any answer it writes the list (lib/FileopsList.php): local/logs/fileops/<sha1 of the tool call id>.jsonl.gz.
  * Fails open (5 s): a slow walk or a crash lets the command run, and guard-destructive still runs. A safety prompt for
  * the agent's own mistakes, not a security boundary (AGENTS.md). Off with fileopsCheck.disabled.
@@ -103,6 +104,7 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
     $relative = false;
     $verbs = [];
     $inside = []; // the sensitive paths the targets are or hold
+    $replaces = false; // an mv over an existing file: a delete for the ask policy (ADR-0073)
     foreach ($c['matches'] as $m) {
         $paths = [];
         $dest = [];
@@ -118,6 +120,7 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
         if ($m['tier'] === 'mv') {
             $hit = fileopsCollisions($m, $paths, $dest, $homeReal);
             if ($hit) {
+                $replaces = true;
                 $asks[] = 'mv replaces ' . implode(', ', array_map(function ($p) use ($homeReal) {
                     return fileopsShow($p, $homeReal);
                 }, array_slice($hit, 0, 3))) . (count($hit) > 3 ? ' and ' . (count($hit) - 3) . ' more' : '') . ', unrecoverable';
@@ -190,14 +193,14 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
             $base = preg_replace('/^find -exec | -R$/', '', $v);
             return $v . ' ' . (array_key_exists($base, FILEOPS_WHAT) ? FILEOPS_WHAT[$base] : 'changes files');
         }, $verbs));
-        return ['action' => 'block', 'message' => 'Pikkumies fileops check: ' . implode('; ', $what) . ". Not run. $about Tell the user in one line what this command changes, or change the command. Running the identical command again within 10 minutes proceeds."];
+        return ['action' => 'block', 'message' => 'Pikkumies fileops check: ' . implode('; ', $what) . ". Not run. $about Check what it touches, say in your answer in one line what it changes, and run the identical command again (within 10 minutes it proceeds), or change the command."];
     }
     $why = $asks ? implode('; ', array_unique($asks)) : "$verbText needs a check, and this session's check could not be recorded";
     $approveMessage = "Pikkumies: $why. $about Command [$id]: $command";
     if (!HookUnits::approveShown($approveMessage)) {
         return ['action' => 'block', 'message' => 'Pikkumies fileops check: a command that needs the user\'s approval, and it is too long to show the user in full. Not run. Split it into smaller commands.'];
     }
-    return ['action' => 'approve', 'rule_key' => 'pikkumies-fileops:' . $id, 'message' => $approveMessage];
+    return ['action' => 'approve', 'rule_key' => 'pikkumies-fileops:' . $id, 'message' => $approveMessage] + ($replaces ? ['kind' => 'delete'] : []);
 }
 
 if (realpath((string) $_SERVER['SCRIPT_FILENAME']) === __FILE__) {

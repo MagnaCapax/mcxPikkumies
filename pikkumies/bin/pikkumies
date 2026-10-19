@@ -371,6 +371,11 @@ switch ($cmd) {
                 out('Not updating: pikkumies/hermes fetches from ' . ($origin ?: '(no origin)') . ', not the official Hermes repository.');
                 exit(1);
             }
+            if (!array_intersect(['--yes', '-y'], $passArgs)) {
+                // No questions (ADR-0073): Hermes' --yes takes the config migration and the stash restore, and skips the
+                // fork-upstream question and API-key entry (hermes_cli/subcommands/update.py).
+                array_splice($passArgs, 1, 0, ['--yes']);
+            }
             $updateArgv = CronTick::wrap(array_merge([hermesBin()], $passArgs), !empty(profile()['root']['available']));
             if (!$updateArgv) {
                 out('Not updating: root is available here and setpriv is missing; the Hermes updater may call sudo, so it runs only under setpriv --no-new-privs (ADR-0025, ADR-0033).');

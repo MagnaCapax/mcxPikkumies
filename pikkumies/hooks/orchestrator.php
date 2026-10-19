@@ -15,6 +15,8 @@
  *   is no opinion. One approve is passed on as it is. Two or more become one approve holding every question
  *   unaltered, keyed pikkumies-multi:<sha1 of the sorted keys>, or a block naming the units when together they are too
  *   long to show (HookUnits::APPROVE_SHOWN): Hermes would keep only the first, and drop the delete guard's question.
+ *   Before the merge lib/AskPolicy.php drops every question or turns it into a block, so no approve is ever printed:
+ *   Hermes runs with approvals.mode off, which approves an approve answer without asking anyone (ADR-0073).
  * - pre_llm_call (agent/turn_context.py _collect_pre_llm_call_context): contexts joined by a blank
  *   line, capped at 9000 characters (Hermes spills a hook's context to disk above 10000): shipped units first,
  *   then Pikkumies' notes and the hook notes (lib/HookNotes.php, untrusted), local units last, each labelled with its
@@ -265,15 +267,19 @@ if ($hookEvent === 'pre_llm_call') {
     }
     $all = array_merge($results, $localResults);
     if ($hookEvent === 'pre_tool_call') {
-        // Which questions still reach the user (ADR-0073); any doubt keeps them. Counts only, never the payload, go to the log.
+        // Every question is dropped or turned into a block (ADR-0073): Hermes runs with approvals off, which would approve
+        // an approve answer silently. Counts only, never the payload, go to the log.
         $askStart = microtime(true);
         list($all, $asked) = AskPolicy::apply($all, isset($payload['tool_name']) ? (string) $payload['tool_name'] : '',
             AskPolicy::evidenceFor($session), (int) floor($budget - ($askStart - $started) - 1));
-        if ($asked['dropped'] + $asked['cleared'] + (isset($asked['error']) ? 1 : 0) > 0) { // a kept question is the old behaviour: not logged
+        if (array_sum($asked) > 0) {
             hookLog($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked));
         }
     }
     $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);
+    if ($hookEvent === 'pre_tool_call' && is_array($answer) && $answer['action'] === 'approve') {
+        $answer = ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED]; // never reached: AskPolicy leaves no approve
+    }
 }
 if ($answer !== null) {
     $json = json_encode($answer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);

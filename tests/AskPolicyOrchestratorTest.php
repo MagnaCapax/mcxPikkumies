@@ -1,8 +1,9 @@
 <?php
 /**
  * hooks/orchestrator.php with the ask policy (ADR-0073), end to end against a fake model endpoint: a reviewed question
- * clears only on a clear review of what the user wrote; no snapshot, a load test and the feedback send are decided
- * without a model call. What a real light model answers is not tested here.
+ * clears only on a clear review of what the user wrote, and otherwise blocks the call (approvals are off, so no
+ * question is ever printed); no snapshot and a load test are decided without a model call, the feedback send clears
+ * only on the user's yes. What a real light model answers is not tested here.
  */
 if (!function_exists('orchestratorTree')) {
     require __DIR__ . '/OrchestratorTest.php';
@@ -40,7 +41,7 @@ if (!function_exists('askOrchTree')) {
 }
 
 return [
-    'orchestrator ask policy: a clear review of the user\'s own words clears a delete question; a doubtful one or no snapshot keeps it' => function () {
+    'orchestrator ask policy: a clear review of the user\'s own words clears a delete question; a doubtful one or no snapshot blocks it' => function () {
         $dir = testTempDir('pk-askorch');
         list($proc, $port) = hookSearchFakeProvider($dir);
         $del = ['action' => 'approve', 'message' => 'Pikkumies: deletes or empties files, which cannot be undone. Command [1]: rm -r ~/old', 'rule_key' => 'pikkumies-delete:1', 'kind' => 'delete'];
@@ -48,30 +49,30 @@ return [
         $call = ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -r ~/old'], 'session_id' => 'sess-1'];
         try {
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check(is_array($d) && $d['action'] === 'approve' && !isset($d['kind']) && hookSearchRequests($dir) === [], 'no snapshot: the question must be kept without a model call: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED] && hookSearchRequests($dir) === [], 'no snapshot: the delete must be blocked without a model call: ' . $raw);
             askOrchSnapshot($tree, 'sess-1', [['role' => 'user', 'text' => 'delete the old folder in my home']]);
             file_put_contents("$dir/reply", "R1: yes\nR2: yes\nR3: no");
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
             check($d === null, 'a clear review must let the call run: ' . $raw);
             $req = hookSearchRequests($dir);
             check(count($req) === 1 && $req[0]['body']['model'] === 'acme/light' && strpos($req[0]['body']['messages'][1]['content'], '[user wrote] delete the old folder in my home') !== false, 'one review with the light model: ' . json_encode($req));
-            check(in_array('ask-policy={"kept":0,"dropped":0,"cleared":1}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
+            check(in_array('ask-policy={"blocked":0,"dropped":0,"cleared":1,"ran":0}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
             file_put_contents("$dir/reply", "R1: unsure\nR2: yes\nR3: no");
             list($d) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === 'pikkumies-delete:1', 'a doubtful review must keep the question');
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM], 'a doubtful review must block until the user says yes');
             file_put_contents("$dir/reply", "Sure, go ahead!");
             list($d) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check(is_array($d) && $d['action'] === 'approve', 'an unparsable review must keep the question');
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'an unparsable review must block a delete');
         } finally {
             proc_terminate($proc);
             testRmTree($tree);
             testRmTree($dir);
         }
     },
-    'orchestrator ask policy: a load test runs unasked, the feedback send is always asked, neither calls the model' => function () {
+    'orchestrator ask policy: a load test runs unasked without a model call; the feedback send blocks until the user\'s yes' => function () {
         $dir = testTempDir('pk-askorch');
         list($proc, $port) = hookSearchFakeProvider($dir);
-        file_put_contents("$dir/reply", "R1: yes\nR2: no\nR3: no");
+        file_put_contents("$dir/reply", "R1: unsure\nR2: no\nR3: no");
         $load = ['action' => 'approve', 'message' => 'Pikkumies: a benchmark or load test. Command [2]: fio', 'rule_key' => 'pikkumies-load:2', 'kind' => 'load'];
         $send = ['action' => 'approve', 'message' => 'Pikkumies: send this feedback?', 'rule_key' => 'pikkumies-feedback:3', 'kind' => 'send'];
         $call = ['tool_name' => 'terminal', 'tool_input' => ['command' => 'fio'], 'session_id' => 'sess-2'];
@@ -82,9 +83,13 @@ return [
             askOrchSnapshot($sendTree, 'sess-2', [['role' => 'user', 'text' => 'send my feedback']]);
             list($d, $raw) = orchestratorRun($loadTree, 'pre_tool_call', $call);
             check($d === null, 'a load test must run unasked: ' . $raw);
+            check(hookSearchRequests($dir) === [], 'a load test must not call the model');
             list($d, $raw) = orchestratorRun($sendTree, 'pre_tool_call', $call);
-            check(is_array($d) && $d['action'] === 'approve' && $d['message'] === 'Pikkumies: send this feedback?', 'the feedback send must be asked: ' . $raw);
-            check(hookSearchRequests($dir) === [], 'neither may call the model');
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM], 'the model\'s R2 "no" must not clear the feedback send: ' . $raw);
+            askOrchSnapshot($sendTree, 'sess-2', [['role' => 'user', 'text' => 'send my feedback'], ['role' => 'agent', 'text' => 'This sends the draft to Pulsed Media. Send it?'], ['role' => 'user', 'text' => 'yes']]);
+            file_put_contents("$dir/reply", "R1: yes\nR2: no\nR3: no");
+            list($d, $raw) = orchestratorRun($sendTree, 'pre_tool_call', $call);
+            check($d === null, 'the user\'s yes must let the send run: ' . $raw);
         } finally {
             proc_terminate($proc);
             testRmTree($loadTree);

@@ -1,6 +1,6 @@
 <?php
 /**
- * lib/AskPolicy.php and lib/AskReview.php (ADR-0073): which hook questions reach the user. The decision is PHP over
+ * lib/AskPolicy.php and lib/AskReview.php (ADR-0073): which hook questions block the call. The decision is PHP over
  * the review's yes/no answers; how a real light model answers R1-R3 is not tested here (only a live question-suite
  * run shows that). The reviewer is replaced through AskPolicy::$reviewer.
  */
@@ -48,9 +48,9 @@ return [
         }
         check(AskReview::parse("R1: Yes\nr2:no\n R3 : unsure\nR4: yes\nignore this") === ['R1' => 'yes', 'R2' => 'no', 'R3' => 'unsure'], 'parse');
     },
-    'AskPolicy routing: local and feedback questions are kept, load and daemon stops dropped, every other kind (unknown or none) reviewed' => function () {
-        check(AskPolicy::route(askApprove('delete', ['local' => true])) === 'keep', 'a local unit is kept');
-        check(AskPolicy::route(askApprove('send', ['unit' => 'guard/feedback-send'])) === 'keep', 'the feedback send is kept');
+    'AskPolicy routing: local and feedback questions need the user\'s yes, load and daemon stops dropped, every other kind (unknown or none) reviewed' => function () {
+        check(AskPolicy::route(askApprove('load', ['local' => true])) === 'confirm', 'a local unit needs the user\'s yes, whatever its kind');
+        check(AskPolicy::route(askApprove('send', ['unit' => 'guard/feedback-send'])) === 'confirm', 'the feedback send needs the user\'s yes');
         foreach (['load', 'stop'] as $k) {
             check(AskPolicy::route(askApprove($k)) === 'drop', "$k is dropped");
         }
@@ -58,24 +58,25 @@ return [
             check(AskPolicy::route(askApprove($k)) === 'review', var_export($k, true) . ' is reviewed');
         }
     },
-    'AskPolicy::apply: a clear review clears the question; a block, no evidence, no time, an empty or failed review keeps it' => function () use ($cleared) {
+    'AskPolicy::apply: a clear review clears the question; a block skips the review; no evidence, no time, an empty or failed review block a delete' => function () use ($cleared) {
         $block = ['action' => 'block', 'message' => 'no'];
+        $unchecked = ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED];
         list($out, $counts, $calls) = askApply([askApprove('delete'), askApprove('load'), ['action' => 'modify', 'args' => []]], $cleared);
-        check($out === [['action' => 'modify', 'args' => []]] && $counts === ['kept' => 0, 'dropped' => 1, 'cleared' => 1] && $calls === 1, 'cleared: ' . json_encode([$out, $counts, $calls]));
+        check($out === [['action' => 'modify', 'args' => []]] && $counts === ['blocked' => 0, 'dropped' => 1, 'cleared' => 1, 'ran' => 0] && $calls === 1, 'cleared: ' . json_encode([$out, $counts, $calls]));
         list($out, $counts, $calls) = askApply([askApprove('delete'), $block], $cleared);
         check(count($out) === 2 && $calls === 0 && $counts['cleared'] === 0, 'a block in the answers must skip the review: ' . json_encode([$counts, $calls]));
         list($out, , $calls) = askApply([askApprove('delete')], $cleared, []);
-        check(count($out) === 1 && $calls === 0, 'no evidence must keep the question without a review');
+        check($out === [$unchecked] && $calls === 0, 'no evidence must block a delete without a review');
         list($out, , $calls) = askApply([askApprove('delete')], $cleared, [['role' => 'user', 'text' => 'x']], 1);
-        check(count($out) === 1 && $calls === 0, 'no time left must keep the question without a review');
+        check($out === [$unchecked] && $calls === 0, 'no time left must block a delete without a review');
         list($out) = askApply([askApprove('delete')], []);
-        check(count($out) === 1, 'an empty review keeps the question');
+        check($out === [$unchecked], 'an empty review blocks a delete');
         list($out, $counts) = askApply([askApprove('delete'), askApprove('load')], new Exception('boom'));
-        check(count($out) === 2 && !empty($counts['error']), 'an error keeps every question, the dropped one too: ' . json_encode($counts));
+        check($out === [$unchecked, $unchecked] && !empty($counts['error']), 'an error blocks every question, the dropped one too: ' . json_encode($counts));
         list($out) = askApply([askApprove('mail')], ['R1' => 'unsure', 'R2' => 'no', 'R3' => 'no']);
-        check(count($out) === 1, 'a mail is not cleared by an R2 "no" alone');
+        check($out === [['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM]], 'a mail is not cleared by an R2 "no" alone');
         list($out, , $calls) = askApply([askApprove('send', ['unit' => 'guard/feedback-send']), askApprove('stop')], $cleared);
-        check(count($out) === 1 && $out[0]['unit'] === 'guard/feedback-send' && $calls === 0, 'feedback kept, stop dropped, no review');
+        check($out === [] && $calls === 1, 'stop dropped, the feedback send reviewed and cleared by the user\'s yes');
     },
     'AskReview::evidence: only what the user wrote and the reply they answered, and only in a person\'s own session' => function () {
         $history = [

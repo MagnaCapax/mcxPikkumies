@@ -58,7 +58,9 @@ class NestedAgent
     /**
      * True when this Hermes was started with approvals off by HERMES_YOLO_MODE (--yolo sets it; Hermes reads it once at
      * start with its truthy set 1/true/yes/on, tools/approval.py, utils.py). A /yolo typed inside a session is in-process
-     * state no hook can see (ADR-0020).
+     * state no hook can see (ADR-0020). Pikkumies itself pins approvals.mode off, the same bypass, and no hook question
+     * relies on Hermes' prompt any more: the orchestrator's ask policy never passes an approve on (ADR-0073), so this
+     * env check only keeps the feedback send's stricter refusal under --yolo.
      */
     public static function approvalsOff($raw = null)
     {

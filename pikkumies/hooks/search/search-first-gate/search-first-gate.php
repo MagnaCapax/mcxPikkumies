@@ -3,7 +3,7 @@
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): search first. Until the agent has run the memory search
  * (`tools/memory/pikkumies/pikkumies.php search`, lessons and documentation together), tool calls
  * that act are blocked with the command to run, and so is reading or searching the downloaded documentation
- * (local/docs-cache, the wiki and kb units; ADR-0043: lessons first). Other reading, asking the user, the memory unit and a
+ * (local/docs-cache, the wiki and kb units; ADR-0043: lessons first). Other reading, the memory unit and a
  * plain system-status show or account call (the live account figures, ADR-0058) are allowed.
  * Partner of hooks/search/search-first/.
  *
@@ -122,4 +122,4 @@ $notCounted = preg_match('#pikkumies\.php(\s+--?[a-z][a-z-]*)*\s+search(\s|$)#',
     ? "This memory search was not counted. Run it plain, on its own, with the path below: nothing may follow it but 2>&1 or 2>/dev/null first, then one | head or | tail (bare, -n N or -N).\n" : '';
 echo json_encode(['action' => 'block', 'message' => $notCounted . "Pikkumies search first: " . ($docs ? 'lessons before documentation' : 'before acting')
     . ", search the lessons and documentation for this task:\n"
-    . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading other files and asking the user are allowed meanwhile.)"]) . "\n";
+    . "php $tool search \"<a few technical words>\"\nRead the best hits, then continue. (Reading other files is allowed meanwhile.)"]) . "\n";

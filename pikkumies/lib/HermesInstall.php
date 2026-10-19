@@ -51,7 +51,11 @@ class HermesInstall
         'web.keyless_fallback' => ['hermes_cli/config_defaults.py', '"keyless_fallback":'],
         'web.keyless_rescue' => ['hermes_cli/config_defaults.py', '"keyless_rescue":'],
         'security.allow_lazy_installs' => ['hermes_cli/config_defaults.py', '"allow_lazy_installs":'],
-        'approvals.mode' => ['tools/approval_context.py', '_VALID_MODES = ("manual"'],
+        'approvals.mode' => ['tools/approval_context.py', '_VALID_MODES = ("manual", "smart", "off")'],
+        'approvals.destructive_slash_confirm' => ['hermes_cli/config_defaults.py', '"destructive_slash_confirm":'],
+        'approvals.mcp_reload_confirm' => ['hermes_cli/config_defaults.py', '"mcp_reload_confirm":'],
+        'model.switch_context_confirm_tokens' => ['hermes_cli/model_selection_guards.py', 'model_cfg.get("switch_context_confirm_tokens")'],
+        'security.protected_instruction_files' => ['tools/file_tools_write_guards.py', '"security", "protected_instruction_files"'],
         'checkpoints.enabled' => ['hermes_cli/config_defaults.py', '"checkpoints":'],
         'plugins.enabled' => ['hermes_cli/config_defaults.py', '"plugins":'],
         'auxiliary.background_review.enabled' => ['hermes_cli/config_defaults.py', '"background_review":'],
@@ -66,7 +70,6 @@ class HermesInstall
         'onboarding.profile_build' => ['agent/onboarding.py', '_onboarding_section(config).get("profile_build")'],
         'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
         'agent.disabled_toolsets' => ['hermes_cli/tools_config.py', '.get("disabled_toolsets")'],
-        'auxiliary.approval' => ['hermes_cli/config_defaults.py', '"approval": _aux('],
         // The answer HermesTelemetry records; without it the dashboard and chat ask about sending metrics (ADR-0072).
         'telemetry.shared_metrics.offer_version' => ['hermes_cli/observability/shared_metrics_consent.py', 'section["offer_version"] = OFFER_VERSION'],
     ];

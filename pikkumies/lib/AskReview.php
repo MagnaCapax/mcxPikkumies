@@ -1,8 +1,8 @@
 <?php
 /**
- * AskReview (ADR-0073): the review a hook question gets before it may reach the user. The hooks' light model
- * (HookLlm) answers three fixed yes/no/unsure questions about the call; the decision is deterministic PHP over
- * those answers alone, and every doubt keeps the question. R1 is judged only from what the user wrote or saw
+ * AskReview (ADR-0073): the review a hook question gets: the call runs, or is blocked until the user says yes
+ * (AskPolicy). The hooks' light model (HookLlm) answers three fixed yes/no/unsure questions about the call; the
+ * decision is deterministic PHP over those answers alone, and every doubt blocks the call. R1 is judged only from what the user wrote or saw
  * (evidence(): their own messages and the agent reply they answered), never from tool output, so a file or a
  * page cannot pose as the user's request. Nothing the model writes reaches the agent or the user.
  */
@@ -18,7 +18,7 @@ class AskReview
     const PERSON_PLATFORMS = ['cli', 'tui', 'desktop'];
 
     const QUESTIONS = [
-        1 => 'Did the user ask for exactly this action, on these targets (the same files, items, recipients, host or setting), in their own messages shown?',
+        1 => 'Did the user ask for exactly this action, on these targets (the same files, items, recipients, host or setting), in their own messages shown? A plain yes counts when it answers an agent reply that named this action and these targets.',
         2 => 'If this action were a mistake, could it lose the user\'s data for good, reveal it beyond this account for good, or switch off or rewrite a safety check that guards against that? Data counts as replaceable only when it is clearly a cache, temporary files, build output, something created earlier in this same conversation, or a copy that exists elsewhere; if you cannot tell, answer yes.',
         3 => 'Does the action reach further than the request needs: a wider path or pattern, a variable that may be empty, a whole folder or the home, or more items or recipients than the user named?',
     ];
@@ -119,7 +119,7 @@ class AskReview
     }
 
     /**
-     * true = keep the question for the user. Only a clear answer lets the call run: R2 "no" (nothing lost or revealed
+     * true = block the call until the user says yes. Only a clear answer lets the call run: R2 "no" (nothing lost or revealed
      * for good), or R1 "yes" with R3 "no" (exactly what the user asked, no further). $forceR2: a send, a mail or an
      * exposure, which cannot be taken back, so R2 is yes whatever the model says.
      */
@@ -132,7 +132,7 @@ class AskReview
         return !(isset($answers['R1'], $answers['R3']) && $answers['R1'] === 'yes' && $answers['R3'] === 'no');
     }
 
-    /** One model call; '' (no endpoint, disabled, timeout, error) parses to nothing, which keeps the question. */
+    /** One model call; '' (no endpoint, disabled, timeout, error) parses to nothing, which AskPolicy treats as no review. */
     public static function ask($tool, array $questions, array $evidence, $timeout)
     {
         return self::parse(HookLlm::chat(self::prompt($tool, $questions, $evidence), $timeout, self::MAX_TOKENS));

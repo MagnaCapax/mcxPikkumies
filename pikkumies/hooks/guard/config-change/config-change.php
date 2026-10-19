@@ -1,7 +1,7 @@
 <?php
 /**
- * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): Hermes' approval prompt for the settings changes
- * that loosen something, cost credits, stop scheduled jobs or delete history (ADR-0059).
+ * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): a question for the orchestrator's ask policy
+ * (ADR-0073) about the settings changes that loosen something, cost credits, stop scheduled jobs or delete history (ADR-0059).
  * - `php <this Pikkumies' pikkumies-configure.php> set <key> <value>`, alone in the terminal, is judged by the configure
  *   tool's own ConfigureChange::plan against the defaults and local/config.php: an asked change gets approve with
  *   rule_key pikkumies-config:<sha256 of key, old and new>, so an "always" answer covers that change each time it
@@ -53,13 +53,13 @@ foreach ($fields[$tool] as $k) {
     $parts[] = isset($input[$k]) && is_scalar($input[$k]) ? (string) $input[$k] : '';
 }
 $text = implode("\n", $parts);
-/** Asks the person; Hermes shows only the message, so what is approved must fit in it whole. */
-$ask = function ($what, $id, $shown) use ($say) {
+/** A question for the ask policy (ADR-0073); $kind 'delete' when the change deletes something that has no copy. */
+$ask = function ($what, $id, $shown, $kind = '') use ($say) {
     $approveMessage = "Pikkumies: $what. Command [" . substr($id, 0, 16) . "]: $shown";
     if (!HookUnits::approveShown($approveMessage)) {
         $say(['action' => 'block', 'message' => "Pikkumies safety: $what, and it is too long to show the user in full. Not run."]);
     }
-    $say(['action' => 'approve', 'rule_key' => 'pikkumies-config:' . $id, 'message' => $approveMessage]);
+    $say(['action' => 'approve', 'rule_key' => 'pikkumies-config:' . $id, 'message' => $approveMessage] + ($kind !== '' ? ['kind' => $kind] : []));
 };
 $askWhole = function ($what) use ($ask, $tool, $text) {
     $ask($what, substr(hash('sha256', $tool . "\n" . $text), 0, 32), $tool === 'write_file' || $tool === 'patch' ? "$tool " . trim($text) : trim($text));
@@ -130,7 +130,8 @@ if ($words !== null) {
             return json_encode($v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         };
         $what = "sets {$args[0]} from " . $json($plan['old']) . ' to ' . $json($value) . ($plan['why'] !== '' ? ', which ' . $plan['why'] : '');
-        $ask($what, substr(hash('sha256', $json([$args[0], $plan['old'], $value])), 0, 32), trim($text));
+        // A shorter sessions.retentionDays makes Hermes delete ended sessions: a delete, also where no yes can be checked.
+        $ask($what, substr(hash('sha256', $json([$args[0], $plan['old'], $value])), 0, 32), trim($text), $args[0] === 'sessions.retentionDays' ? 'delete' : '');
     }
 }
 if ($hit('/pikkumies-configure(\.php)?[\s"\',\])]+set(?![\w-])/') || ($hit("/$askedKeys/") && $hit('/(?<![\w-])(set|apply)(?![\w-])/'))) {

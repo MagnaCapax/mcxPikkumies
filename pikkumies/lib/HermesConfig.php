@@ -157,7 +157,8 @@ class HermesConfig
         $y = $pinsOnly ? self::managedHeader() : self::seedHeader();
         // A named provider: Hermes reads key_env for entries under providers: (hermes_cli/providers.py);
         // a bare `provider: custom` ignored model.key_env when this was first verified (ADR-0005).
-        $y .= "model:\n  provider: \"custom:pikkumies\"\n  default: " . self::q($prov['model']) . "\n";
+        // switch_context_confirm_tokens 0: no question before a model switch in a long session (model_selection_guards.py).
+        $y .= "model:\n  provider: \"custom:pikkumies\"\n  default: " . self::q($prov['model']) . "\n  switch_context_confirm_tokens: 0\n";
         $y .= "providers:\n  pikkumies:\n    base_url: " . self::q($prov['endpoint']) . "\n    key_env: PIKKUMIES_API_KEY\n    default_model: " . self::q($prov['model']) . "\n";
         $y .= "skills:\n";
         if (!$pinsOnly) {
@@ -184,12 +185,18 @@ class HermesConfig
         // at runtime (tools/lazy_deps.py), which costs every account on a shared server the download.
         // Off unless the user sets hermes.lazyInstalls (ADR-0021), which also decides whether the install
         // declines the optional tools; the required ones (node, ffmpeg, ...) always come (ADR-0033).
-        $y .= "security:\n  allow_lazy_installs: " . ($lazyInstalls ? 'true' : 'false') . "\n";
-        // Hermes' approvals.mode "smart" (its default): a second model judges a command on Hermes' dangerous list first
-        // and only a deny or an unsure answer asks the user (tools/approval_smart.py); Pikkumies' own hook questions never
-        // pass through it and get their own review (lib/AskPolicy.php). "manual" asked about every restart; "off" would
-        // approve every hook question too (ADR-0073). Deep-merged over the defaults, so timeout and cron_mode: deny stay.
-        $y .= "approvals:\n  mode: smart\n";
+        // protected_instruction_files off: Hermes would ask the person before every write_file or patch of an agent
+        // instruction file (AGENTS.md, SOUL.md and the like) or a project .hermes file, even with approvals off
+        // (tools/file_tools_write_guards.py). Such a write can be undone and its terminal form was never asked; Pikkumies'
+        // own SOUL.md is rebuilt at every start and its hooks and settings have their own checks (ADR-0073 amendment).
+        $y .= "security:\n  allow_lazy_installs: " . ($lazyInstalls ? 'true' : 'false') . "\n  protected_instruction_files: false\n";
+        // approvals.mode "off": Hermes never shows its approval prompt; its hardline floor (rm -rf /, mkfs on a disk, ...)
+        // and the user's approvals.deny still block (tools/approval.py, hermes_cli/approvals_test.py). "off" also approves
+        // every hook "approve" answer without asking (_run_approval_gate), so Pikkumies never sends one: the orchestrator's
+        // ask policy drops each question or blocks the call until the user says yes in the chat (lib/AskPolicy.php).
+        // Quoted: YAML reads a bare off as false (Hermes maps that to "off" as well). No question before the person's own
+        // /new, /clear, /reset, /undo or /reload-mcp either (cli_modal_mixin.py, cli_info_mixin.py). ADR-0073.
+        $y .= "approvals:\n  mode: \"off\"\n  destructive_slash_confirm: false\n  mcp_reload_confirm: false\n";
         // No first-contact offer: on the first message Hermes otherwise tells the agent to offer a profile and to ask
         // consent before every lookup (agent/onboarding.py), and run starts the desktop's onboarding chat (ADR-0073).
         $y .= "onboarding:\n  profile_build: \"off\"\n  run: false\n";
@@ -205,10 +212,7 @@ class HermesConfig
         // already decided for hooks, under the one named provider every call here uses (ADR-0047).
         // goals.max_turns stays at Hermes' own default; nothing here was measured to pick a number.
         if ($goalJudgeModel !== '') {
-            $y .= "  goal_judge:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";
-            // The smart approvals guardian (auxiliary.approval) on the same light model (ADR-0073).
-            $y .= "  approval:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";
-        }
+            $y .= "  goal_judge:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";        }
         // The seed only, so the line stays the user's: clarify is how Hermes lets the agent stop to ask; the tool hook
         // hooks/tools/clarify/decide-yourself blocks it on every install, this keeps it out of the model's list (ADR-0073).
         $y .= $pinsOnly ? '' : "agent:\n  disabled_toolsets:\n    - \"clarify\"\n";

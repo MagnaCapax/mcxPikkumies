@@ -71,8 +71,8 @@ return [
             $cmd = "chmod -R 700 $tree/home/data";
             list($d, $raw) = fileopsRun($tree, fileopsPayload($cmd, 's1', 'c1'));
             check(is_array($d) && $d['action'] === 'block', 'first run must block: ' . $raw);
-            check(strpos($d['message'], 'hold 3 entries') !== false && strpos($d['message'], 'within 10 minutes proceeds') !== false
-                && strpos($d['message'], 'Tell the user in one line') !== false, 'block message: ' . $d['message']);
+            check(strpos($d['message'], 'hold 3 entries') !== false && strpos($d['message'], 'within 10 minutes it proceeds') !== false
+                && strpos($d['message'], 'say in your answer in one line what it changes, and run the identical command again') !== false && stripos($d['message'], 'tell the user') === false, 'block message: ' . $d['message']);
             check(is_file(fileopsListFile($tree, 'c1')), 'the list must be written before the block');
             list($d, $raw) = fileopsRun($tree, fileopsPayload($cmd, 's1', 'c2'));
             check($d === null && trim($raw) === '', 'the identical command within 10 minutes must run unasked, got ' . $raw);

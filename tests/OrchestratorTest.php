@@ -56,7 +56,8 @@ return [
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'mkfs.ext4 /home/x.img']]);
         check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'filesystem format') !== false, 'mkfs not blocked through the orchestrator');
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rclone sync ~/a remote:a']]);
-        check(is_array($d) && $d['action'] === 'approve' && strpos($d['rule_key'], 'pikkumies-delete:') === 0, 'delete not asked through the orchestrator');
+        // No session, so no yes can be checked: the ask policy blocks the delete (ADR-0073); approvals are off, so it never asks.
+        check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'delete not blocked through the orchestrator: ' . json_encode($d));
         list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]);
         check(trim($raw) === '', 'harmless command got an answer: ' . $raw);
         // The search-first gate runs too: with a session and no search yet, an acting call is blocked.
@@ -67,12 +68,12 @@ return [
         $log = (string) @file_get_contents("$tree/pikkumies/local/logs/hooks/" . gmdate('Ymd') . '.jsonl');
         $lines = array_values(array_filter(explode("\n", $log)));
         // Units run in name order: guard/config-change and guard/feedback-send (no opinion on rm -rf), guard/fileops-check, guard/guard-destructive (the block),
-        // search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068).
+        // search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068); the blocked delete adds one ask-policy line (ADR-0073).
         $config = json_decode($lines[0], true);
         $send = json_decode($lines[1], true);
         $first = json_decode($lines[2], true);
         $guard = json_decode($lines[3], true);
-        check(count($lines) === 24 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
+        check(count($lines) === 25 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
             && $first['unit'] === 'guard/fileops-check' && $first['outcome'] === 'none'
             && $guard['event'] === 'pre_tool_call' && $guard['unit'] === 'guard/guard-destructive' && $guard['outcome'] === 'block'
             && is_int($guard['ms']) && isset($guard['ts']), 'one log line per unit run: ' . $log);
@@ -103,9 +104,9 @@ return [
         check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'timeout must be') !== false, 'broken failClosed unit skipped: ' . $raw);
         exec('rm -rf ' . escapeshellarg($tree));
         // A fail-open failure next to a working unit leaves that unit's answer.
-        $tree = orchestratorTree(['fx/a-crash' => ['pre_tool_call', false, 1, 'undefined_function_xyz();'], 'fx/b-ask' => ['pre_tool_call', false, 1, 'echo json_encode(["action" => "approve", "message" => "ask"]);']]);
+        $tree = orchestratorTree(['fx/a-crash' => ['pre_tool_call', false, 1, 'undefined_function_xyz();'], 'fx/b-stop' => ['pre_tool_call', false, 1, 'echo json_encode(["action" => "block", "message" => "stop"]);']]);
         list($d) = orchestratorRun($tree, 'pre_tool_call', $terminal);
-        check(is_array($d) && $d['action'] === 'approve' && $d['message'] === 'ask', 'a fail-open crash hid the next unit');
+        check($d === ['action' => 'block', 'message' => 'stop'], 'a fail-open crash hid the next unit');
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'orchestrator: block beats approve whatever the order; two approves become one question; modifies merge in order' => function () use ($terminal, $say) {
@@ -121,8 +122,11 @@ return [
             'y/a-first' => ['pre_tool_call', false, 5, $say(['action' => 'approve', 'message' => ' first ', 'rule_key' => ' k1 '])],
             'y/c-noise' => ['pre_tool_call', false, 5, $say(['action' => 'allow', 'message' => 'irrelevant'])],
         ]);
-        list($d) = orchestratorRun($tree, 'pre_tool_call', $terminal);
-        // ADR-0054: every question is shown, in run order (name, across categories), trimmed; the key covers both.
+        list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $terminal);
+        // ADR-0073: questions of no known kind run where no yes can be checked (no session); approvals are off, so none is printed.
+        check($d === null, 'two questions of no kind, no session: the call runs: ' . $raw);
+        // ADR-0054, the merge itself: every question is shown, in run order, trimmed; the key covers both.
+        $d = HookAnswers::mergePreToolCall([['action' => 'approve', 'message' => 'first', 'rule_key' => ' k1 '], ['action' => 'approve', 'message' => 'second', 'rule_key' => 'k2'], ['action' => 'allow', 'message' => 'irrelevant']]);
         check($d === ['action' => 'approve', 'message' => 'Pikkumies: 2 checks ask about this call. (1) first (2) second', 'rule_key' => 'pikkumies-multi:' . substr(sha1("k1\nk2"), 0, 16)], 'two approves must merge into one question: ' . json_encode($d));
         exec('rm -rf ' . escapeshellarg($tree));
         $tree = orchestratorTree([
@@ -160,7 +164,7 @@ return [
         exec('rm -rf ' . escapeshellarg($tree));
     },
     'orchestrator: a unit that ignores a large stdin does not hang; the log keeps 7 daily files' => function () use ($say) {
-        $tree = orchestratorTree(['fx/quick' => ['pre_tool_call', true, 5, $say(['action' => 'approve', 'message' => 'm'])]]);
+        $tree = orchestratorTree(['fx/quick' => ['pre_tool_call', true, 5, $say(['action' => 'block', 'message' => 'm'])]]);
         $logs = "$tree/pikkumies/local/logs/hooks";
         @mkdir($logs, 0700, true);
         for ($i = 1; $i <= 9; $i++) {
@@ -168,7 +172,7 @@ return [
         }
         $start = microtime(true);
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => str_repeat('x', 3000000)]]);
-        check(is_array($d) && $d['action'] === 'approve' && microtime(true) - $start < 4, 'large stdin hung or lost the answer');
+        check($d === ['action' => 'block', 'message' => 'm'] && microtime(true) - $start < 4, 'large stdin hung or lost the answer');
         $files = glob("$logs/*.jsonl");
         check(count($files) === 7 && in_array("$logs/" . gmdate('Ymd') . '.jsonl', $files, true), 'log not pruned to 7 files: ' . json_encode(array_map('basename', $files)));
         exec('rm -rf ' . escapeshellarg($tree));

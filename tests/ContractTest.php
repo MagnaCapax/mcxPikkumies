@@ -227,7 +227,7 @@ return [
             'hermes_cli/plugins.py' => ['rule_key=details.rule_key or tool_name'],                         // ADR-0020: per-command rule_key
             'hermes_cli/config_defaults.py' => ['"keyless_fallback": True', '"keyless_rescue": True'],     // ADR-0021: we turn both off
             'tools/tool_output_limits.py' => ['DEFAULT_MAX_BYTES = 50_000'],                                 // ADR-0016: our budget stays below
-            'tools/approval_context.py' => ['_VALID_MODES = ("manual", "smart", "off")'],                    // ADR-0020: we set manual
+            'tools/approval_context.py' => ['_VALID_MODES = ("manual", "smart", "off")'],                    // ADR-0073: we set off
             'hermes_cli/config.py' => ['def _deep_merge('],                                                   // ADR-0020: approvals.mode alone keeps the other defaults
             'hermes_cli/_parser.py' => ['_query_group.add_argument("--query-file"'],                          // ADR-0052: the launcher's --prompt-file is chat's --query-file
         ];

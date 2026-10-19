@@ -26,7 +26,7 @@ return [
         $pins = HermesConfig::renderYaml($prov, ['/a'], $hooks, false, 'light', true) . HermesConfig::sessionsYaml([]);
         foreach (["model:\n  provider: \"custom:pikkumies\"\n  default: \"m\"\n", "    key_env: PIKKUMIES_API_KEY\n", "skills:\n  guard_agent_created: true\n", "updates:\n  check: false\n",
             "cli:\n  expose_on_path: false\n", "web:\n  keyless_fallback: false\n  keyless_rescue: false\n", "security:\n  allow_lazy_installs: false\n",
-            "approvals:\n  mode: smart\n", "auxiliary:\n  goal_judge:\n", "auth:\n  adopt_external_logins: false\n", "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n",
+            "approvals:\n  mode: \"off\"\n", "auxiliary:\n  goal_judge:\n", "auth:\n  adopt_external_logins: false\n", "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n",
             "      fail_closed: true\n", "sessions:\n  auto_prune: false\n", "telemetry:\n  shared_metrics:\n"] as $pin) {
             check(strpos($pins, $pin) !== false, "pin missing: $pin in $pins");
         }

@@ -2,7 +2,9 @@
 /**
  * ADR-0054: two or more approves become one question holding every unit's question unaltered, whatever their order,
  * keyed pikkumies-multi:<sha1 of the sorted keys>, and blocked when together they pass HookUnits::APPROVE_SHOWN; and
- * lib/HookPayload.php reads a call exactly as the guard's own inline code did before it moved there.
+ * lib/HookPayload.php reads a call exactly as the guard's own inline code did before it moved there. Through the
+ * orchestrator no question is printed (ADR-0073: approvals are off, the ask policy blocks or lets the call run), so
+ * the merge is tested on HookAnswers directly and the orchestrator for what the ask policy makes of the questions.
  */
 if (!function_exists('orchestratorTree')) {
     require __DIR__ . '/OrchestratorTest.php';
@@ -39,7 +41,7 @@ $sayHM = function (array $answer) {
     return 'echo ' . var_export(json_encode($answer), true) . ';';
 };
 return [
-    'hook merge: a tool hook approving next to a guarded delete keeps the guard\'s question and command; the key is new and order-free' => function () use ($sayHM) {
+    'hook merge: a tool hook approving next to a guarded delete cannot let the delete through; the merged key is new and order-free' => function () use ($sayHM) {
         $keys = [];
         foreach (['aaa', 'zzz'] as $name) {
             $tree = orchestratorTree();
@@ -50,35 +52,34 @@ return [
             file_put_contents("$dir/$name.php", "<?php\n" . $sayHM(['action' => 'approve', 'message' => 'tool asks', 'rule_key' => 'k']));
             try {
                 list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm f']]);
-                $id = substr(sha1('rm f'), 0, 16);
-                check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], "deletes or empties files, which cannot be undone. Command [$id]: rm f") !== false
-                    && strpos($d['message'], 'tool asks') !== false, "$name: the guard's question was replaced: $raw");
-                check($d['rule_key'] !== 'k' && strpos($d['rule_key'], 'pikkumies-multi:') === 0, "$name: rule_key " . $d['rule_key']);
-                $keys[] = $d['rule_key'];
+                check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], "$name: the delete must stay blocked (no session): $raw");
             } finally {
                 testRmTree($tree);
             }
+        }
+        $guard = ['action' => 'approve', 'message' => 'Pikkumies: deletes or empties files', 'rule_key' => 'pikkumies-delete:1'];
+        $tool = ['action' => 'approve', 'message' => 'tool asks', 'rule_key' => 'k'];
+        foreach ([[$tool, $guard], [$guard, $tool]] as $pair) {
+            $d = HookAnswers::mergePreToolCall($pair);
+            check(strpos($d['message'], 'deletes or empties files') !== false && strpos($d['message'], 'tool asks') !== false, 'the guard\'s question was replaced: ' . json_encode($d));
+            check($d['rule_key'] !== 'k' && strpos($d['rule_key'], 'pikkumies-multi:') === 0, 'rule_key ' . $d['rule_key']);
+            $keys[] = $d['rule_key'];
         }
         check($keys[0] === $keys[1], 'the merged key depends on which unit sorts first: ' . json_encode($keys));
     },
-    'hook merge: merged questions up to ' . HookUnits::APPROVE_SHOWN . ' characters are asked, one more is blocked' => function () use ($sayHM) {
+    'hook merge: merged questions up to ' . HookUnits::APPROVE_SHOWN . ' characters are asked, one more is blocked' => function () {
         check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
         $fixed = strlen('Pikkumies: 2 checks ask about this call. (1) ') + strlen(' (2) b');
         foreach ([HookUnits::APPROVE_SHOWN => 'approve', HookUnits::APPROVE_SHOWN + 1 => 'block'] as $total => $want) {
-            $tree = orchestratorTree([
-                'a/one' => ['pre_tool_call', false, 5, $sayHM(['action' => 'approve', 'message' => str_repeat('a', $total - $fixed), 'rule_key' => 'k1'])],
-                'a/two' => ['pre_tool_call', false, 5, $sayHM(['action' => 'approve', 'message' => 'b'])],
+            $d = HookAnswers::mergePreToolCall([
+                ['action' => 'approve', 'message' => str_repeat('a', $total - $fixed), 'rule_key' => 'k1', 'unit' => 'a/one'],
+                ['action' => 'approve', 'message' => 'b', 'unit' => 'a/two'],
             ]);
-            try {
-                list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls']]);
-                check(is_array($d) && $d['action'] === $want, "$total characters: expected $want: $raw");
-                check($want === 'block' || strlen($d['message']) === $total, 'length arithmetic off: ' . strlen($d['message']));
-            } finally {
-                testRmTree($tree);
-            }
+            check(is_array($d) && $d['action'] === $want, "$total characters: expected $want: " . json_encode($d));
+            check($want === 'block' || strlen($d['message']) === $total, 'length arithmetic off: ' . strlen($d['message']));
         }
     },
-    'hook merge: the shipped feedback-send question still reaches the user alone and unaltered through every shipped unit' => function () {
+    'hook merge: the shipped feedback-send question, with no yes to check, is a block through every shipped unit (approvals off)' => function () {
         if (!function_exists('feedbackTree')) {
             require __DIR__ . '/FeedbackTest.php';
         }
@@ -94,7 +95,8 @@ return [
             list($d, $raw) = testWithEnv(['HOME' => $tree], function () use ($tree, $payload) {
                 return orchestratorRun($tree, 'pre_tool_call', $payload);
             });
-            check(is_array($direct) && is_array($d) && ksort($direct) && ksort($d) && $direct['action'] === 'approve' && $d === $direct, 'the orchestrator changed the feedback question: ' . $raw);
+            check(is_array($direct) && $direct['action'] === 'approve' && $direct['rule_key'] === 'pikkumies-send:' . $rec['id'], 'the unit itself still asks: ' . json_encode($direct));
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'with no session nobody\'s yes can clear the send, and Hermes must never get an approve: ' . $raw);
         } finally {
             testRmTree($tree);
         }
@@ -117,16 +119,17 @@ return [
             check(HookPayload::read($p) === hookMergeOldInline($p), 'differs for ' . json_encode($p) . ': ' . json_encode(HookPayload::read($p)));
         }
     },
-    'hook merge: an unknown SSH host next to a delete is too long to ask together and names both checks; with the host allowed only the delete is asked (ADR-0068)' => function () {
+    'hook merge: an unknown SSH host alone runs where no yes can be checked; next to a delete, allowed or not, the delete blocks (ADR-0068, ADR-0073)' => function () {
         $tree = orchestratorTree();
         try {
             $cmd = 'rsync -a --delete d/ unknown.example:d/ # intent: mirror the reports folder';
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
-            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'guard/ssh-connect') !== false
-                && strpos($d['message'], 'guard/guard-destructive') !== false, 'both checks must be named: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'the delete must block: ' . $raw);
+            list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ssh unknown.example uptime # intent: check the load']]);
+            check($d === null, 'an unknown host alone is not a delete or a send: it runs: ' . $raw);
             file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['ssh' => ['allow' => ['unknown.example']]], true) . ";\n");
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
-            check(is_array($d) && $d['action'] === 'approve' && strpos($d['rule_key'], 'pikkumies-delete:') === 0, 'only the delete question: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'only the delete blocks: ' . $raw);
         } finally {
             testRmTree($tree);
         }

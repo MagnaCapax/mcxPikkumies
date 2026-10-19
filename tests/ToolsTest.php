@@ -1,10 +1,13 @@
 <?php
 // The guard tests run through hooks/orchestrator.php (ADR-0030), in a throwaway tree so its log stays out of this checkout.
+// The tests of what the guard asks run its unit script alone: the orchestrator's ask policy turns every question into a
+// block or lets the call run (ADR-0073), so only the unit's own answer still shows the question.
 if (!function_exists('orchestratorTree')) {
     require __DIR__ . '/OrchestratorTest.php';
 }
 $guardTree = orchestratorTree();
 $guardOrchestrator = "$guardTree/pikkumies/hooks/orchestrator.php";
+$guardUnit = "$guardTree/pikkumies/hooks/guard/guard-destructive/guard-destructive.php";
 register_shutdown_function(function () use ($guardTree) {
     exec('rm -rf ' . escapeshellarg($guardTree));
 });
@@ -23,8 +26,10 @@ return [
         $d = json_decode($out, true);
         check(is_array($d) && $d['action'] === 'block', 'regex error let the call through');
     },
-    'guard hook asks the user (approve) for data deletes, one decision per command' => function () use ($guardOrchestrator) {
-        $hook = $guardOrchestrator;
+    'guard hook asks the user (approve) for data deletes, one decision per command' => function () use ($guardOrchestrator, $guardUnit) {
+        list(, $out) = runPhp($guardOrchestrator, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rclone sync ~/data remote:backup']]));
+        check(json_decode($out, true) === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'through the orchestrator, with no yes to check, the delete is blocked: ' . $out);
+        $hook = $guardUnit;
         $ask = function ($cmd) use ($hook) {
             list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
             return json_decode($out, true);
@@ -109,10 +114,10 @@ return [
     // guard-destructive checks the exact message it is about to send against HookUnits::APPROVE_SHOWN (ADR-0020
     // 2026-10-19 amendment), not a longer per-site literal: a merge-time-only check would miss the common case of
     // one unit answering alone, which the orchestrator passes through unchecked (HookAnswers::mergePreToolCall).
-    'guard hook: an approve message is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked, counted in characters not bytes' => function () use ($guardOrchestrator) {
+    'guard hook: an approve message is asked right up to HookUnits::APPROVE_SHOWN characters, one more is blocked, counted in characters not bytes' => function () use ($guardUnit) {
         check(HookUnits::APPROVE_SHOWN === 350, 'the shown-in-full cap moved; re-measure the 24x80 approval panel before changing it');
-        $ask = function ($cmd) use ($guardOrchestrator) {
-            list(, $out) = runPhp($guardOrchestrator, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
+        $ask = function ($cmd) use ($guardUnit) {
+            list(, $out) = runPhp($guardUnit, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
             return json_decode($out, true);
         };
         $tail = ' rclone purge remote:'; // keeps the rclone-delete rule matching however much filler precedes it

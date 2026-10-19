@@ -62,7 +62,7 @@ return [
             testRmTree($tree);
         }
     },
-    'hook notes: merged questions too long to show are blocked with the asking units named' => function () use ($sayHN) {
+    'hook notes: a local unit\'s question with no yes to check blocks the call; merged questions too long to show name their units' => function () use ($sayHN) {
         $tree = orchestratorTree([
             'a/one' => ['pre_tool_call', false, 5, $sayHN(['action' => 'approve', 'message' => str_repeat('a', 400)])],
             'a/two' => ['pre_tool_call', false, 5, $sayHN(['action' => 'approve', 'message' => 'b'])],
@@ -71,8 +71,13 @@ return [
         localHookStart($tree);
         try {
             list($d, $raw) = localHookRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls']]);
-            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], '3 checks ask about this call (a/one, a/two, local/mine/three)') !== false, 'units not named: ' . $raw);
-            check(strpos($raw, '"unit"') === false, 'the internal unit field leaked into the answer');
+            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'a local question with no yes to check must block (ADR-0073): ' . $raw);
+            check(strpos($raw, '"unit"') === false && strpos($raw, '"local"') === false, 'the internal unit fields leaked into the answer');
+            $merged = HookAnswers::mergePreToolCall([
+                ['action' => 'approve', 'message' => str_repeat('a', 400), 'unit' => 'a/one'], ['action' => 'approve', 'message' => 'b', 'unit' => 'a/two'],
+                ['action' => 'approve', 'message' => 'c', 'unit' => 'local/mine/three', 'local' => true],
+            ]);
+            check($merged['action'] === 'block' && strpos($merged['message'], '3 checks ask about this call (a/one, a/two, local/mine/three)') !== false, 'units not named: ' . json_encode($merged));
         } finally {
             testRmTree($tree);
         }
