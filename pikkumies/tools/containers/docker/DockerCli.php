@@ -126,15 +126,16 @@ class DockerCli
 
     /**
      * One docker call. Returns ToolProc's ['code', 'out', 'err', 'stopped', 'cut'] plus 'timed_out'. Refuses
-     * (CliError) when there is no own daemon, so no verb can reach root's or another account's.
+     * (CliError) when there is no own daemon, so no verb can reach root's or another account's. $onLine: ToolProc's
+     * line reader, for output too big to hold (dump streams a database dump to its file through it).
      */
-    public function run(array $args, $seconds = self::CALL_SECONDS)
+    public function run(array $args, $seconds = self::CALL_SECONDS, $onLine = null)
     {
         $a = $this->absence();
         if ($a['state'] !== 'ok') {
             throw new CliError('no Docker daemon of your own to use: ' . $a['state'] . ($a['reason'] ? " ({$a['reason']})" : '') . '; nothing was done', $a['hint']);
         }
-        $r = ToolProc::run($this->argv($args, $seconds), $this->env());
+        $r = ToolProc::run($this->argv($args, $seconds), $this->env(), $onLine);
         $r['timed_out'] = $r['code'] === self::TIMED_OUT;
         return $r;
     }

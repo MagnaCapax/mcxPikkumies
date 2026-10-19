@@ -672,7 +672,7 @@ class DockerLaunch
     }
 
     /** A shell word: as is when it holds only safe characters, else single-quoted. */
-    private static function word($w)
+    public static function word($w)
     {
         return preg_match('#^[A-Za-z0-9_@%+=:,./-]+$#', $w) ? $w : escapeshellarg($w);
     }

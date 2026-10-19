@@ -1,6 +1,6 @@
 <?php
 /**
- * DockerDiagnose: the `diagnose` verb (ADR-0034, USAGE.md). Four forms, one at a time:
+ * DockerDiagnose: the `diagnose` verb (ADR-0034, USAGE.md). Five forms, one at a time:
  * - no argument: the daemon ladder (DockerCli::ladder), then every container with a problem, who can reach its ports,
  *   and the inventory events the scheduled check stored, most severe first (a 20-record page shows the worst).
  * - `<container>`: what its exit code means, restart count, oom (unknown unless limits are enforced), image
@@ -10,6 +10,7 @@
  *   are never printed: names only, and every value of `environment` and of the project's `.env` is redacted.
  * - `--changes`: the scheduled form (a no_agent Hermes job). Silent unless something changed; writes only
  *   local/containers/state.json and local/notices/docker.txt, and only from a healthy answer.
+ * - `--network`: the rootless network stack and published ports (DockerNetwork.php).
  * On PMSS the platform owns the daemon: nothing here stops, restarts or kills it or prints a kill command; a wedged
  * daemon points at the provider's recovery page, and `watchdog_processes` shows afterwards whether any process the
  * platform's watchdog counts as a running daemon is left. Reads only; a manual run only marks stored events seen.
@@ -35,16 +36,22 @@ class DockerDiagnose
         'oom' => [7, 'warning'], 'port-in-use' => [7, 'warning'], 'chown-lockout' => [7, 'warning'], 'arch-mismatch' => [7, 'warning'],
         'stopped' => [7, 'warning'], 'restarting' => [7, 'warning'], 'image-not-local' => [7, 'warning'], 'bind-missing' => [7, 'warning'],
         'signal-stop' => [8, 'info'], 'created' => [8, 'info'], 'build' => [8, 'info'], 'incomplete' => [8, 'info'],
+        // diagnose --network (DockerNetwork)
+        'network-helper-missing' => [0, 'critical'], 'port-taken' => [3, 'critical'], 'port-not-listening' => [7, 'warning'],
+        'host-loopback-disabled' => [8, 'info'], 'no-network' => [8, 'info'],
     ];
 
     public static function diagnose(DockerCli $d, array $args, array $opt)
     {
-        $forms = (count($args) > 0 ? 1 : 0) + (isset($opt['compose']) ? 1 : 0) + (!empty($opt['changes']) ? 1 : 0);
+        $forms = (count($args) > 0 ? 1 : 0) + (isset($opt['compose']) ? 1 : 0) + (!empty($opt['changes']) ? 1 : 0) + (!empty($opt['network']) ? 1 : 0);
         if ($forms > 1 || count($args) > 1) {
-            throw new CliError('give one of: nothing, one container, --compose <file> or --changes; nothing was done', 'e.g. `diagnose`, `diagnose web-1`, `diagnose --compose ~/docker/app/compose.yaml`');
+            throw new CliError('give one of: nothing, one container, --compose <file>, --network or --changes; nothing was done', 'e.g. `diagnose`, `diagnose web-1`, `diagnose --network`, `diagnose --compose ~/docker/app/compose.yaml`');
         }
         if (!empty($opt['changes'])) {
             self::changes($d); // exits
+        }
+        if (!empty($opt['network'])) {
+            return DockerNetwork::network($d);
         }
         if (isset($opt['compose'])) {
             return self::compose($d, $opt['compose']);
@@ -129,7 +136,7 @@ class DockerDiagnose
     }
 
     /** Exposure facts for this host: shared tenancy (seam `shared`, else PMSS or more than one human account) and the provider's dropped ports. */
-    private static function exposureFacts(DockerCli $d)
+    public static function exposureFacts(DockerCli $d)
     {
         $shared = array_key_exists('shared', $d->seams) ? (bool) $d->seams['shared']
             : Detect::sharedTenancy($d->pmss(), isset($d->seams['passwd']) ? $d->seams['passwd'] : '/etc/passwd');
@@ -137,7 +144,7 @@ class DockerDiagnose
     }
 
     /** A finding record; $rank/$severity override the kind's. Records are sorted by rank, then by the order found. */
-    private static function finding($kind, array $fields, $rank = null, $severity = null)
+    public static function finding($kind, array $fields, $rank = null, $severity = null)
     {
         $k = isset(self::KINDS[$kind]) ? self::KINDS[$kind] : [8, 'info'];
         return ['kind' => $kind, 'severity' => $severity !== null ? $severity : $k[1]] + $fields + ['_rank' => $rank !== null ? $rank : $k[0]];
@@ -197,7 +204,7 @@ class DockerDiagnose
     }
 
     /** $path is $home or inside it (both already resolved). */
-    private static function inside($path, $home)
+    public static function inside($path, $home)
     {
         return $home !== '' && ($path === $home || strpos($path, rtrim($home, '/') . '/') === 0);
     }
@@ -371,7 +378,7 @@ class DockerDiagnose
         return ['records' => self::sortFindings($recs), 'status' => $status];
     }
 
-    private static function home(DockerCli $d)
+    public static function home(DockerCli $d)
     {
         $real = realpath($d->home);
         return $real !== false ? $real : $d->home;
@@ -411,7 +418,7 @@ class DockerDiagnose
         }
         foreach (self::lockedMounts($d, $i) as $lock) {
             $findings[] = self::finding('chown-lockout', ['name' => $back['name']] + $lock + [
-                'next_step' => 'files there belong to the container\'s sub-uids: this account cannot change or delete them, and copying them as the account skips them; change them from inside a container (its root is this account)']);
+                'next_step' => 'files there belong to the container\'s sub-uids: this account cannot change or delete them, and copying them as the account skips them; `fix-owner ' . $lock['source'] . ' --to me` makes them this account\'s (it changes them inside a container, where root is this account, and records how to undo it)']);
         }
         $summary = ['kind' => 'container', 'name' => $back['name'], 'id' => substr($id, 0, 12),
             'image' => isset($i['Config']['Image']) ? (string) $i['Config']['Image'] : null, 'state' => $back['state'], 'exit_code' => $back['exit_code'],
@@ -773,12 +780,12 @@ class DockerDiagnose
         return is_array($s) ? $s : [];
     }
 
-    /** Atomic 0600 write in a 0700 directory. */
-    private static function writeFile($file, $body)
+    /** Atomic 0600 write in a 0700 directory (also the docker unit's other writers: show --record, fix-owner's manifest). */
+    public static function writeFile($file, $body)
     {
         $dir = dirname($file);
         if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
-            throw new CliError("cannot create $dir", 'check that pikkumies/local is writable by this account');
+            throw new CliError("cannot create $dir", "check that the folder above $dir is writable by this account");
         }
         $tmp = $file . '.tmp' . getmypid();
         $old = umask(0077);

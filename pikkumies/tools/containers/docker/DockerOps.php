@@ -132,14 +132,18 @@ class DockerOps
         return $out;
     }
 
-    /** show: one container's settings as a fixed list of fields. Env values, command and arguments are never printed. */
+    /**
+     * show: one container's settings as a fixed list of fields. Env values, command and arguments are never printed.
+     * --record <dir>: also writes them, with the line that recreates the container, to <dir>/<name>.json (DockerRecord).
+     */
     public static function show(DockerCli $d, array $args, array $opt)
     {
         $ref = self::one('show', $args);
         $d->requireHealthy();
         $inv = self::inventory($d, ['ps', '--all', '--format', '{{json .}}']);
         $id = DockerRefs::resolve([$ref], self::refList($inv))[0];
-        return [self::project(self::find($inv, $id), self::exposureFacts($d))];
+        $shown = self::project(self::find($inv, $id), self::exposureFacts($d));
+        return [isset($opt['record']) ? $shown + DockerRecord::write($d, self::find($inv, $id), $shown, $opt['record']) : $shown];
     }
 
     /** The allowlist projection of one inspect object. Anything not named here (Config.Cmd, Args, Env values...) is not printed. */
@@ -646,7 +650,7 @@ class DockerOps
         return (int) $e;
     }
 
-    private static function refList(array $inv)
+    public static function refList(array $inv)
     {
         $out = [];
         foreach ($inv as $c) {
@@ -657,7 +661,7 @@ class DockerOps
         return $out;
     }
 
-    private static function find(array $inv, $id)
+    public static function find(array $inv, $id)
     {
         foreach ($inv as $c) {
             if ($c['inspect'] && $c['inspect']['Id'] === $id) {
@@ -667,7 +671,7 @@ class DockerOps
         return [];
     }
 
-    private static function nameOf(array $i)
+    public static function nameOf(array $i)
     {
         return isset($i['Name']) ? ltrim((string) $i['Name'], '/') : (isset($i['Id']) ? substr((string) $i['Id'], 0, 12) : '?');
     }

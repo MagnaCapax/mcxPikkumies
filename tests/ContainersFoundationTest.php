@@ -8,7 +8,8 @@ require_once dirname(__DIR__) . '/pikkumies/tools/containers/docker/DockerCli.ph
 require_once dirname(__DIR__) . '/pikkumies/tools/containers/docker/DockerRefs.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/containers/docker/DockerExposure.php';
 
-const CONTAINERS_VERBS = ['stats', 'list', 'show', 'logs', 'start', 'stop', 'restart', 'remove', 'images', 'prune', 'diagnose', 'launch-plan', 'launch'];
+const CONTAINERS_VERBS = ['stats', 'list', 'show', 'logs', 'start', 'stop', 'restart', 'remove', 'images', 'prune', 'diagnose', 'launch-plan', 'launch',
+    'fix-owner', 'expose', 'dump'];
 
 /** A full 64-hex container ID made from a short seed. */
 function containersId($seed)
@@ -31,7 +32,8 @@ return [
             list($code, $recs) = containersRun($fx, ['nope']);
             check($code === 2 && $recs && $recs[count($recs) - 1]['ok'] === false, "unknown verb must be a usage error (exit 2), got $code");
             foreach (CONTAINERS_VERBS as $verb) {
-                $built = is_file(dirname(__DIR__) . '/pikkumies/tools/containers/docker/' . (in_array($verb, ['diagnose'], true) ? 'DockerDiagnose' : (strpos($verb, 'launch') === 0 ? 'DockerLaunch' : 'DockerOps')) . '.php');
+                $part = ['diagnose' => 'DockerDiagnose', 'launch-plan' => 'DockerLaunch', 'launch' => 'DockerLaunch', 'fix-owner' => 'DockerOwner', 'expose' => 'DockerExpose', 'dump' => 'DockerDump'];
+                $built = is_file(dirname(__DIR__) . '/pikkumies/tools/containers/docker/' . (isset($part[$verb]) ? $part[$verb] : 'DockerOps') . '.php');
                 if ($built) {
                     continue; // that stage's own tests cover it
                 }
@@ -44,7 +46,7 @@ return [
             containersDone($fx);
         }
     },
-    'containers unit: --verbs lists the 13 verbs in USAGE order, and a mistyped option is a usage error that runs nothing' => function () {
+    'containers unit: --verbs lists the 16 verbs in USAGE order, and a mistyped option is a usage error that runs nothing' => function () {
         $fx = containersFixture();
         try {
             list($code, , $out) = containersRun($fx, ['--verbs']);

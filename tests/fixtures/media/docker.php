@@ -11,7 +11,9 @@
  * in the field names docker 26 prints for `--format '{{json .}}'` (one object per line). FAKE_SLEEP (seconds, capped
  * at 10) delays each answer, for time-limit tests. State keys: engine {version, info, df, compose}, containers [{id,
  * name, image, state, exit_code, ports [{ip, host, container, proto}], labels {}, env [], mounts [], restart,
- * auto_remove, started_at, finished_at, restart_count, log_path, oom, created, logs [{stream, text}], stats {}}],
+ * auto_remove, started_at, finished_at, restart_count, log_path, oom, created, logs [{stream, text}], stats {}, user, exec_out,
+ * exec_err, exec_code (what `exec` prints and exits)}], engine.networks (`network ls`), engine.oneshot_out/err/code (a `run --rm` without
+ * -d: printed and recorded in oneshots, no container kept),
  * images [{id, repository, tag, size, created, arch?, os?, user?, labels?}] (`image inspect` defaults arch amd64, os linux;
  * `info` reports Architecture x86_64), fail {command: {code, err}}, calls [argv...], contexts [DOCKER_CONTEXT
  * seen by each call, null when unset].
@@ -67,7 +69,8 @@ function containersFake(array $s, array $args, $file)
     $alias = ['container ls' => 'ps', 'container list' => 'ps', 'container inspect' => 'inspect', 'container rm' => 'rm', 'container remove' => 'rm',
         'image ls' => 'images', 'image list' => 'images', 'image rm' => 'rmi', 'image remove' => 'rmi', 'container start' => 'start',
         'container stop' => 'stop', 'container restart' => 'restart', 'container logs' => 'logs', 'container run' => 'run', 'system df' => 'df',
-        'compose version' => 'compose-version', 'container stats' => 'stats', 'image inspect' => 'image-inspect'];
+        'compose version' => 'compose-version', 'container stats' => 'stats', 'image inspect' => 'image-inspect', 'network ls' => 'network-ls',
+        'network list' => 'network-ls', 'container exec' => 'exec'];
     $two = isset($args[1]) ? $args[0] . ' ' . $args[1] : '';
     if (isset($alias[$two])) {
         $cmd = $alias[$two];
@@ -255,7 +258,40 @@ function containersFake(array $s, array $args, $file)
             $save();
             return $code;
         case 'run':
+            if (!in_array('-d', $rest, true) && in_array('--rm', $rest, true)) {
+                // A one-shot helper (`run --rm` without -d): docker prints its output and removes it; nothing stays.
+                $s['oneshots'][] = $rest;
+                $save();
+                echo isset($e['oneshot_out']) ? (string) $e['oneshot_out'] : '';
+                if (!empty($e['oneshot_err'])) {
+                    fwrite(STDERR, (string) $e['oneshot_err'] . "\n");
+                }
+                return isset($e['oneshot_code']) ? (int) $e['oneshot_code'] : 0;
+            }
             return containersFakeRun($s, $rest, $save);
+        case 'network-ls':
+            foreach (isset($e['networks']) ? $e['networks'] : [['Name' => 'bridge', 'Driver' => 'bridge'], ['Name' => 'host', 'Driver' => 'host'], ['Name' => 'none', 'Driver' => 'null']] as $n) {
+                $out($n + ['ID' => substr(hash('sha256', $n['Name']), 0, 12), 'Scope' => 'local']);
+            }
+            return 0;
+        case 'exec':
+            // `exec <ref> <command...>`: prints the container's exec_out (stdout) and exec_err, exits exec_code.
+            $refs = containersFakeRefs($rest, ['-u', '--user', '-w', '--workdir', '-e', '--env']);
+            $i = $refs ? containersFakeFind($s['containers'], $refs[0]) : null;
+            if ($i === null) {
+                fwrite(STDERR, 'Error response from daemon: No such container: ' . ($refs ? $refs[0] : '') . "\n");
+                return 1;
+            }
+            $c = $s['containers'][$i];
+            if ($c['state'] !== 'running') {
+                fwrite(STDERR, 'Error response from daemon: container ' . $c['id'] . " is not running\n");
+                return 1;
+            }
+            echo isset($c['exec_out']) ? (string) $c['exec_out'] : '';
+            if (!empty($c['exec_err'])) {
+                fwrite(STDERR, (string) $c['exec_err'] . "\n");
+            }
+            return isset($c['exec_code']) ? (int) $c['exec_code'] : 0;
     }
     fwrite(STDERR, "fake docker: unsupported command $cmd\n");
     return 1;
@@ -350,7 +386,7 @@ function containersFakeInspect(array $c)
         'HostConfig' => ['AutoRemove' => !empty($c['auto_remove']), 'RestartPolicy' => ['Name' => isset($c['restart']) ? $c['restart'] : 'no', 'MaximumRetryCount' => 0],
             'PortBindings' => $bindings ?: new stdClass(), 'LogConfig' => ['Type' => 'json-file', 'Config' => new stdClass()]],
         'Mounts' => isset($c['mounts']) ? $c['mounts'] : [],
-        'Config' => ['Image' => $c['image'], 'Env' => isset($c['env']) ? $c['env'] : [], 'Cmd' => isset($c['cmd']) ? $c['cmd'] : [], 'Labels' => isset($c['labels']) && $c['labels'] ? $c['labels'] : new stdClass()],
+        'Config' => ['Image' => $c['image'], 'User' => isset($c['user']) ? (string) $c['user'] : '', 'Env' => isset($c['env']) ? $c['env'] : [], 'Cmd' => isset($c['cmd']) ? $c['cmd'] : [], 'Labels' => isset($c['labels']) && $c['labels'] ? $c['labels'] : new stdClass()],
         'NetworkSettings' => ['Ports' => $running && $bindings ? $bindings : new stdClass()]];
 }
 

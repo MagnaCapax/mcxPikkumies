@@ -1,6 +1,6 @@
 # docker
 
-Manages the user's own Docker daemon and its containers: engine facts and space used, listing with who can reach each published port, a container's settings and logs, start, stop, restart, removing containers and unused images with a preview, diagnosing a daemon that does not answer or a container that keeps failing, and launching one or more containers after checking that this account can run them. It runs the `docker` CLI as the user, never as root for another account, and never through a shell string. The rules for the agent are in `../DOCTRINE.md`, with their reasons in `../README.md`; the decision record is [ADR-0034](../../../../docs/adr/0034-containers-category.md).
+Manages the user's own Docker daemon and its containers: engine facts and space used, listing with who can reach each published port, a container's settings and logs, start, stop, restart, removing containers and unused images with a preview, diagnosing a daemon that does not answer, a container that keeps failing or a port that does not answer, launching one or more containers after checking that this account can run them, recording a container's settings, giving the account (or the container) the files of a bind folder, putting a container's web page behind the PMSS web server, and dumping a database container to a file. It runs the `docker` CLI as the user, never as root for another account, and never through a shell string. The rules for the agent are in `../DOCTRINE.md`, with their reasons in `../README.md`; the decision record is [ADR-0034](../../../../docs/adr/0034-containers-category.md).
 
 ## Where the daemon is found
 
@@ -19,8 +19,13 @@ Manages the user's own Docker daemon and its containers: engine facts and space 
 | `DockerRefs.php` | container names and ID prefixes resolved to full IDs before any change; name and image grammar; the state read back after a change |
 | `DockerExposure.php` | who can reach a published port: `public`, `local-shared`, `none` |
 | `DockerOps.php` | stats, list, show, logs, start, stop, restart, remove, images, prune |
+| `DockerRecord.php` | show --record: the settings and the line that recreates the container, written to a file |
 | `DockerDiagnose.php` | diagnose, the scheduled check, its state file and notice |
+| `DockerNetwork.php` | diagnose --network: the rootless network helper and published ports against real listeners |
 | `DockerLaunch.php` | launch-plan, launch |
+| `DockerOwner.php` | fix-owner: owner changes in a bind folder through a one-shot chown helper, recorded first, with --restore |
+| `DockerExpose.php` | expose: a PMSS lighttpd fragment for a container's port, checked with `lighttpd -t` |
+| `DockerDump.php` | dump: a database container's databases to a new file through its own dump program |
 
 ## The daemon ladder
 
@@ -42,6 +47,12 @@ On PMSS the advice carries `source` and `verified` from `Host::TABLE['pmss']['do
 ## Exposure
 
 `DockerExposure` classifies each published binding. Every interface (docker's default for `-p 8080:80`) or a non-loopback address is `public`, unless the provider's firewall drops that port from outside (PMSS drops 8080 and 8112, `scripts/util/setupNetwork.php:121-122`), which makes it `local-shared`. Loopback is `local-shared` on a server shared with other accounts (all accounts share one network namespace on PMSS) and `none` on a server this account has to itself. It reports facts only, never whether the app has a login.
+
+## Owners, the web server and dumps
+
+- **fix-owner.** In a rootless container uid 0 is the account and every other uid one of its sub-uids (`/etc/subuid`), so files an app writes as uid 1000 inside belong to sub-uid `first + 999` on the server, which the account cannot change, delete or copy (a copy as the account skips them silently: the DOCTRINE line). The change runs where it can: in a one-shot helper from the container's own image with `--user 0:0` (root there is the account), never pulled, no network. Each entry is recorded with its owner in a manifest before anything changes; a tree is changed with `chown -R` only when every folder was read and nothing in it belongs to anyone else, otherwise path by path. Folders only the container's user can read are opened first (the folder itself, recorded), then read. Every entry is read back.
+- **expose.** PMSS keeps `~/.lighttpd/custom.d/*.conf` for the customer's own fragments ([PMSS ADR-0032](https://github.com/MagnaCapax/PMSS/blob/main/docs/adr/0032-system-managed-per-user-lighttpd-config-belongs-in-template.md), included by `template.lighttpd`); nginx sends `/user-<user>/` to the account's lighttpd as it is, behind the panel login, and `/public-<user>/` with that prefix taken off (`template.nginx-user`). The fragment follows PMSS's own (`lib/lighttpd/proxyFragments.php`): a URL condition, `proxy.server` on 127.0.0.1, forwarded headers, WebSocket upgrade and `map-urlpath`. The platform's lighttpd watchdog restarts the server when a fragment is newer than it (`root.cron`: every minute), so this tool never restarts it.
+- **dump.** `docker exec <id> sh -c <script>`: the script refers to the container's password variables by name and passes the value to the dump program in its environment (`MYSQL_PWD`, `PGPASSWORD`), so it is on no command line. Not yet run against a live database container: the scripts follow the images' documented variables.
 
 ## Per-container limits
 
