@@ -5,9 +5,10 @@
  * the machine; refresh downloads only the configured documentation.
  * Search tiers (ADR-0031): hits come grouped by tier, highest first, each group headed: 1 memory,
  * 2 this host's provider and app docs, 3 other providers' docs (cached copies only, with a note
- * that they may not apply); tier 4, deep research, is only named in `next`. A search that finds
- * nothing in tiers 1-2 enables the background download of tier 3, and every search records the
- * tiers it covered for the search-first gate (DocSources::recordSearch).
+ * that they may not apply); tier 4, deep research, is only named in `next`. A search that no lesson
+ * and no official page of this host answered enables the background download of tier 3 (ADR-0031,
+ * amended 2026-10-19); the status says how many pages each tier had on disk, and every search records
+ * the tiers it covered for the search-first gate (DocSources::recordSearch).
  */
 $lib = dirname(__DIR__, 3) . '/lib';
 require_once "$lib/DocSources.php";
@@ -29,7 +30,7 @@ Cli::run($argv, [
         }
         $limit = isset($opt['limit']) ? max(1, (int) $opt['limit']) : 5; // per tier (ADR-0031)
         $offline = !empty($opt['offline']);
-        list($hits, $notes, $tiers) = DocSources::search($query, $limit, $offline);
+        list($hits, $notes, $tiers, $pages) = DocSources::search($query, $limit, $offline);
         $mode = 'keywords';
         if (!$hits) {
             list($hits, $retryNotes) = DocSources::search($query, $limit, true, 0.34); // step 2: a share of the words is enough
@@ -41,6 +42,8 @@ Cli::run($argv, [
         // Tiers in order, a heading on the first hit of each tier; tier 3 hits carry the peer note.
         $records = [];
         $perTier = [1 => 0, 2 => 0, 3 => 0];
+        $sources = []; // source name => hits shown and tier, for the metrics (never words)
+        $ownAnswer = false; // an official page of this host's provider matched
         $fetched = false;
         foreach ($hits as $h) {
             list($path, $title, $source, $trust, $url, $tier) = $h;
@@ -54,14 +57,21 @@ Cli::run($argv, [
                 $r['note'] = DocSources::PEER_NOTE;
             }
             $perTier[$tier]++;
+            $sources[$source] = ['hits' => (isset($sources[$source]) ? $sources[$source]['hits'] : 0) + 1, 'tier' => $tier];
+            $ownAnswer = $ownAnswer || ($tier === 2 && $trust === 'official');
             $records[] = $r;
         }
-        if ($perTier[1] + $perTier[2] === 0 && DocSources::enablePeerFill()) {
-            $notes[] = 'nothing in tiers 1-2: other providers\' documentation is now downloaded by the background fill (at most '
+        if ($pages[3] === 0 && DocSources::peers()) {
+            $notes[] = 'other providers\' documentation is not on disk yet (tier 3 had 0 pages)';
+        }
+        // Peers are fetched once the host's own documentation did not answer: no lesson and no official page (ADR-0031).
+        if ($perTier[1] === 0 && !$ownAnswer && DocSources::enablePeerFill()) {
+            $notes[] = 'no lesson and no official page of this host matched: other providers\' documentation is now downloaded by the background fill (at most '
                 . DocSources::PEER_FILL_REQUESTS . ' pages a source a day) and searched as tier 3 once it is on disk';
         }
-        DocSources::recordSearch($tiers, $perTier, $query); // metrics only with privacy.perfLogging on; the words only when tier 1 found nothing (ADR-0041)
-        $status = ['matched' => $mode, 'tiers_searched' => $tiers, 'hits_per_tier' => $perTier, 'notes' => $notes];
+        // Metrics only with privacy.perfLogging on: hits per tier and per source name, pages per tier; the words only when tier 1 found nothing (ADR-0041).
+        DocSources::recordSearch($tiers, $perTier, $query, ['sources' => (object) $sources, 'pages_per_tier' => $pages]);
+        $status = ['matched' => $mode, 'tiers_searched' => $tiers, 'hits_per_tier' => $perTier, 'pages_per_tier' => $pages, 'notes' => $notes];
         $next = !$hits ? NEXT_STEP : ($perTier[1] + $perTier[2] === 0 ? PEER_NEXT : '');
         if ($perTier[1] === 0) { // no lesson settles it: the search ends with a saved lesson, resolved or not (ADR-0041)
             $next = ltrim($next . ' ' . SAVE_NEXT . MemoryMetrics::saveCommand());
@@ -120,7 +130,8 @@ Cli::run($argv, [
                 'fetched_at' => isset($m['fetched']) ? (int) $m['fetched'] : null,
                 'age_s' => isset($m['fetched']) ? time() - (int) $m['fetched'] : null,
                 'pages' => isset($m['count']) ? (int) $m['count'] : 0,
-                'last_error' => isset($m['error']) ? (string) $m['error'] : ''];
+                'last_error' => isset($m['error']) ? (string) $m['error'] : '',
+                'paused_until' => isset($m['pausedUntil']) && (int) $m['pausedUntil'] > time() ? (int) $m['pausedUntil'] : null];
         }
         return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },

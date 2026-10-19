@@ -5,7 +5,7 @@ description: "Memory, not the built-in memory tool: search first, save and appen
 
 # Memory
 
-**Search first.** Before you change anything or answer from what you remember, run `search` with a few technical words for the task (app names, error text, config keys). Read the best hits; the best lesson or official page comes with its key paragraph.
+**Search first.** Before you change anything or answer from what you remember, run `search` with a few technical words for the task (app names, error text, config keys). Then read the best page of each kind that matched (this provider, the app's manual, another provider) before you answer: the best lesson or official page comes with its key paragraph, and an excerpt is one paragraph. Name each page you use and its address; another provider's page may not apply here.
 
 1. **Tiers.** Hits come in order: your lessons, then this host's provider and app docs, then other providers' docs (may not apply here). Web search is the last tier: the web tools stay blocked until this turn's search has run.
 2. **No lesson settles it?** When the answer must come from this host's docs, the wiki, the kb or other providers' docs, use the `deep-research` skill: its first part reads the top hits with subagents side by side and checks each answer twice; its second part is the web, through a backend the user configured. Nothing found at all? The same search already retried with any of the words. If none is configured, ask the user. When the notes list the provider's support pages, give the user that address for questions about the provider's own policies.

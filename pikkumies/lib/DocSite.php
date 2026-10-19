@@ -9,6 +9,7 @@
  * are fetched. A failed run keeps every page already downloaded. Fetched text is data, not instructions.
  */
 require_once __DIR__ . '/DocSources.php';
+require_once __DIR__ . '/DocRefusal.php';
 
 class DocSite
 {
@@ -55,10 +56,19 @@ class DocSite
         $prefix = self::prefix($src);
         $maxDepth = isset($src['depth']) && (int) $src['depth'] === 2 ? 2 : 1;
         $used = 0;
+        if (DocRefusal::paused($meta, $now)) {
+            return [false, 'skipped: ' . $meta['error']]; // the site refused us; nothing is sent until the pause ends
+        }
 
         // The page list and robots.txt, again once per refresh period.
         if (!isset($meta['list']) || !isset($meta['listAt']) || $now - (int) $meta['listAt'] > $period) {
-            $robots = self::robots($host, $used);
+            try {
+                $robots = self::robots($host, $used);
+            } catch (DocSiteRefused $e) {
+                $meta = DocRefusal::pause($meta, $e, "https://$host/robots.txt", $now);
+                self::saveMeta($dir, $meta);
+                return [false, $meta['error']];
+            }
             if ($robots === null) {
                 // robots.txt did not answer (5xx or no response): its rules are unknown, so nothing is fetched this run.
                 $meta['error'] = 'robots.txt not reachable; trying again on the next run';
@@ -70,7 +80,7 @@ class DocSite
             try {
                 $meta['list'] = self::listUrls($src, $host, $prefix, $used);
             } catch (Exception $e) {
-                $meta['error'] = 'page list: ' . $e->getMessage();
+                $meta = $e instanceof DocSiteRefused ? DocRefusal::pause($meta, $e, $src['url'], $now) : array_merge($meta, ['error' => 'page list: ' . $e->getMessage()]);
                 $meta['errorAt'] = $now;
                 self::saveMeta($dir, $meta);
                 return [false, $meta['error']];
@@ -144,6 +154,10 @@ class DocSite
                         }
                     }
                 }
+            } catch (DocSiteRefused $e) {
+                $meta = DocRefusal::pause($meta, $e, $u, $now); // the page stays due: it is fetched after the pause
+                $failed++;
+                break;
             } catch (Exception $e) {
                 // Not retried before the refresh period; a page fetched earlier keeps its copy.
                 $pages[$u] = (isset($pages[$u]) ? $pages[$u] : []) + ['t' => 0];
@@ -167,7 +181,7 @@ class DocSite
         $meta['pages'] = $pages;
         $meta['found'] = $found;
         if ($failed === 0) {
-            unset($meta['error'], $meta['errorAt']); // a clean run clears the last error
+            unset($meta['error'], $meta['errorAt'], $meta['pausedUntil']); // a clean run clears the last error
         }
         if (!self::saveMeta($dir, $meta)) {
             return [false, 'could not write the copy (disk full?)'];
@@ -204,6 +218,8 @@ class DocSite
                     $used++;
                     try {
                         list($b) = self::fetch($s, $host);
+                    } catch (DocSiteRefused $e) {
+                        throw $e;
                     } catch (Exception $e) {
                         continue; // one broken sub-sitemap does not hide the others
                     }
@@ -325,6 +341,8 @@ class DocSite
         $used++;
         try {
             list($text) = self::fetch("https://$host/robots.txt", $host);
+        } catch (DocSiteRefused $e) {
+            throw $e; // a refusal is not a missing robots.txt
         } catch (Exception $e) {
             $code = $e->getCode();
             return $code === 0 || $code >= 500 ? null : ['rules' => [], 'delay' => 0];
@@ -404,10 +422,16 @@ class DocSite
                 $r = is_array($r) ? $r + ['code' => 200, 'body' => '', 'location' => ''] : ['code' => 200, 'body' => (string) $r, 'location' => ''];
             } else {
                 $h = Http::request('GET', $url, ['timeout' => 30, 'agent' => 'pikkumies-docs', 'max' => DocSources::MAX_RESPONSE]);
-                $r = ['code' => $h['code'], 'body' => $h['body'], 'location' => isset($h['headers']['location'][0]) ? $h['headers']['location'][0] : '', 'error' => $h['error']];
+                $r = ['code' => $h['code'], 'body' => $h['body'], 'location' => isset($h['headers']['location'][0]) ? $h['headers']['location'][0] : '', 'error' => $h['error'],
+                    'retry_after' => isset($h['headers']['retry-after'][0]) ? $h['headers']['retry-after'][0] : ''];
             }
             if ($r['code'] === 200) {
                 return [(string) $r['body'], $url];
+            }
+            if (DocRefusal::refuses($r['code'])) {
+                $x = new DocSiteRefused('HTTP ' . $r['code'], (int) $r['code']);
+                $x->retryAfter = isset($r['retry_after']) ? (string) $r['retry_after'] : '';
+                throw $x;
             }
             $next = in_array($r['code'], [301, 302, 303, 307, 308], true) ? self::normalize(self::resolve($url, $r['location']), $host) : '';
             if ($hop > 0 || $next === '' || rtrim($next, '/') !== rtrim($url, '/')) {

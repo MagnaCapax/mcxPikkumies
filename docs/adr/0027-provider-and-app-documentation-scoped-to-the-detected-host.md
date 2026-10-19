@@ -76,5 +76,9 @@ Research on 2026-10-15 (raw responses kept with the session notes) found:
 
 ADR-0011 forbids downloading any `/clients/` address, because unauthenticated requests there can look like failed logins. A `link` is never downloaded; it is only given to the user. So `DocSources::problems()` now refuses `/clients/` only for downloaded types, and the Pulsed Media `pm-support` link points at the ticket form, the same address the PMSS landing page gives. Fetching still refuses every `/clients/` address on its own: `DocSources::get()` and `DocSite` check the URL before any request. The agent is told to give links to the user and never fetch them.
 
+## Addendum 2026-10-19: two more upstream sources; the PMSS docs wait for an index page
+
+The operator asked that Pikkumies study all the documentation available. Two sources were added after `tests/testing/sources/check-sources.php` printed OK for each (38 pages in one 40-request refresh): `linuxserver-docs` (docs.linuxserver.io sitemap, trust `upstream`, scope `pmss`: PMSS runs these images in each account's rootless Docker) and `sabnzbd-wiki` (sabnzbd.org/wiki/ index page, trust `upstream`, scope `all`: the usenet downloader the PMSS media stack installs). PMSS's own `docs/` folder is not added yet: github.com's robots.txt disallows `/tree/` and allows `/blob/`, and the repository has no page that links its user-facing docs, so a `site` source has nothing to start from. It needs a `docs/README.md` index in PMSS first, then the same live check. The wiki stays the official source for how these work on Pulsed Media.
+
 ## References
 - ADR-0011, ADR-0012, ADR-0018, ADR-0021, [ADR-0023](0023-host-detection-cache.md), ADR-0028.

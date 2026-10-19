@@ -47,7 +47,7 @@ if (!function_exists('memMetricsTree')) {
 require_once dirname(__DIR__) . '/pikkumies/tools/memory/pikkumies/MemoryStats.php';
 
 return [
-    'memory metrics: with perfLogging on, a search and a save each append one 0600 line (time, tiers, hits; words only without a lesson; a save only its time)' => function () {
+    'memory metrics: with perfLogging on, a search and a save each append one 0600 line (time, tiers, hits by tier and source name, pages per tier; words only without a lesson; a save only its time)' => function () {
         $tree = memMetricsTree(true);
         $umask = umask(0022); // a permissive umask: only the explicit chmod makes the file 0600
         try {
@@ -57,7 +57,7 @@ return [
             $dir = "$tree/pikkumies/local/state/memory-metrics";
             $file = "$dir/searches-" . gmdate('Ym') . '.jsonl';
             $l = memMetricsLines($file);
-            check(count($l) === 1 && array_keys($l[0]) === ['ts', 'tiers', 'hits', 'words'] && $l[0]['words'] === 'zebra quantum' && $l[0]['tiers'] === [1, 2, 3]
+            check(count($l) === 1 && array_keys($l[0]) === ['ts', 'tiers', 'hits', 'sources', 'pages_per_tier', 'words'] && $l[0]['sources'] === [] && $l[0]['pages_per_tier']['1'] >= 1 && $l[0]['words'] === 'zebra quantum' && $l[0]['tiers'] === [1, 2, 3]
                 && $l[0]['hits'] === ['1' => 0, '2' => 0, '3' => 0] && $l[0]['ts'] >= time() - 60, 'search line: ' . json_encode($l));
             check((fileperms($dir) & 0777) === 0700 && (fileperms($file) & 0777) === 0600, 'modes: ' . decoct(fileperms($dir) & 0777) . ' ' . decoct(fileperms($file) & 0777));
             file_put_contents("$tree/body.md", "Zebra quantum is not a setting here.\n");
@@ -68,6 +68,8 @@ return [
             list(, $out) = runPhp($tool, ['search', 'rtorrent', 'disk', '--offline']);
             $l = memMetricsLines($file);
             check(count($l) === 2 && $l[1]['hits'][1] === 1 && !isset($l[1]['words']), 'a search that found a lesson keeps no words: ' . json_encode($l));
+            // The hits by source name (ADR-0041 amended 2026-10-19): names and counts only, never a path, a title or a word.
+            check(isset($l[1]['sources']['lessons']) && $l[1]['sources']['lessons'] === ['hits' => 1, 'tier' => 1] && strpos(json_encode($l[1]), 'rtorrent') === false, 'sources: ' . json_encode($l[1]));
         } finally {
             umask($umask);
             testRmTree($tree);

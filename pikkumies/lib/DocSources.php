@@ -16,8 +16,9 @@
  * 3 other providers' documentation (peer sources: valid, on, scoped to a different provider or stack),
  * searched only from the copies the background fill made, and 4 deep research on the web, which a
  * search never runs and only names as the next step. Peer sources are never downloaded in the
- * foreground; the background fill takes them only after the account's first search with nothing
- * in tiers 1-2 (local/docs-peer-enabled), at most 50 requests a source a day, refreshed every 30 days.
+ * foreground; the background fill takes them only after the account's first search that neither a lesson
+ * nor this host's own official documentation answered (local/docs-peer-enabled, ADR-0031 amended 2026-10-19),
+ * at most 50 requests a source a day, refreshed every 30 days.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Detect.php';
@@ -320,7 +321,7 @@ class DocSources
         return is_file(self::peerFlagFile());
     }
 
-    /** Called after a search found nothing in tiers 1-2; true when this call turned peer fill on. */
+    /** Called after a search that no lesson and no official page of this host answered; true when this call turned peer fill on. */
     public static function enablePeerFill()
     {
         $file = self::peerFlagFile();
@@ -328,7 +329,7 @@ class DocSources
             return false;
         }
         @mkdir(dirname($file), 0700, true);
-        return @file_put_contents($file, gmdate('c') . " first search with nothing in tiers 1-2\n") !== false;
+        return @file_put_contents($file, gmdate('c') . " first search with no lesson and no official page of this host\n") !== false;
     }
 
     /** This host's family and stack: the detection cache when there is one, else the cheap checks (no rDNS). */
@@ -613,7 +614,8 @@ class DocSources
      * Unless $offline, stale mediawiki and kb-json sources of this host are downloaded first; `site`
      * sources never are here (only the background fill fetches them), and peer sources (tier 3) are
      * never downloaded here at all: only their copies on disk are searched.
-     * Returns [hits, notes, tiers searched]; a hit is [path, title, source, trust, url, tier].
+     * Returns [hits, notes, tiers searched, pages per tier]; a hit is [path, title, source, trust, url, tier]. Pages per
+     * tier are the files each tier had on disk for this search, so a tier with 0 pages was searched but held nothing.
      */
     public static function search($query, $limit, $offline, $share = null)
     {
@@ -632,6 +634,10 @@ class DocSources
         }
         $files = TextSearch::readDirs(array_keys($dirs));
         $byTier = [1 => [], 2 => [], 3 => []];
+        $pages = [1 => 0, 2 => 0, 3 => 0];
+        foreach (array_keys($files) as $p) {
+            $pages[$dirs[dirname($p)][2]]++;
+        }
         // A memory link may be relative to the memory root (ADR-0018 save accepts it), so search follows that form too.
         foreach (TextSearch::rank($files, $query, max(1, count($files)), $share, [self::root() . '/memory']) as $p) {
             list($source, $trust, $tier) = $dirs[dirname($p)];
@@ -643,7 +649,7 @@ class DocSources
         if (!$byTier[1] && !$byTier[2] && ($note = self::linkNote()) !== '') {
             $notes[] = $note; // nothing from this machine or this host's docs: the provider's own support pages
         }
-        return [array_merge($byTier[1], $byTier[2], $byTier[3]), $notes, [1, 2, 3]];
+        return [array_merge($byTier[1], $byTier[2], $byTier[3]), $notes, [1, 2, 3], $pages];
     }
 
     /** Where the memory search records what it searched; next to the search-first gate's session markers. */
@@ -655,10 +661,11 @@ class DocSources
     /**
      * Written by the memory search when it completes: the time, the tiers it searched and the hits per tier.
      * With $words (the memory search is the only caller that passes them) the search is also appended to
-     * the memory metrics when privacy.perfLogging is on (ADR-0041): time, tiers and hits, and the words
-     * only when tier 1 found no lesson (the searches `stats` reads them for).
+     * the memory metrics when privacy.perfLogging is on (ADR-0041): time, tiers and hits, the words
+     * only when tier 1 found no lesson (the searches `stats` reads them for), and from $more only `sources`
+     * (source name => hits shown and tier, never words) and `pages_per_tier` (ADR-0041 amended 2026-10-19).
      */
-    public static function recordSearch(array $tiers, array $hitsPerTier, $words = null)
+    public static function recordSearch(array $tiers, array $hitsPerTier, $words = null, array $more = [])
     {
         $dir = self::searchStateDir();
         @mkdir($dir, 0700, true);
@@ -673,7 +680,8 @@ class DocSources
         }
         if ($words !== null) {
             $noLesson = isset($hitsPerTier[1]) && (int) $hitsPerTier[1] === 0;
-            self::appendMetric('searches', ['ts' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier] + ($noLesson ? ['words' => substr((string) $words, 0, 500)] : []));
+            $rec = ['ts' => $time, 'tiers' => $tiers, 'hits' => $hitsPerTier] + array_intersect_key($more, array_flip(['sources', 'pages_per_tier']));
+            self::appendMetric('searches', $rec + ($noLesson ? ['words' => substr((string) $words, 0, 500)] : []));
         }
     }
 

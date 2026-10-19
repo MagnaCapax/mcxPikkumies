@@ -12,7 +12,7 @@ class MetricsLog
     /** Seconds between prunes: retention is kept to within a day. */
     const PRUNE_EVERY = 86400;
     /** The fields a line of each kind keeps; a search keeps its words only when it found no lesson (ADR-0041). */
-    const KEEP = ['searches' => ['ts', 'tiers', 'hits', 'words'], 'saves' => ['ts']];
+    const KEEP = ['searches' => ['ts', 'tiers', 'hits', 'sources', 'pages_per_tier', 'words'], 'saves' => ['ts']];
 
     /** Append one line to <kind>-YYYYMM.jsonl (created 0600), pruning first when due; true when written. */
     public static function append($dir, $kind, array $rec, $retentionDays)

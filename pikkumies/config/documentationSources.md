@@ -36,7 +36,7 @@ Each source is a `## name` section (lowercase letters, digits and dashes) with t
 - `covers`: the topics this source is the authority for. Outside them it is only a lead.
 - `scope`: the hosts the source is for, as a comma list of host names from `pikkumies/lib/Host.php` (the provider or the software stack, such as `pmss`, `feral` or `swizzin`), `generic` (a host no row matches), or `all`. Missing means `all`. `pikkumies.php sources` shows which sources match this host.
 - `verified`: the date the address last answered 200 without a redirect when checked.
-- `refresh`: how old the downloaded copy may get before it is downloaded again, such as `12h` or `7d`. A search refreshes stale `mediawiki` and `kb-json` sources (at most 40 requests each). A `site` source is never fetched by a search: the background fill (started by install and by the daily update) fetches up to 300 pages a day for a provider source and 100 for an app manual, missing pages first, then the oldest; robots.txt and its Crawl-delay are followed.
+- `refresh`: how old the downloaded copy may get before it is downloaded again, such as `12h` or `7d`. A search refreshes stale `mediawiki` and `kb-json` sources (at most 40 requests each). A `site` source is never fetched by a search: the background fill (started by install and by the daily update) fetches up to 300 pages a day for a provider source and 100 for an app manual, missing pages first, then the oldest; robots.txt and its Crawl-delay are followed. A site that answers 403 or 429 is paused: nothing is fetched from it for the time its Retry-After asks, else 7 days (at most 30), and `sources` shows `paused_until`.
 - `prefix`: `site` only, optional: fetch only pages whose path starts with this. The default is the index page's own folder, or `/` for a sitemap.
 - `depth`: `site` index pages only, optional: `1` (the pages the index links to, the default) or `2` (also the pages those link to).
 - `status`: `on` or `off`.
@@ -52,7 +52,7 @@ A search returns its hits grouped by tier, highest first. A higher tier's hit al
 3. **Other providers' documentation**: the sources below that are on and valid but scoped to a different provider or stack than this host. Similar services often document the same app or problem. Each hit keeps its source's trust level and carries a note that another provider's documentation may not apply to this host; check it on this machine before relying on it.
 4. **Deep research on the web**: never run by a search. The search names it as the next step when tiers 1-3 have nothing.
 
-Tier 3 is never downloaded while you wait. It is searched only from copies already on disk, and nothing downloads it until a search on this account first finds nothing in tiers 1-2 (that search creates `~/pikkumies/local/docs-peer-enabled`). From then on the daily background fill also takes the other providers' sources, at most 50 requests per source per day, each page refreshed at most every 30 days. To keep one of them out, switch it off in your overlay with `- status: off`.
+Tier 3 is never downloaded while you wait. It is searched only from copies already on disk, and nothing downloads it until a search on this account first finds neither a lesson nor an `official` page of this host (only app manuals, or nothing at all; that search creates `~/pikkumies/local/docs-peer-enabled`). From then on the daily background fill also takes the other providers' sources, at most 50 requests per source per day, each page refreshed at most every 30 days. To keep one of them out, switch it off in your overlay with `- status: off`. The search's status line counts the pages each tier had on disk (`pages_per_tier`), so an empty tier 3 is visible.
 
 ## pm-wiki
 
@@ -621,3 +621,30 @@ The restic documentation (stable release).
 - status: on
 
 The BorgBackup documentation (stable release; the master branch documents borg 2).
+
+## linuxserver-docs
+
+- type: site
+- url: https://docs.linuxserver.io/sitemap.xml
+- trust: upstream
+- covers: LinuxServer.io container images: each image's setup, parameters and ports, PUID/PGID, rootless use, FAQ
+- scope: pmss
+- verified: 2026-10-19
+- refresh: 30d
+- status: on
+
+The LinuxServer.io documentation. PMSS runs these images in each account's rootless Docker (its own docs/linuxserver.io.md); the PM wiki stays the official source for how that works here.
+
+## sabnzbd-wiki
+
+- type: site
+- url: https://sabnzbd.org/wiki/
+- trust: upstream
+- covers: SABnzbd: setup, configuration of servers and categories, folders, troubleshooting, FAQ
+- scope: all
+- verified: 2026-10-19
+- refresh: 30d
+- prefix: /wiki/
+- status: on
+
+The SABnzbd user manual (usenet downloader; the PMSS media stack installs it).

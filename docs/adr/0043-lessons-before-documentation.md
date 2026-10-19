@@ -33,5 +33,9 @@ What the question suite showed on a live run the same day (`tests/testing/questi
 - One extra call when the agent goes for a page or the wiki/kb units first. The search's hits include the same page, so the work is not repeated.
 - Tests: `tests/HookSearchTest.php` covers the blocked cases, a file merely named like the cache, and the documentation opening after the search. Mutation checked.
 
+## Addendum 2026-10-19: run 3's two misses are not in the gate
+
+In question-suite run 3, `borg-prune-keep-daily-weekly` and `restic-forget-needs-prune` opened skills and then read `local/docs-cache/` with no memory search before. Their exact call sequences, replayed through the shipped orchestrator and units (`tests/HookSearchReplayTest.php`), are blocked every time, as this record says. So the miss lies between Hermes and the hook, or in that live account's state, not in the gate's matcher or the orchestrator. The question suite now keeps each question's hook-log lines ([ADR-0039](0039-question-suite.md)), which show whether the gate ran for those calls and what it answered; the next live run settles it.
+
 ## References
 - ADR-0011 (documentation sources, the first-turn hint, the gate), [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md) (search first on every question), [ADR-0031](0031-search-tiers.md) (search tiers), ADR-0037 (wiki and kb units), [ADR-0038](0038-plain-search-command-config-overlay-live-source-check.md) (a plain search command opens the gate)
