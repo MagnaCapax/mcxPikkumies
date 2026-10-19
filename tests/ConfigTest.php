@@ -193,7 +193,7 @@ return [
         check(strpos($n, "sessions:\n  auto_prune: true\n  retention_days: 45\n") === 0, 'N days: ' . $n);
         check(strpos($forever, "telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n") !== false, 'Hermes telemetry must be pinned off');
         $src = (string) file_get_contents(Config::root() . '/lib/HermesConfig.php');
-        check(strpos($src, '. self::sessionsYaml($config));') !== false, 'write() must append the sessions block to config.yaml');
+        check(strpos($src, '. self::sessionsYaml($config),') !== false && strpos($src, '. self::sessionsYaml($config, true));') !== false, 'write() must append the sessions block to both config files');
     },
     'hermes sessions: the installed Hermes still has the sessions and telemetry keys we set' => function () {
         $src = HermesInstall::sourceDir();

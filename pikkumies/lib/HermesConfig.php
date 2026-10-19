@@ -34,14 +34,17 @@ class HermesConfig
     }
 
     /**
-     * The environment every Hermes Pikkumies starts gets: its home, the managed scope beside it, and no
-     * HERMES_RUNTIME_DIR (pm's tool store follows HERMES_HOME, as at install, ADR-0033). A null value removes the
-     * variable. Without HERMES_MANAGED_DIR Hermes would run without the pinned settings and hooks (ADR-0062).
+     * The environment every Hermes Pikkumies starts gets: its home, the managed scope beside it, its own rendezvous
+     * directory, and no HERMES_RUNTIME_DIR (pm's tool store follows HERMES_HOME, as at install, ADR-0033). A null value
+     * removes the variable. Without HERMES_MANAGED_DIR Hermes would run without the pinned settings and hooks (ADR-0062).
+     * HERMES_GATEWAY_LOCK_DIR: Hermes keeps one backend record per OS user (gateway/status.py _get_lock_dir), and a
+     * `hermes dashboard` attaches to the backend that record names; without it, `pikkumies run dashboard` could hand
+     * the user a plain Hermes started on the same account, without Pikkumies' settings and hooks (ADR-0074).
      */
     public static function env($home = null)
     {
         $home = $home !== null ? $home : self::home();
-        return ['HERMES_HOME' => $home, 'HERMES_MANAGED_DIR' => self::managedDir($home), 'HERMES_RUNTIME_DIR' => null];
+        return ['HERMES_HOME' => $home, 'HERMES_MANAGED_DIR' => self::managedDir($home), 'HERMES_GATEWAY_LOCK_DIR' => $home . '/gateway-locks', 'HERMES_RUNTIME_DIR' => null];
     }
 
     public static function write(array $config, array $profile)
@@ -72,7 +75,7 @@ class HermesConfig
         $lazy = !empty($config['hermes']['lazyInstalls']);
         // The pins, at every start: a key or setting changed after install reaches Hermes (ADR-0005), and a run
         // never starts without the hooks, since a failed write throws (ADR-0062).
-        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true) . self::sessionsYaml($config));
+        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true) . self::sessionsYaml($config, true));
         // Key lives only in the managed .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($managed . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         // The user's config.yaml: seeded once with everything, then only careful, backed-up, logged edits.
@@ -251,14 +254,15 @@ class HermesConfig
     /**
      * Appended to config.yaml (ADR-0032). sessions: Hermes prunes ended sessions older than
      * retention_days at start (auto_prune, hermes_cli/config_defaults.py "sessions"); our
-     * sessions.retentionDays 0 means keep them forever, so pruning is off. telemetry: Hermes'
-     * own shared metrics stay off (already its default), set explicitly so a new release cannot turn them on.
+     * sessions.retentionDays 0 means keep them forever, so pruning is off. telemetry: Hermes' own shared metrics stay
+     * off; the user's file gets Hermes' own "No thanks" answer, which is what Hermes reads, and the managed file pins
+     * only send (HermesTelemetry, ADR-0072).
      */
-    public static function sessionsYaml(array $config)
+    public static function sessionsYaml(array $config, $pinsOnly = false)
     {
         $days = isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0;
         $y = $days > 0 ? "sessions:\n  auto_prune: true\n  retention_days: $days\n" : "sessions:\n  auto_prune: false\n";
-        return $y . "telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n";
+        return $y . ($pinsOnly ? HermesTelemetry::managedYaml() : HermesTelemetry::seedYaml(HermesTelemetry::offerVersion()));
     }
 
     /**

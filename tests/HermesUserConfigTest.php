@@ -85,7 +85,7 @@ return [
     'hermes user config: a missing skills dir goes back through hermes config get/set, keeping the user\'s entries, backed up and logged' => function () {
         $w = userCfgWorld();
         try {
-            $before = "# mine\nskills:\n  external_dirs:\n    - /home/u/more-skills\n";
+            $before = "# mine\nskills:\n  external_dirs:\n    - /home/u/more-skills\n" . HermesTelemetry::seedYaml(HermesTelemetry::DEFAULT_OFFER_VERSION); // answer settled: only the skills dir is due
             file_put_contents($w['home'] . '/config.yaml', $before);
             @mkdir($w['local'] . '/state', 0700);
             HermesConfig::put(HermesUserConfig::marker($w['local']), "{}\n");

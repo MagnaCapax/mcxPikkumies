@@ -124,7 +124,7 @@ return [
             check(basename($f) === 'HermesInstall.php' || strpos($src, "'HERMES_HOME' => HermesConfig::home()") === false, "$f builds a Hermes env without the managed dir");
         }
         $env = HermesConfig::env('/x/local/hermes');
-        check($env === ['HERMES_HOME' => '/x/local/hermes', 'HERMES_MANAGED_DIR' => '/x/local/hermes-managed', 'HERMES_RUNTIME_DIR' => null], json_encode($env));
+        check($env === ['HERMES_HOME' => '/x/local/hermes', 'HERMES_MANAGED_DIR' => '/x/local/hermes-managed', 'HERMES_GATEWAY_LOCK_DIR' => '/x/local/hermes/gateway-locks', 'HERMES_RUNTIME_DIR' => null], json_encode($env));
         check(strpos((string) file_get_contents("$root/tools/system/feedback/FeedbackSend.php"), 'HermesConfig::env()') !== false, 'the feedback export runs Hermes too');
     },
 ];

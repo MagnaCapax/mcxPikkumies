@@ -388,11 +388,20 @@ switch ($cmd) {
                 exit(1);
             }
         }
+        // A dashboard: never without a login (ADR-0074); its web page built first, alone on the tree (ADR-0033 addendum 2026-10-19).
+        $dash = HermesDashboardGate::refusal($passArgs, hermesBin());
+        if ($dash === '' && HermesWebUi::needed($passArgs)) {
+            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out');
+        }
+        if ($dash !== '') {
+            out('Not starting the dashboard: ' . $dash);
+            exit(1);
+        }
         // Held until Hermes exits: shared for a session, exclusive for an update, so an update never
         // rewrites the code a running session or scheduled job is using.
         $hermesLock = HermesInstall::lock($isUpdate);
         if (!$hermesLock) {
-            out($isUpdate ? 'Not updating: other Hermes sessions or a scheduled job are running from pikkumies/hermes. Close the sessions (or wait a minute for the job) and run `pikkumies run update` again.'
+            out($isUpdate ? 'Not updating: other Hermes sessions, a dashboard or a scheduled job are running from pikkumies/hermes. Close the sessions, stop a dashboard with `pikkumies run dashboard --stop` (or wait a minute for the job) and run `pikkumies run update` again.'
                 : 'Hermes is being updated right now (`pikkumies run update`); start again when it has finished.');
             exit(1);
         }

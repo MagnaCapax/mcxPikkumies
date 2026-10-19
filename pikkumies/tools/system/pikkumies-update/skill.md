@@ -26,5 +26,5 @@ Never edit files under `~/pikkumies` that git tracks. To change how a shipped sk
 
 Hermes is a separate, unmodified checkout in `~/pikkumies/hermes` and updates on its own, only when the user asks ([ADR-0033](../../../../docs/adr/0033-vanilla-hermes-git-checkout-updated-separately.md)). Tell the user to type `/update` in a session, or to run `~/pikkumies/bin/pikkumies run update` from a shell when no other session is open. Never run `hermes update` or `pikkumies run update` from your own terminal tool: it rewrites the code this session is running. Never run the Hermes installer script: it edits the user's shell files and tries sudo.
 
-- **"Not updating: other Hermes sessions or a scheduled job are running"**: the user closes the other sessions and runs it again.
+- **"Not updating: other Hermes sessions, a dashboard or a scheduled job are running"**: the user closes the other sessions, stops a running dashboard with `pikkumies run dashboard --stop`, and runs it again.
 - **"Hermes was updated, but Pikkumies will not start it"** or **"not starting: pikkumies/hermes changed and fails the Pikkumies checks"**: a setting Pikkumies relies on (for example the delete guard) no longer works with this Hermes. Run `pikkumies doctor` and give the user the exact message and what it shows; do not try to repair the Hermes checkout.

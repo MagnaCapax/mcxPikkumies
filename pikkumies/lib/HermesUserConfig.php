@@ -8,11 +8,13 @@
  *   shipped skills leave Hermes' skills.disabled (they are no longer generated). Every other byte stays. The marker
  *   (local/state/hermes-config.json) is written last; the old line 1 seen again (an older version ran) runs it again.
  * - skills dir: the generated skills directory goes back into skills.external_dirs when it is missing.
- * The list edits go through Hermes' own `config get/set`, which keeps every other entry and the file's comments, so
+ * - telemetry answer: Hermes' shared-metrics "No thanks" goes back in when it is gone (HermesTelemetry, ADR-0072).
+ * The edits of single keys go through Hermes' own `config get/set`, which keeps every other entry and the file's comments, so
  * they wait until Hermes is built. A failed edit is logged and noted on stderr, the start goes on (the pins and hooks
  * are in the managed file), and the next start tries again. Hermes keeps copies too (HERMES_HOME/backups/config/).
  */
 require_once __DIR__ . '/HermesConfigBackup.php';
+require_once __DIR__ . '/HermesTelemetry.php';
 
 class HermesUserConfig
 {
@@ -27,7 +29,8 @@ class HermesUserConfig
     {
         $local = dirname($home);
         $cfg = "$home/config.yaml";
-        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir)) {
+        $offer = HermesTelemetry::offerVersion();
+        if (!self::migrationDue($cfg) && is_file($cfg) && self::hasSkillDir($cfg, $skillDir) && HermesTelemetry::isOff($cfg, $offer)) {
             return; // the usual start: no lock, no Hermes process
         }
         @mkdir("$local/state", 0700, true);
@@ -51,6 +54,9 @@ class HermesUserConfig
                 } elseif (!in_array($skillDir, $dirs, true)) { // listed but written some other way: never add it twice
                     self::setList($home, 'skills.external_dirs', array_merge($dirs, [$skillDir]), 'repair-external-dirs');
                 }
+            }
+            if (!HermesTelemetry::isOff($cfg, $offer) && self::bin() !== '') { // else the seed has it, or the next start does it
+                HermesTelemetry::repair($home, $offer);
             }
         } finally {
             flock($lock, LOCK_UN);
@@ -150,8 +156,14 @@ class HermesUserConfig
         return [true, array_values($v)];
     }
 
-    /** Back up config.yaml, then `hermes config set <key> <json list>`; logged either way. */
+    /** `hermes config set <key> <json list>`, through setValue(). */
     public static function setList($home, $key, array $list, $action)
+    {
+        return self::setValue($home, $key, json_encode(array_values($list), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $action, count($list) . ' entries');
+    }
+
+    /** Back up config.yaml, then `hermes config set <key> <value>` (Hermes coerces the text); logged either way. */
+    public static function setValue($home, $key, $value, $action, $detail)
     {
         $local = dirname($home);
         $cfg = "$home/config.yaml";
@@ -160,13 +172,13 @@ class HermesUserConfig
         if ($backup === null) {
             return HermesConfigBackup::fail($local, 'config.yaml', $key, 'no backup could be written; nothing changed');
         }
-        $r = self::hermes($home, ['config', 'set', $key, json_encode(array_values($list), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]);
+        $r = self::hermes($home, ['config', 'set', $key, (string) $value]);
         clearstatcache();
         $after = @file_get_contents($cfg);
         if ($r['code'] !== 0) {
             return HermesConfigBackup::fail($local, 'config.yaml', $key, 'hermes config set exit ' . $r['code'] . ': ' . self::firstLine($r['err'] . "\n" . $r['out']), $backup);
         }
-        HermesConfigBackup::log($local, $action, $cfg, $key, $before, $after === false ? null : $after, $backup, count($list) . ' entries');
+        HermesConfigBackup::log($local, $action, $cfg, $key, $before, $after === false ? null : $after, $backup, $detail);
         return true;
     }
 

@@ -67,6 +67,8 @@ class HermesInstall
         'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
         'agent.disabled_toolsets' => ['hermes_cli/tools_config.py', '.get("disabled_toolsets")'],
         'auxiliary.approval' => ['hermes_cli/config_defaults.py', '"approval": _aux('],
+        // The answer HermesTelemetry records; without it the dashboard and chat ask about sending metrics (ADR-0072).
+        'telemetry.shared_metrics.offer_version' => ['hermes_cli/observability/shared_metrics_consent.py', 'section["offer_version"] = OFFER_VERSION'],
     ];
 
     /**
