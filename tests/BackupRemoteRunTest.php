@@ -37,6 +37,18 @@ function brPhrase(array $fx)
     return trim((string) file_get_contents($fx['secrets'] . '/pass'));
 }
 
+/** Puts the real wc in the fixture's bin of fakes: `check` counts entries with it. */
+function brCheckTools(array $fx)
+{
+    foreach (explode(':', (string) getenv('PATH')) as $p) {
+        if (is_executable("$p/wc")) {
+            symlink("$p/wc", $fx['bin'] . '/wc');
+            return;
+        }
+    }
+    skip('wc is not installed here');
+}
+
 return [
     'backup remote run meta: PMSS panel set, ~/.config without caches, dotfiles, pikkumies local and a file list; never secrets, logs, caches, history, keys or data; restore brings it back' => function () {
         $fx = brHome();
@@ -188,7 +200,7 @@ return [
             foreach ([['passphrase'], ['passphrase', '--confirm-saved'], ['stats'], ['list'], ['run', '--mode', 'meta']] as $args) {
                 $all .= brRun($fx, $args)[2];
             }
-            check(strpos($all, brPhrase($fx)) === false, 'a verb printed the passphrase');
+            check(strpos($all, brPhrase($fx)) === false && strpos($all, implode(' ', str_split(brPhrase($fx), 4))) === false, 'a verb printed the passphrase');
             check(strpos($all, 'own terminal') !== false && brRun($fx, ['stats'])[1][0]['passphrase_saved_by_user'] === false, 'refusal: ' . $all);
             $script = trim((string) shell_exec('command -v script 2>/dev/null'));
             if ($script === '') {
@@ -197,10 +209,22 @@ return [
             $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(stScript($fx, 'backup/remote/remote.php', ['remoteLocalDir' => $fx['localdir'],
                 'remoteMountinfo' => $fx['mountinfo']]));
             $shown = (string) shell_exec(escapeshellarg($script) . ' -qec ' . escapeshellarg("$cmd passphrase") . ' /dev/null < /dev/null');
-            check(strpos($shown, brPhrase($fx)) !== false, 'not shown on a terminal: ' . $shown);
-            shell_exec(escapeshellarg($script) . ' -qec ' . escapeshellarg("$cmd passphrase --confirm-saved") . ' /dev/null < /dev/null');
+            // In 12 groups of 4 with where to keep it (ADR-0099); the confirm below takes the grouped form.
+            check(strpos($shown, implode(' ', str_split(brPhrase($fx), 4))) !== false && strpos($shown, 'password manager or on paper') !== false,
+                'not shown grouped on a terminal: ' . $shown);
+            // --confirm-saved reads the saved copy back at the terminal (ADR-0099): a wrong copy records nothing, the right one does.
+            $typed = function ($line) use ($script, $cmd) {
+                return (string) shell_exec('printf %s ' . escapeshellarg("$line\n") . ' | ' . escapeshellarg($script) . ' -qec '
+                    . escapeshellarg("$cmd passphrase --confirm-saved") . ' /dev/null');
+            };
+            $wrong = $typed('not-the-passphrase');
             clearstatcache();
-            check(brRun($fx, ['stats'])[1][0]['passphrase_saved_by_user'] === true, 'confirm-saved not recorded');
+            check(brRun($fx, ['stats'])[1][0]['passphrase_saved_by_user'] === false && strpos($wrong, 'not the passphrase') !== false,
+                'a wrong copy was recorded as saved: ' . $wrong);
+            $right = $typed(implode(' ', str_split(brPhrase($fx), 4)));
+            clearstatcache();
+            check(brRun($fx, ['stats'])[1][0]['passphrase_saved_by_user'] === true, 'confirm-saved with the right copy not recorded: ' . $right);
+            // No echo check here: piped typeahead reaches the pty before `stty -echo`, so the terminal itself echoes it in this harness.
         } finally {
             stDone($fx);
         }
@@ -261,6 +285,99 @@ return [
             check(brSshCalls($fx) === [], 'ssh ran for a denied host: ' . json_encode(brSshCalls($fx)));
             list(, $l) = brRun($fx, ['stats']);
             check($l[0]['last_run']['ok'] === false && strpos($l[0]['last_run']['error'], 'SSH deny list') !== false, 'last_run: ' . json_encode($l));
+        } finally {
+            stDone($fx);
+        }
+    },
+    'backup remote check: the newest meta archive decrypts and lists (entries counted, recorded); a corrupted archive and a gpg failure are not ok' => function () {
+        $fx = brHome();
+        try {
+            brCheckTools($fx);
+            check(brRun($fx, ['run', '--mode', 'meta'])[0] === 0, 'run failed');
+            list($code, $l, $out) = brRun($fx, ['check']);
+            check($code === 0 && $l[0]['checked'] === true && $l[0]['verify_ok'] === true && $l[0]['entries'] > 5 && end($l)['verified'] === true, 'check: ' . $out);
+            check(strpos($out, '.rtorrent.rc') === false, 'the archive contents must never be printed: ' . $out);
+            $state = json_decode((string) file_get_contents($fx['secrets'] . '/state.json'), true);
+            check($state['last_check']['verify_ok'] === true && $state['last_check']['entries'] === $l[0]['entries'], 'not recorded: ' . json_encode($state));
+            $arch = glob($fx['remote'] . '/pikkumies-backups/*/*.meta.tgz.gpg');
+            $data = (string) file_get_contents($arch[0]);
+            $head = substr($data, 0, strpos($data, "\n") + 1);
+            file_put_contents($arch[0], $head . str_repeat('x', 64)); // decrypts, then is not a compressed tar
+            list($code, $l, $out) = brRun($fx, ['check']);
+            check($code === 0 && $l[0]['verify_ok'] === false && strpos($l[0]['error'], 'failed at pigz') === 0 && end($l)['verified'] === false, 'corrupt: ' . $out);
+            file_put_contents($arch[0], $data);
+            brSetState($fx, ['gpg_fail' => true]);
+            list(, $l, $out) = brRun($fx, ['check']);
+            check($l[0]['verify_ok'] === false && strpos($l[0]['error'], 'failed at gpg') === 0 && strpos($l[0]['error'], 'fake failure') !== false, 'gpg: ' . $out);
+        } finally {
+            stDone($fx);
+        }
+    },
+    'backup remote check: with no meta archive and only full ones over the limit nothing is downloaded, and it is not a failure' => function () {
+        $fx = brHome();
+        try {
+            brCheckTools($fx);
+            list(, $l, $out) = brRun($fx, ['check']);
+            check($l[0]['checked'] === false && $l[0]['why'] === 'no archive yet', 'no archive: ' . $out);
+            check(brRun($fx, ['run', '--mode', 'full', '--allow-large'])[0] === 0, 'full run failed');
+            stClearLog($fx);
+            list($code, $out) = stRun($fx, 'backup/remote/remote.php', ['check'], ['remoteLocalDir' => $fx['localdir'], 'remoteMountinfo' => $fx['mountinfo'],
+                'remoteCheckFullMax' => 10]);
+            $l = stLines($out);
+            check($code === 0 && $l[0]['checked'] === false && $l[0]['verify_ok'] === null && strpos($l[0]['why'], 'over 10 GiB') !== false, 'too big: ' . $out);
+            check(!stCalls($fx, 'gpg'), 'nothing may be downloaded or decrypted: ' . json_encode(stCalls($fx, 'gpg')));
+            list(, $l, $out) = brRun($fx, ['check']);
+            check($l[0]['checked'] === true && $l[0]['verify_ok'] === true, 'a full archive under the limit is checked: ' . $out);
+        } finally {
+            stDone($fx);
+        }
+    },
+    'backup safety facts: the remote counts as verified only by check, not by a run whose bytes matched; the unconfirmed key is only a custody line' => function () {
+        $fx = brHome();
+        try {
+            brCheckTools($fx);
+            check(brRun($fx, ['run', '--mode', 'meta'])[0] === 0, 'run failed');
+            $status = function () use ($fx) {
+                list(, $out) = stRun($fx, 'backup/backup-safety/backup-safety.php', ['status', '--refresh'], ['safetyLocalDir' => $fx['localdir']]);
+                return stLines($out);
+            };
+            $l = $status();
+            $m = array_values(array_filter($l, function ($r) {
+                return isset($r['record'], $r['kind']) && $r['record'] === 'method' && $r['kind'] === 'remote';
+            }));
+            check($m && $m[0]['verify_ok'] === true && end($l)['state'] === 'working', 'a checked archive works: ' . json_encode($l));
+            check(strpos(end($l)['custody'], 'backup passphrase not confirmed saved') === 0 && strpos(end($l)['table'], 'not confirmed saved') !== false,
+                'custody line in the status and the table: ' . json_encode(end($l)));
+            $state = json_decode((string) file_get_contents($fx['secrets'] . '/state.json'), true);
+            $state['last_check']['verified_at'] -= 8 * 86400; // stale: the next refresh checks again
+            file_put_contents($fx['secrets'] . '/state.json', json_encode($state));
+            $arch = glob($fx['remote'] . '/pikkumies-backups/*/*.meta.tgz.gpg');
+            $data = (string) file_get_contents($arch[0]);
+            file_put_contents($arch[0], substr($data, 0, strpos($data, "\n") + 1) . 'garbage');
+            $l = $status();
+            check(end($l)['state'] === 'broken', 'last_run ok but the archive does not read back: broken, not working: ' . json_encode($l));
+        } finally {
+            stDone($fx);
+        }
+    },
+    'cwe F3: an archive that is not encrypted with the passphrase is not a backup: check says so, restore refuses after unpacking' => function () {
+        $fx = brHome();
+        try {
+            brCheckTools($fx);
+            check(brRun($fx, ['run', '--mode', 'meta'])[0] === 0, 'run failed');
+            $arch = glob($fx['remote'] . '/pikkumies-backups/*/*.meta.tgz.gpg');
+            $data = (string) file_get_contents($arch[0]);
+            file_put_contents($arch[0], "FAKEPLAIN\n" . substr($data, strpos($data, "\n") + 1)); // gpg prints it and exits 0, no DECRYPTION_OKAY
+            list(, $l, $out) = brRun($fx, ['check']);
+            check($l[0]['verify_ok'] === false && strpos($l[0]['error'], 'not encrypted with your passphrase') !== false, 'check: ' . $out);
+            check(strpos(implode("\n", stCalls($fx, 'gpg')), '--status-fd 2') !== false, 'gpg must report its status: ' . json_encode(stCalls($fx, 'gpg')));
+            list($code, $l, $out) = brRun($fx, ['restore', basename($arch[0]), '--target', $fx['home'] . '/plain']);
+            check($code === 1 && strpos(end($l)['error'], 'not your backup') !== false, 'restore: ' . $out);
+            file_put_contents($arch[0], $data);
+            list($code, , $out) = brRun($fx, ['restore', basename($arch[0]), '--target', $fx['home'] . '/real']);
+            check($code === 0, 'a real archive restores: ' . $out);
+            check(is_dir($fx['localdir'] . '/tmp') && (fileperms($fx['localdir'] . '/tmp') & 0777) === 0700 && count(scandir($fx['localdir'] . '/tmp')) === 2,
+                'cwe F4: the stages\' temporary files were in local/tmp and are gone');
         } finally {
             stDone($fx);
         }

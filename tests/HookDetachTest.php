@@ -14,7 +14,7 @@ return [
                 $marker = "$tmp/$name.marker";
                 // The hook: starts the job as kick() builds the command (or a broken variant of it), then keeps running until killed.
                 file_put_contents("$tmp/$name.php", '<?php require ' . var_export("$lib/HookAsync.php", true) . ';'
-                    . ' $cmd = HookAsync::detached([HookAsync::bin("sh"), "-c", "sleep 2; touch ' . $marker . '"], 10);'
+                    . ' $cmd = HookAsync::detached([HookAsync::bin("sh"), "-c", "sleep 2; touch ' . $marker . '"], 10, ' . var_export("$tmp/$name.log", true) . ');'
                     . ($variant === 'fg' ? ' $cmd = str_replace("\x27-k\x27", "\x27--foreground\x27 \x27-k\x27", $cmd);' : '') . ($variant === 'nobg' ? ' $cmd = substr($cmd, 0, -2);' : '')
                     . ' file_put_contents(' . var_export("$tmp/$name.started", true) . ', "1"); exec($cmd); sleep(30);');
                 $p = proc_open('exec ' . escapeshellarg(HookAsync::bin('setsid')) . ' ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$tmp/$name.php"),

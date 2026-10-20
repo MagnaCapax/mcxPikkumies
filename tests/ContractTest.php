@@ -140,7 +140,8 @@ return [
             'torrent-clients/find' => 'finds which client/service has a torrent before any shared verb can use its id; its own single verb, not the per-client contract above',
             'torrent-clients/move' => 'not a client: it moves torrents between boxes through the client units',
             'torrent-clients/session-rewrite' => 'offline session-file path rewrite for a stopped client, not a live client; see tools/torrent-clients/session-rewrite/README.md',
-            'documentation/report' => 'ADR-0091: writes PDF reports, does not search a documentation source'];
+            'documentation/report' => 'ADR-0091: writes PDF reports, does not search a documentation source',
+            'backup/backup-safety' => 'ADR-0099: reads whether backups work and copies files, not a snapshot repository'];
         foreach (Tree::scan(Units::toolsDir(), 'skill.md')['categories'] as $category => $dir) {
             $readme = "$dir/README.md";
             $shared = is_file($readme) ? array_column(Units::verbs((string) file_get_contents($readme)), 'verb') : [];

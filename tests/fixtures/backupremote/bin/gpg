@@ -1,7 +1,8 @@
 #!/usr/bin/env php
 <?php
 // Fake gpg --symmetric / --decrypt: "encrypts" as a header naming the passphrase's hash plus the data, and refuses to
-// decrypt with another passphrase. The passphrase is read from --passphrase-file only. State: gpg_fail.
+// decrypt with another passphrase. The passphrase is read from --passphrase-file only. A decrypt with --status-fd writes
+// DECRYPTION_OKAY to stderr; data starting FAKEPLAIN plays an unencrypted message (printed, exit 0, no DECRYPTION_OKAY). State: gpg_fail.
 require __DIR__ . '/fakelib.php';
 fakeLog($argv, ['pw_set' => getenv('PIKKUMIES_REMOTE_PASSWORD') !== false]);
 $a = array_slice($argv, 1);
@@ -25,6 +26,12 @@ if (in_array('--symmetric', $a, true)) {
     $put($head . $data);
 } elseif (strpos($data, $head) === 0) {
     $put(substr($data, strlen($head)));
+    if (in_array('--status-fd', $a, true)) {
+        fwrite(STDERR, "[GNUPG:] DECRYPTION_OKAY\n[GNUPG:] END_DECRYPTION\n");
+    }
+} elseif (strpos($data, "FAKEPLAIN\n") === 0) {
+    $put(substr($data, 10)); // an unencrypted OpenPGP message: real gpg prints it and exits 0, with PLAINTEXT but no DECRYPTION_OKAY
+    fwrite(STDERR, "[GNUPG:] PLAINTEXT 62 0\n");
 } else {
     fwrite(STDERR, "gpg: decryption failed: Bad session key\n");
     exit(2);

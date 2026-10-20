@@ -23,7 +23,9 @@ return [
     'update: cronTickLine() direct, fixed per-minute schedule and tag' => function () {
         $line = Update::cronTickLine();
         check(strpos($line, '* * * * * ') === 0, "cron-tick must run every minute: $line");
-        check(strpos($line, 'cron-tick') !== false && strpos($line, '/dev/null 2>&1') !== false, "output must be silenced: $line");
+        // Its output goes to a log of the last run, never to /dev/null (ADR-0099): a failing tick must leave its error somewhere.
+        check(strpos($line, 'cron-tick > ' . escapeshellarg(Update::cronTickLog()) . ' 2>&1') !== false && strpos($line, '/dev/null') === false,
+            "output must go to the tick log: $line");
         check(substr($line, -strlen(Update::CRON_TICK_TAG)) === Update::CRON_TICK_TAG, "missing tag: $line");
     },
     'update: cronMerge() collapses 3 duplicate stale tagged lines down to 1' => function () {
