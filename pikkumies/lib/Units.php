@@ -192,7 +192,8 @@ class Units
                 $verbs = array_map(function ($v) {
                     return $v['verb'] . (in_array(strtolower($v['changes']), ['', 'no', '-'], true) ? '' : '*');
                 }, $u['verbs']);
-                $out .= "- **{$u['name']}** (`{$u['dir']}`): {$u['meta']['description']}" . ($verbs ? ' Verbs: ' . implode(', ', $verbs) . '.' : '') . "\n";
+                $run = isset($u['script']) && $u['script'] !== '' ? " Run: `php {$u['script']} <verb>`." : ''; // the exact path, so the agent never guesses it
+                $out .= "- **{$u['name']}** (`{$u['dir']}`): {$u['meta']['description']}" . ($verbs ? ' Verbs: ' . implode(', ', $verbs) . '.' : '') . $run . "\n";
             }
         }
         return $out;

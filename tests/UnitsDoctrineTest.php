@@ -118,6 +118,16 @@ return [
         $out = Units::renderSkill($u);
         check(strpos($out, 'description: "Path a/b and café."') !== false, 'a slash or a non-ASCII character was escaped: ' . $out);
     },
+    'units render: renderIndex() gives the run line of a unit with a script, so the agent does not guess paths' => function () {
+        $units = [['category' => 'cat', 'name' => 'u', 'dir' => '/t/cat/u', 'script' => '/t/cat/u/u.php', 'meta' => ['description' => 'd'],
+            'verbs' => [['verb' => 'act', 'args' => '', 'changes' => 'no', 'does' => 'x']]],
+            ['category' => 'cat', 'name' => 'v', 'dir' => '/t/cat/v', 'script' => '', 'meta' => ['description' => 'd'], 'verbs' => []]];
+        $out = Units::renderIndex($units);
+        check(strpos($out, 'Run: `php /t/cat/u/u.php <verb>`') !== false, 'the index lacks the run line of a scripted unit: ' . $out);
+        check(substr_count($out, 'Run:') === 1, 'a unit without a script got a run line: ' . $out);
+        // defect this catches (2026-10-20): the index listed only directories, and the agent spent three or four
+        // failed commands guessing the script path inside a tool directory before running it.
+    },
     'units render: renderIndex() treats any "changes" word other than blank/no/- as destructive' => function () {
         $units = [['category' => 'cat', 'name' => 'u', 'dir' => '/t', 'meta' => ['description' => 'd'],
             'verbs' => [['verb' => 'act', 'args' => '', 'changes' => 'Maybe', 'does' => 'x']]]];
