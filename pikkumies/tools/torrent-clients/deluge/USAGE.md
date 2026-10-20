@@ -17,6 +17,7 @@ The user's own Deluge 2.x through deluge-web's JSON-RPC on 127.0.0.1. Same verbs
 | limit | `[--down <rate>] [--up <rate>]` | yes | No option: `down_limit`, `up_limit` (bytes/s, 0 = none). With options: sets Deluge's global limits (kept in KiB/s), reads them back (`was`, `asked`, `verified`). Rates: bytes/s, `512KiB/s`, `10MiB/s`; `0` = no limit. |
 | export | `<id>` | no | Saves the torrent's .torrent file as `~/pikkumies/local/state/exports/<id>.torrent` (0600) and prints only `file` (that path), `id`, `name`, `info_hash`, `bytes`, `sha256`, `private`, `trackers`, `source`. Read from Deluge's `~/.config/deluge/state/<id>.torrent`; the info-hash is computed again from the file and must equal the id, or nothing is written. The file holds the tracker URLs with their passkeys: never print or paste it. |
 | restart | | yes | PMSS only, and only while Deluge is enabled: stops this user's own `deluged` and `deluge-web` (SIGTERM, SIGKILL after 3 s), starts them the way the PMSS panel does, waits up to 30 s for an answer. Elsewhere it refuses and prints the provider's way. |
+| repath | `<id>... --to <dir>` | yes | Points the torrent at a folder that already holds its data (checked file by file, exact size; refused otherwise). `--to` must already be a real folder inside your home. Deluge has no "move the pointer only" call and its on-disk state is never edited, so this re-adds instead, without moving any data itself: removes the torrent keeping its files, re-adds Deluge's own saved `.torrent` copy paused at the new `download_location`, rechecks, then resumes only when it was not paused before. A label (the Label plugin, not core) is not carried in v1. |
 
 ```sh
 D=~/pikkumies/tools/torrent-clients/deluge/deluge.php
@@ -35,6 +36,7 @@ php $D recheck 3f2a9c1b
 php $D reannounce 3f2a9c1b 77d0e2aa
 php $D limit
 php $D limit --down 0 --up 10MiB/s
+php $D repath 3f2a9c1b --to ~/data/moved     # the data must already be at ~/data/moved, every file, exact size
 ```
 
 - Ids are the 40-character ids `list` prints. To find one by name: `list --search <text>`.

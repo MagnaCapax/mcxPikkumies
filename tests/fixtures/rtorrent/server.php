@@ -111,6 +111,10 @@ function fakeAnswer(array &$state, $method, array $p)
         $t['custom5'] = (string) $p[1];
         return 0;
     }
+    if ($method === 'd.directory_base.set') { // repath: never appends the torrent's name, unlike d.directory.set (RtorrentRepath.php)
+        $t['dir'] = (string) $p[1];
+        return 0;
+    }
     if ($method === 'd.erase') {
         if (!empty($t['custom5'])) { // ruTorrent's erasedata on-erase hook deletes the files when custom5 is set (PMSS rutorrent/plugins/erasedata/init.php:10-22)
             foreach ($t['files'] as $f) {

@@ -112,9 +112,9 @@ class QbitApi
         return $d;
     }
 
-    public function text($path)
+    public function text($path, array $query = [], $raw = false)
     {
-        return trim($this->call('GET', $path, [], null, [])['body']);
+        $body = $this->call('GET', $path, $query, null, [])['body']; return $raw ? $body : trim($body);
     }
 
     /** POST form fields, or a prepared multipart body with its Content-Type. Returns [code, body]. */

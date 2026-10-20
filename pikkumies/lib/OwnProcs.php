@@ -9,12 +9,17 @@ require_once __DIR__ . '/PathName.php';
 class OwnProcs
 {
     /**
-     * Pids of processes whose comm is exactly one of $names, owned by $uid, in this mount namespace (as PMSS
-     * does, so a Docker guest of the same name is left alone). When the own namespace cannot be read, the
-     * namespace is not compared. Sorted.
+     * Pids of processes whose comm is exactly one of $names, OR one of $names truncated to 15 characters --
+     * the kernel's TASK_COMM_LEN-1 limit on /proc/<pid>/comm (e.g. "transmission-daemon" is read back as
+     * "transmission-da"; lib/Detect.php's KNOWN_APPS matching already allows for this, security review N2)
+     * -- owned by $uid, in this mount namespace (as PMSS does, so a Docker guest of the same name is left
+     * alone). When the own namespace cannot be read, the namespace is not compared. Sorted.
      */
     public static function pids(array $names, $uid, $proc = '/proc')
     {
+        $match = array_unique(array_merge($names, array_map(function ($n) {
+            return substr($n, 0, 15);
+        }, $names)));
         $ns = @readlink("$proc/self/ns/mnt");
         $out = [];
         foreach ((array) glob("$proc/[0-9]*", GLOB_ONLYDIR) as $dir) {
@@ -22,7 +27,7 @@ class OwnProcs
             if (!ctype_digit($pid) || @fileowner($dir) !== (int) $uid || ($ns !== false && @readlink("$dir/ns/mnt") !== $ns)) {
                 continue;
             }
-            if (in_array(trim((string) @file_get_contents("$dir/comm")), $names, true)) {
+            if (in_array(trim((string) @file_get_contents("$dir/comm")), $match, true)) {
                 $out[] = (int) $pid;
             }
         }

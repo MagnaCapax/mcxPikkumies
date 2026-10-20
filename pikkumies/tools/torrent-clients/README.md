@@ -2,6 +2,10 @@
 
 Tools for the user's own torrent clients: `rtorrent`, `qbittorrent`, `deluge` and `transmission`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Every unit has the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the list below. `move` is not a client and is exempt: it moves torrents between the user's boxes through these units (each unit adds `export` for it: the .torrent, checked against the id, saved to a 0600 file under `local/state/exports`).
 
+`session-rewrite` is not a live client: it rewrites account-rename path prefixes in a STOPPED client's own
+session files, offline, with its own one verb (`session-rewrite/README.md`). The contract test exempts it
+from the table below by name.
+
 ## Verbs (the same in every unit)
 
 | verb | arguments | changes | what it does |

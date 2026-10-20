@@ -14,7 +14,7 @@ require_once dirname(__DIR__) . '/lib/Torrents.php';
 require_once dirname(__DIR__) . '/lib/Bencode.php';
 require_once dirname(__DIR__) . '/lib/TorrentExport.php';
 foreach (['QbitSecret', 'QbitEndpoint', 'QbitApi', 'QbitProc', 'QbitRestart', 'QbitStats', 'QbitAdd', 'QbitChange', 'QbitDetails',
-    'QbitExtras', 'QbittorrentClient', 'Export'] as $qbitClass) {
+    'QbitExtras', 'QbittorrentClient', 'Export', 'QbitRepath'] as $qbitClass) {
     require_once __DIR__ . "/$qbitClass.php";
 }
 
@@ -29,6 +29,7 @@ usage: php qbittorrent.php <verb> [arguments] [--human]
   recheck <id>...   reannounce <id>...  limit [--down <rate>] [--up <rate>]
   export <id>       (the .torrent as base64 parts, for move)
   login             (the user types the WebUI password at a terminal; stored for this tool)
+  repath <id>... --to <dir>
 Ids are the 40-hex ids `list` prints. Output: JSON Lines; --human for people. See USAGE.md.
 TXT;
 
@@ -43,11 +44,30 @@ $qbitMake = function () use ($qbitSecretDir, $qbitFamily) {
     return [new QbitApi($ep, $secret), $secret];
 };
 
-$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'recheck', 'reannounce', 'limit', 'export', 'login'];
+$qbitClient = function () use ($qbitMake, $qbitProcRoot, $qbitPage) {
+    list($api) = $qbitMake();
+    $client = new QbittorrentClient($api, new QbitRestart(new QbitProc($qbitProcRoot)));
+    if ($qbitPage !== null) {
+        $client->page = (int) $qbitPage;
+    }
+    return $client;
+};
+
+$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'recheck', 'reannounce', 'limit', 'export', 'login', 'repath'];
 list($qbitVerb, , $qbitOpt) = Cli::parse($argv, $qbitVerbs);
 if ($qbitVerb === null && !empty($qbitOpt['verbs'])) {
     echo implode("\n", $qbitVerbs), "\n"; // Torrents::run lists only the shared verbs
     exit(0);
+}
+if ($qbitVerb === 'export') {
+    Cli::run($argv, ['export' => function ($args, $opt) use ($qbitClient) {
+        return QbitExport::verb($qbitClient(), $args, $opt);
+    }], $usage);
+}
+if ($qbitVerb === 'repath') {
+    Cli::run($argv, ['repath' => function ($args, $opt) use ($qbitClient) {
+        return QbitRepath::run($qbitClient(), $args, $opt);
+    }], $usage, [], ['to']);
 }
 if ($qbitVerb === 'login') {
     Cli::run($argv, ['login' => function () use ($qbitMake) {
@@ -72,11 +92,4 @@ if ($qbitVerb === 'login') {
     }], $usage);
 }
 
-Torrents::run($argv, function () use ($qbitMake, $qbitProcRoot, $qbitPage) {
-    list($api) = $qbitMake();
-    $client = new QbittorrentClient($api, new QbitRestart(new QbitProc($qbitProcRoot)));
-    if ($qbitPage !== null) {
-        $client->page = (int) $qbitPage;
-    }
-    return $client;
-}, $usage, ['export' => ['QbitExport', 'verb']]);
+Torrents::run($argv, $qbitClient, $usage);

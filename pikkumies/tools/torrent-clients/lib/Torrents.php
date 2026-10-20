@@ -5,17 +5,13 @@
  * the delete plan live here once, so the three clients behave the same.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
-require_once "$lib/Cli.php";
-require_once "$lib/CliHuman.php";
-require_once "$lib/Quota.php";
+foreach (['Cli', 'CliHuman', 'Quota'] as $class) {
+    require_once "$lib/$class.php";
+}
 require_once __DIR__ . '/TorrentsTelemetry.php'; // local-only history of `stats`, one shared place for every client (docs/adr/0084-...)
-require_once __DIR__ . '/TorrentClient.php';
-require_once __DIR__ . '/DeleteFreed.php';
-require_once __DIR__ . '/DeletePlan.php';
-require_once __DIR__ . '/DeleteRun.php';
-require_once __DIR__ . '/TorrentList.php';
-require_once __DIR__ . '/TorrentChange.php';
-require_once __DIR__ . '/TorrentTrackers.php';
+foreach (['TorrentClient', 'DeleteFreed', 'DeletePlan', 'DeleteRun', 'TorrentList', 'TorrentChange', 'TorrentTrackers', 'TorrentsSafety'] as $class) {
+    require_once __DIR__ . "/$class.php";
+}
 
 class Torrents
 {
@@ -125,13 +121,16 @@ class Torrents
         return array_values($out);
     }
 
-    /** --dir as its real path: an existing folder inside $home, for every client alike (rTorrent's rule, the strictest). */
+    /** --dir as its real path: an existing folder inside $home, for every client alike (rTorrent's rule, the strictest), never a path TorrentsSafety denies. */
     public static function dir($dir, $home)
     {
         $real = realpath($dir);
         $realHome = $home === '' ? false : realpath($home);
         if ($real === false || !is_dir($real) || $realHome === false || strpos($real . '/', rtrim($realHome, '/') . '/') !== 0) {
             throw new CliError("nothing added: --dir $dir is not an existing folder inside your home", 'create it first, e.g. mkdir -p ~/data/new');
+        }
+        if (($why = TorrentsSafety::dirDenyReason($real, $realHome)) !== '') {
+            throw new CliError("nothing added: --dir $dir is $why; never used for torrent data", 'use an ordinary folder under your home meant for downloads, e.g. ~/data');
         }
         return $real;
     }

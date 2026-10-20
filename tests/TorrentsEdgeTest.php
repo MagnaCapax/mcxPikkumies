@@ -379,4 +379,25 @@ return [
         check($msg !== null && strpos($msg, 'not an existing folder inside your home') !== false, 'a symlink escaping $HOME via its target was accepted: ' . $msg);
         testRmTree($dir);
     },
+    'Torrents::dir refuses the home root itself, a hidden folder, and Pikkumies\' own tree (security review D1)' => function () {
+        $dir = testTempDir();
+        mkdir("$dir/home/data", 0700, true);
+        mkdir("$dir/home/.hidden", 0700, true);
+        $home = torrentsEdgeErr(function () use ($dir) {
+            Torrents::dir("$dir/home", "$dir/home");
+        });
+        check($home !== null && strpos($home, 'your home folder itself') !== false, 'the home root itself was accepted as --dir: ' . $home);
+        $hidden = torrentsEdgeErr(function () use ($dir) {
+            Torrents::dir("$dir/home/.hidden", "$dir/home");
+        });
+        check($hidden !== null && strpos($hidden, 'hidden folder') !== false, 'a hidden (dot-prefixed) folder was accepted as --dir: ' . $hidden);
+        check(Torrents::dir("$dir/home/data", "$dir/home") === realpath("$dir/home/data"), 'an ordinary data folder must still be accepted');
+        testRmTree($dir);
+        // TorrentsSafety::dirDenyReason directly: a real PMSS install has ~/pikkumies physically INSIDE
+        // $HOME, so the "escapes $HOME" check above never fires for it; the deny reason is tested on its own.
+        $pm = Config::root();
+        check(TorrentsSafety::dirDenyReason($pm, dirname($pm)) !== '', "Pikkumies' own tree was not denied: " . var_export(TorrentsSafety::dirDenyReason($pm, dirname($pm)), true));
+        check(strpos(TorrentsSafety::dirDenyReason($pm, dirname($pm)), "Pikkumies' own folder") !== false, 'wrong deny reason for the Pikkumies tree');
+        check(TorrentsSafety::dirDenyReason(dirname($pm) . '/data', dirname($pm)) === '', 'an ordinary sibling folder must not be denied');
+    },
 ];

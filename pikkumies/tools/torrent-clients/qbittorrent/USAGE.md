@@ -18,6 +18,7 @@ The user's own qBittorrent through its WebUI API v2 on 127.0.0.1 (port from `~/.
 | limit | `[--down <rate>] [--up <rate>]` | yes | No option: `down_limit`, `up_limit` (bytes/s, 0 = none). With options: sets the global limits, reads them back (`was`, `asked`, `verified`; qBittorrent keeps whole KiB/s) and says `alt_speed`: when alternative limits are on, those are the ones changed. Rates: bytes/s, `512KiB/s`, `10MiB/s`; `0` = no limit. |
 | export | `<id>` | no | Saves the torrent's .torrent file as `~/pikkumies/local/state/exports/<id>.torrent` (0600) and prints only `file` (that path), `id`, `name`, `info_hash`, `bytes`, `sha256`, `private`, `trackers`, `source`. Read from qBittorrent itself (`torrents/export`, qBittorrent 4.5 and later), else `BT_backup/<id>.torrent`, which may hold no tracker (`trackers: false`); the info-hash is computed again from the file and must equal the id, or nothing is written. The file holds the tracker URLs with their passkeys: never print or paste it. |
 | login | | yes | Run by the user in a terminal: reads the WebUI password without echo, tries it once, and keeps it for this tool in `pikkumies/local/secrets/qbittorrent` (mode 0600). Nothing is kept when qBittorrent rejects it. Refuses when not run in a terminal, and on PMSS before asking when no WebUI password has been chosen yet (the panel asks for one on qBittorrent start or restart). |
+| repath | `<id>... --to <dir>` | yes | Points the torrent at a folder that already holds its data (checked file by file, exact size; refused otherwise). `--to` must already be a real folder inside your home. No data is moved: the .torrent is exported, the torrent removed keeping its files, re-added paused with `savepath` = `--to`, its category and tags restored, then rechecked, then resumed only when it was not paused before. Refused when the torrent has no metadata yet to export (a magnet still fetching). |
 
 ```sh
 Q=~/pikkumies/tools/torrent-clients/qbittorrent/qbittorrent.php
@@ -38,6 +39,7 @@ php $Q recheck 3f2a9c1b
 php $Q reannounce 3f2a9c1b 77d0e2aa
 php $Q limit
 php $Q limit --down 0 --up 10MiB/s
+php $Q repath 3f2a9c1b --to ~/data/moved     # the data must already be at ~/data/moved, every file, exact size
 ```
 
 - Ids are the 40-character ids `list` prints: qBittorrent's own id, which for v2 and hybrid torrents is the v2 info-hash cut to 40 characters. To find one by name: `list --search <text>`.

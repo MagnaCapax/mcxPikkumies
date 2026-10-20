@@ -43,7 +43,7 @@ if ($s['auth'] && (!isset($_COOKIE['SID']) || $_COOKIE['SID'] !== 'fakesid')) {
 }
 $v5 = version_compare($s['api'], '2.11', '>=');
 $writes = ['torrents/stop', 'torrents/start', 'torrents/pause', 'torrents/resume', 'torrents/delete', 'torrents/add', 'torrents/recheck',
-    'torrents/reannounce',
+    'torrents/reannounce', 'torrents/setCategory', 'torrents/addTags',
     'transfer/setDownloadLimit', 'transfer/setUploadLimit'];
 if (in_array($api, $writes, true) !== ($method === 'POST')) {
     $done(405, 'Method Not Allowed');
@@ -90,6 +90,29 @@ switch ($api) {
         }
         $out = array_slice($out, isset($in['offset']) ? (int) $in['offset'] : 0, isset($in['limit']) ? (int) $in['limit'] : null);
         $done(200, $out, true);
+    case 'torrents/export': // GET, application/x-bittorrent bytes (qBittorrent master torrentscontroller.cpp exportAction())
+        $i = $find(isset($in['hash']) ? $in['hash'] : '');
+        if ($i < 0) {
+            $done(404, 'Not Found');
+        }
+        if (!empty($s['torrents'][$i]['no_metadata'])) {
+            $done(409, 'Conflict');
+        }
+        $done(200, isset($s['torrents'][$i]['torrent_file']) ? $s['torrents'][$i]['torrent_file'] : 'd4:infod4:name1:x6:lengthi1eee');
+    case 'torrents/setCategory':
+        foreach ($hashes as $h) {
+            if (($i = $find($h)) >= 0) {
+                $s['torrents'][$i]['category'] = isset($in['category']) ? $in['category'] : '';
+            }
+        }
+        $done(200, '');
+    case 'torrents/addTags':
+        foreach ($hashes as $h) {
+            if (($i = $find($h)) >= 0) {
+                $s['torrents'][$i]['tags'] = isset($in['tags']) ? $in['tags'] : '';
+            }
+        }
+        $done(200, '');
     case 'torrents/properties':
     case 'torrents/files':
     case 'torrents/trackers':
@@ -148,6 +171,9 @@ switch ($api) {
         }));
         $done(200, '');
     case 'torrents/add':
+        if (!empty($s['add_fails'])) { // test knob: simulate a re-add failure after a repath's remove already succeeded
+            $done(409, '');
+        }
         $new = [];
         if (!empty($_POST['urls']) && preg_match('/btih:([0-9a-fA-F]{40})/', $_POST['urls'], $m)) {
             $new[] = [strtolower($m[1]), 'magnet torrent'];

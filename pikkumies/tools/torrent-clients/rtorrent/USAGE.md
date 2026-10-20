@@ -17,6 +17,7 @@ The user's own rTorrent through its SCGI socket (XML-RPC): `~/.rtorrent.socket` 
 | reannounce | `<id>...` | yes | `d.tracker_announce` per torrent (ruTorrent's update trackers; not the forced one), then each state read once right after the request (the status line says `read_back`: requested; state right after request, the client finishes in the background), and `message` (the torrent's tracker text, `null` when there is none). |
 | limit | `[--down <rate>] [--up <rate>]` | yes | No option: `down_limit`, `up_limit` (bytes/s, 0 = none). With options: sets rTorrent's global limits in whole KiB/s (1 to 1023 B/s is refused: rTorrent would read it as no limit), reads them back (`was`, `asked`, `verified`) and says `persists: false`: a restart brings back the rc file's limits. On PMSS the up limit can be the account's upload cap, which the rc file and the PMSS watchdog set again, so a changed up limit may not stay (the record's `note`). Rates: bytes/s, `512KiB/s`, `10MiB/s`; `0` = no limit. |
 | export | `<id>` | no | Saves the torrent's .torrent file as `~/pikkumies/local/state/exports/<id>.torrent` (0600) and prints only `file` (that path), `id`, `name`, `info_hash`, `bytes`, `sha256`, `private`, `trackers`, `source`. Read from the session folder (`session.path`; `<INFO-HASH>.torrent`); the info-hash is computed again from the file and must equal the id, or nothing is written. The file holds the tracker URLs with their passkeys: never print or paste it. |
+| repath | `<id>... --to <dir>` | yes | Points the torrent at a folder that already holds its data (checked file by file, exact size; refused otherwise). `--to` must already be a real folder inside your home, as `add --dir` requires. `d.stop`, `d.directory_base.set` (never renames or nests the data, unlike `d.directory.set`), `d.check_hash`, then `d.start` only when it was started before. Prints `directory` read back and `verified`. Does not move any file itself: copy or move the data to `--to` first (`tools/torrent-clients/session-rewrite/README.md` explains why this exists, including account renames). |
 
 ```sh
 R=~/pikkumies/tools/torrent-clients/rtorrent/rtorrent.php
@@ -36,6 +37,7 @@ php $R recheck 3f2a9c1b
 php $R reannounce 3f2a9c1b 77d0e2aa
 php $R limit
 php $R limit --down 0 --up 10MiB/s
+php $R repath 3f2a9c1b --to ~/data/moved     # the data must already be at ~/data/moved, every file, exact size
 ```
 
 - Ids are the 40-character ids `list` prints (rTorrent's info-hash, lower case). To find one by name: `list --search <text>`.
