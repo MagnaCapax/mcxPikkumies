@@ -76,7 +76,8 @@ class HookPayload
             return strlen($b) - strlen($a);
         });
         $sep = '\s;&|()<>\'"`';
-        $re = '~(?<![^' . $sep . '])(?:[^' . $sep . ']*/)?pikkumies[ \t]+(' . implode('|', array_map(function ($n) {
+        // Spaces, tabs, line breaks and backslashes between the words: a backslash-newline continues the line in the shell.
+        $re = '~(?<![^' . $sep . '])(?:[^' . $sep . ']*/)?pikkumies(?:[ \t\r\n]|\\\\)+(' . implode('|', array_map(function ($n) {
             return preg_quote($n, '~');
         }, $names)) . ')(?=[' . $sep . ']|$)~';
         $rewrite = function ($text) use ($re, $scripts) {

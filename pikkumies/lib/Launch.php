@@ -121,8 +121,15 @@ class Launch
     public static function toolScripts()
     {
         $out = [];
+        $seen = [];
         foreach (Units::all() as $u) {
-            if (preg_match('/^[a-z0-9][a-z0-9-]*$/D', $u['name']) === 1 && $u['script'] !== '' && ($real = realpath($u['script'])) !== false) {
+            // A broken unit, or a name two units share, resolves to nothing: the words stay a prompt, never a guessed script.
+            if (isset($seen[$u['name']])) {
+                unset($out[$u['name']]);
+                continue;
+            }
+            $seen[$u['name']] = true;
+            if (!$u['errors'] && preg_match('/^[a-z0-9][a-z0-9-]*$/D', $u['name']) === 1 && $u['script'] !== '' && ($real = realpath($u['script'])) !== false) {
                 $out[$u['name']] = $real;
             }
         }

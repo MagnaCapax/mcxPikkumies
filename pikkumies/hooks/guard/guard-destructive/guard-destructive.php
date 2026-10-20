@@ -102,7 +102,8 @@ if ($fileTool) {
         exit(0);
     }
     foreach (array_merge([$command], $named) as $target) {
-        $keyHit = GuardKeyFiles::checkKeys($tool, $input, guardTexts($target), $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
+        $keyHit = GuardKeyFiles::checkKeys($tool, $input, guardTexts($target), $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local')
+            ?: GuardKeyFiles::checkStateDirs(guardTexts($target), $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
         if ($keyHit !== null) {
             echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $keyHit. Not run."]) . "\n";
             exit(0);
@@ -205,7 +206,8 @@ if ($disk !== null) {
     exit(0);
 }
 // The media apps' logins after the stored-password and AI-key rules above, so those keep their own reason.
-$keyHit = GuardKeyFiles::checkKeys($tool, $input, $texts, $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
+$keyHit = GuardKeyFiles::checkKeys($tool, $input, $texts, $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local')
+    ?: GuardKeyFiles::checkStateDirs($texts, $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
 if ($keyHit !== null) {
     echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $keyHit. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
     exit(0);

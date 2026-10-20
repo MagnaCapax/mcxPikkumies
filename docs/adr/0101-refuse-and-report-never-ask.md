@@ -64,3 +64,6 @@ What was checked in Hermes (v0.22.2, the newest stable tag, which Pikkumies inst
 - A content search from the home folder that excluded only the media logins is now refused too; it must exclude the key files as well, or search a subfolder.
 - Out of sight, as before: a name built in a variable or in code, and a program that reads files by itself. A safety prompt, not security (AGENTS.md).
 - Tests: `tests/KeyGuardTest.php`, `tests/HookGuardMediaCredentialsTest.php`, `tests/ProviderKeyFileModeTest.php`, `tests/HookGuardDiskTest.php`.
+
+## Amendment 2026-10-20: the records are guarded by path, not only by name
+A CWE review of the scheduled-job record found that guard-destructive's name rule (`state/ask`, `state/halt` in the command text) missed a relative write from inside the folder (the payload's cwd), a `cd` by glob and a glob path, so the agent could forge a record and with it the evidence for a scheduled job. `GuardKeyFiles::checkStateDirs` now refuses those three ways for both folders, with the key guard's own path resolution. A path built in a variable or by a program stays out of sight: the records remain a safety record, not a security boundary.

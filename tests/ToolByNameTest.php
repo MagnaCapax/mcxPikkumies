@@ -72,6 +72,8 @@ return [
             '"pikkumies" feedback send ab12' => 'php /p/feedback.php send ab12',
             'pikk\\umies feedback send ab12' => 'php /p/feedback.php send ab12',
             "pikkumies 'feedback' send ab12" => 'php /p/feedback.php send ab12',
+            "pikkumies \\\nfeedback send ab12" => 'php /p/feedback.php send ab12',
+            "pikkumies\tfeedback send ab12" => 'php /p/feedback.php send ab12',
             'pikkumies feedbackx send' => 'pikkumies feedbackx send',
             'pikkumies why is my disk full' => 'pikkumies why is my disk full',
             'xpikkumies feedback send' => 'xpikkumies feedback send',

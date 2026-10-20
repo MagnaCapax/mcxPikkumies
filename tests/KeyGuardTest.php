@@ -69,4 +69,23 @@ return [
             }
         }
     },
+    'key guard: the records of what the user asked are refused by a relative path, a cd, the payload cwd or a glob (ADR-0101)' => function () {
+        $home = sys_get_temp_dir() . '/pk-kg-' . getmypid() . '/home';
+        @mkdir("$home/pikkumies/local/state/ask", 0700, true);
+        @mkdir("$home/pikkumies/local/state/halt", 0700, true);
+        $rows = [
+            ['printf x > jobs.json', 'block', "$home/pikkumies/local/state/ask"],
+            ['cd ~/pikkumies/local/state/a* && printf x > jobs.json', 'block'],
+            ['cat ~/pikkumies/local/state/a*/jobs.json', 'block'],
+            ['cp /tmp/forged ~/pikkumies/local/state/as?/jobs.json', 'block'],
+            ['cd ~/pikkumies/local && echo x > state/halt/s.json', 'block'],
+            ['cd ~/pikkumies/local/state && cat ask/jobs.json', 'block'],
+            ['ls ~/*', 'none'], ['ls ~/pikkumies/local/state', 'none'], ['cat ~/subfolder/notes.txt', 'none'],
+        ];
+        foreach ($rows as $r) {
+            $got = keyGuardAnswer('terminal', ['command' => $r[0]], isset($r[2]) ? $r[2] : '');
+            check($got === $r[1], "{$r[0]}: expected {$r[1]}, got $got");
+        }
+        check(keyGuardAnswer('write_file', ['path' => 'jobs.json', 'content' => '{}'], "$home/pikkumies/local/state/ask") === 'block', 'write_file of a relative jobs.json inside the ask folder');
+    },
 ];
