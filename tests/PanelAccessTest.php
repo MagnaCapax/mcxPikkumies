@@ -164,7 +164,8 @@ return [
                 skip('flock(1) not installed; the in-process holder above covered the lock');
             }
             $bytes = file_get_contents($file);
-            $p = proc_open([$flock, '-w', '10', "$file.lock", '-c', 'sleep 3'], [], $pipes);
+            $p = proc_open(escapeshellarg($flock) . ' -w 10 ' . escapeshellarg("$file.lock") . ' -c ' . escapeshellarg('sleep 3'), [], $pipes);
+            check(is_resource($p), 'flock(1) holder did not start');
             $probe = fopen("$file.lock", 'c');
             for ($i = 0; $i < 50 && flock($probe, LOCK_EX | LOCK_NB); $i++) { // wait until flock(1) holds it
                 flock($probe, LOCK_UN);

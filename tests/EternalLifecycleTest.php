@@ -193,6 +193,10 @@ return [
         try {
             testWithEnv(['PATH' => $root], function () use ($runner) {
                 list($code, $out) = runPhp($runner, ['tmux']);
+                // PHP 7.3 prints the included executable's shebang before its output.
+                if (strpos($out, "#!/usr/bin/env php\n") === 0) {
+                    $out = substr($out, strlen("#!/usr/bin/env php\n"));
+                }
                 // Exact 8b17c97 tmux-not-installed output; kept inline for shallow CI checkouts.
                 $upstream = 'tmux is not installed on this machine. Plain `pikkumies` starts a session without it; install tmux (or ask your provider) to use `pikkumies tmux`.' . "\n";
                 check($code === 1 && $out === $upstream, 'markerless tmux guidance differs from 8b17c97: ' . $out);

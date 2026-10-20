@@ -81,7 +81,12 @@ return [
         putenv("HOME=$home");
         try {
             $r = Detect::resources();
-            check($r['disk'] === Quota::fields($home), 'resources()[\'disk\'] must be exactly Quota::fields($home): ' . json_encode($r));
+            $quotaFields = Quota::fields($home);
+            $diskFields = $r['disk'];
+            // Free space can change between the two probes as other processes write files.
+            unset($quotaFields['fs_free_bytes'], $diskFields['fs_free_bytes']);
+            check($diskFields === $quotaFields && is_int($r['disk']['fs_free_bytes']),
+                'resources()[\'disk\'] must use Quota::fields($home): ' . json_encode($r));
             check($r['homeTotalGb'] === round(disk_total_space($home) / 1073741824, 1), 'homeTotalGb must be disk_total_space($home) in GiB: '
                 . json_encode($r));
             check(is_int($r['cpus']) && $r['cpus'] >= 0, 'cpus must be a non-negative int: ' . json_encode($r));

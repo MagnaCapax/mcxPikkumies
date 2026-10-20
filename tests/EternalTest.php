@@ -288,10 +288,15 @@ return [
         $path = $dir . '/state.lock';
         $lock = EternalLock::take($path);
         check(is_resource($lock), 'lock not acquired');
-        $process = proc_open('sleep 2', [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $process = proc_open('exec sleep 2', [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
         try {
             check(is_resource($process), 'child did not start');
             $status = proc_get_status($process);
+            // proc_open returns while its shell may still hold inherited fds before exec.
+            for ($i = 0; $i < 100 && trim((string) @file_get_contents('/proc/' . $status['pid'] . '/comm')) !== 'sleep'; $i++) {
+                usleep(10000);
+            }
+            check(trim((string) @file_get_contents('/proc/' . $status['pid'] . '/comm')) === 'sleep', 'child did not exec sleep');
             $fds = glob('/proc/' . $status['pid'] . '/fd/*');
             check(is_array($fds), 'child fds could not be read');
             foreach ($fds as $fd) {
