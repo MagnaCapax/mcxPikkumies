@@ -7,12 +7,12 @@ class EternalAsk
         return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]|\xC2[\x80-\x9F]/', '', $text);
     }
 
-    public static function send($text, $nonce = '')
+    public static function send($text, $nonce = '', $uid = null)
     {
         if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
             return [1, 'Primary is not enabled on this host.'];
         }
-        if (self::rootRefused(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
+        if (self::rootRefused($uid !== null ? $uid : (function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()))) {
             return [1, 'Ask runs as the account owner, not root.'];
         }
         $text = trim(self::clean($text));
@@ -71,7 +71,8 @@ class EternalAsk
         if (!self::cancelCopyMode($paneParts[2])) {
             return [1, 'Could not send to Primary.'];
         }
-        $process = @proc_open(implode(' ', array_map('escapeshellarg', array_merge(['timeout', '5'], Eternal::tmuxArgv(['load-buffer', '-'])))), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $buffer = 'pkask-' . bin2hex(random_bytes(8));
+        $process = @proc_open(implode(' ', array_map('escapeshellarg', array_merge(['timeout', '5'], Eternal::tmuxArgv(['load-buffer', '-b', $buffer, '-'])))), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (!is_resource($process)) {
             return [1, 'Could not send to Primary.'];
         }
@@ -79,8 +80,12 @@ class EternalAsk
         fclose($pipes[0]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        if (proc_close($process) !== 0 || Eternal::tmux(['paste-buffer', '-p', '-d', '-t', '=pikkumies:pm1'])[0] !== 0
-            || Eternal::tmux(['send-keys', '-t', '=pikkumies:pm1', 'Enter'])[0] !== 0) {
+        $loaded = proc_close($process) === 0;
+        $pasted = $loaded && Eternal::tmux(['paste-buffer', '-p', '-d', '-b', $buffer, '-t', '=pikkumies:pm1'])[0] === 0;
+        if (!$loaded || !$pasted || Eternal::tmux(['send-keys', '-t', '=pikkumies:pm1', 'Enter'])[0] !== 0) {
+            if (!$pasted) {
+                Eternal::tmux(['delete-buffer', '-b', $buffer]);
+            }
             return [1, 'Could not send to Primary.'];
         }
         $state['count']++;
