@@ -166,8 +166,9 @@ return [
         }
         foreach (['../../etc/x y?.txt' => 'x y_.txt', '.hidden.log' => 'hidden.log', 'ä€ö.pdf' => '_.pdf', str_repeat('n', 150) . '.txt' => str_repeat('n', 96) . '.txt'] as $name => $want) {
             $f = $make('src.' . pathinfo($name, PATHINFO_EXTENSION), pathinfo($name, PATHINFO_EXTENSION) === 'pdf' ? '%PDF-1.4' : 'x');
-            rename($f, $dir . '/' . basename($name));
-            $a = TicketDraft::attachment($dir . '/' . basename($name));
+            $base = substr((string) strrchr('/' . $name, '/'), 1); // not basename(): locale-dependent before PHP 8
+            rename($f, "$dir/$base");
+            $a = TicketDraft::attachment("$dir/$base");
             check($a['name'] === $want && preg_match('/^[A-Za-z0-9._ -]+$/', $a['name']), json_encode($name) . ' -> ' . json_encode($a['name']));
         }
         testRmTree($dir);

@@ -125,7 +125,10 @@ class TicketDraft
             throw new CliError("$path is not a file of this account (a symlink, a folder, another account's or missing)",
                 'attach only files the user named; copy another account\'s file into the home first');
         }
-        $name = trim(ltrim((string) preg_replace('/[^A-Za-z0-9._ -]+/', '_', basename($path)), ' .'));
+        // The part after the last slash, not basename(): before PHP 8 basename() follows the locale and drops leading
+        // multibyte characters in the C locale ("ä€ö.pdf" became ".pdf" on PHP 7.3).
+        $base = substr((string) strrchr('/' . $path, '/'), 1);
+        $name = trim(ltrim((string) preg_replace('/[^A-Za-z0-9._ -]+/', '_', $base), ' .'));
         $ext = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
             throw new CliError("$path: only " . implode(', ', array_keys(self::TYPES)) . ' files can be attached', 'save it as one of those, or leave it out');
