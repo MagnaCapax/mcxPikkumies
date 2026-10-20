@@ -121,11 +121,16 @@ class HaltState
 
     /**
      * One JSONL line per halt-guard decision, local/logs/halt-guard/YYYYMMDD.jsonl (0700/0600), never
-     * the transcript or the final answer: {ts, session_id, source, attempt, verdict, questions}.
+     * the transcript or the final answer: {ts, session_id, source, attempt, verdict, questions, deferral, final_attempt}.
+     * deferral (ADR-0102): the fixed class, antipattern id and note of each question that continued the turn
+     * (HaltJudge::deferrals), or the caller's own fixed entries in $verdict['deferral'] (the clarify block); never model
+     * or transcript text. final_attempt: this was the last continue the guard may send for the turn.
      * A new day's file prunes files older than $retentionDays (0 = keep forever, matching the command log).
      */
-    public static function logDecision($sessionId, $source, $attempt, array $verdict, $retentionDays = 0)
+    public static function logDecision($sessionId, $source, $attempt, array $verdict, $retentionDays = 0, $finalAttempt = false)
     {
+        require_once __DIR__ . '/HaltJudge.php';
+        $deferral = isset($verdict['deferral']) && is_array($verdict['deferral']) ? $verdict['deferral'] : HaltJudge::deferrals($verdict);
         $dir = Config::localDir() . '/logs/halt-guard';
         if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
             return;
@@ -134,7 +139,8 @@ class HaltState
         $new = !is_file($file);
         $rec = ['ts' => gmdate('Y-m-d\TH:i:s\Z'), 'session_id' => (string) $sessionId, 'source' => (string) $source,
             'attempt' => (int) $attempt, 'verdict' => isset($verdict['verdict']) ? $verdict['verdict'] : '',
-            'questions' => isset($verdict['answers']) && is_array($verdict['answers']) ? $verdict['answers'] : []];
+            'questions' => isset($verdict['answers']) && is_array($verdict['answers']) ? $verdict['answers'] : [],
+            'deferral' => $deferral, 'final_attempt' => (bool) $finalAttempt];
         $old = umask(0077);
         @file_put_contents($file, json_encode($rec, JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
         umask($old);

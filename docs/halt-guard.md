@@ -34,6 +34,16 @@ If Pikkumies already writes a Hermes `auxiliary.*` setting for this provider (it
 
 Right after each judge call, both the hook and the one-shot wrapper also run the common-mistakes check (`lib/Antipatterns.php`, [ADR-0088](adr/0088-common-mistakes-list-and-check.md)): a continue or wrap-up message gets its matching fixed lines appended, no extra turn. A verdict that would otherwise send nothing gets one resume with the fixed correction text instead, using this same run's one wrap-up slot, so the 3-continues-plus-one-wrap-up bound above is unchanged. `antipatterns.disabled` turns this off everywhere it runs; `antipatterns.resume` turns off only that one-shot resume.
 
+## Deferral log
+
+Each time the guard keeps a turn going because the agent deferred work, it notes why ([ADR-0102](adr/0102-deferral-log-and-nudge.md)), so the deferrals can be counted and classified without reading anyone's conversation.
+
+- **Where:** in the decision log, `local/logs/halt-guard/YYYYMMDD.jsonl` (0700/0600), on this machine only; nothing is sent.
+- **Fields:** `deferral`, a list of `{class, slug, note}`, one per question that continued the turn: `work-not-done` (Q3), `asked-permission-for-the-task` (Q4), `failure-unaddressed` (Q5), `listed-own-next-steps` (Q6) and `offered-or-handed-back` (Q9). `slug` is the matching entry in `doctrine/antipatterns.md`, and `note` is a fixed sentence of at most 75 words. A blocked `clarify` call (source `clarify`) is logged as `asked-user-to-decide`. `final_attempt` is true on the last continue the guard may send for that turn. No transcript, final answer or model text is ever written.
+- **Retention:** like the rest of the decision log, `sessions.retentionDays` (0 keeps it forever).
+- **Off:** with `halt.disabled`, together with the guard.
+- **The nudge:** every continue message, and the clarify block, ends with the same method sentence: investigate first (the tool's docs and usage, memory, a read-only check), attack the plan (what could go wrong, how it is undone), iterate until it holds, and do it.
+
 ## See also
 
 - `hooks/halt/halt-snapshot/README.md`, `hooks/halt/halt-guard/README.md`: what each hook unit does.

@@ -41,8 +41,41 @@ class HaltJudge
         9 => 'The answer offered to do or check something, or handed a step to the user, instead of doing it, or said it should work without checking: do it or check it yourself now, back up anything you change first, and report what the check showed.',
     ];
 
+    // How to get unstuck without asking (ADR-0102): appended to every continue through CONTINUE_RULE, and to the clarify block.
+    const METHOD = 'Instead of asking: investigate first (the tool\'s own docs and usage, memory, a read-only check), then attack your plan (what could go wrong, how it is undone), iterate until it holds, and do it.';
+
     // The request bounds every continue, whatever the answers were; a how-to question about this account counts when the change can be undone (ADR-0073).
-    const CONTINUE_RULE = 'Do only what is still missing from what the user asked for (a question about how to do something in this account counts, when the change can be undone); do not repeat steps that already succeeded, and do not change the user\'s config, services or data beyond that request; never work around a refusal from a Pikkumies tool or safety check.';
+    const CONTINUE_RULE = 'Do only what is still missing from what the user asked for (a question about how to do something in this account counts, when the change can be undone); do not repeat steps that already succeeded, and do not change the user\'s config, services or data beyond that request; never work around a refusal from a Pikkumies tool or safety check. ' . self::METHOD;
+
+    /**
+     * The deferral log (ADR-0102): for each question that continues a turn, [class, antipattern id, note]. Fixed PHP
+     * text of at most 75 words, enough to classify the deferral and never the specifics: no transcript or model text.
+     */
+    const DEFERRAL_CLASSES = [
+        3 => ['work-not-done', 'done-without-receipts', 'The turn ended while the evidence did not show the requested work carried out: the agent stopped short of the task or claimed it without a check.'],
+        4 => ['asked-permission-for-the-task', 'asked-permission-for-the-task', 'The answer asked the user to approve, choose or confirm a step of the requested work that the agent could decide and do itself, or said it would do it later.'],
+        5 => ['failure-unaddressed', 'exit-status-lost', 'A command failed and the answer neither fixed it nor said why it cannot be fixed.'],
+        6 => ['listed-own-next-steps', 'plan-instead-of-doing', 'The answer listed next steps of the requested work that the agent could take itself, instead of taking them.'],
+        9 => ['offered-or-handed-back', 'answered-not-done', 'The answer offered to do or check something, or handed the user a step, instead of doing it, or said it should work without a check.'],
+    ];
+
+    /** The deferral classes of a continue verdict's answers (ADR-0102), in question order; [] for any other verdict. */
+    public static function deferrals(array $verdict)
+    {
+        if (!isset($verdict['verdict']) || $verdict['verdict'] !== 'continue' || !isset($verdict['answers']) || !is_array($verdict['answers'])) {
+            return [];
+        }
+        $a = $verdict['answers'];
+        $triggers = isset($a['Q2']) && $a['Q2'] === 'yes' ? [3 => 'no', 4 => 'yes', 5 => 'yes', 6 => 'yes', 9 => 'yes'] : [9 => 'yes'];
+        $out = [];
+        foreach ($triggers as $n => $trigger) {
+            if (isset($a['Q' . $n]) && $a['Q' . $n] === $trigger) {
+                list($class, $slug, $note) = self::DEFERRAL_CLASSES[$n];
+                $out[] = ['class' => $class, 'slug' => $slug, 'note' => $note];
+            }
+        }
+        return $out;
+    }
 
     const WRAPUP = 'Before you finish: if this task taught you something worth keeping, save it as a lesson in memory. '
         . 'Then end with one short idea that could help the user with their setup, as a plain suggestion, not a question that waits for an answer; if nothing useful comes to mind, name one light, fun topic. Keep both brief.';

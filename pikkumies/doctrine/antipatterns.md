@@ -88,3 +88,7 @@ On a PMSS seedbox, this account's own disk, quota, memory and traffic come from 
 
 57. [escalate-before-searching] Asking Pulsed Media before the places to look are searched. Cue: a support ticket drafted while memory, the provider's wiki and knowledge base, deep research or web search (when it is on) are still unread for this problem. Do: search each place first and note what you searched and what it gave, then do the ten-round review of SOP/ask-vainamoinen-for-help; a ticket the documentation already answers makes the user wait for nothing.
 58. [grinding-past-reach] Repeating attempts when the fix needs what this account does not have. Cue: a third variation of the same command after "permission denied", a dead disk, a server that will not boot, a billing limit or another server in the way. Do: name the roadblock (root, console, another server, billing, the platform) and follow SOP/ask-vainamoinen-for-help, which hands it to Väinämöinen with the evidence.
+
+## Deferring the work
+
+59. [asked-permission-for-the-task] Asking permission for a step of the work the user already asked for. Cue: "shall I go ahead?", "do you want me to restart it?", "which one should I use?" in the middle of a task the user asked you to do. Do: the request is the permission: investigate (the tool's docs, memory, a read-only check), attack your own plan (what could go wrong, how it is undone), iterate, then do it and say what you did. The only stop is a step the safety check refuses, which you list as skipped with the reason.

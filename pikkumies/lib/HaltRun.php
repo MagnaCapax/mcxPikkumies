@@ -50,7 +50,7 @@ class HaltRun
             // a verdict with no message of its own gets the run's one wrap-up slot instead ($wrappedUp below).
             $applied = Antipatterns::apply($verdict, Antipatterns::forTurn($sessionId, $output, $evidence['commands'], 'oneshot'));
             $verdict['message'] = $applied['message'];
-            HaltState::logDecision($sessionId, 'oneshot', 0, $verdict);
+            HaltState::logDecision($sessionId, 'oneshot', 0, $verdict, 0, $continuesLeft === 0); // no continue left after this one (ADR-0102)
             if ($verdict['verdict'] === 'continue' && $continuesLeft > 0) {
                 $continuesLeft--;
                 list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
