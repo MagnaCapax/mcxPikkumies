@@ -26,7 +26,7 @@ php $D list --search "ubuntu"
 php $D show 3f2a9c1b --human
 php $D add "magnet:?xt=urn:btih:..." --dir ~/data/linux
 php $D pause 3f2a9c1b 77d0e2aa
-php $D show 3f2a9c1b0d6e... --files          # show the user the files and the expect value
+php $D show 3f2a9c1b0d6e... --files          # the files and the expect value, said in your message
 php $D remove 3f2a9c1b0d6e... --with-data --expect 41.2GiB:44236814336
 php $D stats --human
 php $D list --sort size --limit 10

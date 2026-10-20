@@ -23,7 +23,7 @@ The user's own Whisparr, v2 or v3, through its API on 127.0.0.1 (`/api/v3` under
 W=~/pikkumies/tools/arr/whisparr/whisparr.php
 php $W stats --human
 php $W list --search "studio"
-php $W show 12 --files --limit 0         # show the user every file and the expect value
+php $W show 12 --files --limit 0         # every file and the expect value, said in your message
 php $W remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $W wanted --limit 50
 php $W login-check

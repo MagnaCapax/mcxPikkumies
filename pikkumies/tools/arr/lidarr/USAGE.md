@@ -27,7 +27,7 @@ php $L list --search "radio"
 php $L lookup "artist name"
 php $L add mbid:<id from lookup> --profile Lossless
 php $L stats --human
-php $L show 12 --files --limit 0         # show the user every file and the expect value
+php $L show 12 --files --limit 0         # every file and the expect value, said in your message
 php $L remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $L wanted --limit 50
 php $L login-check

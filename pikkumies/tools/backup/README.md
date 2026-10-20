@@ -17,7 +17,7 @@ Tools for snapshot backups in the user's own repository: `restic` and `borg`, on
 | check | `[--read-data] [--read-data-subset P]` | no | Repository check, metadata only unless `--read-data`, at the lowest CPU and disk priority. `errors_found` only when the program reports damage; `finished: false` when the check stopped early (lock, network, login, an option the version lacks) and so says nothing about damage. Never repairs. |
 | backup | `<path>...` | yes | A new snapshot of paths inside the home, at the lowest CPU and disk priority, one job per account at a time. |
 | restore | `<id> --target <new-dir> [--include /path]` | yes | Restores into a new or empty directory inside the home, never into a FUSE mount, never over existing files. |
-| prune | `--keep-... --expect <n>` | deletes | Removes the snapshots the keep policy no longer keeps and frees their space. Refuses unless `n` equals the count of a fresh plan. Asks the user first. |
+| prune | `--keep-... --expect <n>` | deletes | Removes the snapshots the keep policy no longer keeps and frees their space. Refuses unless `n` equals the count of a fresh plan. The safety check decides (doctrine/safety.md). |
 
 Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-weekly N`, `--keep-monthly N`, `--keep-yearly N`, `--keep-within 30d` (H, d, w, m, y). At least one is required.
 
@@ -37,7 +37,7 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 ## Removing snapshots
 
 1. `show --prune-plan --keep-daily 7 --keep-weekly 4` lists the snapshots that would go and the `expect` value. It changes nothing (it runs `restic forget --dry-run` or `borg prune --dry-run`).
-2. `prune --keep-daily 7 --keep-weekly 4 --expect <n>` rebuilds the plan, refuses when the count differs, and removes exactly the planned snapshots by id (restic `forget <ids>` then `prune`; borg `delete :: <names>` then `compact` on 1.2+). The delete guard asks the user once for the whole batch (`prune` after `php`, [ADR-0020](../../../docs/adr/0020-deletes-need-the-users-approval.md)).
+2. `prune --keep-daily 7 --keep-weekly 4 --expect <n>` rebuilds the plan, refuses when the count differs, and removes exactly the planned snapshots by id (restic `forget <ids>` then `prune`; borg `delete :: <names>` then `compact` on 1.2+). The whole batch goes through the safety check once (`prune` after `php` is a delete for the guard, [ADR-0101](../../../docs/adr/0101-refuse-and-report-never-ask.md)).
 3. The records name what was removed; `verified` says none of them is listed any more.
 
 ## Restoring
@@ -53,5 +53,5 @@ Keep options: `--keep-last N`, `--keep-hourly N`, `--keep-daily N`, `--keep-week
 
 ## Not here
 
-- Kopia and Duplicacy: later, when a user has the binary (neither is shipped by PMSS). The delete guard already asks before `kopia snapshot expire|delete` and `duplicacy prune`.
-- `init` of a new repository, `unlock`, `key` changes, `check --repair`: the user's own decisions, run by hand. RAID is not a backup (PM wiki features:617).
+- Kopia and Duplicacy: later, when a user has the binary (neither is shipped by PMSS). The delete guard already sends `kopia snapshot expire|delete` and `duplicacy prune` to the safety check.
+- `init` of a new repository (its password is the user's own, typed in their terminal), `unlock`, `key` changes, `check --repair`: not verbs of these tools; run as raw commands, a repair goes through the safety check (doctrine/safety.md). RAID is not a backup (PM wiki features:617).

@@ -66,7 +66,7 @@ Most Transmission RPC servers require an `X-Transmission-Session-Id` header; the
 
 **PMSS, only while a build is selected** (`is_link("$home/bin/transmission/default")`, ADR-0108). Graceful stop of this user's own `transmission-daemon`: processes matched in `/proc` by owner uid, mount namespace and exact 15-byte-truncated `comm` ("transmission-da" -- PMSS reads it back the identical way, `etc/skel/www/transmissionLaunch.php:14-29`); SIGTERM, up to 3 s, SIGKILL only to survivors. Then the account's own shipped launcher: `php ~/www/torrentClientsResolve.php transmission --launch` -- the exact command PMSS's own watchdog cron runs for this account (`scripts/cron/transmissionInstancesCheck.php:20-22`), whose CLI tail calls `pmssTransmissionLaunch()` (`etc/skel/www/transmissionLaunch.php`): that function alone resolves the curated build, (re)writes the managed settings.json while stopped, and starts the daemon under its own `flock`. This unit never re-implements that catalog/projection resolution -- it only runs the same unprivileged entrypoint every PMSS account already has in `~/www/`.
 
-**Other hosts**: refused, "ask the provider" -- no Feral/Ultra.cc/Whatbox-specific Transmission restart instructions have been researched for this unit (unlike Deluge's and qBittorrent's units, which cite each provider's own documentation).
+**Other hosts**: refused ("restart is done by the provider here"; restart it the way that provider documents it) -- no Feral/Ultra.cc/Whatbox-specific Transmission restart instructions have been researched for this unit (unlike Deluge's and qBittorrent's units, which cite each provider's own documentation).
 
 ## Tests
 

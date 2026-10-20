@@ -27,7 +27,7 @@ php $R show 3f2a9c1b --human
 php $R add "magnet:?xt=urn:btih:..." --dir ~/data/linux
 php $R add ~/new.torrent --paused
 php $R pause 3f2a9c1b 77d0e2aa
-php $R show 3f2a9c1b0d6e... --files          # show the user the files and the expect value
+php $R show 3f2a9c1b0d6e... --files          # the files and the expect value, said in your message
 php $R remove 3f2a9c1b0d6e... --with-data --expect 41.2GiB:44236814336
 php $R stats --human
 php $R list --sort size --limit 10

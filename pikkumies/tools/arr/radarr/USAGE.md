@@ -29,7 +29,7 @@ php $T list --search "matrix"
 php $T lookup "the matrix"
 php $T add tmdb:603 --profile HD-1080p --no-search
 php $T stats --human
-php $T show 12 --files --limit 0         # show the user every file and the expect value
+php $T show 12 --files --limit 0         # every file and the expect value, said in your message
 php $T remove 12 --with-data --expect 41.2GiB:44239978905:7b5200
 php $T history --since "-2 days"
 php $T releases 12

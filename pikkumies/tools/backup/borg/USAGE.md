@@ -11,7 +11,7 @@ Archives in the user's own borg repository. Same verbs, ids and records as `rest
 | check | `[--read-data] [--read-data-subset P]` | no | `borg check`; `--read-data` adds `--verify-data` (reads everything). borg has no sampled check, so `--read-data-subset` is refused. Runs at nice 19 and idle I/O. `errors_found` is borg exit 1 (the check found problems); exit 2 is `finished` false (lock, connection, key: nothing said about damage). Never `--repair`. |
 | backup | `<path>...` | yes | `borg create ::<host>-<UTC time>Z` (e.g. `myhost-2026-10-14T12:25:58.123Z`: to the millisecond, so two runs in one second never collide) at nice 19 and idle I/O; refuses while a restic or borg job of this account runs. Reports the archive name and its stats. |
 | restore | `<id> --target <new-dir> [--include /path]` | yes | `borg extract` run inside a new or empty directory inside the home; files land under their stored path. Reads back how many entries arrived (`verified`). |
-| prune | `--keep-... --expect <n>` | deletes | Rebuilds the plan (`borg prune --dry-run --list`), refuses unless `n` matches, then `borg delete` of exactly the planned archives and `borg compact` on 1.2+. Asks the user first; reads back that they are gone (`verified`). |
+| prune | `--keep-... --expect <n>` | deletes | Rebuilds the plan (`borg prune --dry-run --list`), refuses unless `n` matches, then `borg delete` of exactly the planned archives and `borg compact` on 1.2+. The safety check decides (doctrine/safety.md); reads back that they are gone (`verified`). |
 
 ```sh
 php ~/pikkumies/tools/backup/borg/borg.php login --repo ssh://me@storagebox/./borg-repo

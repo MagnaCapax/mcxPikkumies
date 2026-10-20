@@ -9,7 +9,7 @@ This is not the `storage` category: storage is the account's space and quota and
 1. Every verb needs root (`root.available` in system-status). Without it each verb refuses with a hint; on a shared or managed server the provider watches the disks.
 2. Reading never wakes a sleeping disk (`smartctl -n standby`).
 3. Nothing writes to a disk that is mounted, used as swap, held by md, LVM, dm-crypt or multipath (sysfs `holders/`), named in `/proc/mdstat`, open by any process (`fuser`), or carrying an array or volume signature (probed with `blkid -p`). `badblocks` itself refuses only mounted devices, so the tool checks the rest (badblocks(8), `-f`).
-4. A disk with any other filesystem or partition table needs `--with-data`, which the delete guard asks the user about once: an interrupted `-n` pass can lose the block under test.
+4. A disk with any other filesystem or partition table needs `--with-data`, which the delete guard sends to the safety check: an interrupted `-n` pass can lose the block under test.
 5. Write passes are `badblocks -n` (non-destructive read-write) only; a full-disk `-w` pass and `-f` are never run. `--fix-unreadable` writes only the blocks a completed pass could not read.
 6. Only `smartctl`, `badblocks`, `blkid -p` and `fuser -s` run as root; parsing, state and every file write happen as the account.
 7. The guard refuses raw `badblocks -w`, `hdparm` writes, erases and trims, `blkdiscard`, `nvme format|sanitize|write-zeroes`, `sg_format`, `sg_sanitize`, `mkswap` on a device, output redirected, copied or tee'd onto a disk, and md `repair` (into `sync_action` or `mdadm --action=repair`).

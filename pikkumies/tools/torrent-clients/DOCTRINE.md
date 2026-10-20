@@ -1,6 +1,6 @@
 - Ids are the client's own ids as `list` prints them; names are never ids (find one with `list --search <text>`). `remove` takes full ids only.
 - No "all": every verb names its torrents.
-- Deleting data: `show <id>... --files` first, show the user the files and the `--expect` value, then `remove <id>... --with-data --expect <that value>`: one call, one approval.
+- Deleting data: `show <id>... --files` first, say the files and the `--expect` value in your message, then `remove <id>... --with-data --expect <that value>`: one call, one safety check (doctrine/safety.md).
 - The shared-file check sees only the client being called: when two clients seed the same files, check the other one before deleting with data.
 - `limit` makes one change and reads it back; give the user `was` to undo it. On PMSS the watchdog may set the upload cap again.
 - A client on another account's port is never contacted. "busy" means no answer in time: unknown, not down.
@@ -8,8 +8,8 @@
 - "Latest" means the newest release that page lists. For Ubuntu that is the newest LTS; name the newer interim release too, so the user can pick. Say which version you picked and where you read it.
 - After the download, check the file against the checksum list the publisher puts next to it (`SHA256SUMS` or the like) and report the result. No published checksum: say so.
 - Seeding uses the account's upload allowance: say so when adding large releases, and show `stats` or `traffic` if the user asks how much is left.
-- A client's config file (`.rtorrent.rc`, qBittorrent's or Deluge's settings) changes when the user asked for that change or asked how to make it on this account: back up the file, change it, check it, and say how to undo it. When `restart` refuses, tell the user why and stop: never restart by hand (marker files, the provider's restart scripts, killing the process).
+- A client's config file (`.rtorrent.rc`, qBittorrent's or Deluge's settings) changes when the user asked for that change or asked how to make it on this account: back up the file, change it, check it, and say how to undo it. When `restart` refuses, that refusal is final: say why in your answer and go on with the rest; never restart by hand (marker files, the provider's restart scripts, killing the process).
 - Moving torrents between the user's boxes is the `move` tool, run on the box that receives them. Do not hand-copy the data and then re-add and delete in the clients yourself: that skips the check that the copy is complete and seeding before the old copy goes.
-- A move frees the old box only after the torrent seeds here at 100 % under the same id, and only when the user asked for the old copy gone, in their own words: `run <move> --free-source --ids <ids> --expect <value> --intent "<their words>"`. Without that request, stop at "seeding on both boxes" and say so.
+- A move frees the old box only after the torrent seeds here at 100 % under the same id, and only when the user's request covers the old copy going (a move does, a copy does not), with their words: `run <move> --free-source --ids <ids> --expect <value> --intent "<their words>"`. Without that request, stop at "seeding on both boxes" and say so.
 - A recheck below 100 % keeps the old copy: run the move again (it copies the differences); never resume a short copy to let a private tracker fill it.
-- When the old box's key does not allow deletes, give the user the command `move` printed for that box; do not find another way in.
+- When the old box's key does not allow deletes, the old copy stays: say in your answer that it stays and why (that key was set up without `--allow-delete`); do not find another way in.

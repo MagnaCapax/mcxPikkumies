@@ -7,7 +7,7 @@ description: "Speech to text for the user's own audio or video file: a cloud Ope
 
 Use this when the user asks to transcribe one of their own audio or video files.
 
-1. **The key comes from the user, never from chat.** If `status` shows no cloud login, tell the user to run `login` in their own terminal (it prompts for the endpoint, model name and API key; the key is never echoed). Never ask for the key in the chat and never put it on a command line.
+1. **The key comes from the user, never from chat.** If `status` shows no cloud login, say in your answer that the user runs `login` once in their own terminal (it prompts for the endpoint, model name and API key; the key is never echoed). Never ask for the key in the chat and never put it on a command line.
 2. **`run <file>`** does the work: converts the file, tries the cloud endpoint first (unless `--local` is given or none is stored), and falls back to the local engine on any cloud failure. It prints the transcribed text on stdout; add `--json` for the full record (`provider`, `seconds`, `language`, `chars`, `text`).
 3. **No local engine yet?** `install-local` builds one (`--model base` is the default and smaller; `--model small` is more accurate and needs more memory and disk). It takes a while: run it when the user asked for a transcription and the cloud cannot do it, and say so first. Never run it otherwise.
 4. **`status`** shows what is ready: a cloud login (endpoint host and model, never the key), whether the local engine is installed, and whether ffmpeg was found.

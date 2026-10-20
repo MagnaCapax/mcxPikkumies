@@ -13,4 +13,4 @@ Root is one more capability layer, not a different job.
 3. Read before changing: `systemctl status <unit>`, the unit's journal, the config file.
 4. Back up any config before editing it.
 5. One change at a time; verify after each (`systemctl is-active`, the service answers).
-6. Never reboot or stop shared services on a multi-user machine without the owner's explicit yes.
+6. Never reboot or stop shared services on a multi-user machine unless the task needs it: review it first (will it come back, who uses it now), say it in one line, then do it and check that everything came back (doctrine/safety.md).

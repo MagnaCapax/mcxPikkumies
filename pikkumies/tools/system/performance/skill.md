@@ -21,7 +21,7 @@ Busy is not broken, and a slow test is no hardware verdict. Never say what suppo
 1. "Downloads from the seedbox to my PC are slow, torrents are fast" → `check --symptom slow-download` (your own session: receive window, round trip, one stream); then `net --target ssh`.
 2. "Everything is capped at the same speed whatever I do" → `check --symptom capped`: the cap's value and its effect; ticket wording only if it is lower than the plan.
 3. "My backup / rsync keeps stalling" → `check --symptom stalls`: memory status, OOM kills, memory in use against the limit; a bigger plan only when memory is the measured cause.
-4. "mtr shows 80% loss at hop 7" → `net --target ssh`, explain the rule (loss must last to the end), ask for their reverse run with the printed instructions.
+4. "mtr shows 80% loss at hop 7" → `net --target ssh`, explain the rule (loss must last to the end), give them the reverse run with the printed instructions.
 5. "Torrents are slow but the disk and network look fine" → `check --symptom torrents`, then the client's own verbs from `next_checks` (rtorrent `traffic` caps, peers).
 6. "Is the server overloaded? It got slow after the move" → `check`: server pressure ("busy is not broken"), the comparison with the previous server, the Diagnose button on PMSS. Never "oversold".
 7. "Run a speed test / benchmark my disk" → `disk` first (light, labelled); then `heavy --test disk-read` (or `download --url`, `iperf3`, `speedtest` when installed); run it; one test only.

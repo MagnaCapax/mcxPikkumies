@@ -11,7 +11,7 @@ Snapshots in the user's own restic repository. Same verbs, ids and records as `b
 | check | `[--read-data] [--read-data-subset P]` | no | `restic check`; `--read-data-subset` (`n/m`; a percentage such as `5%` needs a newer restic: 0.14.0 takes it, 0.11.0 does not) or `--read-data` also reads stored data. Runs at nice 19 and idle I/O. `errors_found` is true only when restic reports "repository contains errors"; `finished` false means the check stopped early (a lock, the network, the login) and says nothing about damage. A percentage on restic before 0.12.0 is refused before restic runs (use `n/m`). Never `--repair`. |
 | backup | `<path>...` | yes | `restic backup` at nice 19 and idle I/O; refuses while a restic or borg job of this account runs. Reports the new snapshot `id` (short id), `snapshot_id` (full id, null when restic printed only the short one, as 0.14.0 does), new and changed files, `added_bytes`, `incomplete` (some files unreadable). |
 | restore | `<id> --target <new-dir> [--include /path]` | yes | `restic restore` into a new or empty directory inside the home; files land under their original full path inside it. Reads back how many entries arrived (`verified`). |
-| prune | `--keep-... --expect <n>` | deletes | Rebuilds the plan, refuses unless `n` matches, then `restic forget <planned ids>` and `restic prune`. Asks the user first; reads back that the snapshots are gone (`verified`). |
+| prune | `--keep-... --expect <n>` | deletes | Rebuilds the plan, refuses unless `n` matches, then `restic forget <planned ids>` and `restic prune`. The safety check decides (doctrine/safety.md); reads back that the snapshots are gone (`verified`). |
 
 ```sh
 php ~/pikkumies/tools/backup/restic/restic.php login --repo sftp:me@storagebox:restic-repo

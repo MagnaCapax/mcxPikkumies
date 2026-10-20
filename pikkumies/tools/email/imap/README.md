@@ -12,7 +12,7 @@ libcurl URL-decodes a typed IMAP command before refusing control bytes, so `%22`
 
 ## Deleting and moving
 
-`delete` removes exactly the given uids: `\Deleted` on those uids, then `UID EXPUNGE` of the same uids (UIDPLUS). A plain `EXPUNGE` would also remove every other message someone marked deleted in that folder, so a server without UIDPLUS is refused. `move` uses MOVE when the server has it, else COPY plus the same exact expunge. Both read the folder back (`verified`). `delete` runs when the user already asked for exactly this; otherwise the guard blocks it until the user says yes in the chat (rule `pikkumies-delete:`, [ADR-0073](../../../../docs/adr/0073-no-questions-no-deferrals-one-reviewed-exception.md)).
+`delete` removes exactly the given uids: `\Deleted` on those uids, then `UID EXPUNGE` of the same uids (UIDPLUS). A plain `EXPUNGE` would also remove every other message someone marked deleted in that folder, so a server without UIDPLUS is refused. `move` uses MOVE when the server has it, else COPY plus the same exact expunge. Both read the folder back (`verified`). `delete` runs when what the user asked for covers it; otherwise the safety check refuses it (rule `pikkumies-delete:`, [ADR-0101](../../../../docs/adr/0101-refuse-and-report-never-ask.md)).
 
 ## Attachments and the archive
 

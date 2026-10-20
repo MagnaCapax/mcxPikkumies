@@ -27,7 +27,7 @@ Sources: `github.com/restic/restic/tree/v0.11.0` and `/tree/v0.14.0`, read 2026-
 ## Safety
 
 - `prune` removes exactly the snapshots of the plan the user saw, by full id; the policy is not re-run between the check and the removal.
-- `restore` never writes into an existing non-empty directory, outside the home, or into a FUSE mount. The delete guard also asks the user before the unit's `restore` (its pattern matches `restic ... restore`), one extra question.
+- `restore` never writes into an existing non-empty directory, outside the home, or into a FUSE mount. The delete guard also sends the unit's `restore` to the safety check (its pattern matches `restic ... restore`): it writes only into a new or empty folder, so it destroys nothing that has no copy.
 - `check` never repairs; `init`, `unlock`, `key` and `repair` are not verbs.
 
 ## Tests

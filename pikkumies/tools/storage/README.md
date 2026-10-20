@@ -8,8 +8,8 @@ Tools for the space the user has and where their files go: `storage` (disk space
 
 1. No storage verb deletes. Freeing space goes through the tool that owns the data (`remove <id> --with-data` of a torrent client); the agent never `rm`s a listed file to free space.
 2. Every scan runs as `nice -n 19 ionice -c3 timeout 300`, on one filesystem (`du -x`, `find -xdev`), read from the pipe with a row cap, one at a time per account (a lock), cached for 10 minutes. Nothing is written into the user's quota but a small cache whose write may fail. No content hashing.
-3. Quota truth comes from `quota` / `~/.quota` (`pikkumies/lib/Quota.php`), never from the filesystem's free space. "Cannot open quotafile ... Permission denied" means quota is off on the host: tell support.
-4. Previews are read verbs (`rclone check`, `show --prune-plan` in the backup units). A verb that deletes or replaces needs `--expect` (recomputed, refused when different) or `--replace`, and the delete guard asks the user once.
+3. Quota truth comes from `quota` / `~/.quota` (`pikkumies/lib/Quota.php`), never from the filesystem's free space. "Cannot open quotafile ... Permission denied" means quota is off on the host: a server problem for support; say so in your answer (a ticket goes only when the user asked for one).
+4. Previews are read verbs (`rclone check`, `show --prune-plan` in the backup units). A verb that deletes or replaces needs `--expect` (recomputed, refused when different) or `--replace`, and the safety check decides once (doctrine/safety.md).
 5. Restores go to a new or empty directory inside the home, never into a FUSE mount, never over existing files.
 6. Secrets: never read or print config values or password files. Passwords only through a terminal prompt into `pikkumies/local/secrets/`. An encrypted rclone config stops the tool.
 7. Backup `check` reads metadata by default; never `--repair`; reading the data only when asked (`--read-data`).
@@ -36,8 +36,8 @@ What the Pulsed Media feature list and wiki offer for storage and backup, and wh
 | s3fs and sshfs mounts (features:289-293) | `rclone stats` lists them among this account's FUSE mounts | |
 | Restic (features:277-278; `restic-s3-backup-to-your-storage-box-on-pmss`) | `restic` (backup category) | |
 | BorgBackup (features:271-272) | `borg` (backup category) | |
-| borgmatic (features:274-275) | `borg stats` names its config files | Bare `borgmatic` runs prune, compact, create and check (borgmatic 1.7.7, the Debian 12 version, `borgmatic/commands/arguments.py:71-72`); the guard asks before it runs |
-| Kopia, Duplicacy (features:955; `kopia-s3-...`, `duplicacy-s3-...`) | | Later, on demand: not shipped by PMSS; their deleting commands are already asked by the guard |
+| borgmatic (features:274-275) | `borg stats` names its config files | Bare `borgmatic` runs prune, compact, create and check (borgmatic 1.7.7, the Debian 12 version, `borgmatic/commands/arguments.py:71-72`); the guard sends it to the safety check |
+| Kopia, Duplicacy (features:955; `kopia-s3-...`, `duplicacy-s3-...`) | | Later, on demand: not shipped by PMSS; the guard already sends their deleting commands to the safety check |
 | Cloudplow (features:219-221) | | Later, on demand, read-only first: it moves data on its own |
 | Syncthing (features:283-284) | | Own web UI; continuous sync spreads deletes; not asked for |
 | Resilio Sync (features:286-287) | | Own app and UI |
@@ -45,7 +45,7 @@ What the Pulsed Media feature list and wiki offer for storage and backup, and wh
 | Client-side encryption (`client-side-encryption-for-your-seedbox-or-storage-box`) | crypt remotes show as `type: crypt` in `rclone list` | gocryptfs and gpg are user procedures |
 | Proxmox backups to a storage box (features:955; `backup-proxmox-with-pulsed-media-storage-box`) | | Runs on the customer's Proxmox host, not here |
 | SFTP, FTP, SCP, rsync, WebDAV, SSHFS access (features:497-526) | | Used from the user's own computer |
-| lftp (features:326) | | Used directly; the guard asks before `--Remove-source-files` and `mirror --delete` |
+| lftp (features:326) | | Used directly; the guard sends `--Remove-source-files` and `mirror --delete` to the safety check |
 | Archive tools (features:295-316) | | File handling, not storage |
 | RAID per plan, "RAID ... is not a backup" (features:617) | | The backup skills say it |
 | Storage boxes: 500 MB of RAM (features:941) | | `borg check` and backups warn about memory |

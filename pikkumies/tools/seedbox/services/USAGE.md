@@ -24,4 +24,4 @@ php ~/pikkumies/tools/seedbox/services/services.php remote hdd1 torrent-clients/
 ```
 
 - Output is JSON Lines; the last line says `ok`, or gives `error` and `hint`. `--human` prints the same for people.
-- `remote ... remove <id> -- --with-data --expect <size>` deletes torrent data on the other box: the delete guard asks first, and that box refuses it unless its key line has `--allow-delete`.
+- `remote ... remove <id> -- --with-data --expect <size>` deletes torrent data on the other box: the safety check reviews it (doctrine/safety.md), and that box refuses it unless its key line has `--allow-delete`.

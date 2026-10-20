@@ -12,4 +12,4 @@ This tool only reads what other tools already recorded; it never runs a diagnost
 - Never call `record` yourself: it is for the tools that already run a diagnostic, not for you to log a number you made up.
 - With nothing on disk for a source, `series` returns an empty list and `list` does not mention it: say the history has not started yet (the account's own next diagnostic run starts it), never that the tool is broken.
 - This is local-only: nothing a torrent-client stats run, a quota check or a health check already records is sent anywhere by this tool. See [ADR-0086](../../../../docs/adr/0086-local-only-telemetry-history-for-diagnostics-and-health-runs.md) if asked why it is not `privacy.telemetry`.
-- `prune` deletes data on request only (the delete guard asks first); without `--keep-days` it does nothing, because the default is to keep everything.
+- `prune` deletes data on request only (the safety check decides, doctrine/safety.md); without `--keep-days` it does nothing, because the default is to keep everything.

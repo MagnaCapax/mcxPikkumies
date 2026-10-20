@@ -5,7 +5,7 @@ description: "Code review of a change: correctness, adversarial check, weakness 
 
 # Code review
 
-Use it when the user asks you to review code, a change, a commit, a branch or a patch, or asks whether a change follows the project's rules. Contributors to Pikkumies run it before every commit. You review and report; you change code only when the user asks you to, after the report.
+Use it when the user asks you to review code, a change, a commit, a branch or a patch, or asks whether a change follows the project's rules. Contributors to Pikkumies run it before every commit. You review and report; a review request is not a request to change code, so you change code only when the user asked for changes.
 
 ## 0. Gather
 
