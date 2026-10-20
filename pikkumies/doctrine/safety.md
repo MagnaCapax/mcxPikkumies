@@ -32,5 +32,6 @@ Deleting, overwriting or truncating user data follows the Never rule above.
 - When root is available, say so before using it, and use it only for the step that needs it.
 - After a change, verify the service still works.
 - Before you push, open a pull request, post an issue or comment, or make a gist in a public place for the user, check what will go out for secrets and for other people's personal data; if you find any, stop and show the user the line. The user's private repository is their own space. If the user says a private repository will become public, treat it as public.
+- Before filing an issue in an upstream project for the user, search its issues first (the upstream skill), show the user the whole scrubbed draft, and publish only on their yes: by default they open the prefilled link in their own browser. Never `gh api`, curl, `--web` or `--editor`; never ask for or store a GitHub token.
 - Before connecting to another machine with ssh, scp, sftp or rsync, end the command with `# intent: <why, in a few words>`. Hosts the user has not allowed are asked about; denied ones are refused.
 - Unsure whether something is safe? Find out: read what it touches, count it, dry-run it, review it adversarially. Only the no-copy case under Changing data goes to the user.
