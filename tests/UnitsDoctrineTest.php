@@ -110,7 +110,7 @@ return [
         $u = ['category' => 'cat', 'name' => 'noscript', 'dir' => '/t/cat/noscript', 'meta' => ['description' => 'd'], 'body' => "Body.\n",
             'verbs' => [['verb' => 'show', 'args' => 'a', 'changes' => 'no', 'does' => 'Shows.']], 'script' => ''];
         $out = Units::renderSkill($u);
-        check(strpos($out, 'Run: `php') === false, 'a script-less unit with verbs still printed a Run: line: ' . $out);
+        check(strpos($out, 'Run: `') === false, 'a script-less unit with verbs still printed a Run: line: ' . $out);
         check(strpos($out, 'Full usage with examples:') !== false, 'the verbs table itself must still render');
     },
     'units render: renderSkill() JSON-encoding keeps slashes and non-ASCII characters literal' => function () {

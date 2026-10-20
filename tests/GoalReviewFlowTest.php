@@ -58,7 +58,7 @@ return [
             check(count($req) === 1 && $req[0]['body']['max_tokens'] === 300 && strpos($req[0]['body']['messages'][1]['content'], 'R2: Did it move all of them?') !== false
                 && strpos($req[0]['body']['messages'][1]['content'], 'T1: diskmove') !== false && strpos($req[0]['body']['messages'][1]['content'], 'D1: Moving torrents to a new disk') !== false, 'request: ' . json_encode($req));
             check(strlen($req[0]['body']['messages'][0]['content'] . $req[0]['body']['messages'][1]['content']) <= 20000, 'input too large');
-            check(strpos($d['context'], 'request (2)') !== false && strpos($d['context'], 'diskmove.php --help') !== false && strpos($d['context'], 'Moving torrents to a new disk (') !== false
+            check(strpos($d['context'], 'request (2)') !== false && strpos($d['context'], 'pikkumies diskmove --help') !== false && strpos($d['context'], 'Moving torrents to a new disk (') !== false
                 && strpos($d['context'], GoalReview::CHECKLIST) !== false && $d['quotes'] === ['Please move my torrents to the new disk', 'Did it move all of them? Check the free space too'], 'answer: ' . $raw);
             check($d['state']['checklistShown'] === true && count($d['state']['shown']) === 2, 'state: ' . json_encode($d['state']));
             $log = grLog($tree);

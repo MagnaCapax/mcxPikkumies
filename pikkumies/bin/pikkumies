@@ -97,6 +97,10 @@ if ($cmd === 'error') { // a launcher flag without its value (ADR-0052): nothing
     out('Not starting: ' . $passArgs[0]);
     exit(2);
 }
+if ($cmd === 'tool') { // inside an agent, `pikkumies <tool> ...` runs the tool itself (ADR-0103); its stdio and exit code pass through
+    $toolProc = proc_open('exec ' . implode(' ', array_map('escapeshellarg', array_merge([PHP_BINARY], $passArgs))), [0 => STDIN, 1 => STDOUT, 2 => STDERR], $toolPipes);
+    exit(is_resource($toolProc) ? proc_close($toolProc) : 127);
+}
 
 switch ($cmd) {
     case 'eternal':

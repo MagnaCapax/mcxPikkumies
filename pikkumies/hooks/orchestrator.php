@@ -51,6 +51,9 @@ try {
     require_once dirname(__DIR__) . '/lib/Config.php';
     require_once dirname(__DIR__) . '/lib/HookUnits.php';
     require_once dirname(__DIR__) . '/lib/HookPayload.php';
+    require_once dirname(__DIR__) . '/lib/NestedAgent.php';
+    require_once dirname(__DIR__) . '/lib/Units.php';
+    require_once dirname(__DIR__) . '/lib/Launch.php';
     require_once dirname(__DIR__) . '/lib/LocalHooks.php';
     require_once dirname(__DIR__) . '/lib/HookNotes.php';
     require_once dirname(__DIR__) . '/lib/HookAnswers.php';
@@ -66,6 +69,23 @@ try {
 $stdin = (string) stream_get_contents(STDIN);
 $payload = json_decode($stdin, true, 100000);
 $payload = is_array($payload) ? $payload : [];
+if ($hookEvent === 'pre_tool_call' && $payload) {
+    // `pikkumies <tool> ...` runs the tool inside an agent (ADR-0103): every unit sees it as `php <script> ...`, the form
+    // the guards check. A command the rewrite cannot read is blocked here, never passed on unrewritten.
+    $normalized = HookPayload::normalize($payload);
+    $encoded = $normalized === null ? false : json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($encoded === false) {
+        $hookDone = true;
+        HookLog::add($hookEvent, 'normalize', 0, 'blocked');
+        echo json_encode(['action' => 'block', 'message' => 'Pikkumies could not read this command to check it (too long or complex). Not run; split it into simpler commands.']) . "\n";
+        exit(0);
+    }
+    if ($normalized !== $payload) {
+        $payload = $normalized;
+        $stdin = $encoded;
+        HookLog::add($hookEvent, 'normalize', 0, 'rewritten');
+    }
+}
 list(, , $callTexts) = HookPayload::read($payload);
 $session = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
 $feed = HookFeed::start($hookEvent, $payload); // null unless an interval unit is on

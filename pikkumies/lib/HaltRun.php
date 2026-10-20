@@ -58,16 +58,61 @@ class HaltRun
             }
             if ($verdict['verdict'] === 'done-wrapup' && !$wrappedUp) {
                 $wrappedUp = true;
+                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $sessionId)) {
+                    return $code; // unattended: the answer is out; the wrap-up runs on its own (ADR-0103)
+                }
                 list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
             }
             if ($applied['resume'] !== null && !$wrappedUp) {
                 $wrappedUp = true;
+                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail), $sessionId)) {
+                    return $code;
+                }
                 list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail));
                 continue; // same single wrap-up slot as done-wrapup above: ADR-0047's bound stays 3 continues + 1 final resume
             }
             return $code;
         }
+    }
+
+    const WRAPUP_DETACH_ENV = 'PIKKUMIES_WRAPUP_DETACH'; // set to 1 by an unattended caller (a support job) that reads the answer and goes
+    const WRAPUP_DETACH_SECONDS = 300;                  // the detached wrap-up's own bound: no caller watches it
+
+    /**
+     * With PIKKUMIES_WRAPUP_DETACH=1, the run's one wrap-up turn (save a lesson, one idea: HaltJudge::WRAPUP) starts in its
+     * own session under `timeout`, its output to a 0600 log, and the run returns at once: the caller has the answer
+     * without waiting for the memory save (ADR-0103). Nothing is skipped: the same resume runs, with the same bound of 3
+     * continues + 1 wrap-up. Returns false (the caller runs it inline, as without the variable) when the variable is not
+     * set, setsid or timeout is missing, or the start fails.
+     */
+    public static function detachWrapUp($hermesBin, array $argv, $sessionId)
+    {
+        if (getenv(self::WRAPUP_DETACH_ENV) !== '1') {
+            return false;
+        }
+        $setsid = trim((string) @shell_exec('command -v setsid 2>/dev/null'));
+        $timeout = trim((string) @shell_exec('command -v timeout 2>/dev/null'));
+        $dir = Config::localDir() . '/logs/halt-guard';
+        if ($setsid === '' || $timeout === '' || (!is_dir($dir) && !@mkdir($dir, 0700, true))) {
+            return false;
+        }
+        $log = $dir . '/wrapup-' . sha1((string) $sessionId) . '.log';
+        $cmd = escapeshellarg($setsid) . ' ' . escapeshellarg($timeout) . ' -k 10 ' . self::WRAPUP_DETACH_SECONDS . ' ' . escapeshellarg($hermesBin);
+        foreach ($argv as $a) {
+            $cmd .= ' ' . escapeshellarg($a);
+        }
+        $env = getenv();
+        $env[HookAsync::ONESHOT_ENV] = '1';
+        unset($env[self::WRAPUP_DETACH_ENV]);
+        $old = umask(0077);
+        $p = @proc_open($cmd . ' &', [0 => ['file', '/dev/null', 'r'], 1 => ['file', $log, 'a'], 2 => ['file', $log, 'a']], $pipes, null, $env);
+        umask($old);
+        if (!is_resource($p) || proc_close($p) !== 0) {
+            return false;
+        }
+        HaltState::logDecision($sessionId, 'oneshot', 0, ['verdict' => 'wrapup-detached']);
+        return true;
     }
 
     /**

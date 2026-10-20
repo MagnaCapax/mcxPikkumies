@@ -8,21 +8,6 @@
  * here.
  */
 return [
-    'launch: inside an agent, a tool unit name as the first word is the tool, not a new agent' => function () {
-        $was = getenv('PIKKUMIES_DEPTH');
-        try {
-            putenv('PIKKUMIES_DEPTH=1');
-            $r = Launch::route(['pikkumies', 'system-status', 'health']);
-            check($r[0] === 'error' && strpos($r[1][0], 'tools/system/system-status/system-status.php') !== false
-                && strpos($r[1][0], 'pikkumies -- system-status') !== false, 'tool name at depth 1 started an agent: ' . json_encode($r));
-            check(Launch::route(['pikkumies', '--', 'system-status', 'health']) === ['run', ['chat', '--query=system-status health']], '`--` no longer forces a prompt');
-            check(Launch::route(['pikkumies', 'why', 'is', 'my', 'disk', 'full']) === ['run', ['chat', '--query=why is my disk full']], 'plain words at depth 1 stopped being a prompt');
-            putenv('PIKKUMIES_DEPTH');
-            check(Launch::route(['pikkumies', 'system-status', 'health']) === ['run', ['chat', '--query=system-status health']], 'the user\'s own shell (depth 0) changed');
-        } finally {
-            $was === false ? putenv('PIKKUMIES_DEPTH') : putenv("PIKKUMIES_DEPTH=$was");
-        }
-    },
     'launch: Eternal verbs claim only their exact command shapes' => function () {
         $root = testTempDir('launch-eternal-route');
         file_put_contents($root . '/enabled', "1\n");

@@ -165,7 +165,7 @@ class Units
         if ($u['verbs']) {
             $out .= "\n## Verbs\n\n";
             if ($u['script'] !== '') {
-                $out .= "Run: `php {$u['script']} <verb> [arguments]`. Output is JSON Lines; the last line says `ok` or gives `error` and `hint`. Add `--human` to show it to the user.\n";
+                $out .= "Run: `pikkumies {$u['name']} <verb> [arguments]` (it runs `php {$u['script']}`). Output is JSON Lines; the last line says `ok` or gives `error` and `hint`. Add `--human` to show it to the user.\n";
             }
             $out .= "Full usage with examples: `{$u['dir']}/USAGE.md`\n\n" . self::VERBS_HEADER . "\n|---|---|---|---|\n";
             foreach ($u['verbs'] as $v) {

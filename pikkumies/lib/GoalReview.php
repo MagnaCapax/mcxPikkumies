@@ -115,7 +115,7 @@ class GoalReview
             }
         }
         foreach ($a[4] === 'none' ? [] : array_unique(explode(',', $a[4])) as $id) {
-            $lines[] = "A tool that may fit: {$tools[$id][0]}; its use: php {$tools[$id][1]} --help";
+            $lines[] = "A tool that may fit: {$tools[$id][0]}; its use: pikkumies {$tools[$id][0]} --help";
         }
         foreach ($a[5] === 'none' ? [] : array_unique(explode(',', $a[5])) as $id) {
             $lines[] = "A page that may answer it: {$docs[$id][0]} ({$docs[$id][1]})";

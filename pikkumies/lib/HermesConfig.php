@@ -421,7 +421,7 @@ class HermesConfig
             . implode('', array_map(function ($n) {
                 return "\n- Notice from " . $n['from'] . ': ' . $n['text'];
             }, self::notices()))
-            . "\n\nSkills for other machines are listed too; use one only if it matches. Tool index: " . Units::toolsDir() . "/INDEX.md.";
+            . "\n\nSkills for other machines are listed too; use one only if it matches. Run a Pikkumies tool by its name: `pikkumies <tool> <verb> ...` (its skill lists the verbs); never type a path to it. Tool index: " . Units::toolsDir() . "/INDEX.md.";
     }
 
     // Hermes cuts a context file past 6% of the model's window in characters (4 per token), at least 20 000.

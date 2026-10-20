@@ -106,3 +106,5 @@ One exception to the user's own `--yolo` letting the guards' questions through: 
 
 ## Amendment 2026-10-20: a tool name typed as a prompt inside an agent
 In a test run an agent ran `pikkumies system-status health` meaning the system-status tool; plain words after `pikkumies` are a prompt, so each call started a whole second agent (two in one run, each a full model session on the same key). Inside an agent (`PIKKUMIES_DEPTH` 1 or more), `Launch::route` now treats a first word that names a tool unit with a script as the tool: nothing is started, and the launcher prints the tool's run line (`php <path> <verb>`) and how to ask an agent anyway (`pikkumies -- <words>`). The user's own shell (depth 0) is unchanged, other words are still a prompt, and an agent may still start another agent with its safety layers on; this only catches the misroute. A safety prompt, not a boundary: the agent can set the depth or use `--`.
+
+Superseded the same day by [ADR-0103](0103-tools-by-name-and-support-job-steps.md): instead of printing the run line (which cost the agent a step every time), the launcher runs the tool.

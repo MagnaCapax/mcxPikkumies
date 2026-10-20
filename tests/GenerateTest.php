@@ -31,7 +31,7 @@ return [
         check(strpos($skill, "---\nname: rtorrent\ndescription: \"Control rTorrent: list, add, pause.\"\n---\n") === 0, 'frontmatter not regenerated safely: ' . substr($skill, 0, 120));
         check(strpos($skill, 'Generated from tools/torrent-clients/rtorrent/skill.md') !== false && strpos($skill, 'Body text.') !== false, 'header or body missing');
         check(strpos($skill, "| add | `<file\\|magnet>` | yes | Add one. |") !== false, 'verbs table or escaped pipe lost');
-        check(strpos($skill, "php $tmp/tools/torrent-clients/rtorrent/rtorrent.php <verb>") !== false, 'run line missing');
+        check(strpos($skill, 'Run: `pikkumies rtorrent <verb> [arguments]`') !== false && strpos($skill, "php $tmp/tools/torrent-clients/rtorrent/rtorrent.php") !== false, 'run line missing');
         $index = (string) file_get_contents("$tmp/tools/INDEX.md");
         check(strpos($index, "## torrent-clients\n- **rtorrent**") !== false && strpos($index, 'Verbs: list, add*.') !== false, 'index line wrong: ' . $index);
         check(strpos($index, 'broken') === false, 'broken unit listed in the index');

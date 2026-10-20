@@ -95,30 +95,38 @@ class Launch
             && !in_array($argv[1], ['ask', 'ui', 'eternal'], true) && self::allFlags($rest))) {
             return [$argv[1], $rest];
         }
-        if (($tool = self::toolRunLine($argv[1])) !== '') {
-            return ['error', [$tool]];
+        if (($script = self::toolScript($argv[1])) !== '') {
+            return ['tool', array_merge([$script], array_slice($argv, 2))];
         }
         return ['run', self::promptArgs(array_slice($argv, 1))];
     }
 
     /**
-     * Inside an agent (PIKKUMIES_DEPTH 1 or more), `pikkumies <tool unit name> ...` almost always means the tool, and as a
-     * prompt it would start a whole second agent (seen in a test run, 2026-10-20). Returns the tool's run line, or
-     * '' (the user's own shell, a word that names no tool unit with a script). `pikkumies -- <words>` still asks an agent.
-     * ADR-0020 amendment 2026-10-20.
+     * Inside an agent (PIKKUMIES_DEPTH 1 or more), `pikkumies <tool unit name> ...` is the tool: the launcher runs
+     * `php <its script> ...` (ADR-0103), so the agent needs the tool's name, never its path. As a prompt it would start a
+     * whole second agent (seen in a test run, 2026-10-20). Returns the script's canonical path, or '' (the user's own
+     * shell, a word that names no tool unit with a script). `pikkumies -- <words>` still asks an agent. The hook
+     * orchestrator rewrites the same form with this resolver, so every guard sees what runs (HookPayload::normalize).
      */
-    public static function toolRunLine($word)
+    public static function toolScript($word)
     {
-        if (NestedAgent::depth() < 1 || preg_match('/^[a-z0-9][a-z0-9-]*$/D', (string) $word) !== 1) {
+        if (NestedAgent::depth() < 1) {
             return '';
         }
+        $scripts = self::toolScripts();
+        return isset($scripts[(string) $word]) ? $scripts[(string) $word] : '';
+    }
+
+    /** Tool unit name => its script's canonical path, for every unit with a script. */
+    public static function toolScripts()
+    {
+        $out = [];
         foreach (Units::all() as $u) {
-            if ($u['name'] === $word && $u['script'] !== '') {
-                return "`$word` is a Pikkumies tool: run `php {$u['script']} <verb>`. `pikkumies <words>` starts a new agent;"
-                    . " to ask one anyway, use `pikkumies -- $word ...`.";
+            if (preg_match('/^[a-z0-9][a-z0-9-]*$/D', $u['name']) === 1 && $u['script'] !== '' && ($real = realpath($u['script'])) !== false) {
+                $out[$u['name']] = $real;
             }
         }
-        return '';
+        return $out;
     }
 
     /** True when every word is a flag (starts with "-"); an empty list counts as all flags. */

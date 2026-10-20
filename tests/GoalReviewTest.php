@@ -35,8 +35,8 @@ return [
         $tools = ['T1' => ['rtorrent', '~/pikkumies/tools/torrent-clients/rtorrent/rtorrent.php']];
         $a = GoalReview::parse(grAnswers([1 => 'yes R1,R2', 2 => 'yes', 4 => 'T1,T1', 5 => 'D1', 7 => 'diagnostics', 9 => 'yes']), 2, $docs, $tools);
         $t = GoalReview::render($a, $docs, $tools, true);
-        check(strpos($t, 'request (1), (2). Do it, or tell the user why not.') !== false && strpos($t, 'php ~/pikkumies/tools/torrent-clients/rtorrent/rtorrent.php --help') !== false
-            && substr_count($t, 'rtorrent.php --help') === 1 && strpos($t, 'Moving data between disks (~/pikkumies/memory/lessons/move.md)') !== false
+        check(strpos($t, 'request (1), (2). Do it, or tell the user why not.') !== false && strpos($t, 'its use: pikkumies rtorrent --help') !== false
+            && substr_count($t, 'rtorrent --help') === 1 && strpos($t, 'Moving data between disks (~/pikkumies/memory/lessons/move.md)') !== false
             && strpos($t, GoalReview::ROWS['diagnostics']) !== false && strpos($t, GoalReview::SAY[9]) !== false && strpos($t, GoalReview::CHECKLIST) !== false, 'text: ' . $t);
         check(strpos(GoalReview::render($a, $docs, $tools, false), GoalReview::CHECKLIST) === false, 'the checklist again after the first review');
         check(GoalReview::render(GoalReview::parse(grAnswers([2 => 'yes', 10 => 'yes']), 1, [], []), [], [], true) === '', 'only chat must say nothing');

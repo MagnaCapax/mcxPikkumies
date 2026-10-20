@@ -46,6 +46,59 @@ class HookPayload
     }
 
     /**
+     * Inside an agent `pikkumies <tool> ...` runs `php <tool script> ...` (Launch::toolScript, ADR-0103). The guards know
+     * the php form, so before any unit reads the call, the command (terminal), code (execute_code) or data (process_manage)
+     * gets every `[path/]pikkumies <tool>` at the start of a word replaced by `php <canonical script>`, with the same
+     * resolver the launcher runs. A quoted or backslashed form is matched on the text without quotes and backslashes
+     * (what SendGuard checks too); that view then becomes the text the units see. Rewriting where nothing runs (an echo)
+     * only makes a guard stricter. Returns the payload unchanged when nothing matches, or null when a regex fails: the
+     * caller then blocks the call, so an unreadable command never reaches the guards in the form they cannot see.
+     * $scripts: name => script, for tests (default Launch::toolScripts()).
+     */
+    public static function normalize(array $payload, $scripts = null)
+    {
+        $tool = isset($payload['tool_name']) ? $payload['tool_name'] : '';
+        $input = isset($payload['tool_input']) && is_array($payload['tool_input']) ? $payload['tool_input'] : [];
+        $field = $tool === 'terminal' ? 'command' : ($tool === 'execute_code' ? 'code' : '');
+        if ($tool === 'process_manage' && isset($input['action']) && in_array($input['action'], ['write', 'submit'], true)) {
+            $field = 'data';
+        }
+        if ($field === '' || !isset($input[$field]) || !is_string($input[$field])
+            || stripos(str_replace(['"', "'", '\\'], '', $input[$field]), 'pikkumies') === false) {
+            return $payload;
+        }
+        $scripts = $scripts === null ? Launch::toolScripts() : $scripts;
+        if (!$scripts) {
+            return $payload;
+        }
+        $names = array_keys($scripts);
+        usort($names, function ($a, $b) {
+            return strlen($b) - strlen($a);
+        });
+        $sep = '\s;&|()<>\'"`';
+        $re = '~(?<![^' . $sep . '])(?:[^' . $sep . ']*/)?pikkumies[ \t]+(' . implode('|', array_map(function ($n) {
+            return preg_quote($n, '~');
+        }, $names)) . ')(?=[' . $sep . ']|$)~';
+        $rewrite = function ($text) use ($re, $scripts) {
+            return preg_replace_callback($re, function ($m) use ($scripts) {
+                return 'php ' . $scripts[$m[1]];
+            }, $text);
+        };
+        $text = $input[$field];
+        $out = $rewrite($text);
+        if ($out === $text) {
+            $bare = str_replace(['"', "'", '\\'], '', $text);
+            $out = $bare === $text ? $text : $rewrite($bare);
+            $out = $out === $bare ? $text : $out;
+        }
+        if ($out === null || preg_last_error() !== PREG_NO_ERROR) {
+            return null;
+        }
+        $payload['tool_input'][$field] = $out;
+        return $payload;
+    }
+
+    /**
      * True when the tool hook $unit runs for this call. A hook for a Hermes tool ('toolCategory' '') runs on that
      * tool_name. A hook for a Pikkumies unit runs when the call names `<tool>.php` or `tools/<category>/<tool>`, when
      * the payload's cwd is inside that unit, or when the call runs php on a variable (`php $X`, `php "$X"`, `php ${X}`),
