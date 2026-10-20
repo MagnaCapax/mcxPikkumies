@@ -23,7 +23,7 @@ the missing part is the ordered maintenance checklist, not another executable.
 
 ## Decision
 - Add `pikkumies/doctrine/SOP/upgrade-a-host-and-reboot.md` and link it from the
-  existing server-admin skill. This extends that unit's procedure (ADR-0015), not
+  existing server-admin skill. This extends that unit's procedure ([ADR-0015](0015-tool-units-one-skill-per-tool.md)), not
   the skills index or command interface. The SOP is its documentation; no new unit.
 - Preserve the lesson's G1–G9 then P1–P7 split. Keep rollback, storage/boot health,
   supported package paths, md-check pause/resume, detached stop+reboot, shutdown
@@ -54,7 +54,7 @@ the missing part is the ordered maintenance checklist, not another executable.
 - [SOP](../../pikkumies/doctrine/SOP/upgrade-a-host-and-reboot.md),
   [server-admin](../../pikkumies/tools/server-admin/server-admin/skill.md),
   [engineering principles](../../development/engineering-principles.md).
-- ADR-0004 (OS privileges), ADR-0015 (existing tool unit), ADR-0020 (approval),
-  ADR-0036 (documentation), ADR-0042 (review), ADR-0044 (command logging).
+- [ADR-0004](0004-provider-key-and-root-detection.md) (OS privileges), [ADR-0015](0015-tool-units-one-skill-per-tool.md) (existing tool unit), [ADR-0020](0020-deletes-need-the-users-approval.md) (approval),
+  [ADR-0036](0036-documentation-layout.md) (documentation), [ADR-0042](0042-development-review-unit.md) (review), [ADR-0044](0044-every-shell-command-is-logged.md) (command logging).
 - Provenance (a maintenance-campaign review and its source SOPs) is retained privately by the
   maintainers. It is not a runtime dependency and is deliberately not part of this public repository.
