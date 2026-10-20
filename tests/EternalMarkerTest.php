@@ -26,8 +26,30 @@ return [
         }
     },
     'eternal marker: doctor reads no Eternal records or limits without the marker' => function () {
-        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
-        check(preg_match("/case 'doctor':(.*?)case 'generate':/s", $bin, $match) === 1, 'doctor case missing');
-        check(preg_match('/if \(Eternal::enabled\(\)\) \{.*EternalCli::listing\(\).*Detect::userShowLimitsData\(/s', $match[1]) === 1, 'doctor touched Eternal state without its marker guard');
+        $root = testTempDir('eternal-doctor-marker');
+        $source = dirname(__DIR__) . '/pikkumies';
+        foreach (['bin', 'lib', 'tools', 'doctrine'] as $dir) {
+            exec('cp -R ' . escapeshellarg($source . '/' . $dir) . ' ' . escapeshellarg($root) . '/');
+        }
+        @mkdir($root . '/fixtureuser/bin', 0700, true);
+        file_put_contents($root . '/fixtureuser/bin/userShowLimits', "#!/bin/sh\necho called >> '" . $root . "/limits-called'\nexit 0\n");
+        chmod($root . '/fixtureuser/bin/userShowLimits', 0700);
+        $runner = $root . '/runner.php';
+        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/missing-marker"; require __DIR__ . "/bin/pikkumies";');
+        try {
+            testWithEnv(['HOME' => $root . '/fixtureuser', 'PIKKUMIES_KEY' => null, 'PIKKUMIES_ENDPOINT' => null], function () use ($runner, $root) {
+                list($newCode, $newOut) = runPhp($runner, ['doctor']);
+                $eternalLines = function ($out) {
+                    return array_values(array_filter(explode("\n", $out), function ($line) {
+                        return strpos($line, 'eternals:') === 0 || strpos($line, 'OOM kills:') !== false;
+                    }));
+                };
+                // 8b17c97 has no Eternals or OOM doctor line.
+                check($newCode === 0 && $eternalLines($newOut) === [], 'markerless doctor added Eternal/OOM output: ' . $newOut);
+                check(!is_file($root . '/limits-called'), 'markerless doctor ran userShowLimits');
+            });
+        } finally {
+            testRmTree($root);
+        }
     },
 ];
