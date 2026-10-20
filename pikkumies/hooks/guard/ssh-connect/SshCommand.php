@@ -10,6 +10,7 @@ require_once __DIR__ . '/SshUnreadable.php';
 require_once __DIR__ . '/SshWords.php';
 require_once __DIR__ . '/SshWrappers.php';
 require_once __DIR__ . '/SshPrograms.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class SshCommand
 {
@@ -56,7 +57,7 @@ class SshCommand
     /** The program word's name: /usr/bin/ssh is ssh. */
     public static function program(array $word)
     {
-        return basename($word['text']);
+        return PathName::base($word['text']);
     }
 
     /** One simple command. Returns true when it is a shell reading commands from stdin. */
@@ -121,7 +122,7 @@ class SshCommand
             $found['routes'][] = "$m[1]=$m[2]";
         } else {
             foreach (SshUnreadable::check(preg_split('/[\s;&|`()]+/', $m[2], -1, PREG_SPLIT_NO_EMPTY)) as $word) {
-                if (in_array(basename($word), array_merge(SshPrograms::NAMES, ['sshpass']), true)) {
+                if (in_array(PathName::base($word), array_merge(SshPrograms::NAMES, ['sshpass']), true)) {
                     throw new SshUnreadable("it stores an SSH program in $m[1], so the command that runs it cannot be read");
                 }
             }

@@ -12,6 +12,8 @@
  * The previous check's figures (local/performance/last-check.json, 0600) are shown beside this one's, and a
  * different machine fingerprint says the previous check ran on another server.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class PerfRouter
 {
     /** Rule table order: the order of verdicts when the symptom does not say otherwise. */
@@ -505,7 +507,7 @@ class PerfRouter
         $out = [];
         $add = function ($unit, $verb, $why) use (&$out) {
             if (is_file(dirname(__DIR__, 2) . "/$unit/USAGE.md")) {
-                $out[] = ['unit' => basename($unit), 'verb' => $verb, 'why' => $why];
+                $out[] = ['unit' => PathName::base($unit), 'verb' => $verb, 'why' => $why];
             }
         };
         if (in_array($symptom, ['slow-download', 'slow-upload', 'lag', 'everything'], true)) {

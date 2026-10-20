@@ -8,6 +8,8 @@
  * text (tools/storage/lib/ToolText.php) and listing size (tools/storage/lib/ToolList.php) stay their
  * own classes in storage/lib: storage, backup and media use ToolText, only storage and backup ToolList.
  */
+require_once __DIR__ . '/PathName.php';
+
 class ToolProc
 {
     const MAX_OUT = 8388608;  // stdout bytes kept when no line reader is given
@@ -68,7 +70,7 @@ class ToolProc
         $io = [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $p = proc_open('exec ' . self::line($argv), $io, $pipes, $cwd, $vars);
         if (!is_resource($p)) {
-            throw new CliError('could not start ' . basename((string) $argv[0]), 'check that it is installed and runnable');
+            throw new CliError('could not start ' . PathName::base((string) $argv[0]), 'check that it is installed and runnable');
         }
         $r = ['code' => 0, 'out' => '', 'err' => '', 'stopped' => false, 'cut' => false];
         $open = [1 => $pipes[1], 2 => $pipes[2]];

@@ -8,6 +8,7 @@
  * (research torrent-clients.md §2.5).
  */
 require_once dirname(__DIR__, 3) . '/lib/OwnProcs.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class QbitProc
 {
@@ -35,7 +36,7 @@ class QbitProc
         }
         foreach (OwnProcs::pids([self::NAME], $uid, $this->root) as $pid) {
             $exe = @readlink($this->root . "/$pid/exe");
-            if (!is_string($exe) || basename(preg_replace('/ \(deleted\)$/', '', $exe)) === self::NAME) {
+            if (!is_string($exe) || PathName::base(preg_replace('/ \(deleted\)$/', '', $exe)) === self::NAME) {
                 $out[] = $pid;
             }
         }

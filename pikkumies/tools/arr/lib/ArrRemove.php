@@ -6,6 +6,8 @@
  * `not_sent`. A failure ends the call with ok:false naming what happened to every item, as
  * torrent-clients/lib/DeleteRun.php finish() does, so a half-done removal is never reported as done.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class ArrRemove
 {
     /** DELETE each target in order; [id => '' when the app accepted it, or the error], up to the first error. */
@@ -62,9 +64,9 @@ class ArrRemove
                 if (file_exists($p['path'])) {
                     $r['disposal'] = 'refused';
                     $r['errors'][] = 'the folder is still there: the app refused, or is still deleting (see its log, System, Logs)';
-                } elseif ($bin !== '' && is_dir($bin . '/' . basename($p['path']))) {
+                } elseif ($bin !== '' && is_dir($bin . '/' . PathName::base($p['path']))) {
                     $r['disposal'] = 'recycled';
-                    $r['recycle_bin'] = $bin . '/' . basename($p['path']);
+                    $r['recycle_bin'] = $bin . '/' . PathName::base($p['path']);
                 } else {
                     $r['disposal'] = 'deleted';
                     $r['freed_bytes'] = $p['freed'];

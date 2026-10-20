@@ -12,6 +12,7 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/FileopsClassify.php';
 require_once __DIR__ . '/ChangeVerbs.php';
 require_once __DIR__ . '/ChangeUnits.php';
+require_once __DIR__ . '/PathName.php';
 
 class ChangeClassify
 {
@@ -92,7 +93,7 @@ class ChangeClassify
         $wrapper = '';
         for ($i = 0, $n = count($words); $i < $n; $i++) {
             $word = $words[$i];
-            $base = basename($word);
+            $base = PathName::base($word);
             if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*=/', $word) || in_array($word, self::NO_COMMAND, true) && $wrapper === '') {
                 continue; // X=1, or a word like for / done
             }

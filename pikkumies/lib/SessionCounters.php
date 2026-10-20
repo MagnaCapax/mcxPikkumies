@@ -7,6 +7,8 @@
  * --pane=#{pane_id}` reads it. One small JSON file per pane under local/state/session-counters/, integers only: no
  * paths, commands, content or session ids. Outside tmux nothing is written.
  */
+require_once __DIR__ . '/PathName.php';
+
 class SessionCounters
 {
     /** What tmux gives as TMUX_PANE and #{pane_id}. \z, not $: "$" would let "%3\n" through. */
@@ -95,7 +97,7 @@ class SessionCounters
     {
         $n = 0;
         foreach ($files as $f) {
-            $n += strncmp(basename($f), $today . '-', 9) === 0 ? 1 : 0;
+            $n += strncmp(PathName::base($f), $today . '-', 9) === 0 ? 1 : 0;
         }
         return [count($files), $n];
     }

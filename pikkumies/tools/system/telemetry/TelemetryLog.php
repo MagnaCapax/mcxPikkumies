@@ -34,6 +34,8 @@
  * usage` verb (ADR-0087); series() (bucketed mean/min/max) is for a snapshot source's numeric trend
  * instead.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class TelemetryLog
 {
     /**
@@ -312,7 +314,7 @@ class TelemetryLog
     {
         $out = [];
         foreach ((array) glob(self::dir($localDir) . '/*', GLOB_ONLYDIR) as $dir) {
-            $source = basename($dir);
+            $source = PathName::base($dir);
             if (!preg_match(self::SOURCE_RE, $source) || self::hiddenFromServe($source)) {
                 continue; // not one of ours, or a usage-* source behind a remote serve call: never list or read it
             }
@@ -326,7 +328,7 @@ class TelemetryLog
                 return is_file($file) ? (int) @file_get_contents($file) : 0;
             };
             $out[] = ['source' => $source, 'days' => count($files), 'bytes' => $bytes,
-                'oldest' => $files ? basename($files[0], '.jsonl') : null, 'newest' => $files ? basename(end($files), '.jsonl') : null,
+                'oldest' => $files ? PathName::base($files[0], '.jsonl') : null, 'newest' => $files ? PathName::base(end($files), '.jsonl') : null,
                 'failures' => $counter('.failures'), 'dropped' => $counter('.dropped')];
         }
         return $out;
@@ -348,7 +350,7 @@ class TelemetryLog
         foreach ((array) glob(self::dir($localDir) . '/*', GLOB_ONLYDIR) as $dir) {
             $did = false;
             foreach (self::dayFiles($dir, '00000000') as $f) {
-                if (basename($f, '.jsonl') < $cutoff && @unlink($f)) {
+                if (PathName::base($f, '.jsonl') < $cutoff && @unlink($f)) {
                     $removed++;
                     $did = true;
                 }
@@ -365,7 +367,7 @@ class TelemetryLog
         sort($files);
         $out = [];
         foreach ($files as $f) {
-            if (is_file($f) && basename($f, '.jsonl') >= $fromYmd) {
+            if (is_file($f) && PathName::base($f, '.jsonl') >= $fromYmd) {
                 $out[] = $f;
             }
         }

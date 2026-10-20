@@ -13,6 +13,8 @@
  * An existing file is never overwritten. The dump goes to <file>.partial and is renamed only when the program
  * exited 0 and wrote its own completion line; otherwise the .partial stays and the record says so.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class DockerDump
 {
     /** image name (last path part, no tag) => engine. */
@@ -133,10 +135,10 @@ class DockerDump
         if ($given !== null) {
             $given = is_string($given) ? $given : '';
             $given = strncmp($given, '~/', 2) === 0 ? $d->home . substr($given, 1) : $given;
-            if ($given === '' || substr($given, -1) === '/' || basename($given) === '..' || basename($given) === '.') {
+            if ($given === '' || substr($given, -1) === '/' || PathName::base($given) === '..' || PathName::base($given) === '.') {
                 throw new CliError('--file takes the path of a new file; nothing was dumped', 'e.g. --file ~/docker/dumps/db.sql');
             }
-            $file = DockerRecord::folder($d, dirname($given), '--file') . '/' . basename($given);
+            $file = DockerRecord::folder($d, dirname($given), '--file') . '/' . PathName::base($given);
         } else {
             $file = DockerRecord::folder($d, $d->home . '/docker/dumps', 'dump') . '/' . $name . '-' . gmdate('Ymd-His') . 'Z.sql';
         }

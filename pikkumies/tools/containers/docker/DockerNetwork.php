@@ -11,6 +11,8 @@
  * Route, DNS and speed checks of the server itself belong to the performance tools, not here. Reads only.
  * Seams (DockerCli's, plus): listener_tables (Host::ownsListener).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class DockerNetwork
 {
     /** Network helper processes a rootlesskit --net value names (pasta's program may be pasta.avx2 or passt). */
@@ -95,7 +97,7 @@ class DockerNetwork
                 continue;
             }
             $argv = explode("\0", rtrim((string) @file_get_contents("$dir/cmdline"), "\0"));
-            $exe = basename((string) $argv[0]);
+            $exe = PathName::base((string) $argv[0]);
             $exes[] = $exe;
             if ($exe === 'rootlesskit' && $kit === null && preg_grep('/^--net(=|$)/', $argv)) {
                 $kit = $argv;

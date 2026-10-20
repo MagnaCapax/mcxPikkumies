@@ -4,6 +4,8 @@
  * name (never by pattern, never `pkill -f`), and a process identity that survives pid reuse: the start
  * time, field 22 of /proc/<pid>/stat. Used by the torrent clients' restart verbs; $proc is a test seam.
  */
+require_once __DIR__ . '/PathName.php';
+
 class OwnProcs
 {
     /**
@@ -16,7 +18,7 @@ class OwnProcs
         $ns = @readlink("$proc/self/ns/mnt");
         $out = [];
         foreach ((array) glob("$proc/[0-9]*", GLOB_ONLYDIR) as $dir) {
-            $pid = basename($dir);
+            $pid = PathName::base($dir);
             if (!ctype_digit($pid) || @fileowner($dir) !== (int) $uid || ($ns !== false && @readlink("$dir/ns/mnt") !== $ns)) {
                 continue;
             }

@@ -35,6 +35,7 @@ require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
 require_once dirname(__DIR__, 3) . '/lib/Units.php';
 require_once dirname(__DIR__, 3) . '/tools/system/telemetry/TelemetryLog.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 /** lowercase, "-"/"/" -> "_", else "other" (TelemetryLog::FIELD_RE); never empty, never the reserved "ts". */
 function usageCountField($name)
@@ -99,8 +100,8 @@ function usageCountUnit($command, $cwd)
         if ($real === false || $toolsDir === false || strpos($real . '/', rtrim($toolsDir, '/') . '/') !== 0) {
             continue;
         }
-        $tool = basename($real, '.php');
-        if (basename(dirname($real)) !== $tool) {
+        $tool = PathName::base($real, '.php');
+        if (PathName::base(dirname($real)) !== $tool) {
             continue; // not <tool>/<tool>.php, the one shape every unit script follows
         }
         if (!isset($m[3]) || $m[3] === '') {

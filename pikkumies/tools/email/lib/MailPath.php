@@ -7,6 +7,8 @@
  * files are created with fopen 'x' (never following a symlink, never replacing a file), mode 0600. A file read for
  * sending is a regular file inside the home, outside dot-directories and local/secrets, and does not look like a key.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class MailPath
 {
     const KEY_NAME = '/^(id_(rsa|dsa|ecdsa|ed25519)(_sk)?|authorized_keys|known_hosts)$|\.(pem|key|p12|pfx|kdbx|ppk)$/i';
@@ -42,7 +44,7 @@ class MailPath
         if ($parent === false) {
             throw new CliError(dirname($path) . ' does not exist', 'create the parent folder first, or leave --to out');
         }
-        self::fence($parent . '/' . basename($path), $home, 'the folder');
+        self::fence($parent . '/' . PathName::base($path), $home, 'the folder');
         if (file_exists($path) || is_link($path)) {
             throw new CliError("$path already exists; attachments go only to a new directory", 'leave --to out, or name a new directory');
         }
@@ -70,7 +72,7 @@ class MailPath
         if ($parent === false || is_link($to) || preg_match('#(^|/)\.\.?(/|$)#', $to)) {
             throw new CliError("$to is not a usable folder (missing parent, a symlink, or . or .. in it)", $example);
         }
-        $real = self::fence($parent . '/' . basename($to), $home, 'the Maildir folder');
+        $real = self::fence($parent . '/' . PathName::base($to), $home, 'the Maildir folder');
         if (!is_dir($real) && !@mkdir($real, 0700)) {
             throw new CliError("cannot create $real", 'check the parent directory and the quota (storage stats)');
         }
@@ -130,7 +132,7 @@ class MailPath
         }
         self::fence($real, $home, $what);
         $secrets = realpath(Config::localDir() . '/secrets');
-        if (($secrets !== false && HomePath::inside($real, $secrets)) || preg_match(self::KEY_NAME, basename($real))) {
+        if (($secrets !== false && HomePath::inside($real, $secrets)) || preg_match(self::KEY_NAME, PathName::base($real))) {
             throw new CliError("$what $real is a stored password or looks like a key; never sent", 'send a different file');
         }
         $head = (string) @file_get_contents($real, false, null, 0, 65536);

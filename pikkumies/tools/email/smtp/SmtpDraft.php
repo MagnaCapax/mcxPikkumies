@@ -6,6 +6,8 @@
  * file, so a changed draft no longer matches what was approved; each attachment carries its own sha256 and size, so a
  * file changed after approval is refused too. Every field is checked again when the draft is read back.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class SmtpDraft
 {
     const MAX_BODY = 1048576;     // 1 MiB of text
@@ -56,7 +58,7 @@ class SmtpDraft
         $total = strlen($text);
         foreach ($attach as $a) {
             $real = MailPath::readable($a, $home, 'the attachment');
-            $files[] = ['path' => $real, 'name' => basename($real), 'bytes' => filesize($real), 'sha256' => hash_file('sha256', $real)];
+            $files[] = ['path' => $real, 'name' => PathName::base($real), 'bytes' => filesize($real), 'sha256' => hash_file('sha256', $real)];
             $total += (int) ceil(filesize($real) * 4 / 3);
         }
         if ($total > self::MAX_TOTAL) {

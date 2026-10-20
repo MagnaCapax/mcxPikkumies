@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Units.php';
+require_once __DIR__ . '/PathName.php';
 
 class ChangeUnits
 {
@@ -16,7 +17,7 @@ class ChangeUnits
     public static function verdict($script, array $rest, $toolsDir)
     {
         if (!is_string($script) || !preg_match('#(?:^|/)tools/((?:[a-z0-9][a-z0-9._-]*/)+)([a-z0-9][a-z0-9_-]*)\.php$#', $script, $m)
-            || basename($m[1]) !== $m[2]) {
+            || PathName::base($m[1]) !== $m[2]) {
             return null;
         }
         $usage = rtrim($toolsDir !== null ? $toolsDir : Units::toolsDir(), '/') . '/' . $m[1] . 'USAGE.md';

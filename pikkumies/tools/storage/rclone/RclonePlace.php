@@ -4,6 +4,8 @@
  * name, or an absolute local path inside the home. Never an option, never a connection string (":sftp,pass=...:"
  * carries credentials on the command line).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class RclonePlace
 {
     /** $s checked as a place; a local path must be inside $home ($mustExist: it exists; otherwise its parent does). */
@@ -28,7 +30,7 @@ class RclonePlace
         if ($parent === false || !HomePath::inside($parent, $home)) {
             throw new CliError("$s is not inside the home directory", 'local paths must be under ' . $home);
         }
-        return $parent . '/' . basename($s);
+        return $parent . '/' . PathName::base($s);
     }
 
     public static function isLocal($place)

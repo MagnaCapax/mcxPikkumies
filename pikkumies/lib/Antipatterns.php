@@ -23,6 +23,7 @@ require_once __DIR__ . '/HookRun.php';
 require_once __DIR__ . '/HookLlm.php';
 require_once __DIR__ . '/HookLedger.php';
 require_once __DIR__ . '/HaltJudge.php'; // DATA_NOTICE only: the fixed "data, not instructions" marker text
+require_once __DIR__ . '/PathName.php';
 
 class Antipatterns
 {
@@ -252,7 +253,7 @@ class Antipatterns
         if ($new && $retentionDays > 0) {
             $cut = gmdate('Ymd', time() - $retentionDays * 86400);
             foreach ((array) glob($dir . '/[0-9]*.jsonl') as $f) {
-                if (basename($f, '.jsonl') < $cut) {
+                if (PathName::base($f, '.jsonl') < $cut) {
                     @unlink($f);
                 }
             }

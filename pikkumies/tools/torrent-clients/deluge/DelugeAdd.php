@@ -8,6 +8,8 @@
  * shared contract (qBittorrent's QbitAdd): `added` or `already in the client`, the torrent's own name read back
  * from the list, `paused` when --paused was given, and `verified` when every item is listed (and paused if asked).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class DelugeAdd
 {
     const MAX_FILE = 10485760; // a .torrent file larger than 10 MiB is not a torrent file
@@ -107,7 +109,7 @@ class DelugeAdd
         if ($data === false || $data === '' || $data[0] !== 'd') {
             throw new CliError('not a readable .torrent file (a bencoded dictionary up to 10 MiB)');
         }
-        return ['core.add_torrent_file', [basename($item), base64_encode($data), $options]];
+        return ['core.add_torrent_file', [PathName::base($item), base64_encode($data), $options]];
     }
 
     /** A short printable label for an item until Deluge names it: a magnet's dn, else the file or URL name without its query. */
@@ -117,7 +119,7 @@ class DelugeAdd
             parse_str((string) parse_url($item, PHP_URL_QUERY), $q);
             return isset($q['dn']) && is_string($q['dn']) ? $q['dn'] : 'magnet';
         }
-        return basename((string) preg_replace('/[?#].*$/', '', $item));
+        return PathName::base((string) preg_replace('/[?#].*$/', '', $item));
     }
 }
 

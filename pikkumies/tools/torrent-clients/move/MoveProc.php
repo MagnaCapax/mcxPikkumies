@@ -4,6 +4,8 @@
  * (PHP 7.3 proc_open takes a string), stdin from a string, and kills it after the timeout (a unit spawns nothing
  * long-lived); decode() reads a unit's JSON Lines answer and throws its `ok: false` as a CliError.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class MoveProc
 {
     const MAX_OUT = 8388608;
@@ -39,7 +41,7 @@ class MoveProc
         $setsid = ToolProc::which('setsid'); // its own process group, so a kill reaches anything it started
         $p = proc_open('exec ' . ToolProc::line($setsid !== null ? array_merge([$setsid, '-w'], $argv) : $argv), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (!is_resource($p)) {
-            throw new CliError('could not start ' . basename((string) $argv[1]), 'check the PHP installation');
+            throw new CliError('could not start ' . PathName::base((string) $argv[1]), 'check the PHP installation');
         }
         fwrite($pipes[0], (string) $stdin);
         fclose($pipes[0]);

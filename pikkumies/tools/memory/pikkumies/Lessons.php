@@ -9,6 +9,8 @@
  * --tool links a memory to the files it is about (frontmatter `tools`, real paths); the memory-check hook shows it when a
  * tool call uses one of them (ADR-0081).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class Lessons
 {
     const EXCERPT = 1500; // bytes of the best paragraph returned with a search hit
@@ -69,7 +71,7 @@ class Lessons
         }
         $duplicate = null;
         foreach ($related as $p) {
-            if (substr(basename($p, '.md'), 9) === $slug) {
+            if (substr(PathName::base($p, '.md'), 9) === $slug) {
                 $duplicate = $p;
             }
         }
@@ -110,7 +112,7 @@ class Lessons
         $real = realpath($path);
         $root = realpath(self::root());
         // README.md is tracked by git: changing it would stop every later `pikkumies update`.
-        if ($real === false || $root === false || strpos($real, $root . '/') !== 0 || substr($real, -3) !== '.md' || !is_file($real) || basename($real) === 'README.md') {
+        if ($real === false || $root === false || strpos($real, $root . '/') !== 0 || substr($real, -3) !== '.md' || !is_file($real) || PathName::base($real) === 'README.md') {
             throw new CliError('append works only on an existing memory file', 'pass --path <a path printed by search or save>');
         }
         $before = filesize($real);
@@ -133,7 +135,7 @@ class Lessons
     {
         $root = realpath(self::root());
         $accept = function ($real) use ($root) {
-            return $root !== false && strpos($real, $root . '/') === 0 && basename($real) !== 'README.md';
+            return $root !== false && strpos($real, $root . '/') === 0 && PathName::base($real) !== 'README.md';
         };
         $links = [];
         // The body follows the frontmatter and title in the file, so a --- block at its start is text, not front

@@ -10,6 +10,7 @@
  */
 require_once __DIR__ . '/DocSources.php';
 require_once __DIR__ . '/DocRefusal.php';
+require_once __DIR__ . '/PathName.php';
 
 class DocSite
 {
@@ -535,7 +536,7 @@ class DocSite
 
     private static function writeFile($file, $data)
     {
-        $tmp = dirname($file) . '/.tmp-' . basename($file) . '-' . getmypid();
+        $tmp = dirname($file) . '/.tmp-' . PathName::base($file) . '-' . getmypid();
         if (@file_put_contents($tmp, $data) !== strlen($data) || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
             @unlink($tmp);
             return false;

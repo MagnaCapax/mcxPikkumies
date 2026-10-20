@@ -5,6 +5,8 @@
  * A file-tool path as written (~/ expanded, slashes folded) and its real path: for a file not there yet, the real path of
  * its nearest existing directory with the rest appended, so a symlinked directory cannot hide a guarded file.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 function configChangePathForms($path)
 {
     $home = rtrim((string) getenv('HOME'), '/');
@@ -18,7 +20,7 @@ function configChangePathForms($path)
             $forms[] = $real . $rest;
             break;
         }
-        $rest = '/' . basename($at) . $rest;
+        $rest = '/' . PathName::base($at) . $rest;
     }
     return $forms;
 }

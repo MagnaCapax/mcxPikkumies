@@ -10,6 +10,8 @@
  * be read, or a category at MAX_DEPTH that still has subdirectories comes back as one unit with a 'problem',
  * never silently dropped and never walked further.
  */
+require_once __DIR__ . '/PathName.php';
+
 class Tree
 {
     const MAX_DEPTH = 8;
@@ -24,7 +26,7 @@ class Tree
         $out = ['units' => [], 'categories' => []];
         $root = rtrim($root, '/');
         if (is_dir($root) && self::subdirs($root) === null) {
-            $out['units'][] = ['category' => '', 'name' => basename($root), 'dir' => $root, 'problem' => self::UNREADABLE];
+            $out['units'][] = ['category' => '', 'name' => PathName::base($root), 'dir' => $root, 'problem' => self::UNREADABLE];
             return $out;
         }
         self::walk($root, '', 1, $marker, $leafIsUnit, $out);
@@ -107,6 +109,6 @@ class Tree
     private static function isUnit($dir, $marker, $leafIsUnit, array $subdirs)
     {
         return is_file("$dir/$marker")
-            || ($leafIsUnit && (is_file("$dir/" . basename($dir) . '.php') || !$subdirs));
+            || ($leafIsUnit && (is_file("$dir/" . PathName::base($dir) . '.php') || !$subdirs));
     }
 }

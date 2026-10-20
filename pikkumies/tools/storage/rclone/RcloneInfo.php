@@ -4,6 +4,8 @@
  * read or printed: `list` uses `rclone listremotes --long` (name, type, description; rclone 1.69.1
  * cmd/listremotes/listremotes.go:224), and the config file is named by path only.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class RcloneInfo
 {
     public static function remotes(RcloneCmd $c)
@@ -93,7 +95,7 @@ class RcloneInfo
             $words = array_values(array_filter(explode("\0", (string) @file_get_contents("$dir/cmdline")), function ($w) {
                 return $w !== '' && $w[0] !== '-';
             }));
-            $out[] = ['pid' => (int) basename($dir), 'command' => isset($words[1]) ? preg_replace('/[^a-z0-9\/_-]/i', '', $words[1]) : ''];
+            $out[] = ['pid' => (int) PathName::base($dir), 'command' => isset($words[1]) ? preg_replace('/[^a-z0-9\/_-]/i', '', $words[1]) : ''];
         }
         return $out;
     }

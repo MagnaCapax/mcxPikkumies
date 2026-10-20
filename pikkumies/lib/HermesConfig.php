@@ -21,6 +21,7 @@ require_once __DIR__ . '/HermesUserConfig.php';
 require_once __DIR__ . '/AskReview.php'; // AskReview::TIMEOUT in the pre_tool_call entry
 require_once __DIR__ . '/LocalNotes.php';
 require_once __DIR__ . '/HookInterval.php';
+require_once __DIR__ . '/PathName.php';
 
 class HermesConfig
 {
@@ -455,7 +456,7 @@ class HermesConfig
         $files = array_merge(in_array($own, $files, true) ? [$own] : [], array_values(array_diff($files, [$own])));
         $others = 0;
         foreach ($files as $f) {
-            $name = basename($f, '.txt');
+            $name = PathName::base($f, '.txt');
             if ($name !== self::OWN_SLOT && $others >= self::NOTICES_MAX) {
                 break;
             }

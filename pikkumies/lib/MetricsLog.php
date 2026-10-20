@@ -7,6 +7,8 @@
  * append or prune of this code drops those fields once from every file (scrubDue, marker .scrubbed-1). Like pruning,
  * a rewrite drops lines that do not parse or carry no ts; nothing reads them.
  */
+require_once __DIR__ . '/PathName.php';
+
 class MetricsLog
 {
     /** Seconds between prunes: retention is kept to within a day. */
@@ -73,7 +75,7 @@ class MetricsLog
     /** The month (YYYYMM) a metrics file holds, from its name. */
     public static function month($file)
     {
-        return substr(basename($file, '.jsonl'), -6);
+        return substr(PathName::base($file, '.jsonl'), -6);
     }
 
     /** Run $visit holding the directory's lock; false when the lock file cannot be opened. */
@@ -122,7 +124,7 @@ class MetricsLog
         }
         $ok = true;
         foreach (self::files($dir, '*') as $f) {
-            $kind = substr(basename($f), 0, -strlen('-YYYYMM.jsonl'));
+            $kind = substr(PathName::base($f), 0, -strlen('-YYYYMM.jsonl'));
             if (isset(self::KEEP[$kind])) {
                 $keep = array_flip(self::KEEP[$kind]);
                 $ok = self::rewrite($f, 0, function ($r, $line) use ($keep) {

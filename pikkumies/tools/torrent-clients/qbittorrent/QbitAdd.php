@@ -7,6 +7,8 @@
  * the id is the v1 info-hash, or the v2 info-hash truncated to 40 hex for v2 and hybrid torrents
  * (tc-5.0.0.cpp:421-423); then the list is read back to confirm.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class QbitAdd
 {
     const MAX_FILE = 20971520;
@@ -37,7 +39,7 @@ class QbitAdd
             } elseif (is_file($item) && is_readable($item) && filesize($item) <= self::MAX_FILE) {
                 $data = (string) file_get_contents($item);
                 list($r['id'], $r['name']) = self::torrentFile($data);
-                $parts[] = ['torrents', $data, preg_replace('/[^\w.-]/', '_', basename($item))];
+                $parts[] = ['torrents', $data, preg_replace('/[^\w.-]/', '_', PathName::base($item))];
             } else {
                 $out[] = ['id' => '', 'name' => '', 'result' => 'error: not a magnet link, an http(s) URL or a readable .torrent file (up to 20 MiB)', 'item' => $item];
                 continue;

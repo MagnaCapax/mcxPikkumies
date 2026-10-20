@@ -5,6 +5,8 @@
  * failure, one JSON line goes to local/state/hermes-config.jsonl with the action, file, key, the sha256 of the bytes
  * before and after and the copy's path, never a value (.env holds keys). Doctor reads the last line.
  */
+require_once __DIR__ . '/PathName.php';
+
 class HermesConfigBackup
 {
     /** Test seam: where notes go (null = STDERR). */
@@ -31,7 +33,7 @@ class HermesConfigBackup
             }
             HermesConfig::put($file, $new, fileperms($file) & 0777);
         } catch (Exception $x) {
-            return self::fail($local, basename($file), null, $x->getMessage(), $backup);
+            return self::fail($local, PathName::base($file), null, $x->getMessage(), $backup);
         }
         self::log($local, $action, $file, null, $before, $new, $backup, $detail);
         return true;
@@ -42,7 +44,7 @@ class HermesConfigBackup
     {
         $dir = self::dir($local);
         @mkdir($dir, 0700, true);
-        $base = $dir . '/' . ltrim(basename($file), '.') . '.' . gmdate('Ymd\THis\Z') . '.' . getmypid();
+        $base = $dir . '/' . ltrim(PathName::base($file), '.') . '.' . gmdate('Ymd\THis\Z') . '.' . getmypid();
         for ($n = 1; $n < 100; $n++) {
             $path = $n === 1 ? $base : "$base.$n";
             $f = @fopen($path, 'x'); // fails when the name exists, a link included
@@ -57,7 +59,7 @@ class HermesConfigBackup
     /** One JSON line per change or failure; sha256 of the bytes, never the bytes. */
     public static function log($local, $action, $file, $key, $before, $after, $backup, $detail)
     {
-        $line = json_encode(['ts' => gmdate('Y-m-d\TH:i:s\Z'), 'action' => $action, 'file' => basename($file), 'key' => $key,
+        $line = json_encode(['ts' => gmdate('Y-m-d\TH:i:s\Z'), 'action' => $action, 'file' => PathName::base($file), 'key' => $key,
             'sha256_before' => $before === null ? null : hash('sha256', $before), 'sha256_after' => $after === null ? null : hash('sha256', $after),
             'backup' => $backup === null ? null : Config::shown($backup), 'detail' => $detail], JSON_UNESCAPED_SLASHES) . "\n";
         @mkdir("$local/state", 0700, true);

@@ -10,6 +10,7 @@
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
 require_once dirname(__DIR__, 3) . '/lib/Redact.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 const COMMAND_LOG_TOOLS = ['terminal'];
 const COMMAND_LOG_MAX = 4000;
@@ -65,7 +66,7 @@ function commandLogWrite(array $rec, $dir, $retentionDays)
     if ($new && $retentionDays > 0) {
         $cut = gmdate('Ymd', time() - $retentionDays * 86400);
         foreach ((array) glob($dir . '/[0-9]*.jsonl') as $f) {
-            if (basename($f, '.jsonl') < $cut) {
+            if (PathName::base($f, '.jsonl') < $cut) {
                 @unlink($f);
             }
         }

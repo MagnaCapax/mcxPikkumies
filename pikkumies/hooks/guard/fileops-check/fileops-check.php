@@ -20,6 +20,7 @@ require_once dirname(__DIR__, 3) . '/lib/Cli.php';
 require_once dirname(__DIR__, 3) . '/lib/FileopsClassify.php';
 require_once dirname(__DIR__, 3) . '/lib/FileopsList.php';
 require_once dirname(__DIR__, 3) . '/lib/HookUnits.php'; // HookUnits::approveShown: the one approve-message-fits-the-panel check (ADR-0054)
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 const FILEOPS_SESSION_RE = '/^[A-Za-z0-9._-]{1,128}$/';
 const FILEOPS_PASS_SECONDS = 600;
@@ -43,7 +44,7 @@ function fileopsCollisions(array $m, array $sources, array $dest, $home)
     $d = $dest[0];
     $into = $m['intoDir'] || (is_dir($d) && !$m['noTargetDir']);
     $landing = $into ? array_map(function ($s) use ($d) {
-        return rtrim($d, '/') . '/' . basename($s);
+        return rtrim($d, '/') . '/' . PathName::base($s);
     }, $sources) : (count($sources) === 1 ? [$d] : []);
     $out = [];
     foreach (array_count_values($landing) as $t => $n) {

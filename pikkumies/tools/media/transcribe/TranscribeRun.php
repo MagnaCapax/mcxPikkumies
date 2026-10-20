@@ -8,6 +8,8 @@
  * removed by the next run once it is STALE_SECONDS old. $localDir is the caller's local/ directory
  * (a test seam, Config::localDir() in production — TranscribeLocal.php's own doc explains the pattern).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class TranscribeRun
 {
     const CLOUD_CHUNK_LIMIT = 25165824; // 24 MiB
@@ -106,7 +108,7 @@ class TranscribeRun
             throw new CliError("cannot create $base", 'check that pikkumies/local is writable by this account');
         }
         foreach ((array) glob($base . '/' . self::TMP_PREFIX . '*', GLOB_ONLYDIR) as $old) {
-            if (preg_match('/^' . self::TMP_PREFIX . '[0-9a-f]{16}$/', basename($old)) && !is_link($old)
+            if (preg_match('/^' . self::TMP_PREFIX . '[0-9a-f]{16}$/', PathName::base($old)) && !is_link($old)
                 && @filemtime($old) < time() - self::STALE_SECONDS) {
                 self::removeTempDir($old, $localDir);
             }

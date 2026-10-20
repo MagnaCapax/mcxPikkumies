@@ -10,6 +10,8 @@
  * part of the command at run time (; & | ( ) a newline, $ or a backtick, xargs, or code): the paths in the text are
  * then not reliable (a cd before them, a variable in them), so the caller lists none.
  */
+require_once __DIR__ . '/PathName.php';
+
 class FileopsClassify
 {
     const VERBS = ['chmod', 'chown', 'chgrp', 'setfacl', 'chattr', 'rename', 'mv', 'find'];
@@ -129,7 +131,7 @@ class FileopsClassify
         foreach ($segments as $seg) {
             for ($i = 0, $n = count($seg), $xargs = false, $wrapped = false; $i < $n; $i++) {
                 $word = $seg[$i]['w'];
-                $base = basename($word);
+                $base = PathName::base($word);
                 if ($isCode && !in_array($base, self::VERBS, true)) {
                     continue; // in code a command can start anywhere
                 }
@@ -242,8 +244,8 @@ class FileopsClassify
             $paths[] = $args[$i];
         }
         for ($exec = ''; $i < $n - 1 && $exec === ''; $i++) {
-            if (in_array($args[$i]['w'], ['-exec', '-execdir', '-ok', '-okdir'], true) && in_array(basename($args[$i + 1]['w']), self::FIND_EXEC, true)) {
-                $exec = basename($args[$i + 1]['w']);
+            if (in_array($args[$i]['w'], ['-exec', '-execdir', '-ok', '-okdir'], true) && in_array(PathName::base($args[$i + 1]['w']), self::FIND_EXEC, true)) {
+                $exec = PathName::base($args[$i + 1]['w']);
             }
         }
         return [$paths ?: [['w' => '.', 'p' => '.', 'g' => false, 't' => false]], $exec];

@@ -14,6 +14,8 @@
  * Out of its sight (a safety prompt, not security, AGENTS.md): a name or path built in a variable (${f}, $(...)), in
  * code from pieces, or by a program that reads files itself without one of the readers above.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class GuardMediaCreds
 {
     const FILE = '.media-stack-credentials.txt';
@@ -98,7 +100,7 @@ class GuardMediaCreds
             while ($w && preg_match('/^(\w+=\S*|sudo|nice|command|env|time)$/', $w[0])) {
                 array_shift($w);
             }
-            $prog = $w ? basename((string) array_shift($w)) : '';
+            $prog = $w ? PathName::base((string) array_shift($w)) : '';
             $find = $prog === 'find' && preg_match('#(-exec(dir)?\s+|xargs\s+(-\S+\s+)*)(' . self::READERS . ')\b#', $cmd);
             $grep = in_array($prog, ['rg', 'ag', 'ack'], true) || (in_array($prog, ['grep', 'egrep', 'fgrep', 'ugrep'], true)
                 && preg_grep('/^(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive|--dereference-recursive|--directories=recurse)$/', $w));

@@ -9,6 +9,7 @@
 require_once dirname(__DIR__, 3) . '/lib/Cli.php';
 require_once dirname(__DIR__, 3) . '/lib/Redact.php';
 require_once dirname(__DIR__, 3) . '/lib/ToolProc.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class PublishScan
 {
@@ -55,7 +56,7 @@ class PublishScan
     /** A file name that usually holds a credential: .env files (not their examples), keys, certificates' private parts. */
     public static function credentialName($path)
     {
-        $b = basename((string) $path);
+        $b = PathName::base((string) $path);
         return (preg_match('/^\.env(\..+)?$/i', $b) && !preg_match('/\.(example|sample|template|dist|defaults?)$/i', $b))
             || preg_match('/\.(pem|key|p12|pfx)$/i', $b) || $b === '.netrc'
             || (preg_match('/^id_(rsa|dsa|ecdsa|ed25519)/', $b) && !preg_match('/\.pub$/', $b))

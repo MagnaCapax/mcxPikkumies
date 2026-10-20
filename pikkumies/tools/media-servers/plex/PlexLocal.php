@@ -7,6 +7,8 @@
  * set it the same way). A container keeps it under its /config mount; the PMSS recipe mounts ~/docker/plex/config
  * there (PMSS docs/linuxserver.io.md, "Plex"). Only the user's own folders are looked in, never /var/lib.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class PlexLocal
 {
     const TAIL = '/Plex Media Server';
@@ -58,7 +60,7 @@ class PlexLocal
             return ['file' => $file, 'lines' => MediaLocal::tail($file, $lines)];
         }
         foreach ($dirs as $d) {
-            $there = array_map('basename', (array) glob("$d/Logs/*.log"));
+            $there = array_map(['PathName', 'base'], (array) glob("$d/Logs/*.log"));
             if ($there) {
                 sort($there);
                 throw new CliError("no \"$name\" in $d/Logs", 'logs there: ' . implode(', ', array_slice($there, 0, 12))

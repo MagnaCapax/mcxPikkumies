@@ -5,6 +5,8 @@
  * after stage $count, whose output this process copies and counts: the bytes handed to ssh on a run, the bytes received
  * on a restore. stderr of each stage goes to a temporary file and only its tail is kept.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class RemotePipe
 {
     /**
@@ -35,7 +37,7 @@ class RemotePipe
             }
             if (!is_resource($p)) {
                 self::finish($procs, $pipes);
-                throw new CliError('could not start ' . basename((string) $argv[0]), 'check that it is installed and runnable');
+                throw new CliError('could not start ' . PathName::base((string) $argv[0]), 'check that it is installed and runnable');
             }
             $procs[$i] = $p;
             $prev = isset($pipes[$i][1]) && $i !== $count ? $pipes[$i][1] : null;

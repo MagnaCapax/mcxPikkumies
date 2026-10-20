@@ -13,6 +13,7 @@ require_once dirname(__DIR__, 3) . '/lib/GoalReview.php';
 require_once dirname(__DIR__, 3) . '/lib/HookLedger.php';
 require_once dirname(__DIR__, 3) . '/lib/HookLlm.php';
 require_once dirname(__DIR__, 3) . '/lib/HookQuotes.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 const GOAL_REVIEW_DAILY = 24;       // light-model calls a day per account unless hooks.dailyCalls.goal-review says otherwise
 const GOAL_REVIEW_SECONDS = 90;     // of the unit's 100 s timeout, for all its model calls together
@@ -45,7 +46,7 @@ $w = GoalReviewWindow::read($records);
 // Whether something shown last time was then used: a tool's script or a page's path in this window's calls.
 $shownBefore = isset($state['shown']) && is_array($state['shown']) ? $state['shown'] : [];
 $log = ['session' => is_array($in) && isset($in['session']) && is_string($in['session']) ? $in['session'] : '',
-    'used' => array_values(array_filter($shownBefore, function ($p) use ($w) { return is_string($p) && strpos($w['used'], basename($p)) !== false; }))];
+    'used' => array_values(array_filter($shownBefore, function ($p) use ($w) { return is_string($p) && strpos($w['used'], PathName::base($p)) !== false; }))];
 list($why, $keep) = GoalReviewWindow::skip($w, $config);
 $rounds = isset($config['hooks']['goalReview']['rounds']) && (int) $config['hooks']['goalReview']['rounds'] === 10 ? 10 : 1;
 if ($why === '' && !HookLedger::spend(Config::localDir(), 'goal-review', HookLedger::cap($config, 'goal-review', GOAL_REVIEW_DAILY), $rounds)) {

@@ -5,6 +5,8 @@
  * privacy.perfLogging on); this class reads them back, and answers the save reminder's questions
  * from last-search.json and the memory files, which exist whatever perfLogging says.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class MemoryMetrics
 {
     /** Seconds after a search during which a save counts as following it, and the reminder may fire. */
@@ -41,7 +43,7 @@ class MemoryMetrics
         $out = [];
         foreach (TextSearch::lessonDirs(DocSources::root()) as $dir) {
             foreach ((array) glob($dir . '/*.md') as $f) {
-                if (basename($f) !== 'README.md') {
+                if (PathName::base($f) !== 'README.md') {
                     $out[] = $f;
                 }
             }
@@ -82,12 +84,12 @@ class MemoryMetrics
         $byKind = ['lesson' => 0, 'reference' => 0, 'research' => 0];
         $byTopic = [];
         foreach (self::memoryFiles() as $f) {
-            $dir = basename(dirname($f));
-            $top = basename(dirname($f, 2)) === 'memory';
+            $dir = PathName::base(dirname($f));
+            $top = PathName::base(dirname($f, 2)) === 'memory';
             $kind = $top && in_array($dir, ['reference', 'research'], true) ? $dir : 'lesson';
             $byKind[$kind]++;
             if ($kind === 'lesson') {
-                $topic = basename(dirname($f, 2)) === 'lessons' ? $dir : '(no topic)';
+                $topic = PathName::base(dirname($f, 2)) === 'lessons' ? $dir : '(no topic)';
                 $byTopic[$topic] = (isset($byTopic[$topic]) ? $byTopic[$topic] : 0) + 1;
             }
         }

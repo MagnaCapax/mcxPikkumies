@@ -149,6 +149,7 @@ return [
         copy(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php', $root . '/lib/HermesInstall.php');
         copy(dirname(__DIR__) . '/pikkumies/lib/Eternal.php', $root . '/lib/Eternal.php');
         copy(dirname(__DIR__) . '/pikkumies/lib/EternalLock.php', $root . '/lib/EternalLock.php');
+        copy(dirname(__DIR__) . '/pikkumies/lib/PathName.php', $root . '/lib/PathName.php');
         $runner = $root . '/runner.php';
         file_put_contents($runner, '<?php require __DIR__ . "/lib/HermesInstall.php"; require __DIR__ . "/lib/Eternal.php"; require __DIR__ . "/lib/EternalLock.php"; Eternal::$hostMarker = __DIR__ . "/missing-marker"; HermesInstall::$root = __DIR__; $lock = HermesInstall::lock(false); if (!$lock) exit(2); passthru("/bin/sh " . escapeshellarg(__DIR__ . "/child.sh"), $code); exit($code);');
         file_put_contents($root . '/child.sh', "#!/bin/sh\nfor fd in /proc/\$\$/fd/*; do [ \"\$(readlink \"\$fd\")\" = '" . $root . "/local/hermes.lock' ] && exit 0; done\nexit 1\n");

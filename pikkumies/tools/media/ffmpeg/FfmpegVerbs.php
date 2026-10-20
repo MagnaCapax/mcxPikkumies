@@ -3,6 +3,8 @@
  * FfmpegVerbs: `probe`, `convert` and `jobs` of the ffmpeg unit (ADR-0045, USAGE.md). `hw` is
  * FfmpegHw.php; the shared ffmpeg/ffprobe runner is tools/media/lib/Ffmpeg.php.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class FfmpegVerbs
 {
     const DEFAULT_HOURS = 6;
@@ -66,7 +68,7 @@ class FfmpegVerbs
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         $out = [];
         foreach ((array) glob('/proc/[0-9]*', GLOB_ONLYDIR) as $dir) {
-            $pid = (int) basename($dir);
+            $pid = (int) PathName::base($dir);
             if (@fileowner($dir) !== $uid) {
                 continue;
             }
@@ -105,7 +107,7 @@ class FfmpegVerbs
         if ($dir === false || !is_dir($dir) || !HomePath::inside($dir, $home)) {
             throw new CliError("the output directory does not exist inside the home: $path", 'create the directory first, or name one under ' . $home);
         }
-        $name = basename($path);
+        $name = PathName::base($path);
         $real = $dir . '/' . $name;
         if ($name === '.' || $name === '..' || is_link($real)) {
             throw new CliError("$real is a symlink or not a file name; nothing converted", 'name a new file under ' . $home);

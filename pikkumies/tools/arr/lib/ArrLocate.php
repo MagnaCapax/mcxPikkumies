@@ -7,6 +7,8 @@
  * invalid, no ApiKey (never started), turned off on PMSS (~/.<app>Disable), and a port (from config.xml
  * or from Docker) whose listener belongs to another account. lib/Http.php checks the owner again.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class ArrLocate
 {
     /**
@@ -63,7 +65,7 @@ class ArrLocate
     /** '; <folder> holds <file>, but ...' when a Docker folder has a config while Docker is not this user's own daemon. */
     public static function skippedDocker($path, $home, $uid)
     {
-        return file_exists($path) ? '; ' . str_replace($home, '~', dirname($path)) . ' holds ' . basename($path)
+        return file_exists($path) ? '; ' . str_replace($home, '~', dirname($path)) . ' holds ' . PathName::base($path)
             . ", but Docker is not this user's own daemon (no socket uid $uid owns at DOCKER_HOST or /run/user/$uid/docker.sock);"
             . ' not used' : '';
     }

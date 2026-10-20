@@ -12,6 +12,7 @@ $lib = dirname(__DIR__, 3) . '/lib';
 require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
 require_once "$lib/ToolProc.php";
+require_once "$lib/PathName.php";
 foreach (['FindMatch', 'FindLocal', 'FindRemote', 'FindStatus', 'FindOutput'] as $class) {
     require_once __DIR__ . "/$class.php";
 }
@@ -93,7 +94,7 @@ Cli::run($argv, ['find' => function ($args, $opt) use ($findRoot, $findTimeout, 
     $query = $args[0];
     $candidates = [];
     $issues = [];
-    $units = FindLocal::discover($findRoot, ['lib', basename(__DIR__)]);
+    $units = FindLocal::discover($findRoot, ['lib', PathName::base(__DIR__)]);
     $local = FindLocal::run($units, $findTimeout);
     foreach ($local['rows'] as $client => $lines) {
         findAbsorb($candidates, $issues, 'local', $client, $lines, $query);

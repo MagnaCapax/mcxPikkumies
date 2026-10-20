@@ -10,6 +10,8 @@
  * then hash-checks the new location, so a mismatch this check missed surfaces as missing/incomplete
  * data in `list` afterwards, never as a silent "done".
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class TransmissionRepath
 {
     public static function run(TransmissionClient $c, array $targets, $to)
@@ -62,6 +64,6 @@ class TransmissionRepath
     private static function relative($old, $oldRoot)
     {
         return $oldRoot !== '' && strncmp($old, $oldRoot . '/', strlen($oldRoot) + 1) === 0
-            ? substr($old, strlen($oldRoot) + 1) : basename($old);
+            ? substr($old, strlen($oldRoot) + 1) : PathName::base($old);
     }
 }

@@ -294,4 +294,14 @@ return [
                 basename($f) . ': a 7.4+ typed property declaration would parse-error under PHP 7.3');
         }
     },
+    'php73: no basename() under lib, tools or hooks (locale-dependent before PHP 8), and every PathName user loads lib/PathName.php' => function () {
+        // tests/run.php loads every lib file, so a missing require would pass here and fail in the installed tool.
+        foreach (actTrackedPhp() as $f) {
+            $code = actStripComments($f);
+            check(!preg_match('/\bbasename\s*\(|[\'"]basename[\'"]/i', $code), basename($f) . ': basename() drops leading multibyte characters in the C locale on PHP 7.3; use PathName::base()');
+            if (strpos($code, 'PathName') !== false && basename($f) !== 'PathName.php') {
+                check(strpos($code, '/PathName.php') !== false || preg_match('/\'PathName\'\] as \$/', $code), basename($f) . ': uses PathName without loading lib/PathName.php');
+            }
+        }
+    },
 ];

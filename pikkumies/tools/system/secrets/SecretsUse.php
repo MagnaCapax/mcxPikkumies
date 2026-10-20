@@ -7,6 +7,8 @@
  * typed at the user's terminal, because a terminal is no proof a person is there (the agent can open one, Hermes
  * pty=true, ADR-0053) but the passphrase is something the agent never has.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class SecretsUse
 {
     const OUT_MAX = 8000;
@@ -52,7 +54,7 @@ class SecretsUse
         $tools = realpath(self::$toolsDir !== null ? self::$toolsDir : Config::root() . '/tools');
         $script = isset($cmd[1]) ? self::expandHome($cmd[1]) : '';
         $real = $script !== '' ? realpath($script) : false;
-        if (!in_array(basename($cmd[0]), ['php', basename(PHP_BINARY)], true) || $tools === false || $real === false || !is_file($real)
+        if (!in_array(PathName::base($cmd[0]), ['php', PathName::base(PHP_BINARY)], true) || $tools === false || $real === false || !is_file($real)
             || substr($real, -4) !== '.php' || strpos($real, $tools . '/') !== 0) {
             throw new CliError('use runs only a Pikkumies tool (php <script under ' . Config::shown((string) $tools) . '/>) unless --any-command is given; nothing was run',
                 'run the tool that needs the secret, e.g. -- php ' . Config::shown((string) $tools) . '/<category>/<tool>/<tool>.php <verb>; '

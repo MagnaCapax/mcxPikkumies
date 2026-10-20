@@ -9,7 +9,7 @@
  * per request to local/state/services-serve.jsonl: never the .torrent bytes, never arguments beyond their count.
  */
 $serveLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'Config', 'ToolProc', 'HomePath'] as $serveClass) {
+foreach (['Cli', 'Config', 'ToolProc', 'HomePath', 'PathName'] as $serveClass) {
     require_once "$serveLib/$serveClass.php";
 }
 require_once dirname(__DIR__, 2) . '/torrent-clients/lib/Bencode.php';
@@ -77,7 +77,7 @@ if ($req['kind'] === 'rsync') {
     exit($rc);
 }
 
-$script = rtrim($serveToolsDir, '/') . '/' . $req['unit'] . '/' . basename($req['unit']) . '.php';
+$script = rtrim($serveToolsDir, '/') . '/' . $req['unit'] . '/' . PathName::base($req['unit']) . '.php';
 if (!is_file($script)) {
     $serveRefuse($peer, 'tool', "{$req['unit']} is not installed on this box", 'update Pikkumies on this box');
 }

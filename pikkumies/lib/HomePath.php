@@ -8,6 +8,8 @@
  * (Documentation/filesystems/fuse.rst, v6.12). Moved from tools/storage/lib/ to pikkumies/lib/ once a
  * third category (media) needed it.
  */
+require_once __DIR__ . '/PathName.php';
+
 class HomePath
 {
     const SYSTEM = ['/bin', '/boot', '/dev', '/etc', '/lib', '/lib32', '/lib64', '/libx32', '/proc', '/root', '/run', '/sbin', '/srv',
@@ -75,11 +77,11 @@ class HomePath
             throw new CliError("$path is a symlink; nothing restored", 'name a new directory');
         }
         $parent = realpath(dirname($path));
-        if ($parent === false || !self::inside($parent . '/' . basename($path), $home) || $parent . '/' . basename($path) === $home) {
+        if ($parent === false || !self::inside($parent . '/' . PathName::base($path), $home) || $parent . '/' . PathName::base($path) === $home) {
             throw new CliError("$path is not a new directory inside the home directory; nothing restored",
                 'restores go only to a new directory under ' . $home);
         }
-        $real = $parent . '/' . basename($path);
+        $real = $parent . '/' . PathName::base($path);
         if (self::inFuse($real, $mounts)) {
             throw new CliError("$real is inside a FUSE mount (rclone, sshfs...); nothing restored",
                 'restore to a local directory under ' . $home);

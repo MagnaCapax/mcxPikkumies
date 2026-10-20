@@ -9,6 +9,8 @@
  *   "<unit> <verb>". `X=<path>.php` in the same text is read into `$X`, `${X}` and `"$X"`;
  * - a Hermes tool outside QUIET, unless its `action` only reads: "<tool>[ <action>][ <path, job, name or process>]".
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class MemoryCheckTargets
 {
     /**
@@ -30,7 +32,7 @@ class MemoryCheckTargets
         $out = [];
         foreach (TextSearch::lessonDirs($root) as $dir) {
             foreach ((array) glob("$dir/*.md") as $file) {
-                if (basename($file) === 'README.md') {
+                if (PathName::base($file) === 'README.md') {
                     continue;
                 }
                 list($meta, $body) = Units::frontmatter((string) @file_get_contents($file, false, null, 0, self::HEAD));
@@ -38,7 +40,7 @@ class MemoryCheckTargets
                 if (!is_array($tools)) {
                     continue;
                 }
-                $title = preg_match('/^# (.+)$/m', $body, $m) ? $m[1] : basename($file, '.md');
+                $title = preg_match('/^# (.+)$/m', $body, $m) ? $m[1] : PathName::base($file, '.md');
                 foreach ($tools as $t) {
                     if (is_string($t) && $t !== '') {
                         $out[$t][] = [$file, $title];
@@ -54,7 +56,7 @@ class MemoryCheckTargets
     {
         $hits = [];
         foreach ($links as $file => $memories) {
-            $word = '#(?<![A-Za-z0-9_.-])' . preg_quote(basename($file), '#') . '(?![A-Za-z0-9_.-])#';
+            $word = '#(?<![A-Za-z0-9_.-])' . preg_quote(PathName::base($file), '#') . '(?![A-Za-z0-9_.-])#';
             foreach ($texts as $text) {
                 if (preg_match($word, $text)) {
                     $hits[$file] = $memories;

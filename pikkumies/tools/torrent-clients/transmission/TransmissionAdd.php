@@ -7,6 +7,8 @@
  * `result` is still the string "success" (section 3.4) -- a structured signal, unlike Deluge's
  * regex-matched duplicate error text.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class TransmissionAdd
 {
     const MAX_FILE = 10485760; // a .torrent file larger than 10 MiB is not a torrent file
@@ -96,6 +98,6 @@ class TransmissionAdd
             parse_str((string) parse_url($item, PHP_URL_QUERY), $q);
             return isset($q['dn']) && is_string($q['dn']) ? $q['dn'] : 'magnet';
         }
-        return basename((string) preg_replace('/[?#].*$/', '', $item));
+        return PathName::base((string) preg_replace('/[?#].*$/', '', $item));
     }
 }

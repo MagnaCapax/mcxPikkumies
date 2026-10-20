@@ -12,6 +12,7 @@ require_once __DIR__ . '/Cli.php';
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/SshLists.php';
 require_once __DIR__ . '/ToolProc.php';
+require_once __DIR__ . '/PathName.php';
 
 class Services
 {
@@ -411,7 +412,7 @@ class Services
         $p = proc_open('exec ' . ($setsid !== null ? escapeshellarg($setsid) . ' ' : '') . ToolProc::line($argv),
             [0 => $stdin === null ? ['file', '/dev/null', 'r'] : ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $vars);
         if (!is_resource($p)) {
-            throw new CliError('could not start ' . basename((string) $argv[0]), 'check that it is installed and runnable');
+            throw new CliError('could not start ' . PathName::base((string) $argv[0]), 'check that it is installed and runnable');
         }
         if ($stdin !== null) {
             stream_set_blocking($pipes[0], false);

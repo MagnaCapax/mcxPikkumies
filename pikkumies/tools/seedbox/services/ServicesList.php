@@ -3,6 +3,8 @@
  * ServicesList: add, list, show, edit and remove entries of the services list (ADR-0084). Provider presets fill in
  * client endpoints only where a source says where they are; anything else stays unknown (null) rather than guessed.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class ServicesList
 {
     /**
@@ -123,7 +125,7 @@ class ServicesList
         foreach (array_merge((array) glob("$memoryDir/lessons/services/*.md"), (array) glob("$memoryDir/reference/*.md")) as $f) {
             $text = is_file($f) && !is_link($f) ? (string) @file_get_contents($f, false, null, 0, 65536) : '';
             if (preg_match('/^service:\s*' . preg_quote($nick, '/') . '\s*$/mi', $text)) {
-                $out[] = ['path' => substr($f, strlen(dirname($memoryDir)) + 1), 'title' => preg_match('/^# (.+)$/m', $text, $m) ? trim($m[1]) : basename($f, '.md')];
+                $out[] = ['path' => substr($f, strlen(dirname($memoryDir)) + 1), 'title' => preg_match('/^# (.+)$/m', $text, $m) ? trim($m[1]) : PathName::base($f, '.md')];
             }
         }
         return $out;

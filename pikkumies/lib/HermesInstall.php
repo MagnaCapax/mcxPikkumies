@@ -14,6 +14,8 @@
  * untracked files. Nothing here deletes a tree: an incomplete one is moved aside and reported.
  * Because the code can change under us, every start checks a changed checkout first (verify()).
  */
+require_once __DIR__ . '/PathName.php';
+
 class HermesInstall
 {
     const REPO = 'https://github.com/NousResearch/hermes-agent.git';
@@ -292,7 +294,7 @@ class HermesInstall
             return "cannot write $store";
         }
         try {
-            $archive = $tmp . '/' . basename((string) parse_url($uv['url'], PHP_URL_PATH));
+            $archive = $tmp . '/' . PathName::base((string) parse_url($uv['url'], PHP_URL_PATH));
             $code = self::run(['curl', '-fsSL', '-o', $archive, $uv['url']]);
             $mirror = json_decode((string) @file_get_contents($tree . '/pm/artifact-mirror.json'), true);
             if ($code !== 0 && in_array($code, self::MIRROR_RETRY_CODES, true) && !empty($mirror['origin']) && !empty($mirror['prefix'])) {
@@ -487,7 +489,7 @@ class HermesInstall
             if (!$moved) {
                 return 'not complete, and could not move pikkumies/hermes aside; move or remove it, then run `pikkumies install`';
             }
-            $note = 'moved the incomplete tree to ' . basename($aside) . ' (remove it when it is not needed); ';
+            $note = 'moved the incomplete tree to ' . PathName::base($aside) . ' (remove it when it is not needed); ';
         }
         @mkdir(self::includeDir(), 0700, true);
         @mkdir(self::localDir(), 0700, true);

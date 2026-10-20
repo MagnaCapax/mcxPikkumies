@@ -11,6 +11,8 @@
  * inside the torrent's directory and $HOME, never through a symlinked directory. DeletePlan has
  * already checked the size the user approved and that no other torrent shares a file.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class RtorrentDeleter
 {
     public static function remove(RtorrentClient $c, array $natives, $withData)
@@ -92,7 +94,7 @@ class RtorrentDeleter
         foreach (array_keys($parents) as $d) {
             self::rmdirEmpty($p['dir'] . '/' . $d);
         }
-        if ($p['multi'] && basename($p['root']) === basename((string) $p['record']['name']) && $p['root'] !== $p['home']) {
+        if ($p['multi'] && PathName::base($p['root']) === PathName::base((string) $p['record']['name']) && $p['root'] !== $p['home']) {
             self::rmdirEmpty($p['dir']); // the torrent's own folder (d.directory.set appends the name, command_download.cc:181-188)
         }
         $r['disposal'] = $orphans ? 'partial' : 'deleted';

@@ -5,6 +5,8 @@
  * "file changed as we read it", is a warning), the bytes handed to ssh must equal the bytes the receiver stored, and only
  * then `commit` makes the archive count; an interrupted upload stays a .part file the receiver removes after a day.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class RemoteRun
 {
     /** PMSS's panel backup set, verbatim: pmssCustomerBackupRelativePaths(), PMSS etc/skel/www/scriptsIncBackup.php:6-19. */
@@ -103,7 +105,7 @@ class RemoteRun
         $want = array_merge(self::PMSS_SET, self::META_MORE);
         foreach ((array) glob($home . '/.[!.]*') as $f) {
             if (is_file($f) || is_link($f)) {
-                $want[] = basename($f);
+                $want[] = PathName::base($f);
             }
         }
         if (HomePath::inside($localDir, $home) && $localDir !== $home) {

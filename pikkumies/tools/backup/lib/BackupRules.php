@@ -3,6 +3,8 @@
  * BackupRules: the checks every backup verb shares (tools/backup/README.md): the keep options, snapshot ids, the
  * listing order, the check record, and one backup job per account at a time (file listings page with ToolList::want).
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class BackupRules
 {
     const KEEP = ['keep-last', 'keep-hourly', 'keep-daily', 'keep-weekly', 'keep-monthly', 'keep-yearly', 'keep-within'];
@@ -52,8 +54,8 @@ class BackupRules
         foreach ((array) glob($ctx['procRoot'] . '/[0-9]*', GLOB_ONLYDIR) as $dir) {
             $comm = trim((string) @file_get_contents("$dir/comm"));
             if (@fileowner($dir) === (int) $ctx['uid'] && in_array($comm, ['restic', 'borg', 'borgmatic'], true)
-                && (int) basename($dir) !== getmypid()) {
-                throw new CliError("a $comm job of this account is already running (pid " . basename($dir) . '); nothing started',
+                && (int) PathName::base($dir) !== getmypid()) {
+                throw new CliError("a $comm job of this account is already running (pid " . PathName::base($dir) . '); nothing started',
                     'wait for it to finish');
             }
         }

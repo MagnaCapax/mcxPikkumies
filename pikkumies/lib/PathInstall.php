@@ -8,6 +8,8 @@
  * ~/.bashrc and ~/.profile that exports PATH itself, so the command works without a relogin and on
  * shells that never source the Debian skeleton.
  */
+require_once __DIR__ . '/PathName.php';
+
 class PathInstall
 {
     const MARK_START = '# >>> pikkumies >>>';
@@ -145,7 +147,7 @@ class PathInstall
         $wrote = [];
         foreach ([$home . '/.bashrc', $home . '/.profile'] as $rc) {
             if (self::ensureFile($rc, $dir)) {
-                $wrote[] = basename($rc);
+                $wrote[] = PathName::base($rc);
             }
         }
         $note = $wrote ? 'PATH line added to ' . implode(' and ', $wrote) . ' (open a new shell)' : 'PATH line already present';

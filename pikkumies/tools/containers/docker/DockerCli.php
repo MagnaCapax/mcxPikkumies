@@ -16,6 +16,7 @@ foreach (['Cli', 'CliHuman', 'Config', 'Host', 'Cgroup', 'Detect'] as $dockerCla
     require_once "$dockerLib/$dockerClass.php";
 }
 require_once dirname(__DIR__, 3) . '/lib/ToolProc.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class DockerCli
 {
@@ -285,7 +286,7 @@ class DockerCli
                 continue;
             }
             $argv = explode("\0", rtrim((string) @file_get_contents("$dir/cmdline"), "\0"));
-            $exe = basename((string) $argv[0]);
+            $exe = PathName::base((string) $argv[0]);
             if ($exe === 'dockerd') {
                 $n['dockerd']++;
             }
@@ -326,7 +327,7 @@ class DockerCli
                 return $pw['name'];
             }
         }
-        return basename($this->home);
+        return PathName::base($this->home);
     }
 
     private static function firstLine($text)

@@ -6,6 +6,8 @@
  * starts with its id, one that carries anything but the unit's own fields, and one already sent: after the receiver
  * took it, it is renamed to <id>.sent.json and is never sent again. lock() keeps two sends of one draft from overlapping.
  */
+require_once __DIR__ . '/PathName.php';
+
 class DraftStore
 {
     const ID_RE = '/^[0-9a-f]{32}$/D';
@@ -90,7 +92,7 @@ class DraftStore
     {
         $rows = [];
         foreach (glob("$dir/*.json") ?: [] as $f) {
-            $id = preg_replace('/\.sent$/', '', basename($f, '.json'));
+            $id = preg_replace('/\.sent$/', '', PathName::base($f, '.json'));
             if (preg_match(self::ID_RE, $id)) {
                 $p = json_decode((string) file_get_contents($f), true);
                 $rows[] = $row($id, is_array($p) ? $p : null, $f, substr($f, -10) === '.sent.json');

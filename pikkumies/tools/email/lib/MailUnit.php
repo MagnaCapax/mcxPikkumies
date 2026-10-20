@@ -12,6 +12,8 @@ foreach (['MailTransport', 'MailImap', 'MailParse', 'MailPath', 'Maildir', 'Mail
     require_once __DIR__ . "/$class.php";
 }
 
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class MailUnit
 {
     /** A JSON state file, or [] when there is none or it is unreadable. */
@@ -58,7 +60,7 @@ class MailUnit
         if ($new && $days > 0) {
             $cut = gmdate('Ymd', time() - $days * 86400);
             foreach ((array) glob($dir . '/[0-9]*.jsonl') as $f) {
-                if (basename($f, '.jsonl') < $cut) {
+                if (PathName::base($f, '.jsonl') < $cut) {
                     @unlink($f);
                 }
             }

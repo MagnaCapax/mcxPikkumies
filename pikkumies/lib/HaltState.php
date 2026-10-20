@@ -8,6 +8,7 @@
  * last_judged_turn}. Also owns the halt-guard decision log, local/logs/halt-guard/YYYYMMDD.jsonl.
  */
 require_once __DIR__ . '/Config.php';
+require_once __DIR__ . '/PathName.php';
 
 class HaltState
 {
@@ -140,7 +141,7 @@ class HaltState
         if ($new && $retentionDays > 0) {
             $cut = gmdate('Ymd', time() - $retentionDays * 86400);
             foreach ((array) glob($dir . '/[0-9]*.jsonl') as $f) {
-                if (basename($f, '.jsonl') < $cut) {
+                if (PathName::base($f, '.jsonl') < $cut) {
                     @unlink($f);
                 }
             }

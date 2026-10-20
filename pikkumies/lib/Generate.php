@@ -17,6 +17,7 @@ require_once __DIR__ . '/LocalHooks.php';
 require_once __DIR__ . '/LocalNotes.php';
 require_once __DIR__ . '/NestedAgent.php';
 require_once __DIR__ . '/Host.php';
+require_once __DIR__ . '/PathName.php';
 
 class Generate
 {
@@ -155,7 +156,7 @@ class Generate
         if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0700, true)) {
             return null;
         }
-        $tmp = dirname($path) . '/.tmp-' . basename($path) . '-' . getmypid();
+        $tmp = dirname($path) . '/.tmp-' . PathName::base($path) . '-' . getmypid();
         if (@file_put_contents($tmp, $content) !== strlen($content) || !@rename($tmp, $path)) {
             @unlink($tmp);
             return null;

@@ -7,6 +7,7 @@
  * variable, run through `sh -c` or an alias, or a cd made in an earlier call is out of sight.
  */
 require_once dirname(__DIR__) . '/ssh-connect/SshWords.php';
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class PublishTargets
 {
@@ -39,7 +40,7 @@ class PublishTargets
             if (!$words) {
                 continue;
             }
-            $program = basename($words[0]['text']);
+            $program = PathName::base($words[0]['text']);
             $args = array_slice($words, 1);
             if ($program === 'cd' && isset($args[0]) && !$args[0]['dyn']) {
                 $dir = self::path($args[0]['text'], $dir, $home);

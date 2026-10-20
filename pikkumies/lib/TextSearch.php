@@ -8,6 +8,7 @@
  * Deterministic and local: nothing leaves the machine.
  */
 require_once __DIR__ . '/Links.php';
+require_once __DIR__ . '/PathName.php';
 
 class TextSearch
 {
@@ -45,7 +46,7 @@ class TextSearch
         $files = [];
         foreach ($dirs as $dir) {
             foreach ((array) glob($dir . '/*.md') as $f) {
-                if (basename($f) !== 'README.md') {
+                if (PathName::base($f) !== 'README.md') {
                     $files[$f] = (string) file_get_contents($f);
                 }
             }

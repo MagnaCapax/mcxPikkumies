@@ -12,6 +12,7 @@
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HookPending.php';
+require_once __DIR__ . '/PathName.php';
 
 class HookFeed
 {
@@ -94,13 +95,13 @@ class HookFeed
     {
         $ids = [];
         foreach (array_keys($units) as $id) {
-            $ids[basename(HookSpool::unitDir($localDir, $id))] = $id;
+            $ids[PathName::base(HookSpool::unitDir($localDir, $id))] = $id;
         }
         $days = isset($config['sessions']['retentionDays']) && (int) $config['sessions']['retentionDays'] > 0 ? min(self::KEEP_DAYS, (int) $config['sessions']['retentionDays']) : self::KEEP_DAYS;
         $cut = time() - $days * 86400;
         foreach ((array) glob(HookSpool::dir($localDir) . '/*/*') as $file) {
             if (is_file($file) && !is_link($file) && @filemtime($file) < $cut && @unlink($file) && preg_match('/\.(context|notice)\.json$/', $file)) {
-                $dir = basename(dirname($file));
+                $dir = PathName::base(dirname($file));
                 HookLog::add('async', isset($ids[$dir]) ? $ids[$dir] : $dir, 0, 'pruned-undelivered');
             }
         }

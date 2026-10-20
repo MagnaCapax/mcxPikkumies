@@ -26,6 +26,7 @@ require_once __DIR__ . '/TextSearch.php';
 require_once __DIR__ . '/Http.php';
 require_once __DIR__ . '/MetricsLog.php';
 require_once __DIR__ . '/Cli.php'; // CliError from listPages
+require_once __DIR__ . '/PathName.php';
 
 class DocSources
 {
@@ -623,7 +624,7 @@ class DocSources
         $dirs = [];
         foreach (TextSearch::lessonDirs(self::root()) as $d) {
             // research/ is labelled below lessons: longer findings to verify before relying on them.
-            $dirs[$d] = basename($d) === 'research' ? ['research', 'research', 1] : [basename($d) === 'reference' ? 'reference' : 'lessons', 'lessons', 1];
+            $dirs[$d] = PathName::base($d) === 'research' ? ['research', 'research', 1] : [PathName::base($d) === 'reference' ? 'reference' : 'lessons', 'lessons', 1];
         }
         foreach (self::active() as $name => $src) {
             self::refreshIfStale($name, $src, $offline, $notes);
@@ -774,7 +775,7 @@ class DocSources
     public static function pageInfo($path)
     {
         $head = (string) file_get_contents($path, false, null, 0, 2048);
-        $title = preg_match('/^# (.+)$/m', $head, $m) ? trim($m[1]) : basename($path, '.md');
+        $title = preg_match('/^# (.+)$/m', $head, $m) ? trim($m[1]) : PathName::base($path, '.md');
         $url = preg_match('/^url: "(.*)"$/m', $head, $m) ? stripcslashes($m[1]) : '';
         return [$title, $url];
     }

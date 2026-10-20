@@ -5,6 +5,8 @@
  * if tracked files were edited, it stops and lists them. local/ and the lesson files in memory/ are
  * gitignored, so user state is never touched.
  */
+require_once __DIR__ . '/PathName.php';
+
 class Update
 {
     const CRON_TAG = '# pikkumies-update';
@@ -193,7 +195,7 @@ class Update
     {
         $out = [];
         foreach ((array) glob(self::keptDir() . '/*.cron') as $file) {
-            $tag = '# pikkumies-' . basename($file, '.cron');
+            $tag = '# pikkumies-' . PathName::base($file, '.cron');
             try {
                 $line = trim((string) SecretFile::read($file, 'run the schedule verb again'));
             } catch (Exception $e) {

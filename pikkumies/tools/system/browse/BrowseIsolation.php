@@ -16,6 +16,8 @@
  * ports listen only inside, the CLI reaches the daemon over its unix socket, outbound HTTPS and DNS work, host loopback
  * does not.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class BrowseIsolation
 {
     /** Process names (comm) of the browser stack; one of them listening in the host's network namespace is a leak. */
@@ -122,7 +124,7 @@ class BrowseIsolation
         $out = [];
         foreach ((array) glob("$proc/[0-9]*", GLOB_ONLYDIR) as $dir) {
             if (@fileowner($dir) === (int) $uid && @readlink("$dir/ns/net") === $net) {
-                $out[] = (int) basename($dir);
+                $out[] = (int) PathName::base($dir);
             }
         }
         sort($out);

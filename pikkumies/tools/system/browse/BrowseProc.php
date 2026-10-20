@@ -4,6 +4,8 @@
  * start unshare, slirp4netns or Chromium. Every command is an argv (ToolProc::line quotes each word); nothing is
  * built from user text.
  */
+require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+
 class BrowseProc
 {
     /**
@@ -91,7 +93,7 @@ class BrowseProc
             $stat = (string) @file_get_contents($f);
             $tail = strrpos($stat, ')') !== false ? explode(' ', substr($stat, strrpos($stat, ')') + 2)) : [];
             if (isset($tail[1]) && (int) $tail[1] === (int) $pid) {
-                $out[] = (int) basename(dirname($f));
+                $out[] = (int) PathName::base(dirname($f));
             }
         }
         return $out;
