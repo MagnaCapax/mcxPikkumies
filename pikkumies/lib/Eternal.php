@@ -6,7 +6,6 @@ class Eternal
     public static $tmuxDirectory = null; // private test socket root; production uses local/
     public static $hostMarker = null;
     const HOST_MARKER = '/etc/seedbox/config/pikkumiesEternals.enabled';
-    const TARGET_HOLD = '/var/lib/pmss/transfer-hold/';
 
     public static function enabled()
     {
@@ -38,11 +37,7 @@ class Eternal
     public static function held($now = null)
     {
         $now = $now === null ? time() : $now;
-        if (self::sourceHeld(Config::localDir() . '/eternals.hold', $now)) {
-            return true;
-        }
-        $user = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
-        return $user && is_file(self::TARGET_HOLD . $user['name']);
+        return self::sourceHeld(Config::localDir() . '/eternals.hold', $now);
     }
 
     public static function sourceHeld($file, $now)
