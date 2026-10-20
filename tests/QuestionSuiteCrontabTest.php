@@ -44,7 +44,8 @@ return [
         }
     },
     'questions: without .bash_profile a login shell resolves crontab to the real one (proves the fix is load-bearing)' => function () {
-        exec('command -v crontab', $o, $c);
+        // Probe the system PATH, not the suite's crontab guard (tests/run.php), which is always found.
+        exec('PATH=/usr/sbin:/usr/bin:/sbin:/bin command -v crontab', $o, $c);
         if ($c !== 0 || !$o) {
             skip('no real crontab binary on this host (a bare container image, typically); there is nothing for a reset login PATH to wrongly resolve to, so this environment cannot demonstrate the exploit the fix closes');
         }

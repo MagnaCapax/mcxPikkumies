@@ -7,11 +7,19 @@ $root = dirname(__DIR__);
 // No test, and no pikkumies process a test spawns, may change the real crontab of whoever runs the suite:
 // a `crontab` that always fails goes first on PATH. A test that puts its own fake earlier on PATH, or sets
 // Update::$crontab, still gets its fake.
-$cronGuard = sys_get_temp_dir() . '/pikkumies-test-crontab-' . getmypid();
-@mkdir($cronGuard, 0700);
-file_put_contents($cronGuard . '/crontab', "#!/bin/sh\necho 'crontab: not available inside the pikkumies test suite' >&2\nexit 1\n");
-chmod($cronGuard . '/crontab', 0700);
+// The directory has an unguessable name and must be created fresh by this process, owned by it, and not a
+// link; otherwise the suite stops, so a directory someone else made can neither go on PATH nor leave the
+// real crontab reachable.
+$cronGuard = sys_get_temp_dir() . '/pikkumies-test-crontab-' . bin2hex(random_bytes(8));
+$guardStat = @mkdir($cronGuard, 0700) ? @lstat($cronGuard) : false;
+if ($guardStat === false || is_link($cronGuard) || $guardStat['uid'] !== (function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()) || ($guardStat['mode'] & 0777) !== 0700
+    || file_put_contents($cronGuard . '/crontab', "#!/bin/sh\necho 'crontab: not available inside the pikkumies test suite' >&2\nexit 1\n") === false
+    || !chmod($cronGuard . '/crontab', 0700)) {
+    fwrite(STDERR, "tests/run.php: could not create the private crontab guard in " . sys_get_temp_dir() . "; not running tests\n");
+    exit(2);
+}
 putenv('PATH=' . $cronGuard . ':' . getenv('PATH'));
+putenv('PIKKUMIES_TEST_CRONTAB_GUARD=' . $cronGuard);
 register_shutdown_function(function () use ($cronGuard) {
     @unlink($cronGuard . '/crontab');
     @rmdir($cronGuard);

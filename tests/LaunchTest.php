@@ -166,7 +166,8 @@ return [
             file_put_contents("$tmp/pikkumies/local/state/configure-changes.jsonl", json_encode(['key' => 'lowBalance.disabled', 'old' => false, 'new' => true]) . "\n");
             // PATH without git: should the routing ever regress into a session, it cannot start building Hermes in the background.
             $undo = function () use ($tmp) {
-                return testWithEnv(['PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null, 'PATH' => dirname(PHP_BINARY)], function () use ($tmp) {
+                // The suite's crontab guard stays first on PATH (tests/run.php).
+                return testWithEnv(['PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null, 'PATH' => getenv('PIKKUMIES_TEST_CRONTAB_GUARD') . ':' . dirname(PHP_BINARY)], function () use ($tmp) {
                     return runPhp("$tmp/pikkumies/bin/pikkumies", ['configure', 'undo']);
                 });
             };
