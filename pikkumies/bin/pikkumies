@@ -99,6 +99,32 @@ if ($cmd === 'error') { // a launcher flag without its value (ADR-0052): nothing
 }
 
 switch ($cmd) {
+    case 'eternal':
+        exit(EternalCli::run($passArgs));
+    case 'ask':
+        $askNonce = '';
+        if (count($passArgs) === 1 && strncmp($passArgs[0], '--nonce=', 8) === 0) {
+            $askNonce = substr($passArgs[0], 8);
+        } elseif ($passArgs) {
+            out('usage: pikkumies ask [--nonce=TOKEN] < question.txt');
+            exit(1);
+        }
+        try {
+            list($askCode, $askMessage) = EternalAsk::send(stream_get_contents(STDIN, 16001), $askNonce);
+        } catch (Throwable $x) {
+            out('Could not send to Primary.');
+            exit(1);
+        }
+        out($askMessage);
+        exit($askCode);
+    case 'ui':
+        if ($passArgs !== ['start']) {
+            out('usage: pikkumies ui start');
+            exit(2);
+        }
+        $uiProblem = EternalUi::start();
+        out($uiProblem === '' ? 'UI started.' : $uiProblem);
+        exit($uiProblem === '' ? 0 : 1);
     case 'install':
         // Flags answer the first-start questions, so an install from a script asks nothing (ADR-0032).
         list($installSettings, $installTerms, $flagErrors) = Launch::installFlags($passArgs);
@@ -331,6 +357,11 @@ switch ($cmd) {
                 ? 'installed (crontab, every minute)' : 'not installed yet (run `pikkumies install` or `update`)';
         }
         out('cron ticker: ' . $tickMode);
+        $eternalRows = EternalCli::listing();
+        $eternalParts = array_map(function ($row) { return $row['id'] . ' ' . $row['state']; }, $eternalRows);
+        $limitsData = Detect::userShowLimitsData((string) getenv('HOME'));
+        $oom = $limitsData ? Detect::userShowLimitsMetric($limitsData['sections'], 'memory', 'OOM kills', 'value') : null;
+        out('eternals: ' . ($eternalParts ? implode(', ', $eternalParts) : 'none') . '; OOM kills: ' . ($oom !== null ? $oom : 'unknown'));
         break;
 
     case 'generate':
@@ -356,12 +387,49 @@ switch ($cmd) {
         $passArgs = Launch::CONFIGURE_ARGS;
         // falls through: the same checks and first-start questions as any session
     case 'run':
+        $eternalId = '';
+        $eternalStarted = time();
+        $eternalSignalled = false;
+        if (isset($passArgs[0]) && $passArgs[0] === '--eternal') {
+            $eternalId = isset($passArgs[1]) ? $passArgs[1] : '';
+            if (!EternalRecord::validId($eternalId) || count($passArgs) !== 2) {
+                exit(2);
+            }
+            $runLock = EternalLock::take(EternalRecord::path($eternalId) . '.run');
+            if (!$runLock) {
+                exit(73);
+            }
+            @file_put_contents('/proc/self/oom_score_adj', '500');
+            if (function_exists('pcntl_async_signals')) {
+                pcntl_async_signals(true);
+                foreach ([SIGHUP, SIGTERM, SIGINT] as $signal) {
+                    pcntl_signal($signal, function () use (&$eternalSignalled) { $eternalSignalled = true; });
+                }
+                pcntl_signal(SIGALRM, function () use (&$eternalSignalled) {
+                    if (!is_dir(Config::root())) {
+                        $eternalSignalled = true;
+                        exit(75);
+                    }
+                    pcntl_alarm(60);
+                });
+                pcntl_alarm(60);
+            }
+            $record = EternalRecord::read($eternalId);
+            if ($record === null) {
+                exit(75);
+            }
+            $passArgs = $record['sessionId'] !== '' && EternalRecord::sessionExists($record['sessionId']) !== false
+                ? Launch::route(['pikkumies', '--resume', $record['sessionId']])[1] : [];
+        }
         // Started from inside an agent: no flag that turns approvals, hooks or rules off; the user's own shell is untouched (ADR-0020).
         if (($nested = NestedAgent::refusal($passArgs)) !== '') {
             out($nested);
             exit(2);
         }
         if (hermesBin() === '') {
+            if ($eternalId !== '') {
+                exit(75);
+            }
             // A preinstalled account (PMSS) has no runtime until the daily update or this first run builds it: start the build, or
             // find it running, and wait for it here with a progress line, then go on (ADR-0033 addenda 2026-10-17 and 2026-10-19).
             $notReady = HermesWait::run(HermesInstall::ensure(false, !empty(profile()['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])),
@@ -370,7 +438,7 @@ switch ($cmd) {
                 }, ['HermesInstall', 'building'], 'promptWrite', HermesInstall::localDir() . '/install.log', Launch::isTty(STDOUT));
             if ($notReady !== '') {
                 out('Not starting: the agent runtime could not be set up: ' . $notReady);
-                exit(1);
+                exit($eternalId !== '' ? 75 : 1);
             }
         }
         // A moved account arrives without its crontab and nothing else restores the two lines (Update::ensureScheduled).
@@ -382,11 +450,17 @@ switch ($cmd) {
         // A session without a model key would only fail on its first request: say where the key comes from instead.
         if (Launch::isSession($passArgs) && ($noKey = Launch::missingKeyMessage(Provider::resolve(Config::load()))) !== '') {
             out($noKey);
-            exit(1);
+            exit($eternalId !== '' ? 75 : 1);
         }
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
         $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';
         if ($isUpdate) {
+            $eternalsUpdateLock = Eternal::lock();
+            if (!$eternalsUpdateLock) {
+                out('Not updating: Pikkumies windows are changing; try again.');
+                exit(1);
+            }
+            Eternal::stopManaged();
             $origin = HermesInstall::origin();
             if (!HermesInstall::originOfficial($origin)) {
                 out('Not updating: pikkumies/hermes fetches from ' . ($origin ?: '(no origin)') . ', not the official Hermes repository.');
@@ -406,7 +480,14 @@ switch ($cmd) {
         // A dashboard: never without a login (ADR-0074); its web page built first, alone on the tree (ADR-0033 addendum 2026-10-19).
         $dash = HermesDashboardGate::refusal($passArgs, hermesBin());
         if ($dash === '' && HermesWebUi::needed($passArgs)) {
-            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out');
+            $eternalsBuildLock = Eternal::lock();
+            if (!$eternalsBuildLock) {
+                out('Not starting the dashboard: Pikkumies windows are changing; try again.');
+                exit(1);
+            }
+            Eternal::stopManaged();
+            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out', 5);
+            fclose($eternalsBuildLock);
         }
         if ($dash !== '') {
             out('Not starting the dashboard: ' . $dash);
@@ -415,10 +496,16 @@ switch ($cmd) {
         // Held until Hermes exits: shared for a session, exclusive for an update, so an update never
         // rewrites the code a running session or scheduled job is using.
         $hermesLock = HermesInstall::lock($isUpdate);
+        if ($isUpdate && !$hermesLock) {
+            for ($attempt = 0; $attempt < 50 && !$hermesLock; $attempt++) {
+                usleep(100000);
+                $hermesLock = HermesInstall::lock(true);
+            }
+        }
         if (!$hermesLock) {
             out($isUpdate ? 'Not updating: other Hermes sessions, a dashboard or a scheduled job are running from pikkumies/hermes. Close the sessions, stop a dashboard with `pikkumies run dashboard --stop` (or wait a minute for the job) and run `pikkumies run update` again.'
                 : 'Hermes is being updated right now (`pikkumies run update`); start again when it has finished.');
-            exit(1);
+            exit($eternalId !== '' ? 75 : 1);
         }
         // First interactive session: the terms until accepted (ADR-0032), then the one feedback question. The agent's name is never
         // asked: it is Pikkumies until the person renames it in chat or with configure (ADR-0032 amendment 2026-10-19). Only on
@@ -456,7 +543,7 @@ switch ($cmd) {
             generate(profile());
         } catch (Exception $x) {
             out('not starting: ' . $x->getMessage());
-            exit(1);
+            exit($eternalId !== '' ? 75 : 1);
         }
         foreach (HermesConfig::env() as $envName => $envValue) { // home, managed settings; no HERMES_RUNTIME_DIR (ADR-0033, ADR-0062)
             putenv($envValue === null ? $envName : "$envName=$envValue");
@@ -481,7 +568,7 @@ switch ($cmd) {
         $problems = HermesInstall::checkBeforeStart();
         if ($problems) {
             out('not starting: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) . '. Run `pikkumies doctor`.');
-            exit(1);
+            exit($eternalId !== '' ? 75 : 1);
         }
         // The credits line once, before Hermes starts (ADR-0040): a library call, silent when credits cannot be read.
         if (Launch::isTty() && Launch::isSession($passArgs)) {
@@ -518,9 +605,18 @@ switch ($cmd) {
             fwrite(STDERR, HaltRun::START_FAILED);
             exit(1);
         }
+        if ($eternalId !== '') {
+            fclose($hermesLock);
+            Eternal::afterExit($eternalId, $code, $eternalStarted, $eternalSignalled);
+        }
         exit($code);
 
     case 'cron-tick': // internal: the crontab line Update::scheduleCronTick installs, once a minute
+        try {
+            Eternal::ensure();
+        } catch (Throwable $x) {
+            CronTick::logIfChanged(Config::localDir() . '/update.log', Config::localDir() . '/eternals-tick.state', 1, 'Eternal ensure failed: ' . $x->getMessage());
+        }
         $lockPath = Config::localDir() . '/cron.lock';
         @mkdir(Config::localDir(), 0700, true);
         $lock = @fopen($lockPath, 'c');
@@ -592,13 +688,23 @@ switch ($cmd) {
             out('usage: pikkumies tmux [1-9]');
             exit(2);
         }
+        $tmuxId = 'pm' . $n;
+        $tmuxLock = Eternal::lock();
+        if (!$tmuxLock) {
+            out('Pikkumies windows are busy; try again.');
+            exit(1);
+        }
+        if (!is_file(EternalRecord::path($tmuxId))) {
+            EternalRecord::write($tmuxId, EternalRecord::initial());
+        }
         exec('command -v tmux 2>/dev/null', $tmuxPath, $tmuxCode);
         if ($tmuxCode !== 0) {
             out('tmux is not installed on this machine. Plain `pikkumies` starts a session without it; install tmux (or ask your provider) to use `pikkumies tmux`.');
             exit(1);
         }
         $windows = null;
-        exec('tmux list-windows -t ' . escapeshellarg('=' . Launch::TMUX_SESSION) . ' -F ' . escapeshellarg('#W') . ' 2>/dev/null', $windowList, $listCode);
+        list($listCode, $windowText) = Eternal::tmux(['list-windows', '-t', '=' . Launch::TMUX_SESSION, '-F', '#W']);
+        $windowList = $listCode === 0 ? explode("\n", trim($windowText)) : [];
         if ($listCode === 0) {
             $windows = $windowList;
         }
@@ -609,16 +715,29 @@ switch ($cmd) {
         $creditsCmd = ($noColor ? 'NO_COLOR=1 ' : '') . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
         // Before it: the memories and the active pane's counters (ADR-0061).
         $self = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__);
+        $eternalCommand = $self . ' run --eternal ' . $tmuxId;
         $plan = Launch::tmuxPlan($n, $windows, $insideTmux, $self, $creditsCmd, $self . ' status-line', !$noColor);
         $attach = array_pop($plan);
         foreach ($plan as $step) {
-            exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);
+            if ($step[1] === 'new-session' || $step[1] === 'new-window') {
+                $step[count($step) - 1] = $eternalCommand;
+            }
+            if ($step[1] === 'new-session' || $step[1] === 'new-window') {
+                foreach (Eternal::environment() as $name => $value) {
+                    if ($value !== false && strpos($value, "\n") === false) {
+                        array_splice($step, 2, 0, ['-e', $name . '=' . $value]);
+                    }
+                }
+            }
+            $stepArgv = array_merge(['timeout', '5'], Eternal::tmuxArgv(array_slice($step, 1)));
+            exec(implode(' ', array_map('escapeshellarg', $stepArgv)) . ' 2>&1', $stepOut, $stepCode);
             if ($stepCode !== 0) {
                 out('tmux failed: ' . implode(' ', $stepOut));
                 exit(1);
             }
         }
-        passthru(implode(' ', array_map('escapeshellarg', $attach)), $code);
+        fclose($tmuxLock);
+        passthru(implode(' ', array_map('escapeshellarg', Eternal::tmuxArgv(array_slice($attach, 1)))), $code);
         exit($code);
 
     case 'status-line': // internal: the tmux status segment `pikkumies tmux` sets (ADR-0061); prints nothing on any failure, as the credits line

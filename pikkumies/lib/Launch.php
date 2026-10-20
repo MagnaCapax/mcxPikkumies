@@ -21,7 +21,7 @@
 class Launch
 {
     /** Subcommands bin/pikkumies dispatches on its own. */
-    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'browse', 'access', 'websearch', 'configure', 'status-line'];
+    const SUBCOMMANDS = ['install', 'update', 'post-update', 'detect', 'doctor', 'generate', 'run', 'cron-tick', 'docs-fill', 'tmux', 'browse', 'access', 'websearch', 'configure', 'status-line', 'eternal', 'ask', 'ui'];
     const HELP = ['help', '--help', '-h'];
     /** `pikkumies configure` on a terminal: a session with the configure skill loaded and this first prompt (ADR-0052). */
     const CONFIGURE_ARGS = ['chat', '-s', 'pikkumies-configure', '--query=Review my setup and help me configure Pikkumies'];
@@ -74,6 +74,9 @@ class Launch
         // `websearch on|off|status`: the person's switch for web search (WebSearch, ADR-0082); "websearch cats" is a prompt.
         if ($argv[1] === 'websearch') {
             return count($rest) === 1 && in_array($rest[0], ['on', 'off', 'status'], true) ? ['websearch', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+        }
+        if ($argv[1] === 'eternal' || $argv[1] === 'ask' || $argv[1] === 'ui') {
+            return [$argv[1], $rest];
         }
         // `configure undo`: the person's own undo of the last settings change, no session (ADR-0059); other words after configure are a prompt.
         if ($argv[1] === 'configure' && $rest === ['undo']) {

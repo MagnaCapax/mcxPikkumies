@@ -71,6 +71,7 @@ class HermesInstall
         'hooks.*.fail_closed' => ['agent/shell_hooks.py', 'raw.get("fail_closed"'],
         'sessions.auto_prune' => ['hermes_cli/config_defaults.py', '"auto_prune":'],
         'sessions.retention_days' => ['hermes_cli/config_defaults.py', '"retention_days":'],
+        'session.terminal_continue' => ['hermes_cli/config_defaults.py', '"terminal_continue":'],
         'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
         'onboarding.profile_build' => ['agent/onboarding.py', '_onboarding_section(config).get("profile_build")'],
         'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
@@ -509,16 +510,8 @@ class HermesInstall
      */
     public static function lock($exclusive)
     {
-        @mkdir(self::localDir(), 0700, true);
-        $h = @fopen(self::lockFile(), 'c');
-        if (!$h) {
-            return null;
-        }
-        if (!flock($h, ($exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB)) {
-            fclose($h);
-            return null;
-        }
-        return $h;
+        $lock = EternalLock::take(self::lockFile(), false, $exclusive);
+        return $lock ?: null;
     }
 
     public static function origin()

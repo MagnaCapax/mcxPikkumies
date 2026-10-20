@@ -48,13 +48,17 @@ class HermesWebUi
      * Build it, saying first that it takes minutes; '' when the page is there afterwards, else why not. The output
      * goes to the user's terminal as the build runs ($say prints Pikkumies' own lines).
      */
-    public static function build($bin, $rootAvailable, callable $say)
+    public static function build($bin, $rootAvailable, callable $say, $waitSeconds = 0)
     {
         $argv = self::command($bin, $rootAvailable);
         if (!$argv) {
             return 'root is available here and setpriv is missing; the build may call sudo, so it runs only under setpriv --no-new-privs (ADR-0025, ADR-0033).';
         }
         $lock = HermesInstall::lock(true);
+        for ($attempt = 0; !$lock && $attempt < $waitSeconds * 10; $attempt++) {
+            usleep(100000);
+            $lock = HermesInstall::lock(true);
+        }
         if (!$lock) {
             return 'the web UI is not built yet, and building it needs Hermes alone: other Hermes sessions or a scheduled job are running.'
                 . ' Close the sessions (or wait a minute for the job) and run `pikkumies run dashboard` again.';

@@ -239,7 +239,7 @@ class HermesConfig
         $y .= $pinsOnly ? '' : "agent:\n  disabled_toolsets:\n    - \"clarify\"\n";
         // The seed only, so the look stays the user's (/skin): the Pikkumies skin, written beside this file by writeConfig;
         // an install from before gets it once through HermesUserConfig (ADR-0061, 2026-10-19 section).
-        $y .= $pinsOnly ? '' : "display:\n  skin: " . self::q(StatusTheme::SKIN) . "\n";
+        $y .= $pinsOnly ? '' : "display:\n  skin: " . self::q(StatusTheme::SKIN) . "\n  busy_input_mode: queue\n";
         // The seed only (Hermes reads browser.* from the user's own file, read_raw_config, so it cannot be pinned): the
         // denylist for sensitive JavaScript in the browser (tools/browser_tool_eval_policy.py). The browse unit offers the
         // browser only while this is true and allow_private_urls and use_real_profile are not on (ADR-0077).
@@ -294,7 +294,8 @@ class HermesConfig
     {
         $days = isset($config['sessions']['retentionDays']) ? (int) $config['sessions']['retentionDays'] : 0;
         $y = $days > 0 ? "sessions:\n  auto_prune: true\n  retention_days: $days\n" : "sessions:\n  auto_prune: false\n";
-        return $y . ($pinsOnly ? HermesTelemetry::managedYaml() : HermesTelemetry::seedYaml(HermesTelemetry::offerVersion()));
+        return $y . ($pinsOnly ? "session:\n  terminal_continue: true\n" . HermesTelemetry::managedYaml()
+            : HermesTelemetry::seedYaml(HermesTelemetry::offerVersion()));
     }
 
     /**
