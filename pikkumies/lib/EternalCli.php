@@ -60,14 +60,21 @@ class EternalCli
             return $stopped && ($verb !== 'off' || Eternal::waitStopped()) ? 0 : 1;
         }
         if ($verb === 'new' && count($args) === 1) {
-            if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)
-                || Eternal::ready() !== ''
-                || !Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
+            if (!Eternal::enabled()) {
                 echo "Pikkumies windows are not ready on this host.\n";
                 return 1;
             }
             $lock = Eternal::lock();
             if (!$lock) {
+                return 1;
+            }
+            if (Eternal::held()) {
+                echo "Pikkumies windows are held for transfer. Try again after the hold ends.\n";
+                return 1;
+            }
+            if (Eternal::ready() !== ''
+                || !Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
+                echo "Pikkumies windows are not ready on this host.\n";
                 return 1;
             }
             $usage = Cgroup::usageAtLimit();

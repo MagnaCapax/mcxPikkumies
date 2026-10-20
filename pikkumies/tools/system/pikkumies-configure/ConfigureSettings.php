@@ -33,7 +33,7 @@ class ConfigureSettings
         'hooks.every.goal-review' => 'Seconds between the goal review\'s looks at the session (60 to 3600; unset: 600); each look calls the light model once. 0 turns it off.',
         'hooks.async.disabled' => 'Turns off every background check that reads the session\'s records every few minutes (the interval hook units); hooks.every.<unit name> sets one unit\'s interval in seconds, 0 turns that one off.',
         'autoUpdate.disabled' => 'Stops the daily `pikkumies update` from the crontab.',
-        'cron.disabled' => 'Stops the per-minute ticker that runs scheduled jobs and also stops Pikkumies windows restarting.',
+        'cron.disabled' => 'Stops the per-minute ticker that runs Hermes\' scheduled jobs.',
         'hermes.lazyInstalls' => 'Lets Hermes download optional packages and a browser while it runs.',
         'ssh.allow' => 'SSH hosts the agent may connect to without asking you (names, addresses or patterns such as *.home.example). Each connection still says why.',
         'ssh.deny' => 'SSH hosts the agent must never connect to; this list wins over ssh.allow. Only you remove a host from it.',

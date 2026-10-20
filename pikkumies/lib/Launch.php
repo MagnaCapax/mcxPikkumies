@@ -75,13 +75,13 @@ class Launch
         if ($argv[1] === 'websearch') {
             return count($rest) === 1 && in_array($rest[0], ['on', 'off', 'status'], true) ? ['websearch', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
         }
-        if ($argv[1] === 'ask' && ($rest === [] || (count($rest) === 1 && strncmp($rest[0], '--nonce=', 8) === 0 && strlen($rest[0]) > 8))) {
+        if (Eternal::enabled() && $argv[1] === 'ask' && ($rest === [] || (count($rest) === 1 && strncmp($rest[0], '--nonce=', 8) === 0 && strlen($rest[0]) > 8))) {
             return ['ask', $rest];
         }
-        if ($argv[1] === 'ui' && $rest === ['start']) {
+        if (Eternal::enabled() && $argv[1] === 'ui' && $rest === ['start']) {
             return ['ui', $rest];
         }
-        if ($argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new']], true)
+        if (Eternal::enabled() && $argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new']], true)
             || (count($rest) === 2 && $rest[0] === 'quit' && preg_match('/^pm[1-9]$/D', $rest[1]) === 1)
             || (count($rest) === 3 && $rest[0] === 'hold' && $rest[1] === '--until' && ctype_digit($rest[2])))) {
             return ['eternal', $rest];
@@ -155,7 +155,7 @@ class Launch
             }
         }
         $plan[] = ['tmux', 'select-window', '-t', "$s:$w"];
-        $plan[] = ['tmux', 'attach-session', '-t', $s];
+        $plan[] = $insideTmux ? ['tmux', 'switch-client', '-t', $s] : ['tmux', 'attach-session', '-t', $s];
         return $plan;
     }
 

@@ -9,16 +9,24 @@
  */
 return [
     'launch: Eternal verbs claim only their exact command shapes' => function () {
+        $root = testTempDir('launch-eternal-route');
+        file_put_contents($root . '/enabled', "1\n");
+        Eternal::$hostMarker = $root . '/enabled';
+        try {
         foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['eternal'], ['eternal', 'list'], ['eternal', 'list', '--json'], ['eternal', 'ensure'], ['eternal', 'new'], ['eternal', 'on'], ['eternal', 'off'], ['eternal', 'quit', 'pm2'], ['eternal', 'hold', '--until', '123']] as $words) {
             check(Launch::route(array_merge(['pikkumies'], $words))[0] === $words[0], 'command rejected: ' . json_encode($words));
         }
         foreach ([['ask', 'how', 'big', 'is', 'my', 'disk'], ['ask', '--nonce='], ['ask', '--bad'], ['ask', '--nonce=abc', 'please'], ['ui', 'show', 'me'], ['ui', '--help'], ['ui', 'start', 'please'], ['eternal', 'life', 'is', 'short'], ['eternal', '--bad'], ['eternal', 'quit', 'bad'], ['eternal', 'hold', '--until', 'tomorrow']] as $words) {
             check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'prompt claimed: ' . json_encode($words));
         }
+        } finally {
+            Eternal::$hostMarker = null;
+            testRmTree($root);
+        }
     },
-    'launch: inside tmux opens a new client with no inherited TMUX' => function () {
+    'launch: inside tmux switches the existing client' => function () {
         $plan = Launch::tmuxPlan('2', ['pm1', 'pm2'], true, 'ignored');
-        check(end($plan) === ['tmux', 'attach-session', '-t', '=pikkumies'], 'an existing client was switched');
+        check(end($plan) === ['tmux', 'switch-client', '-t', '=pikkumies'], 'an existing client was not switched');
         $root = testTempDir('launch-tmux-argv');
         $oldTmux = getenv('TMUX');
         putenv('TMUX=/foreign/socket,1,0');
@@ -29,6 +37,35 @@ return [
         } finally {
             Eternal::$tmuxDirectory = null;
             $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            testRmTree($root);
+        }
+    },
+    'launch: markerless Eternal words are prompts and private socket selects switch or attach' => function () {
+        $root = testTempDir('launch-private-socket');
+        Eternal::$hostMarker = $root . '/missing';
+        Eternal::$tmuxDirectory = $root;
+        try {
+            foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['eternal', 'new'], ['eternal', '--bad']] as $words) {
+                check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'markerless word claimed: ' . json_encode($words));
+            }
+            check(Eternal::insidePrivateTmux($root . '/tmux/tmux-1000/default,1,0'), 'private socket missed');
+            check(!Eternal::insidePrivateTmux('/ordinary/socket,1,0'), 'foreign socket claimed');
+            $privatePlan = Launch::tmuxPlan('1', ['pm1'], Eternal::insidePrivateTmux($root . '/tmux/tmux-1000/default,1,0'), 'cmd');
+            $foreignPlan = Launch::tmuxPlan('1', ['pm1'], Eternal::insidePrivateTmux('/ordinary/socket,1,0'), 'cmd');
+            check(end($privatePlan)[1] === 'switch-client', 'private client did not switch');
+            check(end($foreignPlan)[1] === 'attach-session', 'foreign client did not attach');
+            $oldTmux = getenv('TMUX');
+            try {
+                putenv('TMUX=/ordinary/socket,1,0');
+                check(!in_array('TMUX=/ordinary/socket,1,0', Eternal::tmuxArgv(['attach-session']), true), 'foreign client leaked into private tmux');
+                putenv('TMUX=' . $root . '/tmux/tmux-1000/default,1,0');
+                check(in_array('TMUX=' . $root . '/tmux/tmux-1000/default,1,0', Eternal::tmuxArgv(['switch-client']), true), 'private client identity lost');
+            } finally {
+                $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            }
+        } finally {
+            Eternal::$hostMarker = null;
+            Eternal::$tmuxDirectory = null;
             testRmTree($root);
         }
     },

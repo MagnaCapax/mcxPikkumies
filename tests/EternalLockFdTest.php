@@ -124,17 +124,21 @@ return [
         $oldPath = getenv('PATH');
         $oldHome = getenv('HOME');
         $oldKey = getenv('PIKKUMIES_KEY');
+        $oldTmux = getenv('TMUX');
         putenv('PATH=' . $root . '/fake-bin:' . $oldPath);
         putenv('HOME=' . $root . '/home');
         putenv('PIKKUMIES_KEY=fixture-key');
+        putenv('TMUX=/ordinary/socket,1,0');
         try {
             list($code, $out) = runPhp($runner, ['run', 'update']);
             check(is_file($root . '/updater-ran'), 'update child did not run: ' . $code . ' ' . $out);
             check(!is_file($root . '/leak'), 'update child inherited a lock');
+            check(!is_dir($root . '/local/tmux') && !is_dir($root . '/local/tmp') && !is_file($root . '/local/eternals.lock'), 'markerless update made Eternal state');
         } finally {
             putenv('PATH=' . $oldPath);
             $oldHome === false ? putenv('HOME') : putenv('HOME=' . $oldHome);
             $oldKey === false ? putenv('PIKKUMIES_KEY') : putenv('PIKKUMIES_KEY=' . $oldKey);
+            $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
             testRmTree($root);
         }
     },

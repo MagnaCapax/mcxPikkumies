@@ -36,6 +36,23 @@ return [
             testRmTree($root);
         }
     },
+    'eternal: wrapper ignores Ctrl-C so a later deliberate quit closes the window' => function () {
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(strpos($bin, 'foreach ([SIGHUP, SIGTERM] as $signal)') !== false, 'wrapper listens for an interrupt as a lifecycle signal');
+        check(strpos($bin, 'pcntl_signal(SIGINT, function () {})') !== false, 'wrapper must ignore an interrupt while the child handles it');
+        $root = testTempDir('eternal-interrupt-quit');
+        EternalRecord::$base = $root;
+        Eternal::$tmuxDirectory = $root;
+        try {
+            EternalRecord::write('pm2', ['sessionId' => '', 'fails' => 0, 'lastStart' => time()]);
+            Eternal::afterExit('pm2', 0, time(), 0);
+            check(EternalRecord::read('pm2') === null, 'deliberate quit restarted after an ignored interrupt');
+        } finally {
+            EternalRecord::$base = null;
+            Eternal::$tmuxDirectory = null;
+            testRmTree($root);
+        }
+    },
     'eternal: transfer waits for resident run locks to close' => function () {
         $root = testTempDir('eternal-wait-stop');
         EternalRecord::$base = $root;
@@ -121,14 +138,39 @@ return [
         file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\necho \"\$@\" >> '" . $root . "/calls'\nexit 0\n");
         chmod($root . '/fake-bin/tmux', 0700);
         $oldPath = getenv('PATH');
+        $oldTmux = getenv('TMUX');
         putenv('PATH=' . $root . '/fake-bin:' . $oldPath);
         try {
+            putenv('TMUX=/ordinary/socket,1,0');
             list($code) = runPhp($root . '/bin/pikkumies', ['tmux', '2']);
             $calls = (string) file_get_contents($root . '/calls');
-            check($code === 0 && strpos($calls, 'attach-session') !== false, 'legacy tmux did not attach');
+            check($code === 0 && strpos($calls, 'switch-client') !== false && strpos($calls, 'attach-session') === false, 'legacy tmux did not switch');
             check(strpos($calls, 'run --eternal') === false && strpos($calls, '-L ') === false && !is_dir($root . '/local/eternals'), 'markerless tmux moved socket or made Eternal state');
+            list($residentCode, $residentOut) = runPhp($root . '/bin/pikkumies', ['run', '--eternal', 'pm2']);
+            check($residentCode === 1 && strpos($residentOut, 'not enabled') !== false, 'markerless resident was accepted');
+            check(!is_dir($root . '/local/tmux') && !is_dir($root . '/local/tmp') && !file_exists($root . '/local/eternals/pm2.run'), 'markerless resident wrote Eternal state');
         } finally {
             putenv('PATH=' . $oldPath);
+            $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            testRmTree($root);
+        }
+    },
+    'eternal: transfer hold refuses manual tmux and new before creating a window' => function () {
+        $root = testTempDir('eternal-manual-hold');
+        $source = dirname(__DIR__) . '/pikkumies';
+        exec('cp -R ' . escapeshellarg($source . '/bin') . ' ' . escapeshellarg($source . '/lib') . ' ' . escapeshellarg($root) . '/');
+        @mkdir($root . '/local', 0700);
+        file_put_contents($root . '/enabled', "1\n");
+        file_put_contents($root . '/local/eternals.hold', json_encode(['until' => time() + 600]));
+        $runner = $root . '/runner.php';
+        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/enabled"; require __DIR__ . "/bin/pikkumies";');
+        try {
+            list($tmuxCode, $tmuxOut) = runPhp($runner, ['tmux', '2']);
+            list($newCode, $newOut) = runPhp($runner, ['eternal', 'new']);
+            check($tmuxCode === 1 && strpos($tmuxOut, 'held for transfer') !== false, 'manual tmux ignored hold');
+            check($newCode === 1 && strpos($newOut, 'held for transfer') !== false, 'eternal new ignored hold');
+            check(!is_dir($root . '/local/eternals') && !is_dir($root . '/local/tmux'), 'hold created a window or private socket');
+        } finally {
             testRmTree($root);
         }
     },

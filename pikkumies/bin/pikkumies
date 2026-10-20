@@ -357,11 +357,13 @@ switch ($cmd) {
                 ? 'installed (crontab, every minute)' : 'not installed yet (run `pikkumies install` or `update`)';
         }
         out('cron ticker: ' . $tickMode);
-        $eternalRows = EternalCli::listing();
-        $eternalParts = array_map(function ($row) { return $row['id'] . ' ' . $row['state']; }, $eternalRows);
-        $limitsData = Detect::userShowLimitsData((string) getenv('HOME'));
-        $oom = $limitsData ? Detect::userShowLimitsMetric($limitsData['sections'], 'memory', 'OOM kills', 'value') : null;
-        out('eternals: ' . ($eternalParts ? implode(', ', $eternalParts) : 'none') . '; OOM kills: ' . ($oom !== null ? $oom : 'unknown'));
+        if (Eternal::enabled()) {
+            $eternalRows = EternalCli::listing();
+            $eternalParts = array_map(function ($row) { return $row['id'] . ' ' . $row['state']; }, $eternalRows);
+            $limitsData = Detect::userShowLimitsData((string) getenv('HOME'));
+            $oom = $limitsData ? Detect::userShowLimitsMetric($limitsData['sections'], 'memory', 'OOM kills', 'value') : null;
+            out('eternals: ' . ($eternalParts ? implode(', ', $eternalParts) : 'none') . '; OOM kills: ' . ($oom !== null ? $oom : 'unknown'));
+        }
         break;
 
     case 'generate':
@@ -391,6 +393,10 @@ switch ($cmd) {
         $eternalStarted = time();
         $eternalSignalled = 0;
         if (isset($passArgs[0]) && $passArgs[0] === '--eternal') {
+            if (!Eternal::enabled()) {
+                out('Pikkumies windows are not enabled on this host.');
+                exit(1);
+            }
             $eternalId = isset($passArgs[1]) ? $passArgs[1] : '';
             if (!EternalRecord::validId($eternalId) || count($passArgs) !== 2) {
                 exit(2);
@@ -402,7 +408,8 @@ switch ($cmd) {
             @file_put_contents('/proc/self/oom_score_adj', '500');
             if (function_exists('pcntl_async_signals')) {
                 pcntl_async_signals(true);
-                foreach ([SIGHUP, SIGTERM, SIGINT] as $signal) {
+                pcntl_signal(SIGINT, function () {}); // the child may handle Ctrl-C; it does not end the resident window
+                foreach ([SIGHUP, SIGTERM] as $signal) {
                     pcntl_signal($signal, function ($received) use (&$eternalSignalled, $eternalId) {
                         $eternalSignalled = $received;
                         if ($received === SIGTERM) {
@@ -460,8 +467,8 @@ switch ($cmd) {
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
         $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';
         if ($isUpdate) {
-            $eternalsUpdateLock = Eternal::lock();
-            if (!$eternalsUpdateLock) {
+            $eternalsUpdateLock = Eternal::enabled() ? Eternal::lock() : null;
+            if (Eternal::enabled() && !$eternalsUpdateLock) {
                 out('Not updating: Pikkumies windows are changing; try again.');
                 exit(1);
             }
@@ -481,7 +488,7 @@ switch ($cmd) {
                 exit(1);
             }
             // Stop only after the origin, lifecycle lock and privilege checks pass.
-            if (!Eternal::stopManaged()) {
+            if (Eternal::enabled() && !Eternal::stopManaged()) {
                 out('Not updating: could not stop every Pikkumies window.');
                 exit(1);
             }
@@ -489,14 +496,18 @@ switch ($cmd) {
         // A dashboard: never without a login (ADR-0074); its web page built first, alone on the tree (ADR-0033 addendum 2026-10-19).
         $dash = HermesDashboardGate::refusal($passArgs, hermesBin());
         if ($dash === '' && HermesWebUi::needed($passArgs)) {
-            $eternalsBuildLock = Eternal::lock();
-            if (!$eternalsBuildLock) {
+            $eternalsBuildLock = Eternal::enabled() ? Eternal::lock() : null;
+            if (Eternal::enabled() && !$eternalsBuildLock) {
                 out('Not starting the dashboard: Pikkumies windows are changing; try again.');
                 exit(1);
             }
-            Eternal::stopManaged();
-            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out', 5);
-            fclose($eternalsBuildLock);
+            if (Eternal::enabled()) {
+                Eternal::stopManaged();
+            }
+            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out', Eternal::enabled() ? 5 : 0);
+            if ($eternalsBuildLock) {
+                fclose($eternalsBuildLock);
+            }
         }
         if ($dash !== '') {
             out('Not starting the dashboard: ' . $dash);
@@ -505,7 +516,7 @@ switch ($cmd) {
         // Held until Hermes exits: shared for a session, exclusive for an update, so an update never
         // rewrites the code a running session or scheduled job is using.
         $hermesLock = HermesInstall::lock($isUpdate);
-        if ($isUpdate && !$hermesLock) {
+        if (Eternal::enabled() && $isUpdate && !$hermesLock) {
             for ($attempt = 0; $attempt < 50 && !$hermesLock; $attempt++) {
                 usleep(100000);
                 $hermesLock = HermesInstall::lock(true);
@@ -550,7 +561,7 @@ switch ($cmd) {
         // HermesConfig::write touch is written through a temp file + rename (ADR-0022).
         try {
             generate(profile());
-        } catch (Throwable $x) {
+        } catch (Exception $x) {
             out('not starting: ' . $x->getMessage());
             if ($eternalId !== '') {
                 Eternal::afterExit($eternalId, 1, $eternalStarted, $eternalSignalled);
@@ -701,7 +712,7 @@ switch ($cmd) {
             exit(2);
         }
         // Hosts without supervision keep the original tmux server and plain sessions.
-        if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
+        if (!Eternal::enabled()) {
             exec('command -v tmux 2>/dev/null', $tmuxPath, $tmuxCode);
             if ($tmuxCode !== 0) {
                 out('tmux is not installed on this machine.');
@@ -721,7 +732,6 @@ switch ($cmd) {
                     exit(1);
                 }
             }
-            array_splice($attach, 0, 1, ['env', '-u', 'TMUX', 'tmux']);
             passthru(implode(' ', array_map('escapeshellarg', $attach)), $code);
             exit($code);
         }
@@ -729,6 +739,10 @@ switch ($cmd) {
         $tmuxLock = Eternal::lock();
         if (!$tmuxLock) {
             out('Pikkumies windows are busy; try again.');
+            exit(1);
+        }
+        if (Eternal::held()) {
+            out('Pikkumies windows are held for transfer. Try again after the hold ends.');
             exit(1);
         }
         if (!is_file(EternalRecord::path($tmuxId))) {
@@ -758,7 +772,7 @@ switch ($cmd) {
             }
             $windows = Eternal::withPrimary($windows);
         }
-        $insideTmux = (string) getenv('TMUX') !== '';
+        $insideTmux = Eternal::insidePrivateTmux((string) getenv('TMUX'));
         // The session's status line shows the credits line, refreshed every minute (ADR-0040).
         // NO_COLOR at this start reaches the credits line tmux runs, and keeps the status colours off (ADR-0061).
         $noColor = StatusTheme::noColor();
@@ -787,7 +801,8 @@ switch ($cmd) {
             }
         }
         fclose($tmuxLock);
-        passthru(implode(' ', array_map('escapeshellarg', Eternal::tmuxArgv(array_slice($attach, 1)))), $code);
+        $attachArgv = Eternal::tmuxArgv(array_slice($attach, 1));
+        passthru(implode(' ', array_map('escapeshellarg', $attachArgv)), $code);
         exit($code);
 
     case 'status-line': // internal: the tmux status segment `pikkumies tmux` sets (ADR-0061); prints nothing on any failure, as the credits line
