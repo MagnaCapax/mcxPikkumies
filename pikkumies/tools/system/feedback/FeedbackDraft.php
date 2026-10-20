@@ -1,14 +1,15 @@
 <?php
 /**
  * A feedback draft (ADR-0056): the exact JSON that will be sealed and sent, saved once under
- * local/state/feedback/<id>.json, mode 0400, where <id> is the first 32 hex digits of its sha256. The approval hook and
+ * local/state/feedback/<id>.json through lib/DraftStore.php (mode 0400, named by its own sha256). The approval hook and
  * the send verb both load it through load(), which refuses a file whose sha256 no longer starts with its id, or that
  * carries anything but the known fields, so a draft changed after the user approved it cannot go out under that
  * approval. A sent draft is renamed to <id>.sent.json and is never sent again.
  */
+require_once dirname(__DIR__, 3) . '/lib/DraftStore.php';
+
 class FeedbackDraft
 {
-    const ID_RE = '/^[0-9a-f]{32}$/D';
     /** The user's text, at most this many bytes. */
     const TEXT_MAX = 20000;
     /** The whole payload stays under this; the transcript keeps its newest part to fit. The server takes 2,000,000 sealed. */
@@ -24,10 +25,7 @@ class FeedbackDraft
 
     public static function path($id, $stateDir = null, $suffix = '.json')
     {
-        if (!is_string($id) || !preg_match(self::ID_RE, $id)) {
-            throw new CliError('a feedback id is 32 lowercase hex digits', 'run list to see your drafts');
-        }
-        return self::dir($stateDir) . "/$id$suffix";
+        return DraftStore::path(self::dir($stateDir), $id, 'feedback', $suffix);
     }
 
     /**
@@ -65,19 +63,7 @@ class FeedbackDraft
         if (strlen($json) > self::PAYLOAD_MAX) {
             throw new CliError('the feedback is too large to send', 'shorten the text or leave the conversation out');
         }
-        $id = substr(hash('sha256', $json), 0, 32);
-        $dir = self::dir($stateDir);
-        if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) {
-            throw new CliError("could not create $dir", 'check the disk and the permissions of ~/pikkumies/local/state');
-        }
-        $path = self::path($id, $stateDir);
-        if (!is_file($path)) {
-            $tmp = "$dir/.$id." . bin2hex(random_bytes(4)) . '.tmp';
-            if (file_put_contents($tmp, $json, LOCK_EX) !== strlen($json) || !chmod($tmp, 0400) || !rename($tmp, $path)) {
-                @unlink($tmp);
-                throw new CliError('could not save the draft', 'check the free disk space');
-            }
-        }
+        list($id, $path) = DraftStore::save(self::dir($stateDir), $json);
         return ['id' => $id] + self::summary($payload, strlen($json)) + ['path' => $path];
     }
 
@@ -92,24 +78,8 @@ class FeedbackDraft
     /** @return array [json, decoded payload] of a draft not yet sent whose content still matches its id. */
     public static function load($id, $stateDir = null)
     {
-        $path = self::path($id, $stateDir);
-        if (is_file(self::path($id, $stateDir, '.sent.json'))) {
-            throw new CliError("draft $id was already sent", 'it is never sent twice; draft a new one to add something');
-        }
-        if (is_link($path) || !is_file($path)) {
-            throw new CliError("no draft $id", 'run list to see your drafts, or draft a new one');
-        }
-        $json = (string) file_get_contents($path);
-        if (substr(hash('sha256', $json), 0, 32) !== $id) {
-            throw new CliError("draft $id was changed after it was made", 'draft it again; a changed draft is never sent');
-        }
-        $p = json_decode($json, true);
-        $ok = is_array($p) && array_keys($p) === array_keys(self::FIELDS) && $p['v'] === 1;
-        foreach ($ok ? self::FIELDS : [] as $k => $types) {
-            $ok = $ok && in_array(gettype($p[$k]), explode('|', $types), true)
-                && (!is_array($p[$k]) || count(array_filter($p[$k], 'is_string')) === count($p[$k]));
-        }
-        if (!$ok) {
+        list($json, $p) = DraftStore::load(self::dir($stateDir), $id, self::FIELDS, 'feedback');
+        if (count(array_filter($p['versions'], 'is_string')) !== count($p['versions'])) {
             throw new CliError("draft $id is not a feedback draft", 'draft it again');
         }
         return [$json, $p];
@@ -118,7 +88,7 @@ class FeedbackDraft
     /** After Pulsed Media took it: <id>.json becomes <id>.sent.json, which load() never sends. */
     public static function markSent($id, $stateDir = null)
     {
-        return @rename(self::path($id, $stateDir), self::path($id, $stateDir, '.sent.json'));
+        return DraftStore::markSent(self::dir($stateDir), $id, 'feedback');
     }
 
     /** What the user sees before approving: sizes, the session, whether the conversation is in, and the start of the text. */
@@ -135,20 +105,9 @@ class FeedbackDraft
     /** @return array the drafts kept here, newest first: id, made (UTC), bytes, conversation yes/no, sent yes/no. */
     public static function all($stateDir = null)
     {
-        $rows = [];
-        foreach (glob(self::dir($stateDir) . '/*.json') ?: [] as $f) {
-            $id = preg_replace('/\.sent$/', '', basename($f, '.json'));
-            if (!preg_match(self::ID_RE, $id)) {
-                continue;
-            }
-            $p = json_decode((string) file_get_contents($f), true);
-            $rows[] = ['id' => $id, 'made' => is_array($p) && isset($p['created_at']) ? gmdate('Y-m-d H:i', (int) $p['created_at']) . 'Z' : '',
-                'bytes' => (int) filesize($f), 'conversation' => is_array($p) && isset($p['transcript']) && is_string($p['transcript']),
-                'sent' => substr($f, -10) === '.sent.json'];
-        }
-        usort($rows, function ($a, $b) {
-            return strcmp($b['made'], $a['made']);
+        return DraftStore::all(self::dir($stateDir), function ($id, $p, $f, $sent) {
+            return ['id' => $id, 'made' => isset($p['created_at']) ? gmdate('Y-m-d H:i', (int) $p['created_at']) . 'Z' : '',
+                'bytes' => (int) filesize($f), 'conversation' => isset($p['transcript']) && is_string($p['transcript']), 'sent' => $sent];
         });
-        return $rows;
     }
 }

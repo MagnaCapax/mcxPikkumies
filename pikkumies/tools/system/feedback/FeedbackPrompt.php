@@ -7,6 +7,7 @@
  * text start gets what is left, and when even a short one does not fit, message() returns null and the hook blocks.
  */
 require_once dirname(__DIR__, 3) . '/lib/HookUnits.php';
+require_once dirname(__DIR__, 3) . '/lib/SendGuard.php';
 
 class FeedbackPrompt
 {
@@ -31,25 +32,17 @@ class FeedbackPrompt
         $fixed = "Send to Pulsed Media at pikkumies.mcx.fi? $what, locked for Pulsed Media only, linked to your account. "
             . self::size($s['bytes']) . ", all in $path. Text: \"";
         $left = HookUnits::APPROVE_SHOWN - HookUnits::charCount($fixed) - 1; // the closing quote
-        $text = str_replace('"', '\\"', (string) preg_replace('/\s+/u', ' ', Cli::cleanString((string) $s['text_start'])));
-        if (HookUnits::charCount($text) > $left) {
-            preg_match('/^.{0,' . max(0, $left - 1) . '}/su', $text, $m);
-            $text = rtrim(isset($m[0]) ? $m[0] : '', '\\') . '…';
-        }
-        if ($left < self::TEXT_MIN) {
+        $text = SendGuard::excerpt($s['text_start'], $left, self::TEXT_MIN);
+        if ($text === null) {
             return null;
         }
         $message = $fixed . $text . '"';
         return HookUnits::approveShown($message) ? $message : null;
     }
 
-    /** 812 bytes, 48.2 kB, 1.5 MB (decimal, as the 1,500,000-byte limit is written). */
+    /** 812 bytes, 48.2 kB, 1.5 MB (SendGuard::size). */
     public static function size($bytes)
     {
-        $bytes = (int) $bytes;
-        if ($bytes < 1000) {
-            return "$bytes bytes";
-        }
-        return $bytes < 1000000 ? round($bytes / 1000, 1) . ' kB' : round($bytes / 1000000, 1) . ' MB';
+        return SendGuard::size($bytes);
     }
 }

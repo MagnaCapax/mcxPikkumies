@@ -82,15 +82,15 @@ class FeedbackSend
         return $v;
     }
 
-    /** The Pulsed Media AI key, read the way credits reads it but only from ~/.virsilipasKey, and only a vsk- key. */
+    /** The Pulsed Media AI key (Provider::pulsedMediaKey: only from ~/.virsilipasKey, and only a vsk- key). */
     public static function pmKey(array $config)
     {
-        $file = Provider::readKeyFile(isset($config['provider']['virsilipasKeyFile']) ? (string) $config['provider']['virsilipasKeyFile'] : '');
-        if (strpos($file['key'], 'vsk-') !== 0) {
+        $key = Provider::pulsedMediaKey($config);
+        if ($key === '') {
             throw new CliError('feedback goes to Pulsed Media and needs the Pulsed Media AI key (~/.virsilipasKey)',
                 'your draft is kept; it is sent only with a Pulsed Media key, never with another provider\'s key');
         }
-        return $file['key'];
+        return $key;
     }
 
     /** Seals the draft to Pulsed Media's public key and posts it. @return array the server's receipt (id, received_at) */

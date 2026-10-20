@@ -66,6 +66,16 @@ class Provider
         ];
     }
 
+    /**
+     * The Pulsed Media AI key, for what goes to Pulsed Media itself (/feedback ADR-0056, /ticket ADR-0089): read only from
+     * provider.virsilipasKeyFile (~/.virsilipasKey), never the user's own provider key, and only a vsk- key; '' otherwise.
+     */
+    public static function pulsedMediaKey(array $config)
+    {
+        $key = self::readKeyFile(isset($config['provider']['virsilipasKeyFile']) ? (string) $config['provider']['virsilipasKeyFile'] : '')['key'];
+        return strpos($key, 'vsk-') === 0 ? $key : '';
+    }
+
     public static function mask($key)
     {
         $len = strlen($key);
