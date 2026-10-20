@@ -8,6 +8,17 @@ class Eternal
     const HOST_MARKER = '/etc/seedbox/config/pikkumiesEternals.enabled';
     const TARGET_HOLD = '/var/lib/pmss/transfer-hold/';
 
+    public static function enabled()
+    {
+        return is_file(self::$hostMarker !== null ? self::$hostMarker : self::HOST_MARKER);
+    }
+
+    public static function insidePrivateTmux($tmux)
+    {
+        $base = self::$tmuxDirectory !== null ? self::$tmuxDirectory : Config::localDir();
+        return $tmux !== '' && strpos(explode(',', $tmux, 2)[0], $base . '/tmux/') === 0;
+    }
+
     public static function lock($wait = false)
     {
         return EternalLock::take(Config::localDir() . '/eternals.lock', $wait);
@@ -226,6 +237,9 @@ class Eternal
             if (in_array($name, $allowed, true) || strpos($name, 'LC_') === 0) {
                 $environment[$name] = $value;
             }
+        }
+        if (isset($args[0]) && $args[0] === 'switch-client' && self::insidePrivateTmux((string) getenv('TMUX'))) {
+            $environment['TMUX'] = getenv('TMUX');
         }
         $environment = array_merge($environment, self::tmuxEnvironment());
         $argv = ['env', '-i'];

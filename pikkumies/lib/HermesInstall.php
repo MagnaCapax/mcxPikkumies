@@ -71,7 +71,6 @@ class HermesInstall
         'hooks.*.fail_closed' => ['agent/shell_hooks.py', 'raw.get("fail_closed"'],
         'sessions.auto_prune' => ['hermes_cli/config_defaults.py', '"auto_prune":'],
         'sessions.retention_days' => ['hermes_cli/config_defaults.py', '"retention_days":'],
-        'session.terminal_continue' => ['hermes_cli/config_defaults.py', '"terminal_continue":'],
         'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
         'onboarding.profile_build' => ['agent/onboarding.py', '_onboarding_section(config).get("profile_build")'],
         'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
@@ -547,9 +546,10 @@ class HermesInstall
     }
 
     /** The config keys HermesConfig writes whose text is missing from the installed source (CONFIG_FACTS, or the $facts given). */
-    public static function missingConfigKeys($src = null, array $facts = self::CONFIG_FACTS)
+    public static function missingConfigKeys($src = null, ?array $facts = null)
     {
         $src = $src !== null ? $src : self::sourceDir();
+        $facts = $facts !== null ? $facts : self::configFacts();
         $missing = [];
         foreach ($facts as $key => $fact) {
             if (strpos((string) @file_get_contents($src . '/' . $fact[0]), $fact[1]) === false) {
@@ -629,7 +629,16 @@ class HermesInstall
     /** What verify() checks, as one id. */
     public static function checksId()
     {
-        return substr(sha1(json_encode([self::CONFIG_FACTS, self::LAYER_FACTS, self::GUARD_BLOCK, self::MANAGED_REFUSAL])), 0, 12);
+        return substr(sha1(json_encode([self::configFacts(), self::LAYER_FACTS, self::GUARD_BLOCK, self::MANAGED_REFUSAL])), 0, 12);
+    }
+
+    public static function configFacts()
+    {
+        $facts = self::CONFIG_FACTS;
+        if (Eternal::enabled()) {
+            $facts['session.terminal_continue'] = ['hermes_cli/config_defaults.py', '"terminal_continue":'];
+        }
+        return $facts;
     }
 
     public static function markVerified($commit)
