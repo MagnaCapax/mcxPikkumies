@@ -37,6 +37,8 @@ require __DIR__ . '/GuardLocal.php';
 require __DIR__ . '/GuardBackup.php';
 // The media apps' logins in plain text (ADR-0078): named, globbed or swept up by a search from the home folder.
 require __DIR__ . '/GuardMediaCreds.php';
+// The AI key files the same way: globbed, reached by a relative path after a cd, or swept up by a search from the home folder (ADR-0101).
+require __DIR__ . '/GuardKeyFiles.php';
 require __DIR__ . '/GuardDrives.php';
 require_once dirname(__DIR__, 3) . '/lib/Host.php';
 $mediaHome = Host::home(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());
@@ -84,7 +86,7 @@ $secretPatterns = [
     '#local/secrets\b#'                             => 'a command on stored passwords (~/pikkumies/local/secrets/); what the agent reads goes to the model',
     // The model key (ADR-0004): Pikkumies hands it to Hermes itself; the agent never needs to read or search for it.
     // `credits balance` answers balance questions without it.
-    '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
+    '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance. On Pulsed Media the key file is put in place for the user; for their own provider the user writes ~/.pikkumiesKey themselves',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
     // The halt snapshot and the scheduled-job record hold what the user wrote, the only evidence the ask review trusts
     // (ADR-0073, ADR-0101): the agent never touches them.
@@ -100,6 +102,11 @@ if ($fileTool) {
         exit(0);
     }
     foreach (array_merge([$command], $named) as $target) {
+        $keyHit = GuardKeyFiles::checkKeys($tool, $input, guardTexts($target), $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
+        if ($keyHit !== null) {
+            echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $keyHit. Not run."]) . "\n";
+            exit(0);
+        }
         $media = GuardMediaCreds::check($tool, $input, guardTexts($target), $mediaCwd, $mediaHome);
         if ($media !== null) {
             echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $media. Not run."]) . "\n";
@@ -198,6 +205,11 @@ if ($disk !== null) {
     exit(0);
 }
 // The media apps' logins after the stored-password and AI-key rules above, so those keep their own reason.
+$keyHit = GuardKeyFiles::checkKeys($tool, $input, $texts, $mediaCwd, $mediaHome, dirname(__DIR__, 3) . '/local');
+if ($keyHit !== null) {
+    echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $keyHit. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
+    exit(0);
+}
 $media = GuardMediaCreds::check($tool, $input, $texts, $mediaCwd, $mediaHome);
 if ($media !== null) {
     echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $media. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
@@ -228,6 +240,13 @@ $privacy = [
     // connection listings that are neither listening sockets only, a summary, nor filtered to one endpoint
     '#(^|[\s;&|(`/])ss(?=[\s"\']|$)(?![^;&|\n]*(\s-[a-zA-Z]*[ls]|--(listening|summary)\b|\b(dst|src|dport|sport)\b))#',
     '#(^|[\s;&|(`/])netstat(?=[\s"\']|$)(?![^;&|\n]*(\s-[a-zA-Z]*[lirsg]|--(listening|interfaces|route|statistics|groups)\b))#',
+    // PID 1 answers for system units as root, past /proc's hidepid=2: `systemctl status ssh` lists other accounts'
+    // process titles (sshd: USER@pts/N), and so do `show` of ControlGroup or MainPID and GetUnitProcesses over D-Bus.
+    // The account's own units (--user), is-active / is-enabled (no process titles) and root's own use (euid 0, or
+    // through sudo/doas, which only work where the account has root) stay allowed (ADR-0101).
+    '#(^|[\s;&|(`/])(?<!sudo )(?<!doas )systemctl(?=[\s"\']|$)(?![^;&|\n]*\s--user\b)[^;&|\n]*?\sstatus(?=[\s"\';&|)]|$)#',
+    '#(^|[\s;&|(`/])(?<!sudo )(?<!doas )systemctl(?=[\s"\']|$)(?![^;&|\n]*\s--user\b)(?=[^;&|\n]*\sshow(?=[\s"\';&|)]|$))(?:(?![^;&|\n]*(\s-p|--property)\b)|(?=[^;&|\n]*\b(ControlGroup|MainPID|ExecMainPID|ControlPID)\b))#',
+    '#\bGetUnitProcesses\b#',
 ];
 // user-<n> of another account: always as a slice, otherwise together with the resource tree.
 $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
@@ -240,7 +259,7 @@ foreach ($texts as $text) {
         }
     }
 }
-foreach ($privacy as $re) {
+foreach ($uid === 0 ? array_slice($privacy, 0, -3) : $privacy as $re) { // root sees every process anyway: the three systemd rules are for accounts
     $hit = $hit !== 0 ? $hit : guardMatch($re, $texts);
 }
 if ($hit !== 0) {

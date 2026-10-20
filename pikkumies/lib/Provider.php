@@ -76,11 +76,10 @@ class Provider
         return strpos($key, 'vsk-') === 0 ? $key : '';
     }
 
+    /** A key for display: stars only, never any of its characters (ADR-0101 key guard); '(none)' when there is none. */
     public static function mask($key)
     {
-        $len = strlen($key);
-        // A key under 16 characters is shown as stars only: showing 8 of it would show most of it.
-        return $len === 0 ? '(none)' : ($len < 16 ? str_repeat('*', 8) : substr($key, 0, 4) . str_repeat('*', $len - 8) . substr($key, -4));
+        return strlen((string) $key) === 0 ? '(none)' : str_repeat('*', 8);
     }
 
     /** GET {endpoint}/models as a reachability + key check. Returns [ok, httpCode]. */

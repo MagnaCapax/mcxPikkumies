@@ -40,7 +40,7 @@ class GuardMediaCreds
     }
 
     /** [the text with exclude-option arguments removed, whether one of them matches the file]. */
-    private static function excludes($cmd)
+    protected static function excludes($cmd)
     {
         $re = '#(?<![\w-])(--exclude|--ignore|--glob|--iglob|-g|(?:!|-not)\s+-i?name)(=|\s+)(["\']?)(!?)([^\s"\']+)\3#';
         $hit = false;
@@ -56,7 +56,7 @@ class GuardMediaCreds
     }
 
     /** True when a glob in $text expands to the file (folder parts with glob(), bounded). */
-    private static function globHit($text, $cwd, $home)
+    protected static function globHit($text, $cwd, $home)
     {
         foreach (array_slice(self::words($text), 0, 64) as $w) {
             if (!$w['glob'] && !($w['qglob'] && preg_match('#^(~|\$\{?HOME\}?|/)#', $w['text']))) {
@@ -83,7 +83,7 @@ class GuardMediaCreds
     }
 
     /** True for a recursive content search rooted at the home folder itself. */
-    private static function homeSearch($tool, array $input, $cmd, $cwd, $home)
+    protected static function homeSearch($tool, array $input, $cmd, $cwd, $home)
     {
         if (in_array($tool, ['read_file', 'write_file', 'patch'], true)) {
             return false;
@@ -125,7 +125,7 @@ class GuardMediaCreds
     }
 
     /** Where a relative path in $cmd starts: the last cd it makes (~, $HOME, a path), else the payload's cwd. */
-    private static function base($cmd, $cwd, $home)
+    protected static function base($cmd, $cwd, $home)
     {
         $base = $cwd;
         preg_match_all('/(?:^|[\s;&|(])cd(?=[\s;&|)]|$)(?:\s+([^\s;&|)]+))?/', $cmd, $m);
@@ -136,7 +136,7 @@ class GuardMediaCreds
     }
 
     /** ~, $HOME and ${HOME} as the home folder, a relative path against $base; null when $base is unknown. */
-    private static function resolve($p, $base, $home)
+    protected static function resolve($p, $base, $home)
     {
         $p = (string) preg_replace('#^(~|\$\{HOME\}|\$HOME)(?=/|$)#', $home, trim($p, '"\''));
         if ($p === '' || $p[0] !== '/') {
@@ -145,14 +145,14 @@ class GuardMediaCreds
         return $p;
     }
 
-    private static function real($p)
+    protected static function real($p)
     {
         $r = @realpath((string) $p);
         return $r === false ? rtrim((string) $p, '/') : $r;
     }
 
     /** Shell-like words: the text without quotes, a glob character outside quotes (glob) or inside them (qglob). */
-    private static function words($s)
+    protected static function words($s)
     {
         $out = [];
         $cur = ['text' => '', 'glob' => false, 'qglob' => false, 'open' => false];

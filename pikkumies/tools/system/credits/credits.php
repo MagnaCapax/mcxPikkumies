@@ -18,7 +18,7 @@ $creditsConfig = isset($creditsConfig) ? $creditsConfig : Config::load();
 // The same seam for the line's cache directory (local/state/credits/).
 $creditsStateDir = isset($creditsStateDir) ? $creditsStateDir : CreditsLine::stateDir();
 
-$creditsKeyHint = 'a key comes from ~/.virsilipasKey (the Pulsed Media AI key; also shown in the Pulsed Media client area on the page'
+$creditsKeyHint = 'a key comes from ~/.virsilipasKey (the Pulsed Media AI key, put in place for the user; also shown in the Pulsed Media client area on the page'
     . ' "Virsilipas AI key" under "AI credits") or from ~/.pikkumiesKey for your own provider. Never read or print the key itself';
 
 $usage = <<<'U'

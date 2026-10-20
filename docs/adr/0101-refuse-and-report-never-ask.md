@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-20
-- Status: Accepted. Amends [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md) (the two block messages, R1, which sessions give evidence, the halt guard's Q7) and [ADR-0020](0020-deletes-need-the-users-approval.md) (what happens in scheduled and unattended runs, and the nested-agent message).
+- Status: Accepted; amended 2026-10-20 (the key guard and the system-unit privacy rule, at the end). Amends [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md) (the two block messages, R1, which sessions give evidence, the halt guard's Q7) and [ADR-0020](0020-deletes-need-the-users-approval.md) (what happens in scheduled and unattended runs, and the nested-agent message).
 
 ## Context
 The operator ruled on 2026-10-19: "no asking questions, no work deferrals to confirm none of that shit -- only exception is _destructive_ actions beyond something which is replaceable, but even then adversarial review round to see if should continue". On 2026-10-20 the operator read the public description of what Pikkumies does ("It asks you first before it deletes files, ... In a scheduled job nobody is there to answer, so those actions are refused, unless you once answered "always" for that exact command.") and called it "an antipattern of harassing the operator if still true. needs to be removed, just an adversarial double check for such actiosn", and asked for the other antipatterns like it to be found and removed.
@@ -49,3 +49,18 @@ What was checked in Hermes (v0.22.2, the newest stable tag, which Pikkumies inst
 ## References
 - ADR-0020, [ADR-0047](0047-halt-guard.md), [ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md), ADR-0073, [ADR-0083](0083-check-before-publishing.md), [ADR-0089](0089-support-tickets-with-the-ai-key.md)
 - Hermes v0.22.2: `cron/scheduler.py`, `cron/scheduler_prompt.py`, `tools/cronjob_tools.py`, `agent/turn_context.py`, `agent/shell_hooks.py`, `gateway/authz_mixin.py`, `gateway/pairing.py`, `gateway/run.py`, `gateway/config.py`
+
+## Amendment 2026-10-20: the AI key files, the key mask and system units' status
+
+**Context.** A check of the public "what it will and will not do" claims found three gaps behind "it never reads your AI key" and "it does not look at other accounts' connections". guard-destructive refused a command that named a key file, but not one that globbed it (`cat ~/.v*Key`), reached it by a relative path (`cd ~/pikkumies/local/hermes-managed && cat .env`) or swept it up in a content search from the home folder (`grep -rh ^key= ~`). The media apps' logins already had that treatment (GuardMediaCreds, [ADR-0078](0078-changing-the-login-of-the-users-own-apps.md)). `Provider::mask` still showed the first and last four characters of a long key. And a system unit's `systemctl status ssh` is answered by PID 1 as root, past /proc's `hidepid=2`, so it lists other accounts' process titles (`sshd: USER@pts/N`); so does `systemctl show -p ControlGroup|MainPID` and the D-Bus `GetUnitProcesses` call (`systemd-cgls` reads /proc and does not). Several texts still told the user to edit the platform key file by hand, though the platform writes `~/.virsilipasKey` itself ([ADR-0004](0004-provider-key-and-root-detection.md) amendment 2026-10-17).
+
+**Decision.**
+- `GuardKeyFiles.php` (beside `GuardMediaCreds.php`, whose word, path and home-search helpers it reuses) refuses a call when a word resolves to `~/.virsilipasKey`, `~/.pikkumiesKey` or the Hermes `.env` in `local/hermes/` or `local/hermes-managed/` (also through the `~/pikkumies` link), with `~`, `$HOME`, `/./` and `dir/../` folded and a relative path read against the last `cd` or the call's working folder; when a glob would expand to one (shell dot-file rules); and when it searches content from the home folder itself, unless its exclude options cover every key file name. The name rule in `$secretPatterns` stays.
+- `Provider::mask` shows eight stars for every key.
+- The guard's privacy block also refuses a system unit's `systemctl status`, a `systemctl show` without `-p` or of `ControlGroup`, `MainPID`, `ExecMainPID` or `ControlPID`, and `GetUnitProcesses`, with the same message that names no path. `systemctl --user ...`, `is-active`, `is-enabled`, a manager property (`show -p DefaultTimeoutStopUSec`), root's own use (euid 0) and a command through `sudo` or `doas` (which work only where the account has root) stay allowed. The server-admin skill reads unit status with `sudo`.
+- The install guide, the installer's last line, the credits hint and the guard's key message say that on Pulsed Media the key file is put in place for the user, and that for their own provider the user writes `~/.pikkumiesKey`.
+
+**Consequences.**
+- A content search from the home folder that excluded only the media logins is now refused too; it must exclude the key files as well, or search a subfolder.
+- Out of sight, as before: a name built in a variable or in code, and a program that reads files by itself. A safety prompt, not security (AGENTS.md).
+- Tests: `tests/KeyGuardTest.php`, `tests/HookGuardMediaCredentialsTest.php`, `tests/ProviderKeyFileModeTest.php`, `tests/HookGuardDiskTest.php`.

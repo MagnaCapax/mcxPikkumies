@@ -186,7 +186,7 @@ switch ($cmd) {
         } catch (Exception $x) {
             out('  path: not set up: ' . $x->getMessage());
         }
-        out('Next: a platform key in ~/.virsilipasKey is used as it is; for your own provider put endpoint= and key= in ~/.pikkumiesKey (' . Config::shown(Config::localDir() . '/config.php') . ' can set the endpoint and model, never the key). Then `pikkumies doctor`.');
+        out('Next: on Pulsed Media the platform key ~/.virsilipasKey is put in place for you and used as it is; for your own provider write endpoint= and key= into ~/.pikkumiesKey yourself (' . Config::shown(Config::localDir() . '/config.php') . ' can set the endpoint and model, never the key). Then `pikkumies doctor`.');
         out('Then open a new shell (or `hash -r`) and type `pikkumies`.');
         break;
 

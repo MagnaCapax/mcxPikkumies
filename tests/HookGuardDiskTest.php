@@ -57,7 +57,7 @@ return [
             'mdadm --assemble /dev/md0 /dev/sdb /dev/sdc', 'mdadm --assemble --scan', 'mdadm -As', 'mdadm --assemble --readonly /dev/md0 /dev/sdb /dev/sdc',
             'mdadm --monitor --scan --oneshot', 'mdadm -F -1 -s', 'mdadm --monitor --scan --test --oneshot',
             'cat /proc/mdstat', 'cat /sys/block/md0/md/sync_action', 'cat /sys/block/md0/md/mismatch_cnt 2>/dev/null', 'grep -r . /sys/block/md0/md/stripe_cache_size',
-            'cat /etc/mdadm/mdadm.conf', 'man mdadm', 'apt-get install mdadm', 'systemctl status mdmonitor', 'ls /dev/md*', 'which mdadm',
+            'cat /etc/mdadm/mdadm.conf', 'man mdadm', 'apt-get install mdadm', 'sudo systemctl status mdmonitor', 'systemctl is-active mdmonitor', 'ls /dev/md*', 'which mdadm',
         ], 'none');
     },
     'disk guard: raw writes to md control files are refused; the mdraid tool is the way' => function () {

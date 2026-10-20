@@ -90,8 +90,9 @@ return [
             ['rg pass', 'block', 'home'],
             ['grep -r password ~/subfolder', 'none'], ['rg password ~/subfolder', 'none'], ['find ~ -name "*.log"', 'none'],
             ['find ~/subfolder -type f -exec grep pass {} +', 'none'], ['grep password ~/subfolder/notes.txt', 'none'], ['grep -r pass .', 'none', '/tmp'],
-            ["grep -r pass ~ --exclude='.media-stack-*'", 'none'], ["rg pass ~ -g '!.media-stack-*'", 'none'], ['ag pass ~ --ignore .media-stack-*', 'none'],
-            ["find ~ -type f ! -name '.media-stack-*' -exec grep pass {} +", 'none'], ["rg pass ~ -g '*.log'", 'block'],
+            ["grep -r pass ~ --exclude='.media-stack-*'", 'block'], ["rg pass ~ -g '!.media-stack-*'", 'block'], ['ag pass ~ --ignore .media-stack-*', 'block'], // the AI key files are still in reach (ADR-0101)
+            ["grep -r pass ~ --exclude='.media-stack-*' --exclude='.*Key' --exclude=.env", 'none'],
+            ["find ~ -type f ! -name '.media-stack-*' -exec grep pass {} +", 'block'], ["rg pass ~ -g '*.log'", 'block'],
         ];
         foreach ($rows as $r) {
             $got = guardMediaAnswer('terminal', ['command' => $r[0]], isset($r[2]) ? $r[2] : '');

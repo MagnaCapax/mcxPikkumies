@@ -172,7 +172,7 @@ return [
         @symlink("$dir/key", "$dir/link");
         check(Provider::readKeyFile("$dir/link")['key'] === '', 'symlinked key file was read');
         $m = Provider::mask('vsk-abcdef0123456789');
-        check(strpos($m, 'abcdef') === false && substr($m, 0, 4) === 'vsk-', 'mask leaks key');
+        check($m === '********', 'mask leaks key: ' . $m);
         @unlink("$dir/link");
         @unlink("$dir/key");
         @rmdir($dir);

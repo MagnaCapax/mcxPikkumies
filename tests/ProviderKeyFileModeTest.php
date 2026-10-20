@@ -16,10 +16,10 @@ return [
         check(Provider::readKeyFile("$tmp/key", $me + 1)['key'] === '', 'a key file of another uid must not be trusted');
         testRmTree($tmp);
     },
-    'provider key file: keys under 16 characters are masked completely; longer keys keep 4 and 4' => function () {
+    'provider key file: every key is shown as stars only, whatever its length (ADR-0101)' => function () {
         check(Provider::mask('short123') === '********', 'short key: ' . Provider::mask('short123'));
         check(Provider::mask('vsk-abcdef01234') === '********', '15 chars: ' . Provider::mask('vsk-abcdef01234'));
-        check(Provider::mask('vsk-abcdef0123456789') === 'vsk-' . str_repeat('*', 12) . '6789', 'long key: ' . Provider::mask('vsk-abcdef0123456789'));
+        check(Provider::mask('vsk-abcdef0123456789') === '********', 'long key: ' . Provider::mask('vsk-abcdef0123456789'));
         check(Provider::mask('') === '(none)', 'empty');
     },
     'provider key file: doctor never prints a user:password@ part of the endpoint' => function () {
