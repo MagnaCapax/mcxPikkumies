@@ -1,0 +1,8 @@
+#!/usr/bin/env php
+<?php
+// Fake fuser -s: exit 0 when a process uses one of the named devices (state.busy), 1 when none does.
+require __DIR__ . '/fakelib.php';
+$args = array_slice($argv, 1);
+fakeLog('fuser', $args);
+$busy = isset(fakeState()['busy']) ? fakeState()['busy'] : [];
+exit(array_intersect($args, $busy) ? 0 : 1);

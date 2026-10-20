@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+// Fake sudo: logs the call, drops -n, runs the rest.
+require __DIR__ . '/fakelib.php';
+$args = array_slice($argv, 1);
+fakeLog('sudo', $args);
+if (isset($args[0]) && $args[0] === '-n') {
+    array_shift($args);
+}
+passthru(implode(' ', array_map('escapeshellarg', $args)), $code);
+exit($code);

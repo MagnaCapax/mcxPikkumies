@@ -1,0 +1,38 @@
+#!/usr/bin/env php
+<?php
+// Fake smartctl: prints the fixture named for the device in state.smart; -t starts a self-test (state.selftest).
+require __DIR__ . '/fakelib.php';
+$args = array_slice($argv, 1);
+fakeLog('smartctl', $args);
+$state = fakeState();
+$dev = end($args);
+if (in_array('-t', $args, true)) {
+    if (!empty($state['refuse_test'])) {
+        echo "Self-test not supported\n";
+        exit(4);
+    }
+    $state['selftest'][$dev] = true;
+    fakeSave($state);
+    echo "Testing has begun.\n";
+    exit(0);
+}
+if (!isset($state['smart'][$dev])) {
+    fwrite(STDERR, "Smartctl open device: $dev failed: No such device\n");
+    exit(2);
+}
+$doc = json_decode((string) file_get_contents(getenv('FAKE_FIXTURES') . '/' . $state['smart'][$dev] . '.json'), true);
+if (isset($state['serial'][$dev])) {
+    $doc['serial_number'] = $state['serial'][$dev];
+}
+if (!empty($state['selftest'][$dev])) {
+    $doc['ata_smart_data']['self_test']['status'] = ['value' => 249, 'string' => 'in progress, 90% remaining', 'remaining_percent' => 90];
+}
+foreach (isset($state['override'][$dev]) ? $state['override'][$dev] : [] as $id => $raw) {
+    foreach ($doc['ata_smart_attributes']['table'] as $i => $a) {
+        if ((int) $a['id'] === (int) $id) {
+            $doc['ata_smart_attributes']['table'][$i]['raw'] = ['value' => $raw, 'string' => (string) $raw];
+        }
+    }
+}
+echo json_encode($doc, JSON_UNESCAPED_SLASHES), "\n";
+exit(isset($doc['smartctl']['exit_status']) ? (int) $doc['smartctl']['exit_status'] : 0);

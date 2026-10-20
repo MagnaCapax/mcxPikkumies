@@ -1,0 +1,10 @@
+#!/usr/bin/env php
+<?php
+// Fake lsblk: state.disks; from the call number state.flip.call on, state.flip.disks (a disk changed under the tool).
+require __DIR__ . '/fakelib.php';
+fakeLog('lsblk', array_slice($argv, 1));
+$state = fakeState();
+$state['lsblk_calls'] = (isset($state['lsblk_calls']) ? $state['lsblk_calls'] : 0) + 1;
+fakeSave($state);
+$disks = isset($state['flip']) && $state['lsblk_calls'] >= $state['flip']['call'] ? $state['flip']['disks'] : $state['disks'];
+echo json_encode(['blockdevices' => $disks], JSON_UNESCAPED_SLASHES), "\n";

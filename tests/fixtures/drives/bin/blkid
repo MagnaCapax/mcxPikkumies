@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+// Fake blkid -p -o export <dev>: the signature lines of state.blkid[dev]; exit 2 when there is none (as blkid does).
+require __DIR__ . '/fakelib.php';
+$args = array_slice($argv, 1);
+fakeLog('blkid', $args);
+$dev = end($args);
+$sig = isset(fakeState()['blkid'][$dev]) ? fakeState()['blkid'][$dev] : '';
+if (is_int($sig)) {
+    exit($sig); // a probe failure code (8: ambivalent result)
+}
+if ($sig === '') {
+    exit(2);
+}
+echo "DEVNAME=$dev\n$sig\n";
+exit(0);

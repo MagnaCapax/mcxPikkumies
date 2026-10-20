@@ -1,0 +1,9 @@
+- Drive health only through `drives` (needs root). Read `smart` first; never a raw `smartctl -t`, `badblocks` or `hdparm` write.
+- Counters and flags are a screen, never a verdict: pending, reallocated and uncorrectable counts, the `-H` health flag and `FAILING_NOW` attributes decide the next test, never good or bad. A flag or a count routes the drive to a write pass.
+- Reallocated sectors are normal: the drive remapped them. The only count-based fault is pending that does not fall across a write pass, judged from samples before and after it.
+- Only a completed write pass decides. `smartctl -H` and long self-tests only read. While a pass runs the drive is HOLD, "recoverability undetermined": never write dead, failed or replace before the pass completes. A partial success (some blocks rewrote) leads to the next pass, never to a verdict.
+- The drive's array role comes first, before any write: a live array member gets its write pass from its own array (a `check` scrub, or a rebuild after a re-add), never `repair` and never a targeted write by hand. Single-copy data (RAID0, linear, a lone disk) is copied off before anything writes to it. A disk carrying an array signature with no running array may be the last copy of that array: find out which array first.
+- Key every drive by serial (and WWN), never by device letter; compare serials case-insensitively.
+- Two axes: the verdict (RECOVERED, HOLD, FAILED, INCOMPLETE) and the grade (A, B, C, BIN, only after a completed write pass; before it a drive is untested, whatever its SMART or age). A missing field is unknown, never zero.
+- The health flag and the self-test result are separate fields; never present one as the other.
+- Save a lesson only when `smart` emits a `lesson` record (a verdict or grade landed), never from a screen.

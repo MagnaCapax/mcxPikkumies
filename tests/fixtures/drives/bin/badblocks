@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+// Fake badblocks: behaves as state.badblocks.mode says; afterwards applies state.badblocks.after (new raw counters).
+require __DIR__ . '/fakelib.php';
+$args = array_slice($argv, 1);
+fakeLog('badblocks', $args);
+$state = fakeState();
+$bb = $state['badblocks'];
+$fix = in_array('-wv', $args, true);
+usleep((int) (($bb['sleep'] ?? 0) * 1000000));
+$mode = $fix ? ($bb['fix'] ?? 'ok') : $bb['mode'];
+$err = function ($s) {
+    fwrite(STDERR, $s);
+};
+$err("Checking for bad blocks in non-destructive read-write mode\nFrom block 0 to 1953506645\n");
+$err("  50.00% done, 0:01 elapsed. (0/0/0 errors)" . str_repeat("\x08", 44));
+if ($mode === 'drop') {
+    for ($i = 0; $i < 400000; $i++) {
+        if (@fwrite(STDOUT, "$i\n") === false) {
+            exit(1);
+        }
+    }
+    exit(1);
+}
+if ($mode === 'stall') {
+    $err(" 60.00% done, 0:02 elapsed. (0/5/0 errors)" . str_repeat("\x08", 44));
+    exit(1);
+}
+$summary = ['clean' => [[], '0/0/0'], 'ok' => [[], '0/0/0'], 'read' => [['1000', '1001'], '2/0/0'], 'write' => [['77'], '0/1/0'], 'fail' => [[end($args)], '0/1/0']];
+list($blocks, $triple) = $summary[$mode];
+foreach ($blocks as $b) {
+    echo "$b\n";
+}
+$err("done\nPass completed, " . count($blocks) . " bad blocks found. ($triple errors)\n");
+if (!empty($bb['after'])) {
+    $dev = $fix ? $args[count($args) - 3] : end($args);
+    $state = fakeState();
+    $state['override'][$dev] = $bb['after'];
+    fakeSave($state);
+}
+exit(0);

@@ -143,9 +143,11 @@ class CliHuman
         return ($i === 0 ? (string) (int) $n : number_format($n, 1)) . ' ' . $units[$i];
     }
 
+    /** Display width: characters, plus one for each emoji a terminal draws two columns wide (status glyphs such as 🟢 ⚪). */
     private static function len($s)
     {
-        return function_exists('mb_strlen') ? mb_strlen($s, 'UTF-8') : strlen($s);
+        $wide = preg_match_all('/[\x{1F300}-\x{1FAFF}\x{26AA}\x{26AB}]/u', $s);
+        return (function_exists('mb_strlen') ? mb_strlen($s, 'UTF-8') : strlen($s)) + (int) $wide;
     }
 
     private static function cut($s, $width)

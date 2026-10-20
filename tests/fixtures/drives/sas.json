@@ -1,0 +1,77 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "smartctl": {
+        "version": [
+            7,
+            3
+        ],
+        "exit_status": 0
+    },
+    "device": {
+        "name": "/dev/sdb",
+        "info_name": "/dev/sdb",
+        "type": "scsi",
+        "protocol": "SCSI"
+    },
+    "scsi_vendor": "TEST",
+    "scsi_product": "SAS10T",
+    "scsi_model_name": "TEST SAS10T",
+    "serial_number": "tsas0001",
+    "user_capacity": {
+        "blocks": 2441609216,
+        "bytes": 10000831348736
+    },
+    "rotation_rate": 7200,
+    "smart_status": {
+        "passed": true
+    },
+    "power_on_time": {
+        "hours": 30000,
+        "minutes": 5
+    },
+    "scsi_grown_defect_list": 12,
+    "scsi_error_counter_log": {
+        "read": {
+            "errors_corrected_by_eccfast": 0,
+            "errors_corrected_by_eccdelayed": 900,
+            "total_uncorrected_errors": 2
+        },
+        "write": {
+            "errors_corrected_by_eccdelayed": 2,
+            "total_uncorrected_errors": 0
+        },
+        "verify": {
+            "errors_corrected_by_eccdelayed": 0,
+            "total_uncorrected_errors": 1
+        }
+    },
+    "scsi_self_test_0": {
+        "code": {
+            "value": 1,
+            "string": "Background short"
+        },
+        "result": {
+            "value": 0,
+            "string": "Completed"
+        },
+        "power_on_time": {
+            "hours": 29990
+        }
+    },
+    "scsi_self_test_1": {
+        "code": {
+            "value": 2,
+            "string": "Background long"
+        },
+        "result": {
+            "value": 7,
+            "string": "Failed in segment -->"
+        },
+        "power_on_time": {
+            "hours": 20000
+        }
+    }
+}
