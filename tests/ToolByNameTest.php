@@ -141,4 +141,20 @@ return [
             testRmTree($full);
         }
     },
+    'tool by name: the search gate lets the paired first reading through in its launcher form, and the search opens it' => function () {
+        $full = orchestratorTree();
+        try {
+            foreach (['system/system-status', 'memory/pikkumies'] as $u) {
+                orchestratorCopy(dirname(__DIR__) . "/pikkumies/tools/$u", "$full/pikkumies/tools/$u");
+            }
+            $call = ['tool_name' => 'terminal', 'session_id' => 'sess-sf', 'tool_input' => ['command' => 'pikkumies system-status show']];
+            list($d, $raw) = orchestratorRun($full, 'pre_tool_call', $call);
+            check(!is_array($d) || strpos((string) $d['message'], 'search first') === false, 'the search gate held the paired reading: ' . $raw);
+            $act = ['tool_name' => 'terminal', 'session_id' => 'sess-sf', 'tool_input' => ['command' => 'pikkumies system-status restart-everything']];
+            list($d, $raw) = orchestratorRun($full, 'pre_tool_call', $act);
+            check(is_array($d) && strpos((string) $d['message'], 'search first') !== false, 'an acting call in the launcher form got past the search gate: ' . $raw);
+        } finally {
+            testRmTree($full);
+        }
+    },
 ];
