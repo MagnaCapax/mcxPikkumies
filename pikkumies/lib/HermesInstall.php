@@ -509,8 +509,16 @@ class HermesInstall
      */
     public static function lock($exclusive)
     {
-        $lock = EternalLock::take(self::lockFile(), false, $exclusive);
-        return $lock ?: null;
+        @mkdir(self::localDir(), 0700, true);
+        $h = @fopen(self::lockFile(), 'c');
+        if (!$h) {
+            return null;
+        }
+        if (!flock($h, ($exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB)) {
+            fclose($h);
+            return null;
+        }
+        return $h;
     }
 
     public static function origin()

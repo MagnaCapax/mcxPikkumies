@@ -99,7 +99,7 @@ return [
             testRmTree($root);
         }
     },
-    'eternal: update child does not inherit the lifecycle or runtime lock' => function () {
+    'eternal: update child does not inherit lifecycle locks' => function () {
         $root = testTempDir('eternal-update-fd');
         $source = dirname(__DIR__) . '/pikkumies';
         foreach (['bin', 'lib', 'tools', 'doctrine'] as $dir) {
@@ -112,15 +112,15 @@ return [
         @mkdir($root . '/hermes/.hermes/bin', 0700, true);
         file_put_contents($root . '/include/.hermes-ready', "ready\n");
         $binary = $root . '/hermes/.hermes/bin/hermes';
-        file_put_contents($binary, "#!/bin/sh\nfor fd in /proc/\$\$/fd/*; do path=\$(readlink \"\$fd\"); case \"\$path\" in '" . $root . "/local/eternals.lock'|'" . $root . "/local/hermes.lock') echo leaked >> '" . $root . "/leak';; esac; done\necho invoked > '" . $root . "/updater-ran'\nexit 0\n");
+        file_put_contents($binary, "#!/bin/sh\nfor fd in /proc/\$\$/fd/*; do path=\$(readlink \"\$fd\"); case \"\$path\" in '" . $root . "/local/eternals.lock'|'" . $root . "/local/eternals/'*.run) echo leaked >> '" . $root . "/leak';; esac; done\necho invoked > '" . $root . "/updater-ran'\nexit 0\n");
         chmod($binary, 0700);
         exec('git -C ' . escapeshellarg($root . '/hermes') . ' init -q');
         exec('git -C ' . escapeshellarg($root . '/hermes') . ' -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m seed');
         exec('git -C ' . escapeshellarg($root . '/hermes') . ' remote add origin ' . escapeshellarg('file://' . $root . '/remote'));
-        file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\nexit 1\n");
+        file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\necho called >> '" . $root . "/tmux-calls'\nexit 1\n");
         chmod($root . '/fake-bin/tmux', 0700);
         $runner = $root . '/runner.php';
-        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; HermesInstall::$root = __DIR__; HermesInstall::$repo = "file://" . __DIR__ . "/remote"; Eternal::$tmuxDirectory = __DIR__; require __DIR__ . "/bin/pikkumies";');
+        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; HermesInstall::$root = __DIR__; HermesInstall::$repo = "file://" . __DIR__ . "/remote"; Eternal::$hostMarker = __DIR__ . "/missing-marker"; Eternal::$tmuxDirectory = __DIR__; require __DIR__ . "/bin/pikkumies";');
         $oldPath = getenv('PATH');
         $oldHome = getenv('HOME');
         $oldKey = getenv('PIKKUMIES_KEY');
@@ -132,13 +132,29 @@ return [
         try {
             list($code, $out) = runPhp($runner, ['run', 'update']);
             check(is_file($root . '/updater-ran'), 'update child did not run: ' . $code . ' ' . $out);
-            check(!is_file($root . '/leak'), 'update child inherited a lock');
+            check(!is_file($root . '/leak'), 'update child inherited a lifecycle lock');
+            check(!is_file($root . '/tmux-calls'), 'markerless update called tmux');
             check(!is_dir($root . '/local/tmux') && !is_dir($root . '/local/tmp') && !is_file($root . '/local/eternals.lock'), 'markerless update made Eternal state');
         } finally {
             putenv('PATH=' . $oldPath);
             $oldHome === false ? putenv('HOME') : putenv('HOME=' . $oldHome);
             $oldKey === false ? putenv('PIKKUMIES_KEY') : putenv('PIKKUMIES_KEY=' . $oldKey);
             $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            testRmTree($root);
+        }
+    },
+    'eternal: without marker Hermes child inherits the shared runtime lock' => function () {
+        $root = testTempDir('hermes-lock-inherit');
+        @mkdir($root . '/lib', 0700);
+        copy(dirname(__DIR__) . '/pikkumies/lib/HermesInstall.php', $root . '/lib/HermesInstall.php');
+        copy(dirname(__DIR__) . '/pikkumies/lib/Eternal.php', $root . '/lib/Eternal.php');
+        $runner = $root . '/runner.php';
+        file_put_contents($runner, '<?php require __DIR__ . "/lib/HermesInstall.php"; require __DIR__ . "/lib/Eternal.php"; Eternal::$hostMarker = __DIR__ . "/missing-marker"; HermesInstall::$root = __DIR__; $lock = HermesInstall::lock(false); if (!$lock) exit(2); passthru("/bin/sh " . escapeshellarg(__DIR__ . "/child.sh"), $code); exit($code);');
+        file_put_contents($root . '/child.sh', "#!/bin/sh\nfor fd in /proc/\$\$/fd/*; do [ \"\$(readlink \"\$fd\")\" = '" . $root . "/local/hermes.lock' ] && exit 0; done\nexit 1\n");
+        try {
+            list($code) = runPhp($runner, []);
+            check($code === 0, 'Hermes child lost the shared runtime lock');
+        } finally {
             testRmTree($root);
         }
     },
