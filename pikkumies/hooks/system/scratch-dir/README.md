@@ -1,0 +1,7 @@
+# scratch-dir
+
+A private scratch folder for each session, and a tidy check of the Pikkumies tree ([ADR-0093](../../../../docs/adr/0093-scratch-folder-and-a-tidy-pikkumies-tree.md)).
+
+- **The folder:** `/tmp/pk-<your uid>/<32 random hex digits>`, made once per session inside a parent folder only your account can open. On the session's first turn the agent is told its path in one line, and from then on writes temporary files there instead of into a working directory or `~/pikkumies`. On PMSS `/tmp` is shared by every account (and, where the administrator turned it on, a 2 GB tmpfs mounted `noexec`, emptied at a reboot): the private parent, the long random name, the exclusive create and the owner and mode checks after it are what make it safe there. It is for small files only: the agent is told to put downloads, archives, builds and anything large in your home.
+- **Clean-up:** when a session starts, folders of yours not used for 7 days are removed: only names of this pattern, only folders your account owns, never through a symlink, and never a folder with something mounted inside it. Only the counts are logged (`~/pikkumies/local/logs/hooks/`).
+- **The tree check:** at the same moment, anything in the Pikkumies tree that is neither part of Pikkumies nor its state (git sees it as untracked and not ignored) is named to the agent, at most five entries. It is never deleted; `pikkumies doctor` shows the same list. The [litter-check](../../guard/litter-check/README.md) hook stops most of these before they are made; this catches the rest.

@@ -12,6 +12,13 @@ function testTempDir($prefix = 'pk-test')
     return $dir;
 }
 
+// The scratch folders the hooks make (lib/Scratch.php, ADR-0093) go to a folder of this run, never the real /tmp.
+$testScratchBase = testTempDir('pk-test-scratch');
+putenv("PIKKUMIES_SCRATCH_BASE=$testScratchBase");
+register_shutdown_function(function () use ($testScratchBase) {
+    testRmTree($testScratchBase);
+});
+
 /** Remove a directory tree made by a test. Refuses anything outside the system temp dir. */
 function testRmTree($dir)
 {

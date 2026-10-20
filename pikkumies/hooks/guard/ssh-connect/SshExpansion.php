@@ -4,6 +4,8 @@
  * $VAR, ${...}, $(...), $'...' and backticks, which mark the word as built at run time and keep their raw text. The
  * text of a command substitution is collected, to be read again as commands. -1 means unclosed: the text is unreadable.
  */
+require_once __DIR__ . '/SshUnreadable.php';
+
 class SshExpansion
 {
 

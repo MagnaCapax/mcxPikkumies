@@ -6,23 +6,24 @@
  * and process substitution is returned too, to be read again at command position. Comments are kept with their offsets
  * (the `# intent:` line). An unclosed quote or substitution makes the whole text unreadable: split() returns null.
  * Not a shell: here-documents are read as ordinary lines (each a command), which reads more, never less. A here-string
- * (`bash <<< "ssh x"`) is returned with the substitutions, since a shell fed it runs it.
+ * (`bash <<< "ssh x"`) is returned with the substitutions, since a shell fed it runs it. The target word of each output
+ * redirection (>, >>, &>, >|) is returned under writes with the index of its command, for the litter-check hook (ADR-0093).
  */
 require_once __DIR__ . '/SshExpansion.php';
 
 class SshWords
 {
-    /** ['commands' => [[word, ...], ...], 'nested' => [text, ...], 'comments' => [[start, end, text], ...]], or null when unreadable. */
+    /** ['commands' => [[word, ...], ...], 'nested' => [text, ...], 'comments' => [[start, end, text], ...], 'writes' => [[command index, word], ...]], or null when unreadable. */
     public static function split($text)
     {
         $text = (string) $text;
         $n = strlen($text);
-        $out = ['commands' => [], 'nested' => [], 'comments' => []];
+        $out = ['commands' => [], 'nested' => [], 'comments' => [], 'writes' => []];
         $words = [];
         $w = null; // the word being read: ['text', 'dyn', 'glob', 'q'] (q: something in it was quoted)
         $target = ''; // what the next word is: '' an argument, 'skip' a redirection target, 'nested' a here-string's text
         $end = function () use (&$out, &$words, &$w, &$target) {
-            self::push($words, $w, $target, $out['nested']);
+            self::push($words, $w, $target, $out);
             if ($words) {
                 $out['commands'][] = $words;
             }
@@ -31,7 +32,7 @@ class SshWords
         for ($i = 0; $i < $n; $i++) {
             $c = $text[$i];
             if ($c === ' ' || $c === "\t") {
-                self::push($words, $w, $target, $out['nested']);
+                self::push($words, $w, $target, $out);
                 continue;
             }
             if ($c === "\n" || $c === ';' || $c === '(' || $c === ')') {
@@ -47,7 +48,7 @@ class SshWords
                 if ($w !== null && !$w['q'] && ctype_digit($w['text'])) {
                     $w = null; // 2>&1: the digits are a file descriptor
                 }
-                self::push($words, $w, $target, $out['nested']);
+                self::push($words, $w, $target, $out);
                 if (($c === '<' || $c === '>') && $i + 1 < $n && $text[$i + 1] === '(') {
                     $close = SshExpansion::closing($text, $i + 2);
                     if ($close < 0) {
@@ -66,7 +67,7 @@ class SshWords
                     continue;
                 }
                 // bash <<< "ssh x": the shell runs that text, so it is read as a command; a here-document's lines are read anyway.
-                $target = substr($text, $op, 3) === '<<<' ? 'nested' : 'skip';
+                $target = substr($text, $op, 3) === '<<<' ? 'nested' : (strpos(substr($text, $op, $i - $op + 1), '>') !== false ? 'write' : 'skip');
                 continue;
             }
             if ($c === '#' && $w === null) {
@@ -111,13 +112,15 @@ class SshWords
     }
 
     /** Add the word read so far to the command (or where $target says); a lone unquoted { or } is a group, not a word. */
-    private static function push(array &$words, &$w, &$target, array &$nested)
+    private static function push(array &$words, &$w, &$target, array &$out)
     {
         if ($w === null) {
             return;
         }
         if ($target === 'nested') {
-            $nested[] = $w['text'];
+            $out['nested'][] = $w['text'];
+        } elseif ($target === 'write') {
+            $out['writes'][] = [count($out['commands']), $w];
         } elseif ($target === '' && ($w['q'] || ($w['text'] !== '{' && $w['text'] !== '}'))) {
             $words[] = $w;
         }

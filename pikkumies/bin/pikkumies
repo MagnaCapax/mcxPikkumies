@@ -343,6 +343,7 @@ switch ($cmd) {
             . ($docErrors ? '; last fetch failed: ' . implode(', ', $docErrors) . ' (see `pikkumies.php sources`)' : ''));
         require_once dirname(__DIR__) . '/tools/memory/pikkumies/MemoryStats.php';
         out(MemoryStats::doctorLine()); // lessons on disk, and the last 30 days of searches when perfLogging kept them (ADR-0041)
+        out(TreeLitter::doctorLine(Config::root())); // stray files in the Pikkumies tree, never deleted (ADR-0994)
         // The ticker mode mirrors Update::scheduleCronTick's own decision (ADR-0025), without
         // writing anything: doctor only reads the crontab to report whether the line is actually there.
         $tickOff = !empty($config['cron']['disabled']);
