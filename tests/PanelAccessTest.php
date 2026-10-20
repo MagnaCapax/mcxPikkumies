@@ -164,14 +164,16 @@ return [
                 skip('flock(1) not installed; the in-process holder above covered the lock');
             }
             $bytes = file_get_contents($file);
-            $p = proc_open(escapeshellarg($flock) . ' -w 10 ' . escapeshellarg("$file.lock") . ' -c ' . escapeshellarg('sleep 3'), [], $pipes);
-            check(is_resource($p), 'flock(1) holder did not start');
+            // A string with exec, not proc_open's array form (PHP 7.4+; 7.3 returns false), so proc_terminate reaches flock(1) itself.
+            $p = proc_open('exec ' . implode(' ', array_map('escapeshellarg', [$flock, '-w', '10', "$file.lock", '-c', 'sleep 3'])), [], $pipes);
+            check(is_resource($p), 'flock(1) started');
             $probe = fopen("$file.lock", 'c');
-            for ($i = 0; $i < 50 && flock($probe, LOCK_EX | LOCK_NB); $i++) { // wait until flock(1) holds it
+            for ($i = 0; $i < 50 && ($free = flock($probe, LOCK_EX | LOCK_NB)); $i++) { // wait until flock(1) holds it
                 flock($probe, LOCK_UN);
                 usleep(50000);
             }
             fclose($probe);
+            check(!$free, 'flock(1) took the lock before ensure()');
             list($ok, $why) = $panel->ensure(true);
             proc_terminate($p);
             proc_close($p);
