@@ -41,6 +41,11 @@ PHP;
         putenv('PIKKUMIES_ENDPOINT=https://example.invalid/v1');
         putenv('PIKKUMIES_KEY=fixture-key');
         putenv('TMUX=/ordinary/socket,1,0');
+        // The cap counts sends per wall-clock minute (EternalAsk::send); near a minute boundary the counted sends
+        // would straddle it and the sixth one pass (CI, 2026-10-20). Start in a fresh minute instead.
+        if (time() % 60 > 50) {
+            sleep(61 - time() % 60);
+        }
         try {
             list($code, $out) = runPhp($runner, ['root']);
             check($code === 1 && strpos($out, 'not root') !== false && !is_file($root . '/pastes'), 'root reached tmux');
