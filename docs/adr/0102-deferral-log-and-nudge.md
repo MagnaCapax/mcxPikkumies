@@ -16,11 +16,11 @@ The halt guard already detects these cases: its questions Q3 (work not shown car
 - **A model-written nudge per case.** A fixed method sentence says the same every time and cannot carry injected text. Chosen.
 
 ## Decision
-- `HaltJudge::DEFERRAL_CLASSES` maps each continuing question to a fixed class, the matching `doctrine/antipatterns.md` id and a note of at most 75 words: Q3 `work-not-done` (`done-without-receipts`), Q4 `asked-permission-for-the-task` (the new entry 57), Q5 `failure-unaddressed` (`exit-status-lost`), Q6 `listed-own-next-steps` (`plan-instead-of-doing`), Q9 `offered-or-handed-back` (`answered-not-done`). `HaltJudge::deferrals()` returns the entries for a continue verdict, from its answers alone.
+- `HaltJudge::DEFERRAL_CLASSES` maps each continuing question to a fixed class, the matching `doctrine/antipatterns.md` id and a note of at most 75 words: Q3 `work-not-done` (`done-without-receipts`), Q4 `asked-permission-for-the-task` (the new entry 59), Q5 `failure-unaddressed` (`exit-status-lost`), Q6 `listed-own-next-steps` (`plan-instead-of-doing`), Q9 `offered-or-handed-back` (`answered-not-done`). `HaltJudge::deferrals()` returns the entries for a continue verdict, from its answers alone.
 - `HaltState::logDecision` writes `deferral` (that list, or a caller's own fixed entries) and `final_attempt` (true on the last continue the guard may send: attempt 2 of the hook's 3, or the wrapper's last continue). No transcript, final answer or model text, as before.
 - The clarify block is logged with source `clarify` and the one entry `asked-user-to-decide` (`asking-what-you-can-check`), never the question or the choices, and only when `halt.disabled` is off.
 - `HaltJudge::METHOD`, "Instead of asking: investigate first (the tool's own docs and usage, memory, a read-only check), then attack your plan (what could go wrong, how it is undone), iterate until it holds, and do it.", is part of `CONTINUE_RULE`, so it ends every continue, and it ends the clarify block.
-- `doctrine/antipatterns.md` gets entry 57, `asked-permission-for-the-task`, so the common-mistakes check hunts it too; `doctrine/safety.md` gets one sentence; `docs/halt-guard.md` gets a Deferral log section.
+- `doctrine/antipatterns.md` gets entry 59, `asked-permission-for-the-task`, so the common-mistakes check hunts it too; `doctrine/safety.md` gets one sentence; `docs/halt-guard.md` gets a Deferral log section.
 
 ## Consequences
 - The deferrals the guard catches can be counted by class from `local/logs/halt-guard/` on the machine; nothing is sent, and retention follows `sessions.retentionDays`.

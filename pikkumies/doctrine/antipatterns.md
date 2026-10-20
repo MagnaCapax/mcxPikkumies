@@ -92,3 +92,4 @@ On a PMSS seedbox, this account's own disk, quota, memory and traffic come from 
 ## Deferring the work
 
 59. [asked-permission-for-the-task] Asking permission for a step of the work the user already asked for. Cue: "shall I go ahead?", "do you want me to restart it?", "which one should I use?" in the middle of a task the user asked you to do. Do: the request is the permission: investigate (the tool's docs, memory, a read-only check), attack your own plan (what could go wrong, how it is undone), iterate, then do it and say what you did. The only stop is a step the safety check refuses, which you list as skipped with the reason.
+60. [guessed-tool-path] Typing a Pikkumies tool's path from memory. Cue: `php ~/.../tools/<something>/<tool>.php` built from a guess, or a second try after "Could not open input file". Do: run it by its name, `pikkumies <tool> <verb>`; its skill lists the verbs ([ADR-0103](../../docs/adr/0103-tools-by-name-and-support-job-steps.md)).

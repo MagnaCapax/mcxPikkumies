@@ -4,8 +4,8 @@
  * check as guard/feedback-send (lib/SendGuard.php). `php <this Pikkumies' tools/system/ticket/ticket.php> send <id>`
  * alone in the terminal, the path absolute (or ~/) and canonical, gets an approve built from the draft file itself
  * (TicketPrompt: where it goes, the account email, service, priority, files, then the text). The orchestrator's ask
- * policy blocks it until the review finds the user's own yes in the chat, and outright where no yes can be checked
- * (ADR-0073); under --yolo or at depth 2 or more it is blocked here and the person runs it in their own terminal. The
+ * policy runs it only when what the user asked for covers it and refuses it otherwise (ADR-0073, ADR-0101); at depth 2 or
+ * more it is blocked here and reported as skipped; --yolo, the default run mode, changes nothing. The
  * other forms of a ticket send it can see are blocked. One exception (ADR-0100): a ticket the agent bundled by itself,
  * bundled while ticket.auto was on (scrubbed, "has not seen"), with this account's processes and files only, collected
  * without root, every file as bundle made it, and never with this hook running as root, runs without a question while
