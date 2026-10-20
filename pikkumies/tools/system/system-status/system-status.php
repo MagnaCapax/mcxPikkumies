@@ -15,6 +15,7 @@ require dirname(__DIR__, 3) . '/lib/Cli.php';
 require dirname(__DIR__, 3) . '/lib/CliHuman.php';
 require_once __DIR__ . '/StatusAccount.php';
 require_once __DIR__ . '/StatusHealth.php';
+require_once dirname(__DIR__) . '/telemetry/TelemetryLog.php'; // local-only history of this verb's own record (docs/adr/0084-...)
 
 // Test seams: a test may set these before including the file. Nothing is read from the environment.
 $systemStatusLocalDir = isset($systemStatusLocalDir) ? $systemStatusLocalDir : Config::localDir();
@@ -46,7 +47,16 @@ Cli::run($argv, [
         $profile = Detect::cached(false, $systemStatusLocalDir . '/host.json', $systemStatusLocalDir . '/update.log');
         // Only on PMSS, the same rule Detect::limits() follows: another host's ~/bin/userShowLimits is not this tool.
         $usl = $profile['family'] === 'pmss' ? Detect::userShowLimitsData((string) getenv('HOME')) : null;
-        return [StatusAccount::record($usl, $profile['family'], Detect::runningApps($systemStatusUid, $systemStatusProcDir))];
+        $record = StatusAccount::record($usl, $profile['family'], Detect::runningApps($systemStatusUid, $systemStatusProcDir));
+        try { // one compact numeric telemetry record per run (docs/adr/0084-...); never changes this verb's own output, never breaks it
+            TelemetryLog::record('system-account', ['disk_used' => $record['disk']['used'], 'disk_soft' => $record['disk']['soft'],
+                'disk_used_pct' => $record['disk']['used_pct'], 'mem_used' => $record['memory']['used'], 'mem_pressure_pct' => $record['memory']['pressure_pct'],
+                'traffic_upload_30d' => $record['traffic']['upload_30d'], 'traffic_used_pct' => $record['traffic']['used_pct'],
+                'proc_used' => $record['processes']['used'], 'cpu_quota_pct' => $record['cpu']['quota_pct']]);
+        } catch (Throwable $e) {
+            TelemetryLog::noteFailure('system-account');
+        }
+        return [$record];
     },
     // One answer to "is it down?" (StatusHealth, ADR-0066); the panel probe only on PMSS, where /user-<name>/ is the account's own.
     'health' => function () use ($systemStatusLocalDir, $systemStatusProcDir, $systemStatusUid, $systemStatusPanelBase) {
@@ -54,9 +64,21 @@ Cli::run($argv, [
         $home = (string) getenv('HOME');
         $pw = function_exists('posix_getpwuid') ? posix_getpwuid($systemStatusUid) : false;
         $pmss = $profile['family'] === 'pmss';
-        return [StatusHealth::record(['family' => $profile['family'], 'home' => $home, 'uid' => $systemStatusUid, 'proc' => $systemStatusProcDir,
+        $record = StatusHealth::record(['family' => $profile['family'], 'home' => $home, 'uid' => $systemStatusUid, 'proc' => $systemStatusProcDir,
             'panel_url' => $pmss && is_array($pw) ? $systemStatusPanelBase . '/user-' . rawurlencode($pw['name']) . '/' : null,
-            'usl' => $pmss ? Detect::userShowLimitsData($home) : null])];
+            'usl' => $pmss ? Detect::userShowLimitsData($home) : null]);
+        try { // one compact numeric telemetry record per run (docs/adr/0084-...); never changes this verb's own output, never breaks it
+            $listening = 0;
+            foreach ((array) $record['clients'] as $cl) {
+                $listening += isset($cl['state']) && $cl['state'] === 'listening' ? 1 : 0;
+            }
+            TelemetryLog::record('system-health', ['up_s' => $record['machine']['up_s'], 'quota_used_pct' => $record['quota']['used_pct'],
+                'quota_server_full' => !empty($record['quota']['server_disk_full']), 'mem_oom_kills' => $record['memory'] !== null ? $record['memory']['oom_kills'] : null,
+                'clients_listening' => $listening, 'clients_total' => count((array) $record['clients']), 'findings_count' => count((array) $record['findings'])]);
+        } catch (Throwable $e) {
+            TelemetryLog::noteFailure('system-health');
+        }
+        return [$record];
     },
     // The account's own log files this host family/stack is known to keep (Host::TABLE logGlobs,
     // ADR-0023), optionally searched. Only files under $HOME that this account owns, after

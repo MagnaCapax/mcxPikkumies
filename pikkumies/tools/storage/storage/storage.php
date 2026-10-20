@@ -13,6 +13,7 @@ foreach (['ToolText', 'ToolList'] as $toolLib) {
 }
 require_once __DIR__ . '/StorageStats.php';
 require_once __DIR__ . '/StorageScan.php';
+require_once dirname(__DIR__, 2) . '/system/telemetry/TelemetryLog.php'; // local-only history of `stats`' own record (docs/adr/0084-...)
 
 $usage = <<<'TXT'
 usage: php storage.php <verb> [arguments] [--human]
@@ -28,7 +29,14 @@ $storageLocalDir = isset($storageLocalDir) ? $storageLocalDir : Config::localDir
 
 Cli::run($argv, [
     'stats' => function ($args, $opt) {
-        return [StorageStats::record(HomePath::home())];
+        $record = StorageStats::record(HomePath::home());
+        try { // one compact numeric telemetry record per run (docs/adr/0084-...); never changes this verb's own output, never breaks it
+            TelemetryLog::record('storage', ['quota_used_bytes' => $record['quota_used_bytes'], 'quota_limit_bytes' => $record['quota_limit_bytes'],
+                'quota_used_percent' => $record['quota_used_percent'], 'fs_free_bytes' => $record['fs_free_bytes'], 'fs_full' => !empty($record['fs_full'])]);
+        } catch (Throwable $e) {
+            TelemetryLog::noteFailure('storage');
+        }
+        return [$record];
     },
     'topdirs' => function ($args, $opt) use ($storageLocalDir) {
         return (new StorageScan($storageLocalDir))->topdirs($opt);
