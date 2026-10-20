@@ -121,7 +121,8 @@ class Launch
 
     /**
      * tmux commands for `pikkumies tmux N`, as argv lists to run in order; the last one attaches
-     * in a new client when already inside tmux. Window pmN of session "pikkumies" runs $cmd, made
+     * (switch-client when already inside tmux; enabled hosts on another socket use a new client).
+     * Window pmN of session "pikkumies" runs $cmd, made
      * when missing; named windows, so tmux's base-index and other windows never matter. $windows: the
      * session's window names, or null when the session does not exist. $statusCmd, when given, is a shell command
      * whose output leads the session's status-right, refreshed every minute: the credits line (ADR-0040). Set on

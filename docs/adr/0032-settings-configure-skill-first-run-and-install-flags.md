@@ -58,4 +58,4 @@ The newer ruling in [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-excep
 - Tests: `tests/LaunchTest.php` (no name question at install or the first session, the closing line).
 
 ## Amendment 2026-10-19: named tmux windows
-`pikkumies tmux [N]` keeps its default `pm1` and attach behavior. A newly created named window starts the Eternal invocation and records its resume pointer under `local/`. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).
+`pikkumies tmux [N]` keeps its default `pm1` and attach behavior. On hosts with the Eternals marker, a newly created named window starts the Eternal invocation and records its resume pointer under `local/`. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).
