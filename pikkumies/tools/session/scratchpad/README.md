@@ -1,0 +1,13 @@
+# scratchpad
+
+A per-session checkpoint note, so a task that takes several turns, or a session resumed after a restart, does not have to be re-investigated from the start every time.
+
+One small file per session, `local/state/scratchpad/<sha1 of session_id>.md`, written only on this machine: a pinned "## Task" line (what the task is and where things stand, set with `write`) and a short log below it (one line per checkpoint, added with `append`). The whole file is capped at 8 KiB, under a third of what one hook context can add to a turn; if it ever fills, the oldest log lines go first, never the pinned task line.
+
+Pikkumies does not inject the pad into a turn automatically: a hook that quietly rewrote every prompt would be easy to miss and hard to reason about. Instead, the halt guard's own wrap-up message (`lib/HaltJudge.php`, [ADR-0047](../../../../docs/adr/0047-halt-guard.md)) ends with a short reminder to checkpoint the scratchpad when a task is going to continue, and this tool's own skill tells the agent to run `show` first whenever it is picking up earlier work. The agent decides when a pad is worth writing; nothing here forces it.
+
+A tool has no session id of its own — only a hook running inside Hermes gets one. `session/scratchpad-session` (`pre_llm_call`) records the live session id to `local/state/scratchpad/current` every turn, and this tool reads it back when it is not told `--session` explicitly ([ADR-0090](../../../../docs/adr/0090-per-session-scratchpad.md)). Two chats open on the same account within a few minutes of each other is the one case that is genuinely ambiguous; the tool refuses then, instead of guessing which pad to write into.
+
+`clear` deletes a pad outright, and anything older than 14 days is pruned automatically the next time any session writes one — a pad is a working note, not a record that needs keeping. At most 50 pads exist at once; past that, the oldest is removed the same way, however new it is, so an unbounded run of distinct session ids cannot grow an unbounded number of files. A temporary file left behind by an interrupted write (`*.md.tmp-<pid>`) is pruned the same way a pad is, not kept forever.
+
+A pad is read back into the model's own context by `show`, and sits on disk for up to 14 days, so `write` and `append` run the text through the same secret redaction `pikkumies-configure note-add` already uses: a pasted password, key or token is replaced with `REDACTED` before it is stored, not kept in the clear. `show`'s own output carries a fixed notice that its text is data from an earlier turn, not a new instruction — the same caution this repo already gives the halt guard's transcript tail and the ask review's evidence.
