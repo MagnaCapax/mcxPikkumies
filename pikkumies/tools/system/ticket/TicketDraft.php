@@ -18,7 +18,11 @@ class TicketDraft
     const PRIORITIES = ['Low', 'Medium', 'High'];
     /** Extension => the bytes the file must start with ('' for text: no NUL byte, secrets removed). */
     const TYPES = ['txt' => '', 'log' => '', 'png' => "\x89PNG\r\n\x1a\n", 'jpg' => "\xFF\xD8\xFF", 'jpeg' => "\xFF\xD8\xFF", 'pdf' => '%PDF-'];
+    /** by: 'user' (drafted from the user's words) or 'agent' (bundled by the agent, ADR-0100); bundle: what ticket bundle collected, or null. */
     const FIELDS = ['v' => 'integer', 'created_at' => 'integer', 'email' => 'string', 'subject' => 'string', 'message' => 'string',
+        'priority' => 'string', 'service' => 'string', 'attachments' => 'array', 'by' => 'string', 'bundle' => 'array|NULL'];
+    /** A draft saved before `by` and `bundle` existed: still sent, as the user's own. */
+    const FIELDS_V1 = ['v' => 'integer', 'created_at' => 'integer', 'email' => 'string', 'subject' => 'string', 'message' => 'string',
         'priority' => 'string', 'service' => 'string', 'attachments' => 'array'];
 
     public static function dir($stateDir = null)
@@ -33,10 +37,14 @@ class TicketDraft
 
     /**
      * Builds the request and saves it. $files: paths the user named. $email: given now, or null for the remembered one;
-     * a given one is remembered once the draft is saved. @return array the record the draft verb prints
+     * a given one is remembered once the draft is saved. $by and $bundle: 'user' and null for a draft from the user's
+     * words; ticket bundle passes 'agent' or 'user' and what it collected. @return array the record the draft verb prints
      */
-    public static function create($subject, $message, $email, $priority, $service, array $files, $now, $stateDir = null)
+    public static function create($subject, $message, $email, $priority, $service, array $files, $now, $stateDir = null, $by = 'user', array $bundle = null)
     {
+        if (!in_array($by, ['user', 'agent'], true)) {
+            throw new CliError('a ticket is drafted by the user or by the agent', 'pass --by user or --by agent');
+        }
         $email = $email === null ? self::rememberedEmail($stateDir) : trim((string) $email);
         // A plain address only: a quoted local part could carry quotes and words into the question before sending.
         if (strlen($email) > 254 || !preg_match('/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/D', $email) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -46,7 +54,7 @@ class TicketDraft
         $message = Redact::secrets(trim((string) $message));
         $p = ['v' => 1, 'created_at' => (int) $now, 'email' => $email, 'subject' => self::text($subject, self::SUBJECT_MAX, 'subject'),
             'message' => self::text($message, self::MESSAGE_MAX, 'message'), 'priority' => self::priority($priority),
-            'service' => (string) $service, 'attachments' => []];
+            'service' => (string) $service, 'attachments' => [], 'by' => $by, 'bundle' => $bundle];
         if ($p['service'] !== '' && !preg_match('/^([1-9][0-9]{0,9}|[a-z][a-z0-9_-]{0,31})$/D', $p['service'])) {
             throw new CliError('a service is its number or its username (lowercase letters, digits, _ -), as Pulsed Media accepts it', 'pass --service <name> or --no-service');
         }
@@ -80,7 +88,18 @@ class TicketDraft
     /** @return array [json, decoded payload] of a draft not yet sent whose content still matches its id. */
     public static function load($id, $stateDir = null)
     {
-        list($json, $p) = DraftStore::load(self::dir($stateDir), $id, self::FIELDS, 'ticket');
+        try {
+            list($json, $p) = DraftStore::load(self::dir($stateDir), $id, self::FIELDS, 'ticket');
+        } catch (CliError $e) {
+            if (strpos($e->getMessage(), 'is not a ticket draft') === false) {
+                throw $e;
+            }
+            list($json, $p) = DraftStore::load(self::dir($stateDir), $id, self::FIELDS_V1, 'ticket'); // throws the same refusal when it is neither
+            $p += ['by' => 'user', 'bundle' => null];
+        }
+        if (!in_array($p['by'], ['user', 'agent'], true)) {
+            throw new CliError("draft $id is not a ticket draft", 'draft it again');
+        }
         foreach ($p['attachments'] as $a) {
             if (!is_array($a) || array_keys($a) !== ['name', 'data'] || !is_string($a['name']) || !is_string($a['data'])) {
                 throw new CliError("draft $id is not a ticket draft", 'draft it again');
@@ -99,7 +118,8 @@ class TicketDraft
         }
         return ['to' => 'Pulsed Media support (pulsedmedia.com)', 'email' => $p['email'], 'subject' => $p['subject'],
             'message_start' => $start . (strlen($start) < strlen($p['message']) ? '…' : ''), 'message_chars' => self::chars($p['message']),
-            'priority' => $p['priority'], 'service' => $p['service'], 'attachments' => $files, 'bytes' => (int) $bytes];
+            'priority' => $p['priority'], 'service' => $p['service'], 'attachments' => $files, 'bytes' => (int) $bytes,
+            'bundle' => isset($p['bundle']) && is_array($p['bundle'])];
     }
 
     /** @return array the drafts kept here, newest first. */

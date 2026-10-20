@@ -238,7 +238,7 @@ echo "ok";
             'halt.disabled' => 'bool', 'lowBalance.disabled' => 'bool', 'feedback.ask' => 'bool', 'fileopsCheck.disabled' => 'bool', 'memoryCheck.disabled' => 'bool',
             'antipatterns.disabled' => 'bool', 'antipatterns.resume' => 'bool', 'hooks.reword' => 'bool', 'hooks.llm.disabled' => 'bool', 'hooks.async.disabled' => 'bool',
             'autoUpdate.disabled' => 'bool', 'cron.disabled' => 'bool', 'hermes.lazyInstalls' => 'bool', 'ssh.allow' => 'hosts', 'ssh.deny' => 'hosts',
-            'ssh.blockUnknown' => 'bool', 'web.search' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
+            'ssh.blockUnknown' => 'bool', 'web.search' => 'bool', 'ticket.auto' => 'bool'], 'SETTABLE drifted: ' . json_encode(Config::SETTABLE));
         // USAGE.md's tier table names every key with a rule (ADR-0059), so the person reading it sees every setting.
         $usage = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/system/pikkumies-configure/USAGE.md');
         check(preg_match('/^\| set \|.*\|$/m', $usage) === 1, 'USAGE.md must have a `set` row');

@@ -1,28 +1,50 @@
 <?php
 /**
  * Secrets removed from text that leaves the command line or the machine, one line at a time: what Cli::cleanString
- * removes (URL passkeys, user:password@), option, header, cookie and variable forms, config-file lines (ini, YAML,
- * JSON, netrc), a mysql -p, sshpass -p or curl -u password, PEM private-key blocks, and common token forms (vsk-, sk-,
- * AKIA, ghp_, xoxb-, JWT), which Hermes' own export redaction misses for vsk-. Common forms only: anything else stays,
- * so a person reads the result before it is sent. A regex engine error throws; it never returns less than it removed.
- * Used by the command log (ADR-0044) and by /feedback (ADR-0056).
+ * removes (URL passkeys, user:password@), option, header, cookie and variable forms (also long options and headers that
+ * end in -secret, -pass, -token or -key), config-file lines (ini, YAML, JSON with snake_case or camelCase names,
+ * netrc), a mysql -p, sshpass -p or curl -u password, PEM private-key blocks (also indented or quoted), the private
+ * lines of a PuTTY key, crypt(3) password hashes, and common token forms (vsk-, sk-, AKIA, ghp_, xoxb-, JWT), which
+ * Hermes' own export redaction misses for vsk-. Common forms only: anything else stays, so a person reads the result
+ * before it is sent; a send nobody reads adds its own pass (support tickets, ADR-0100). A regex engine error throws;
+ * it never returns less than it removed. Used by the command log (ADR-0044), /feedback (ADR-0056) and support tickets.
  */
 class Redact
 {
-    /** A secret-like name: the keyword whole or between underscores (API_KEY, db_password), never inside a word (monkey, compass). */
-    const NAME = '(?<![A-Za-z0-9_])(?:[A-Za-z0-9]*_)*(?:password|passwd|passphrase|pass|pwd|token|secret|key|apikey|passkey|auth|credentials?)(?:_[A-Za-z0-9_]*)?(?![A-Za-z0-9])';
+    /**
+     * A secret-like name: the keyword whole or between underscores (API_KEY, db_password), never inside a word (monkey,
+     * compass); or a camelCase name ending in Key, Token, Secret, Password or Passwd (accessToken, PrivateKey), matched
+     * case-sensitively so a lower-case word that only contains one (monkey) stays.
+     */
+    const NAME = '(?<![A-Za-z0-9_])(?:(?:[A-Za-z0-9]*_)*(?:password|passwd|passphrase|pass|pwd|token|secret|key|apikey|passkey|auth|credentials?)(?:_[A-Za-z0-9_]*)?|(?-i:[A-Za-z0-9]*(?:Key|Token|Secret|Password|Passwd)))(?![A-Za-z0-9])';
     const VALUE = '(\'[^\']*\'|"[^"]*"|\S+)';
+    /** The most lines a PuTTY "Private-Lines: N" block may claim, so a bad number cannot swallow the rest of a text. */
+    const PPK_MAX = 200;
 
     public static function secrets($text)
     {
         $out = [];
         $inKey = false;
+        $prefix = '';
+        $skip = 0;
         foreach (explode("\n", (string) $text) as $line) {
-            // A PEM private key: the BEGIN line is kept up to its marker, the base64 body is left out up to END.
+            // A PuTTY key file's private part: "Private-Lines: N" and the N base64 lines after it are left out.
+            if ($skip > 0) {
+                $skip--;
+                continue;
+            }
+            if (preg_match('/^\s*Private-Lines:\s*(\d{1,4})\s*$/', $line, $p) === 1) {
+                $skip = min((int) $p[1], self::PPK_MAX);
+                $out[] = 'Private-Lines: REDACTED';
+                continue;
+            }
+            // A PEM private key: the BEGIN line is kept up to its marker, the base64 body is left out up to END. A key
+            // indented or quoted in an email (">") keeps that prefix on every line: it is taken off before the body test.
             if ($inKey) {
+                $body = $prefix !== '' && strpos($line, $prefix) === 0 ? substr($line, strlen($prefix)) : $line;
                 if (strpos($line, '-----END') !== false) {
                     $inKey = false;
-                } elseif (preg_match('#^(\s*|[A-Za-z0-9+/=]+\s*|[A-Za-z-]+:\s.*)$#', $line) === 1) {
+                } elseif (preg_match('#^(\s*|[A-Za-z0-9+/=]+\s*|[A-Za-z-]+:\s.*)$#', $body) === 1) {
                     continue;
                 } else {
                     $inKey = false;
@@ -30,6 +52,7 @@ class Redact
             }
             if (preg_match('/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/', $line) === 1) {
                 $inKey = strpos(substr($line, (int) strpos($line, '-----BEGIN') + 10), '-----END') === false;
+                $prefix = preg_match('/^\s*(?:>\s*)*/', $line, $pm) === 1 ? $pm[0] : '';
                 $line = (string) preg_replace('/(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----).*$/', '$1REDACTED', $line);
             }
             $out[] = self::line($line);
@@ -47,6 +70,12 @@ class Redact
         $v = self::VALUE;
         $r = preg_replace([
             '/((?<![A-Za-z0-9_-])--?(?:password|passwd|pass|token|api[-_]?key|secret|auth)(?:=|\s+))' . $v . '/i',
+            // A long option that ends in one of these words: --drive-client-secret X, --webdav-pass X, --rpc-secret=X.
+            '/((?<![A-Za-z0-9_-])--[a-z0-9-]*-(?:secret|pass|password|token|key)(?:=|\s+))' . $v . '/i',
+            // A header whose name ends in -token or -key: X-Auth-Token: X.
+            '/(\b[A-Za-z0-9-]*-(?:token|key)\s*:\s*)(\'[^\']*\'|"[^"]*"|[^\s\'"]+)/i',
+            // A crypt(3) password hash, as in /etc/shadow: $1$, $2b$, $5$, $6$, $y$, $gy$, $7$.
+            '/(\$(?:1|2[abxy]?|5|6|y|gy|7)\$)[.\/A-Za-z0-9$]{8,}/',
             '/((?<![A-Za-z0-9_-])(?:-u|--user)\s*[\'"]?[^\s:\'"]*:)([^\s\'"]+)/',
             '/(\bsshpass\s+-p\s*)' . $v . '/',
             '/(\bmysql\S*[^\S\n]+(?:\S+[^\S\n]+)*?-p)(\S+)/',

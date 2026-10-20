@@ -6,7 +6,9 @@
  * the unit builds from the draft file itself; the orchestrator's ask policy never passes it on to Hermes: the call is
  * blocked until the review finds the user's own yes in the chat, and blocked outright where no yes can be checked
  * (ADR-0073). Under --yolo (HERMES_YOLO_MODE) or at depth 2 or more it is blocked here and the person runs it in their
- * own terminal (ADR-0056 amendment 2026-10-19). Blocked: a path to the tool followed by `send`, the sender's class names
+ * own terminal (ADR-0056 amendment 2026-10-19). One exception, for /ticket only (ADR-0100): a plain send that the unit's
+ * $alone check accepts (a ticket the agent bundled, with ticket.auto on) runs without a question, before that block.
+ * Blocked: a path to the tool followed by `send`, the sender's class names
  * with the word send, and a path to the tool with shell expansion and the word send, in a terminal command, code,
  * process input, a file written or patched, or a scheduled job. A safety prompt that catches the agent's own and casual
  * sends, not a security boundary: an agent steered by text it reads can still run the sender some other way, as it
@@ -23,10 +25,12 @@ class SendGuard
      * $word: the unit's name in its paths and class names ('feedback'); $script: the tool under the pikkumies directory;
      * $question: callable($id) -> the approve message, or null when it cannot be shown in full; throws CliError for a
      * draft that is missing, changed or already sent. Loaded only for a send, so every other call costs nothing.
+     * $alone: optional callable($id) -> true when this plain send goes out without a question (an automatic ticket the
+     * person's setting allows, ADR-0100); it throws CliError to block. Only /ticket passes one.
      */
-    public static function main($word, $script, callable $question)
+    public static function main($word, $script, callable $question, callable $alone = null)
     {
-        $d = self::decide((string) stream_get_contents(STDIN), $word, $script, $question);
+        $d = self::decide((string) stream_get_contents(STDIN), $word, $script, $question, $alone);
         if ($d !== null) {
             echo json_encode($d, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
         }
@@ -34,7 +38,7 @@ class SendGuard
     }
 
     /** The answer to one payload (see main), or null for no opinion. */
-    public static function decide($stdin, $word, $script, callable $question)
+    public static function decide($stdin, $word, $script, callable $question, callable $alone = null)
     {
         $block = function ($why) {
             return ['action' => 'block', 'message' => "Pikkumies safety: $why Not run."];
@@ -99,15 +103,25 @@ class SendGuard
         }
         $id = $m[2];
         $yourself = "Tell the user to run it themselves in their own terminal: php $own send $id";
+        require_once __DIR__ . '/Config.php';
+        require_once __DIR__ . '/Cli.php';
+        require_once __DIR__ . '/HookUnits.php';
+        // A send the person's own setting lets go without a question (ADR-0100): it runs, also unattended; the tool applies its caps.
+        if ($alone !== null) {
+            try {
+                if ($alone($id) === true) {
+                    return null;
+                }
+            } catch (CliError $e) {
+                return $block($e->getMessage() . '; ' . $e->hint . '.');
+            }
+        }
         // Approvals off (--yolo) or an agent started by an agent: nobody would be asked, so the person runs it in their own
         // terminal instead (ADR-0056 amendment 2026-10-19, an exception to ADR-0020's yolo rule).
         require_once __DIR__ . '/NestedAgent.php';
         if (NestedAgent::approvalsOff() || NestedAgent::unattended()) {
             return $block("approvals are off in this session, or this agent was started by another agent, so nobody would be asked before this $word leaves the machine. $yourself");
         }
-        require_once __DIR__ . '/Config.php';
-        require_once __DIR__ . '/Cli.php';
-        require_once __DIR__ . '/HookUnits.php';
         try {
             $message = $question($id);
         } catch (CliError $e) {

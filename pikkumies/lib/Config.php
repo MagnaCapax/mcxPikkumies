@@ -47,6 +47,9 @@ class Config
             'ssh' => ['allow' => [], 'deny' => [], 'blockUnknown' => false],
             // search: Hermes web_search through ddgs (DuckDuckGo, keyless), off until the person runs `pikkumies websearch on` (ADR-0082).
             'web' => ['search' => false],
+            // auto: whether a support ticket the agent bundles by itself (ticket bundle --by agent) goes out without asking;
+            // null = on on a Pulsed Media (PMSS) server, off elsewhere (ADR-0100).
+            'ticket' => ['auto' => null],
         ];
     }
 
@@ -84,6 +87,7 @@ class Config
         'ssh.deny' => 'hosts',
         'ssh.blockUnknown' => 'bool',
         'web.search' => 'bool',
+        'ticket.auto' => 'bool',
     ];
     /** Settable keys by pattern: an *arr app's config file (tools/arr/README.md), an absolute path or '' for none. */
     const SETTABLE_PATTERNS = ['/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => 'path', '/^hooks\.every\.[a-z0-9][a-z0-9-]{0,63}\z/' => 'seconds'];

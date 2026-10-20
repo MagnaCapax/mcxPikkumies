@@ -22,10 +22,12 @@ class TicketSend
     /**
      * Posts $body (TicketDraft::body) and returns ['ticket' => number, '' when a 201 carried none]. Any other answer throws
      * with what happened; the hint says whether sending the same draft again can help. A 401 never says whether the key
-     * or the email failed: the server answers the same either way.
+     * or the email failed: the server answers the same either way. $code receives the HTTP status (0: no answer; -1: not
+     * sent at all), which the automatic-ticket caps count (ADR-0100).
      */
-    public static function send($body, $key, $endpoint = self::ENDPOINT)
+    public static function send($body, $key, $endpoint = self::ENDPOINT, &$code = null)
     {
+        $code = -1;
         $u = parse_url($endpoint);
         $local = isset($u['host']) && in_array($u['host'], ['127.0.0.1', '::1', '[::1]', 'localhost'], true);
         if (!isset($u['scheme']) || ($u['scheme'] !== 'https' && !($u['scheme'] === 'http' && $local))) {
@@ -33,6 +35,7 @@ class TicketSend
         }
         $r = Http::request('POST', $endpoint, ['body' => $body, 'timeout' => 60, 'max' => 65536,
             'headers' => ['Authorization: Bearer ' . $key, 'Content-Type: application/json', 'Accept: application/json']]);
+        $code = (int) $r['code'];
         $answer = json_decode($r['body'], true);
         if ($r['code'] === 201) {
             $t = is_array($answer) && isset($answer['ticket']) && is_scalar($answer['ticket']) ? (string) $answer['ticket'] : '';

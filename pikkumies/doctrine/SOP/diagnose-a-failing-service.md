@@ -8,3 +8,4 @@
 6. **Make the smallest fix**, then restart only that service.
 7. **Verify** the same way the problem was seen (the web UI loads, the port answers, the process stays up for a minute).
 8. **Save a lesson** if the cause was not obvious.
+9. **Out of reach** (needs root, hardware, another server, billing or a platform fix): follow ask-vainamoinen-for-help.

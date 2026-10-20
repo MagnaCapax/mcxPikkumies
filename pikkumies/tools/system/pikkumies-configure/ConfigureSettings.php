@@ -38,6 +38,7 @@ class ConfigureSettings
         'ssh.allow' => 'SSH hosts the agent may connect to without asking you (names, addresses or patterns such as *.home.example). Each connection still says why.',
         'ssh.deny' => 'SSH hosts the agent must never connect to; this list wins over ssh.allow. Only you remove a host from it.',
         'ssh.blockUnknown' => 'Refuses SSH hosts on neither list instead of asking you about them.',
+        'ticket.auto' => 'Whether a support ticket Pikkumies bundles by itself, when it is stuck, goes out without asking. Unset: on on a Pulsed Media server, off elsewhere. A ticket the user asks for is always shown to them first.',
         'provider.endpoint' => 'The AI endpoint. Empty: the one in the key file.',
         'provider.keyFile' => 'The AI key file read first.',
         'provider.virsilipasKeyFile' => 'The key file the platform writes, read after keyFile.',
@@ -106,6 +107,8 @@ class ConfigureSettings
                 // A *.disabled key set true turns something off: say so, never "on" for a switch that disables.
                 return substr($key, -9) === '.disabled' ? "turning it off (true): {$w[$rule[1]]}; back on (false): {$w[$rule[2]]}"
                     : "on (true): {$w[$rule[1]]}; off (false): {$w[$rule[2]]}";
+            case 'pmssBool':
+                return "on (true): {$w[$rule[1]]} on a Pulsed Media server, {$w[$rule[2]]} elsewhere; off (false): {$w[$rule[3]]}";
             case 'list':
                 return "adding: {$w[$rule[1]]}; removing: {$w[$rule[2]]}";
             case 'retention':

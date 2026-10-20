@@ -30,6 +30,7 @@ class ConfigureChange
         'hooks.every.' => 'a guard check run less often, or turned off with 0, is a weaker safety layer; the person sets it by hand in ~/pikkumies/local/config.php',
         'autoUpdate.disabled' => 'it stops the daily update, and with it security and bug fixes; the person sets it by hand in ~/pikkumies/local/config.php',
         'hermes.lazyInstalls' => 'it lets Hermes download and run packages and a browser from the internet while it runs; the person sets it by hand in ~/pikkumies/local/config.php',
+        'ticket.auto' => 'outside Pulsed Media servers, support tickets the agent bundles by itself are the person\'s to turn on: they set ticket.auto to true by hand in ~/pikkumies/local/config.php',
         'ssh.deny' => 'removing a host from the SSH deny list lets the agent connect there again; the person edits ssh.deny by hand in ~/pikkumies/local/config.php',
     ];
     /** Said after every HOW: a set rewrites the file, so the person knows their comments there go. */

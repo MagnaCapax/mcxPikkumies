@@ -18,7 +18,8 @@ class ConfigureTiers
     const PERSON = 'person';
 
     /**
-     * key => rule: ['any', tier]; ['bool', tier when set true, tier when set false]; ['list', tier when a name is added,
+     * key => rule: ['any', tier]; ['bool', tier when set true, tier when set false]; ['pmssBool', tier when set true on a
+     * Pulsed Media server, tier when set true elsewhere, tier when set false]; ['list', tier when a name is added,
      * tier when a name is removed; a change that does both takes the stricter]; ['retention'] (shorter asks: Hermes deletes the history; 0 = forever, the longest);
      * ['channel'] (release free, git/<branch> asks: unreleased code); ['every', tier when more often, tier when less often or
      * off] for hooks.every.<unit name>, filled in by rule() from the unit (ADR-0067).
@@ -58,6 +59,9 @@ class ConfigureTiers
         'ssh.blockUnknown' => ['bool', 'free', 'approve'],
         // On sends each search query to DuckDuckGo: the person's own `pikkumies websearch on`, never the agent (ADR-0082).
         'web.search' => ['bool', 'person', 'free'],
+        // Tickets the agent bundles by itself (ADR-0100): unset is on on a Pulsed Media (PMSS) server and off elsewhere.
+        // Off is free everywhere; on is free on PMSS (its default there) and the person's elsewhere.
+        'ticket.auto' => ['pmssBool', 'free', 'person', 'free'],
     ];
     /** Keys by pattern: host.* overrides what detection found; arr.<app>.config only names where an app keeps its config. */
     const PATTERNS = ['/^host\./' => ['any', 'person'], '/^arr\.[a-z][a-z0-9-]{0,31}\.config\z/' => ['any', 'free']];
@@ -82,6 +86,15 @@ class ConfigureTiers
         'ssh.blockUnknown' => [null, 'lets the agent ask you about SSH hosts that are not on the allow list, instead of refusing them'],
         'hooks.every' => 'runs that background check more often, and each run may call the model on your credits',
     ];
+
+    /** Test seam: true or false instead of looking for /etc/seedbox. */
+    public static $pmssOverride = null;
+
+    /** A Pulsed Media (PMSS) server: /etc/seedbox exists, as Detect::run() decides it. */
+    public static function onPmss()
+    {
+        return self::$pmssOverride !== null ? (bool) self::$pmssOverride : is_dir('/etc/seedbox');
+    }
 
     /** What changing $key to $new does, for the question; '' when there is nothing to add. */
     public static function why($key, $new)
@@ -139,6 +152,8 @@ class ConfigureTiers
                 return $rule[1];
             case 'bool':
                 return $new === true ? $rule[1] : $rule[2];
+            case 'pmssBool':
+                return $new === true ? (self::onPmss() ? $rule[1] : $rule[2]) : $rule[3];
             case 'list':
                 // Replacing [a] with [b] adds and removes: the stricter tier wins, or a deny entry could be swapped away freely.
                 $order = [self::FREE => 0, self::APPROVE => 1, self::PERSON => 2];

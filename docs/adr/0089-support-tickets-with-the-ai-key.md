@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-20
-- Status: Accepted. Adds the tool unit `tools/system/ticket/` and the hook unit `guard/ticket-send`; moves the draft store and the send check that `/feedback` had on its own into `lib/DraftStore.php` and `lib/SendGuard.php`, unchanged in behaviour; amends AGENTS.md's privacy rule and [ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md)'s "the one thing".
+- Status: Accepted. Superseded in part by [ADR-0100](0100-ticket-bundle-diagnostics-and-automatic-tickets-on-pulsed-media-servers.md): attaching system information and the conversation (`ticket bundle`), and an automatic send of a ticket the agent bundles on a Pulsed Media server. Adds the tool unit `tools/system/ticket/` and the hook unit `guard/ticket-send`; moves the draft store and the send check that `/feedback` had on its own into `lib/DraftStore.php` and `lib/SendGuard.php`, unchanged in behaviour; amends AGENTS.md's privacy rule and [ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md)'s "the one thing".
 
 ## Context
 The operator's request of 2026-10-20, as passed to this change: tickets from Pikkumies through the AI key; security is paramount; nothing leaves the machine unless the user asked.
