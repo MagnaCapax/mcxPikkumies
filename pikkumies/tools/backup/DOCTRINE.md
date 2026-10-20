@@ -3,4 +3,7 @@
 - Removing snapshots: `show --prune-plan --keep-...` first, then `prune --keep-... --expect <n>`; the user approves once for the whole batch.
 - Restore only into a new or empty directory inside the home, never into a FUSE mount, never over existing files. To put a file back, move it with `mv -n` (it never replaces a file that is there).
 - `check` never repairs; `--read-data` only when asked. `finished: false` says nothing about damage.
+- Before anything destructive with no working backup (`backup-safety status` is not `working`): snap first (`backup-safety snap <paths>`, or `--package <name>` before removing a package), say where the copy is, then act ([ADR-0099](../../../docs/adr/0099-backup-safety-layer.md)). Before a dangerous change, show the user the table of the 10 latest backups. When backups are missing or not working, suggest a storage box with the addresses `status` prints, never one from memory.
+- Never discard a scheduled job's output: no `/dev/null` on a cron line; send it to a log file (`> <log> 2>&1`).
+- The key of an encrypted backup stays with the user, away from this server and the backup machine; it never goes to the storage box or the chat. `passphrase --confirm-saved` has them type it back.
 - The tools never delete the restic/borg cache. "disk quota exceeded" during a backup is often that cache; it is rebuilt from the repository, so when it is the measured cause clean it (`restic cache --cleanup` for old caches, `borg delete --cache-only <repository>`).

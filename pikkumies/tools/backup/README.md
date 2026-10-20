@@ -4,6 +4,8 @@ Tools for snapshot backups in the user's own repository: `restic` and `borg`, on
 
 `remote` is not a snapshot repository: it streams encrypted archives (`tar | pigz | gpg | ssh`) to another machine through a restricted key, with its own verbs (`remote/README.md`, [ADR-0049](../../../docs/adr/0049-backup-remote-over-ssh.md)). The contract test exempts it from the table below by name.
 
+`backup-safety` is not a snapshot repository either: it reads whether the other units' backups work, for the hooks, and copies exactly the files a change is about to remove (`backup-safety/README.md`, [ADR-0099](../../../docs/adr/0099-backup-safety-layer.md)). The contract test exempts it by name too.
+
 ## Verbs (the same in every unit)
 
 | verb | arguments | changes | what it does |

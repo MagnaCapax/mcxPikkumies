@@ -3,12 +3,15 @@
  * RemotePipe: runs `a | b | c` as separate processes, each from an argv (never a shell string built from user text), so
  * every stage's own exit code is known (POSIX sh has no PIPESTATUS). Stage i's stdout feeds stage i+1 directly, except
  * after stage $count, whose output this process copies and counts: the bytes handed to ssh on a run, the bytes received
- * on a restore. stderr of each stage goes to a temporary file and only its tail is kept.
+ * on a restore. stderr of each stage goes to a temporary file in local/tmp (the account's quota, ADR-0099) and only its tail is kept.
  */
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class RemotePipe
 {
+    /** @var string|null the local dir whose tmp/ holds the stderr files (set by RemoteDest); null: Config::localDir() */
+    public static $localDir = null;
+
     /**
      * $stages: argv lists. $in: the first stage's stdin file; $out: the last stage's stdout file. $env adds variables
      * (null removes one); $cwd: the working directory. Returns ['codes' => [exit code per stage], 'bytes' => counted bytes, 'err' => [stderr tail per stage]].
@@ -28,7 +31,7 @@ class RemotePipe
         $procs = $pipes = $errFiles = [];
         $prev = null;
         foreach ($stages as $i => $argv) {
-            $errFiles[$i] = (string) tempnam(sys_get_temp_dir(), 'pk-remote-err');
+            $errFiles[$i] = LocalTmp::file(self::$localDir !== null ? self::$localDir : Config::localDir(), 'pk-remote-err');
             $io = [0 => $i === 0 ? ['file', $in, 'r'] : ($i - 1 === $count ? ['pipe', 'r'] : $prev),
                 1 => $i === $last ? ['file', $out, 'w'] : ['pipe', 'w'], 2 => ['file', $errFiles[$i], 'w']];
             $p = proc_open('exec ' . ToolProc::line($argv), $io, $pipes[$i], $cwd, $vars);

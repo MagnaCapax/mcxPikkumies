@@ -72,7 +72,7 @@ class RemoteRun
         $tar = array_merge($low, ['tar', '--one-file-system', '--no-wildcards-match-slash'], array_map(function ($p) {
             return "--exclude=$p";
         }, $excl), ['-cf', '-', '-C', $home], $paths, $tail);
-        $out = (string) tempnam(sys_get_temp_dir(), 'pk-remote-out');
+        $out = $dest->tmp('pk-remote-out');
         $r = RemotePipe::run([$tar, array_merge($low, ['pigz', '-p', '2', '-c']), array_merge($low, ['gpg', '--batch', '--yes',
             '--pinentry-mode', 'loopback', '--no-symkey-cache', '--passphrase-file', $pass, '--symmetric', '--cipher-algo', 'AES256',
             '--compress-algo', 'none']), $dest->ssh($d, ['put', $name])], '/dev/null', $out, 2);

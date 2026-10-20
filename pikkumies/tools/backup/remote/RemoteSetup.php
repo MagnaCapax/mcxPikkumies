@@ -60,9 +60,8 @@ class RemoteSetup
         }
         $dest->passFile(true);
         $dest->save('dest.json', $d + ['setup_at' => time()]);
-        $state = $dest->state();
         return [$d + ['restricted' => true, 'verified' => true,
-            'passphrase_saved_by_user' => !empty($state['passphrase_saved_by_user']),
+            'passphrase_saved_by_user' => $dest->passphraseConfirmed(),
             'next' => ['change the remote password now: the key works without it, and changing it is what really scrubs it',
                 'the password you typed has already reached the model provider and this session\'s history; it is not stored here',
                 'run `php ' . dirname($recvFile) . '/remote.php passphrase` in your own terminal and keep that passphrase somewhere other'
@@ -118,7 +117,7 @@ class RemoteSetup
             . "touch \"\$HOME/.ssh/authorized_keys\"\ngrep -qxF \"\$line\" \"\$HOME/.ssh/authorized_keys\""
             . " || printf '%s\\n' \"\$line\" >> \"\$HOME/.ssh/authorized_keys\"\necho pikkumies-recv-installed\n";
         file_put_contents($dest->path('install.sh.new'), $script);
-        $out = (string) tempnam(sys_get_temp_dir(), 'pk-remote-out');
+        $out = $dest->tmp('pk-remote-out');
         $argv = array_merge(RemoteDest::base($d, $dest->path('known_hosts.new'), 'yes'), ['-o', 'BatchMode=no',
             '-o', 'PubkeyAuthentication=no', '-o', 'PreferredAuthentications=keyboard-interactive,password', '-o', 'NumberOfPasswordPrompts=1',
             '--', $d['host'], 'sh', '-s']);

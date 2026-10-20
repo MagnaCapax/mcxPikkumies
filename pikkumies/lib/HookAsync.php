@@ -7,7 +7,7 @@
  * synchronous caller (an end-of-turn check of the same unit) uses too, so both share one stamp, cursor and state.
  *
  * The detached start: `timeout -k 5 <timeout+10> [setpriv --no-new-privs] [nice -n 19] php hooks/worker.php <unit>
- * <sha1> </dev/null >/dev/null 2>&1 &`. The shell exits at once, so `timeout` is reparented to init and sits in its own
+ * <sha1> </dev/null > local/logs/hook-async.last 2>&1 &` (the last worker's output kept, ADR-0099). The shell exits at once, so `timeout` is reparented to init and sits in its own
  * process group: Hermes' kill of a timed-out hook (its process group and its descendants, agent/deadline.py
  * kill_process_tree) does not reach it, and Hermes' read of the hook's pipes ends because no pipe is inherited.
  * `timeout --foreground` would stay in the hook's group, so it is never used. Every lock is released before the start.
@@ -64,19 +64,21 @@ class HookAsync
             if (!$go) {
                 continue;
             }
-            exec(self::detached([PHP_BINARY, $worker, $id, $hash], $u['timeout'] + 10));
+            $log = "$localDir/logs/hook-async.last"; // the last worker's output and errors, never /dev/null (ADR-0099)
+            @mkdir(dirname($log), 0700, true);
+            exec(self::detached([PHP_BINARY, $worker, $id, $hash], $u['timeout'] + 10, $log));
             $started[] = $id;
         }
         umask($old);
         return $started;
     }
 
-    /** The shell line that starts $argv detached, killed after $limit seconds (the class comment says why each part is there). */
-    public static function detached(array $argv, $limit)
+    /** The shell line that starts $argv detached, killed after $limit seconds, its output in $log (the class comment says why each part is there). */
+    public static function detached(array $argv, $limit, $log)
     {
         $argv = array_merge([self::bin('timeout'), '-k', '5', (string) $limit], self::bin('setpriv') !== '' ? [self::bin('setpriv'), '--no-new-privs'] : [],
             self::bin('nice') !== '' ? [self::bin('nice'), '-n', '19'] : [], $argv);
-        return implode(' ', array_map('escapeshellarg', $argv)) . ' </dev/null >/dev/null 2>&1 &';
+        return implode(' ', array_map('escapeshellarg', $argv)) . ' </dev/null > ' . escapeshellarg($log) . ' 2>&1 &';
     }
 
     /** True when no run was started yet ($started 0) or the interval has passed since $started. */

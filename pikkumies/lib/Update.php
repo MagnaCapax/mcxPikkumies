@@ -106,15 +106,22 @@ class Update
     }
 
     /**
-     * The per-minute tick line. Output is discarded by the line itself: `cron-tick` logs its own
-     * state changes to local/update.log (CronTick::logIfChanged), and without a redirect cron would
-     * otherwise mail the account on every run that printed anything. '' when the path has a % or a
+     * The per-minute tick line. Its output goes to local/cron-tick.last, replaced every minute: `cron-tick` logs its
+     * own state changes to local/update.log (CronTick::logIfChanged), cron would mail the account on every run that printed
+     * anything, and no line Pikkumies writes discards its errors (no /dev/null, ADR-0099). '' when the path has a % or a
      * line break (see cronLine()).
      */
     public static function cronTickLine()
     {
-        $line = sprintf('* * * * * %s cron-tick >/dev/null 2>&1 %s', escapeshellarg(Config::root() . '/bin/pikkumies'), self::CRON_TICK_TAG);
+        $line = sprintf('* * * * * %s cron-tick > %s 2>&1 %s', escapeshellarg(Config::root() . '/bin/pikkumies'),
+            escapeshellarg(self::cronTickLog()), self::CRON_TICK_TAG);
         return strpbrk($line, "%\n\r") === false ? $line : ''; // same guard as cronLine(): a % or line break would break the line
+    }
+
+    /** Where the tick line's output goes: in local/ itself, beside update.log, because a missing redirect folder would stop the tick. */
+    public static function cronTickLog()
+    {
+        return Config::localDir() . '/cron-tick.last';
     }
 
     /**
@@ -153,7 +160,9 @@ class Update
             $msgs[] = 'auto-update ' . self::schedule($config, $uid);
         }
         $tickWanted = empty($config['cron']['disabled']) && !CronTick::refuses($rootAvailable) && self::cronTickLine() !== '';
-        if ((strpos($before, self::CRON_TICK_TAG) !== false) !== $tickWanted) {
+        $tickThere = strpos($before, self::CRON_TICK_TAG) !== false;
+        // An older tick line (its output to /dev/null or to local/logs/, ADR-0099) is replaced by the current one.
+        if ($tickThere !== $tickWanted || ($tickWanted && strpos($before, self::cronTickLine()) === false)) {
             $msgs[] = 'cron-tick ' . self::scheduleCronTick($config, $rootAvailable, $logFile);
         }
         foreach (self::keptLines() as $tag => $line) {

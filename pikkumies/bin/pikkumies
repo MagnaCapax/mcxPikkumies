@@ -465,6 +465,20 @@ switch ($cmd) {
             out($noKey);
             exit($eternalId !== '' ? 75 : 1);
         }
+        // Backups (ADR-0099): the status the hooks read is refreshed in the background when it is over a day old (it never
+        // holds up the start), and a start says in one line when no backup is known to work.
+        if (Launch::isSession($passArgs)) {
+            $backups = BackupStatus::read(Config::localDir());
+            if (BackupStatus::due($backups, time())) {
+                BackupStatus::refreshInBackground(Config::localDir(), Config::root() . '/tools/backup/backup-safety/backup-safety.php');
+            }
+            if (is_array($backups) && $backups['state'] !== 'working') {
+                out('backups: ' . $backups['state'] . ' (' . Config::shown(Config::root() . '/tools/backup/backup-safety/backup-safety.php') . ' status shows why)');
+            }
+            if (($custody = BackupStatus::custody($backups)) !== '') {
+                out($custody);
+            }
+        }
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
         $isUpdate = isset($passArgs[0]) && $passArgs[0] === 'update';
         if ($isUpdate) {

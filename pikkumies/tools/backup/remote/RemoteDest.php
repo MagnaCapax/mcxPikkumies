@@ -11,14 +11,18 @@ class RemoteDest
 {
     const NAME_RE = '/^(\d{8}T\d{6}Z)\.(meta|full)\.tgz\.gpg$/';
     const RECV = 'sh ~/.pikkumies-recv/recv.sh';
+    const CALL_MAX = 1048576; // bytes of one receiver answer: a listing of thousands of archives fits
 
     public $dir;
+    public $localDir;
     private $configFile;
 
     public function __construct($localDir)
     {
         $this->dir = rtrim($localDir, '/') . '/secrets/backup-remote';
         $this->configFile = rtrim($localDir, '/') . '/config.php';
+        $this->localDir = rtrim($localDir, '/');
+        RemotePipe::$localDir = $this->localDir; // the stages' stderr files go to local/tmp too (ADR-0099)
     }
 
     /** Refuse a host on the person's SSH deny list (ADR-0068); allow and unknown do not apply here (setup is asked, ADR-0049). */
@@ -105,6 +109,18 @@ class RemoteDest
         return is_array($s) ? $s : [];
     }
 
+    /**
+     * True when the user typed the passphrase back (`passphrase --confirm-saved`) for the passphrase file that is here now: a
+     * regenerated file has another sha256, and an older confirmation without one was only a promise (ADR-0099).
+     */
+    public function passphraseConfirmed()
+    {
+        $s = $this->state();
+        $f = $this->path('pass');
+        return !empty($s['passphrase_saved_by_user']) && isset($s['passphrase_sha256']) && is_string($s['passphrase_sha256']) && is_file($f)
+            && hash_equals($s['passphrase_sha256'], (string) hash_file('sha256', $f));
+    }
+
     public function save($name, array $fields)
     {
         unset($fields['saved_at']);
@@ -164,14 +180,24 @@ class RemoteDest
         return ToolText::tail($err);
     }
 
-    /** Runs one receiver command; returns [exit code, stdout, stderr tail]. */
+    /** A new empty 0600 temporary file in local/tmp (counted in this account's quota, never the shared /tmp). */
+    public function tmp($prefix)
+    {
+        return LocalTmp::file($this->localDir, $prefix);
+    }
+
+    /**
+     * Runs one receiver command; returns [exit code, stdout, stderr tail]. Its stdout is read through a pipe and the call is
+     * stopped once it passes CALL_MAX bytes (the backup machine decides what it prints), so nothing of it lands on disk.
+     */
     public function call(array $d, array $words, $new = '')
     {
-        $out = (string) tempnam(sys_get_temp_dir(), 'pk-remote-out');
-        $r = RemotePipe::run([$this->ssh($d, $words, $new)], '/dev/null', $out);
-        $text = (string) @file_get_contents($out, false, null, 0, 1048576);
-        @unlink($out);
-        return [$r['codes'][0], $text, $r['err'][0]];
+        $text = '';
+        $r = ToolProc::run($this->ssh($d, $words, $new), [], function ($line) use (&$text) {
+            $text .= $line . "\n";
+            return strlen($text) <= self::CALL_MAX;
+        });
+        return [$r['stopped'] ? 1 : $r['code'], substr($text, 0, self::CALL_MAX), trim(substr($r['err'], -2000))];
     }
 
     /** Free space on the destination in bytes, from the receiver's `df`. */

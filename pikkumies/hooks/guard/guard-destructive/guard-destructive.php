@@ -34,6 +34,7 @@ if (!is_array($payload) && trim($stdin) !== '') {
 // and with repeated slashes and /./ folded (hermes//.env is hermes/.env).
 require_once dirname(__DIR__, 3) . '/lib/HookPayload.php';
 require __DIR__ . '/GuardLocal.php';
+require __DIR__ . '/GuardBackup.php';
 // The media apps' logins in plain text (ADR-0078): named, globbed or swept up by a search from the home folder.
 require __DIR__ . '/GuardMediaCreds.php';
 require __DIR__ . '/GuardDrives.php';
@@ -312,6 +313,9 @@ $approve = [
     '/\b(rsync|lftp)\b.*--(delete[a-z-]*|del|remove-source-files|Remove-source-files)\b/s'      => ['delete', 'deletes files on one side of a transfer'],
     '/\bgit\b.*\b(clean\b.*(\s-[a-zA-Z]*f|--force\b)|reset\b.*--hard\b)/s'                     => ['delete', 'git clean or reset --hard deletes files and changes that were never committed'],
     '/\bcrontab\b[^;&|\n]*\s-[a-zA-Z]*r\b/'                                                    => ['delete', 'crontab -r deletes every scheduled job of this account'],
+    // Package removal (ADR-0099): remove, purge and autoremove delete installed software and, with purge, its settings; install does not.
+    '/(^|[\s;&|(`"\'])(apt|apt-get|aptitude)\s+([^\s;&|]+\s+)*(remove|purge|autoremove|autopurge)\b|\bdpkg\s+([^\s;&|]+\s+)*(-[a-zA-Z]*[rP]\b|--remove\b|--purge\b)/'
+        => ['delete', 'removes software packages and, with purge, their settings'],
     // The list form in code: subprocess.run(["rm", "-r", p]).
     '/[\[(,]\s*["\']?(rm|unlink|shred|truncate)["\']?\s*,/'                                     => ['delete', 'deletes or empties files'],
     '/\brclone\b.*\bserve\b(?!.*--addr[=\s]+["\']?(127\.|localhost|\[::1\]|unix:))/s'         => ['exposure', 'rclone serve without a loopback --addr publishes files to the network'],
@@ -349,7 +353,27 @@ foreach ($approve as $re => $rule) {
     if ($hit !== 0) {
         $id = substr(sha1($command), 0, 16);
         $key = ($kind === 'load' ? 'pikkumies-load:' : ($kind === 'send' ? 'pikkumies-send:' : 'pikkumies-delete:')) . $id;
-        $approveMessage = "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command;
+        // Before a delete question, the backup check (GuardBackup.php, ADR-0099): copy first without a working backup, and
+        // the table of the latest backups before a dangerous one; it only holds the agent once, it never asks the user.
+        if ($kind === 'delete' && $hit === 1) {
+            try {
+                $held = guardBackup($command, $why, $payload, Config::localDir(), time());
+            } catch (Throwable $e) {
+                $held = null; // the check only adds a hold; failing, it leaves the question below as it was
+            }
+            if ($held !== null) {
+                guardSay($held);
+            }
+        }
+        try {
+            $latest = $kind === 'delete' ? guardBackupLatest(Config::localDir(), time()) : '';
+        } catch (Throwable $e) {
+            $latest = '';
+        }
+        $approveMessage = "Pikkumies: $why{$suffix[$kind]}.$latest Command [$id]: " . $command;
+        if (!HookUnits::approveShown($approveMessage)) {
+            $approveMessage = "Pikkumies: $why{$suffix[$kind]}. Command [$id]: " . $command; // the latest backup only when it fits
+        }
         // The user must see everything they approve: a message too long to show in full is refused.
         if (!HookUnits::approveShown($approveMessage)) {
             echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why, and the command is too long to show the user in full. Not run. Split it into smaller commands."]) . "\n";

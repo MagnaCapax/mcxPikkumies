@@ -15,13 +15,23 @@ class HomePath
     const SYSTEM = ['/bin', '/boot', '/dev', '/etc', '/lib', '/lib32', '/lib64', '/libx32', '/proc', '/root', '/run', '/sbin', '/srv',
         '/sys', '/usr', '/var'];
 
-    /** The real home directory, or a CliError. */
+    /**
+     * The real home directory, or a CliError: $HOME when it is a folder this uid owns, else the passwd entry (the rule of
+     * Host::home). An injected HOME (sudo -E, --preserve-env=HOME) never makes a root run act inside another account's
+     * folder (ADR-0099).
+     */
     public static function home()
     {
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         $home = (string) getenv('HOME');
         $real = $home !== '' ? realpath($home) : false;
+        if ($real !== false && $real !== '/' && @fileowner($real) !== $uid) { // HOME=/ is refused below, never replaced
+            $pw = function_exists('posix_getpwuid') ? @posix_getpwuid($uid) : false;
+            $real = is_array($pw) && isset($pw['dir']) && is_string($pw['dir']) && $pw['dir'] !== '' ? realpath($pw['dir']) : false;
+            $real = $real !== false && @fileowner($real) === $uid ? $real : false;
+        }
         if ($real === false || !is_dir($real) || $real === '/') {
-            throw new CliError('HOME is not set to a directory', 'run the tool as the account whose files it is about');
+            throw new CliError('HOME is not set to a directory of this account', 'run the tool as the account whose files it is about');
         }
         return $real;
     }

@@ -115,6 +115,30 @@ Pulsed Media's support page: the ticket links per department, what to include in
 
 Pulsed Media's human support charter: ticket rules and time frames for the humans behind support, who step in only when the support agent cannot.
 
+## pm-storage-boxes
+
+- type: link
+- url: https://pulsedmedia.com/storage-boxes.php
+- trust: official
+- covers: Pulsed Media storage boxes: plans and prices of off-server storage for backups
+- scope: pmss
+- verified: 2026-10-20
+- status: on
+
+Pulsed Media's storage box page: cheap storage on another machine, the place for this account's backups. Give it to the user to open; never fetch it. The backup safety unit (`tools/backup/backup-safety`) reads this address by name, on every host, when it suggests setting up backups ([ADR-0099](../../docs/adr/0099-backup-safety-layer.md)).
+
+## pm-zero-knowledge-backups
+
+- type: link
+- url: https://wiki.pulsedmedia.com/wiki/Zero-Knowledge_Encryption_for_Your_Seedbox_or_Storage_Box
+- trust: official
+- covers: end-to-end encrypted (zero-knowledge) backups from a seedbox to a storage box
+- scope: pmss
+- verified: 2026-10-20
+- status: on
+
+Pulsed Media's wiki guide to backups that are encrypted before they leave the seedbox, so the storage box holds only data it cannot read. Give it to the user to open; never fetch it. Read by name by the backup safety unit, like pm-storage-boxes.
+
 ## feral-wiki
 
 - type: site

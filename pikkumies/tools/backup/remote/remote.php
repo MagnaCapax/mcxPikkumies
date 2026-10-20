@@ -4,7 +4,7 @@
  * tar | pigz | gpg --symmetric | ssh to a receiver that a restricted key can reach and nothing else.
  */
 $remoteLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update', 'SshLists'] as $remoteClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update', 'SshLists', 'LocalTmp'] as $remoteClass) {
     require_once "$remoteLib/$remoteClass.php";
 }
 require_once dirname(__DIR__, 2) . '/storage/lib/ToolText.php';
@@ -18,6 +18,7 @@ usage: php remote.php <verb> [arguments] [--human]
                                       the login comes only from PIKKUMIES_REMOTE_PASSWORD='...' before the command
   run --mode meta|full [--allow-large] one encrypted archive to the backup machine
   list                                archives on the backup machine, newest first
+  check                               reads the newest meta archive back (decrypt, list), counts its entries
   restore <name> --target <new-dir>   into a new or empty directory inside the home
   stats                               destination, schedule, last run, passphrase_saved_by_user
   schedule --daily HH:MM --mode meta|full [--allow-large] | --off
@@ -28,6 +29,7 @@ TXT;
 // Test seams: a test may set these before including this file. Nothing is read from the environment.
 $remoteLocalDir = isset($remoteLocalDir) ? $remoteLocalDir : Config::localDir();
 $remoteMountinfo = isset($remoteMountinfo) ? $remoteMountinfo : '/proc/self/mountinfo';
+$remoteCheckFullMax = isset($remoteCheckFullMax) ? $remoteCheckFullMax : RemoteOps::CHECK_FULL_MAX;
 $remoteLocalDir = realpath($remoteLocalDir) ?: $remoteLocalDir;
 Update::$keptDir = $remoteLocalDir . '/secrets/cron';
 $remoteDest = new RemoteDest($remoteLocalDir);
@@ -41,6 +43,9 @@ Cli::run($argv, [
     },
     'list' => function ($args, $opt) use ($remoteDest) {
         return RemoteOps::listing($remoteDest);
+    },
+    'check' => function ($args, $opt) use ($remoteDest, $remoteCheckFullMax) {
+        return RemoteOps::check($remoteDest, $remoteCheckFullMax);
     },
     'restore' => function ($args, $opt) use ($remoteDest, $remoteMountinfo) {
         return RemoteOps::restore($remoteDest, $args, $opt, HomePath::home(), $remoteMountinfo);
