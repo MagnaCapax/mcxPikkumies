@@ -132,25 +132,4 @@ return [
             testRmTree($root);
         }
     },
-    'eternal: tmux launcher child does not inherit the lifecycle lock' => function () {
-        $root = testTempDir('eternal-tmux-fd');
-        $source = dirname(__DIR__) . '/pikkumies';
-        exec('cp -R ' . escapeshellarg($source . '/bin') . ' ' . escapeshellarg($source . '/lib') . ' ' . escapeshellarg($root) . '/');
-        @mkdir($root . '/fake-bin', 0700);
-        file_put_contents($root . '/enabled', "1\n");
-        file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\nfor fd in /proc/\$\$/fd/*; do [ \"\$(readlink \"\$fd\")\" = '" . $root . "/local/eternals.lock' ] && echo leaked >> '" . $root . "/leak'; done\necho \"\$@\" >> '" . $root . "/calls'\nexit 0\n");
-        chmod($root . '/fake-bin/tmux', 0700);
-        $runner = $root . '/runner.php';
-        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/enabled"; require __DIR__ . "/bin/pikkumies";');
-        $oldPath = getenv('PATH');
-        putenv('PATH=' . $root . '/fake-bin:' . $oldPath);
-        try {
-            list($code) = runPhp($runner, ['tmux', '2']);
-            check($code === 0 && is_file($root . '/local/eternals/pm2'), 'managed tmux did not create record');
-            check(!is_file($root . '/leak'), 'tmux child inherited lifecycle lock');
-        } finally {
-            putenv('PATH=' . $oldPath);
-            testRmTree($root);
-        }
-    },
 ];

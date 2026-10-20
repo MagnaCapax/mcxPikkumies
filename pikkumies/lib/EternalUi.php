@@ -2,6 +2,8 @@
 /** PMSS launcher entry point; no UI process is started by the cron tick. */
 class EternalUi
 {
+    public static $binary = null; // test seam; production uses the platform-installed binary
+
     public static function start()
     {
         if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
@@ -15,7 +17,7 @@ class EternalUi
         if (!$account || empty($account['dir'])) {
             return 'UI cannot find the account home.';
         }
-        $binary = '/opt/pikkumies-agentboard/agentboard';
+        $binary = self::$binary !== null ? self::$binary : '/opt/pikkumies-agentboard/agentboard';
         if (!is_file($binary) || !is_executable($binary)) {
             return 'UI is not installed on this host.';
         }
