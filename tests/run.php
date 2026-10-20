@@ -4,6 +4,18 @@
  * Each tests/*Test.php returns an array of name => callable; a callable throws on failure.
  */
 $root = dirname(__DIR__);
+// No test, and no pikkumies process a test spawns, may change the real crontab of whoever runs the suite:
+// a `crontab` that always fails goes first on PATH. A test that puts its own fake earlier on PATH, or sets
+// Update::$crontab, still gets its fake.
+$cronGuard = sys_get_temp_dir() . '/pikkumies-test-crontab-' . getmypid();
+@mkdir($cronGuard, 0700);
+file_put_contents($cronGuard . '/crontab', "#!/bin/sh\necho 'crontab: not available inside the pikkumies test suite' >&2\nexit 1\n");
+chmod($cronGuard . '/crontab', 0700);
+putenv('PATH=' . $cronGuard . ':' . getenv('PATH'));
+register_shutdown_function(function () use ($cronGuard) {
+    @unlink($cronGuard . '/crontab');
+    @rmdir($cronGuard);
+});
 foreach (glob($root . '/pikkumies/lib/*.php') as $lib) {
     require_once $lib;
 }
