@@ -79,6 +79,12 @@ What holds whatever the agent types is the other machine's `~/.ssh/authorized_ke
 
 The deny list applies inside `backup remote` too: `setup` refuses a denied host before it connects, and `run`, `list` and `restore`, scheduled runs included, refuse once the recorded host is denied.
 
+## Your other boxes (services)
+
+The [services](../pikkumies/tools/seedbox/services/README.md) tool keeps a list of your other machines and reaches each with its own key ([ADR-0084](adr/0084-services-list-and-moving-torrents-between-boxes.md)). It connects by itself, so the hook does not see those connections; the tool applies the same lists: a host on `ssh.deny` is refused before any connection (setup included), and with `ssh.blockUnknown` so is a host not on `ssh.allow`.
+
+The limit that holds is again on the other machine. On a box that runs Pikkumies, the key line is `restrict,command="php ~/pikkumies/tools/seedbox/services/serve.php <label>"`: whatever this box asks, that box runs only `serve.php`, which allows a short list of read verbs, adding a .torrent, pausing and resuming, read-only file pulls from its data folders (never its keys, `~/.ssh` or the Pikkumies tree), and deleting torrent data only when you added `--allow-delete` to that key. On a box without Pikkumies the key opens port forwards and runs nothing (`restrict,port-forwarding,command="/bin/false"`), and a full shell key exists only when you ask for one (`setup --allow-shell`). Files move by pulling: the box that receives them runs the copy, so no key may write into another box.
+
 ## More
 
 The check is the [ssh-connect hook](../pikkumies/hooks/guard/ssh-connect/README.md). Questions in the chat: [ADR-0020](adr/0020-deletes-need-the-users-approval.md). Who may change which setting: [ADR-0059](adr/0059-settings-tiers-free-asked-and-the-persons-own.md).

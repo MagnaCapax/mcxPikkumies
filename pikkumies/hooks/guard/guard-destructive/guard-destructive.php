@@ -149,14 +149,14 @@ $patterns = $secretPatterns + [
     // backup remote (ADR-0049): the gpg passphrase is shown only on the user's own terminal; what the agent reads goes to the model.
     "/\\bphp\\b.*{$v}passphrase\\b/s" => 'the backup passphrase is for the user\'s own terminal only, never the chat (it would reach the model provider)',
 ] + NestedAgent::guardPatterns(); // another agent with approvals, hooks or rules off (ADR-0020 amendment 2026-10-18)
-// backup remote (ADR-0049): a command that names the tool and builds anything with $, backticks or eval cannot be checked
+// backup remote (ADR-0049) and services setup (ADR-0084): a command that names the tool and builds anything with $, backticks or eval cannot be checked
 // (V=passphrase; php remote.php $V). The setup prefix's own value is skipped when it is single-quoted only, so a login
 // value holding a $ stays usable; a double-quoted or unquoted one is expanded by the shell and counts.
 $unquotedLogin = preg_replace("/PIKKUMIES_REMOTE_PASSWORD=(?:'[^']*'|\\\\')+/", 'PIKKUMIES_REMOTE_PASSWORD=x', $command);
 // A regex engine error (null / false) counts as a hit: an unchecked command is not run.
-if (guardMatch('#remote\.php|tools/backup/remote\b#', $texts) !== 0
+if (guardMatch('#remote\.php|tools/backup/remote\b|(services\.php|tools/seedbox/services\b).*\bsetup\b#s', $texts) !== 0
     && ($unquotedLogin === null || preg_match('/[$`]|\beval\b/', $unquotedLogin) !== 0)) {
-    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a backup remote command built with $, backticks or eval'
+    echo json_encode(['action' => 'block', 'message' => 'Pikkumies safety: a backup remote or services setup command built with $, backticks or eval'
         . ' cannot be checked. Not run. Name the verb and its arguments literally.']) . "\n";
     exit(0);
 }
@@ -315,6 +315,9 @@ $approve = [
     // Re-running the media installer can delete an app's settings and users (PMSS install-media-stack.sh
     // asks on stdin, which a pipe can answer); stopping or starting one app is safe.
     '/install-media-stack\.sh(?![^;&|\n]*--(stop-app|start-app|help)\b)/' => ['delete', 'runs the media installer, which can delete app settings and data'],
+    // services accept --install (ADR-0084): a key line in ~/.ssh/authorized_keys lets another machine log in to this account.
+    "/(services\\.php|tools\\/seedbox\\/services\\b).*{$v}accept\\b.*{$v}--install\\b/s"
+        => ['exposure', 'adds a key line to ~/.ssh/authorized_keys, so another machine can log in to this account'],
     // backup remote (ADR-0049): where the account's files go, and a job that sends them by itself, are the user's decision.
     "/(^|[\\s;&|(`\"'])PIKKUMIES_REMOTE_PASSWORD=|\\bremote\\.php\\b.*{$v}(setup|schedule)\\b|(^|[\\s\"',\\[(])--daily\\b/s"
         => ['send', 'sets up or schedules backups of this account to another machine'],
