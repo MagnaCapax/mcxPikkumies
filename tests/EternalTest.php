@@ -74,10 +74,16 @@ return [
         $root = testTempDir('eternal-ui-clean');
         @mkdir($root . '/ui-dead/sub', 0700, true);
         @mkdir($root . '/ui-live', 0700, true);
-        file_put_contents($root . '/ui-dead/tmux-server.pid', "99999999\n");
+        $child = proc_open('sleep 0.1', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        check(is_resource($child), 'could not start UI fixture child');
+        $childPid = proc_get_status($child)['pid'];
+        file_put_contents($root . '/ui-dead/ui.pid', $childPid . "\n");
+        file_put_contents($root . '/ui-dead/tmux-server.pid', getmypid() . "\n");
         file_put_contents($root . '/ui-dead/sub/state', 'old');
-        file_put_contents($root . '/ui-live/tmux-server.pid', getmypid() . "\n");
+        file_put_contents($root . '/ui-live/ui.pid', getmypid() . "\n");
         try {
+            foreach ($pipes as $pipe) { fclose($pipe); }
+            proc_close($child);
             EternalUi::removeDeadInstances($root);
             check(!is_dir($root . '/ui-dead') && is_dir($root . '/ui-live'), 'UI instance cleanup failed');
         } finally {
@@ -215,8 +221,8 @@ return [
         Eternal::$tmuxDirectory = $root;
         try {
             $base = $root . '/ui';
-            $first = EternalUi::environment('/home/example', $base, $base . '/ui-first');
-            $second = EternalUi::environment('/home/example', $base, $base . '/ui-second');
+            $first = EternalUi::environment('/home/fixtureuser', $base, $base . '/ui-first');
+            $second = EternalUi::environment('/home/fixtureuser', $base, $base . '/ui-second');
             foreach (['AGENTBOARD_DATA_DIR', 'LOG_FILE', 'AGENTBOARD_TMUX_PID_FILE'] as $name) {
                 check($first[$name] !== $second[$name], $name . ' was shared');
             }

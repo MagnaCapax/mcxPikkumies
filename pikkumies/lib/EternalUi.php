@@ -44,11 +44,14 @@ class EternalUi
             $parts[] = $name . '=' . $value;
         }
         $parts[] = 'setsid';
-        $parts[] = '-f';
         $parts[] = $binary;
         $log = $instance . '/launcher-error.log';
-        exec(implode(' ', array_map('escapeshellarg', $parts)) . ' </dev/null >>' . escapeshellarg($log) . ' 2>&1', $out, $code);
-        return $code === 0 ? '' : 'UI could not start; see ' . $log;
+        exec(implode(' ', array_map('escapeshellarg', $parts)) . ' </dev/null >>' . escapeshellarg($log) . ' 2>&1 & echo $!', $out, $code);
+        $pid = isset($out[0]) ? trim($out[0]) : '';
+        if ($code !== 0 || !ctype_digit($pid) || @file_put_contents($instance . '/ui.pid', $pid . "\n") === false) {
+            return 'UI could not start; see ' . $log;
+        }
+        return '';
     }
 
     public static function removeDeadInstances($base)
@@ -57,7 +60,7 @@ class EternalUi
             if (!is_dir($dir) || is_link($dir)) {
                 continue;
             }
-            $pid = trim((string) @file_get_contents($dir . '/tmux-server.pid'));
+            $pid = trim((string) @file_get_contents($dir . '/ui.pid'));
             if (!ctype_digit($pid) || is_dir('/proc/' . $pid)) {
                 continue;
             }
