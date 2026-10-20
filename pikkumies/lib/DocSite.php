@@ -1,7 +1,8 @@
 <?php
 /**
  * DocSite: the `site` documentation type (ADR-0027). `url` is a sitemap.xml, a sitemap index, or an
- * HTML index page whose links are the pages. Pages are downloaded a few at a time and kept one
+ * HTML index page whose links are the pages, or a markdown file (a repository's README or docs index on
+ * raw.githubusercontent.com) whose links to other markdown files are the pages. Pages are downloaded a few at a time and kept one
  * markdown file each in local/docs-cache/<name>/; meta.json remembers when each was fetched, so every
  * run fetches missing pages first, then the oldest ones past the refresh period, within its budget.
  *
@@ -139,7 +140,7 @@ class DocSite
             $slug = isset($pages[$u]['slug']) && $pages[$u]['slug'] !== '' ? $pages[$u]['slug'] : self::slugFor($u, $pages);
             try {
                 list($html, $final) = self::fetch($u, $host);
-                $doc = self::htmlToText($html);
+                $doc = self::isMarkdown($u) ? self::markdownToText($html) : self::htmlToText($html);
                 $page = DocSources::renderPage($src, ['title' => self::title($doc, $u, $pages), 'url' => $final, 'text' => $doc['text'], 'updated' => gmdate('c', $now)]);
                 $old = is_file("$dir/$slug.md") ? filesize("$dir/$slug.md") : 0;
                 if (!self::writeFile("$dir/$slug.md", $page)) {
@@ -265,8 +266,15 @@ class DocSite
     public static function links($html, $base, $host, $prefix)
     {
         preg_match_all('#<a\s[^>]{0,2048}?href\s*=\s*(["\'])([^"\']{1,2048})\1#i', (string) $html, $m);
+        $hrefs = $m[2];
+        if (self::isMarkdown($base)) {
+            // A markdown page's own links, [text](other.md): only to other markdown files, never images or code. Only the
+            // part the cache keeps (MAX_PAGE) is read: on a 5 MB page of "](" the pattern costs seconds of CPU.
+            preg_match_all('#\]\(\s*<?([^)\s<>]{1,2048}?\.(?:md|markdown)(?:\#[^)\s<>]*)?)>?(?:\s+"[^"]*")?\s*\)#i', substr((string) $html, 0, DocSources::MAX_PAGE), $mm);
+            $hrefs = array_merge($hrefs, $mm[1]);
+        }
         $out = [];
-        foreach (array_slice($m[2], 0, self::MAX_LINKS) as $href) {
+        foreach (array_slice($hrefs, 0, self::MAX_LINKS) as $href) {
             $u = self::normalize(self::resolve($base, html_entity_decode(trim($href), ENT_QUOTES | ENT_HTML5, 'UTF-8')), $host);
             if ($u !== '' && self::underPrefix($u, $prefix) && !preg_match('#/_(?!pages(?:/|$))#', (string) parse_url($u, PHP_URL_PATH))) {
                 $out[$u] = true;
@@ -441,6 +449,35 @@ class DocSite
             $url = $next;
         }
         throw new Exception('too many redirects');
+    }
+
+    /** True when the address is a markdown file (by its path), such as a README on raw.githubusercontent.com. */
+    public static function isMarkdown($url)
+    {
+        return (bool) preg_match('#\.(?:md|markdown)$#i', (string) parse_url((string) $url, PHP_URL_PATH));
+    }
+
+    /**
+     * A markdown file as htmlToText() returns a page: the text kept as written (stripping tags would cut it at every
+     * "<"), the title from its first "# " heading outside code blocks, else its first <h1>.
+     */
+    public static function markdownToText($md)
+    {
+        $md = trim(str_replace("\r\n", "\n", (string) $md));
+        $title = '';
+        $fence = false;
+        foreach (explode("\n", $md) as $line) {
+            if (preg_match('/^\s*(```|~~~)/', $line)) {
+                $fence = !$fence;
+            } elseif (!$fence && preg_match('/^#\s+(.+?)[\s#]*$/', $line, $m)) {
+                $title = $m[1];
+                break;
+            }
+        }
+        if ($title === '' && preg_match('#<h1[^>]*>(.{1,500}?)</h1>#is', $md, $m)) {
+            $title = strip_tags($m[1]);
+        }
+        return ['title' => self::cleanTitle($title), 'h1' => '', 'text' => $md];
     }
 
     /** ['title' => <title>, 'h1' => the first <h1>, 'text' => ...]: the main part of the page without scripts, menus and footers. */

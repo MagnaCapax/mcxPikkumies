@@ -40,6 +40,11 @@ Each source is a `## name` section (lowercase letters, digits and dashes) with t
 - `prefix`: `site` only, optional: fetch only pages whose path starts with this. The default is the index page's own folder, or `/` for a sitemap.
 - `depth`: `site` index pages only, optional: `1` (the pages the index links to, the default) or `2` (also the pages those link to).
 - `status`: `on` or `off`.
+- `repo`: optional, the address of the project's source repository: where its code and recent commits are.
+- `issues`: optional, the project's issue tracker or bug-report page.
+  Both are https addresses on a public host name: no IP address, port, user name or password, and no local name such as `localhost` or `.lan`.
+- `tracker`: optional, what `issues` is when it is not GitHub issues: `gitlab`, `forum` or `other` (Trac, Forgejo, Redmine, Bugzilla, a mailing list, a vendor's support page). Missing means `github`, and then `issues` must be on github.com.
+- `docs`: upstream entries only (see Upstream projects), the sources that hold the project's documentation, as a comma list of source names.
 
 Only pages on the same host as `url` are fetched, at most 500 per source and 200 MB for all sources together.
 
@@ -53,6 +58,12 @@ A search returns its hits grouped by tier, highest first. A higher tier's hit al
 4. **Deep research on the web**: never run by a search. The search names it as the next step when tiers 1-3 have nothing.
 
 Tier 3 is never downloaded while you wait. It is searched only from copies already on disk, and nothing downloads it until a search on this account first finds neither a lesson nor an `official` page of this host (only app manuals, or nothing at all; that search creates `~/pikkumies/local/docs-peer-enabled`). From then on the daily background fill also takes the other providers' sources, at most 50 requests per source per day, each page refreshed at most every 30 days. To keep one of them out, switch it off in your overlay with `- status: off`. The search's status line counts the pages each tier had on disk (`pages_per_tier`), so an empty tier 3 is visible.
+
+## Upstream projects
+
+Each app's software project is listed with its repository and issue tracker (`repo`, `issues`, `tracker`), so that a problem in an app can be checked against the project's known issues and recent commits. A source that is a project's documentation carries the lines itself; a project with no downloaded documentation here (or one that shares it, such as the *arr apps and the Servarr wiki) has an upstream entry at the end of this file: a `## name` section with these lines and no `type`. An entry is never downloaded and is not a source. `pikkumies.php upstreams` lists them all.
+
+Checking them is low priority: it is a step of deep research (tier 4), after memory and the documentation did not explain the problem, never the first step. `tools/development/upstream` searches a project's issues and reads its recent commits and releases; an issue search sends its words to GitHub, so it needs web search on (`pikkumies websearch on`, which only the user runs). Before an issue is filed upstream, the open and closed ones are searched first; an issue is public and cannot be taken back, so it is filed only when the user asked for it, otherwise the user gets the draft.
 
 ## pm-wiki
 
@@ -352,6 +363,8 @@ HostingByDesign's client-area knowledge base, where tickets are opened too.
 - scope: swizzin
 - verified: 2026-10-15
 - refresh: 7d
+- repo: https://github.com/swizzin/swizzin
+- issues: https://github.com/swizzin/swizzin/issues
 - status: on
 
 The swizzin documentation. swizzin is installed on the user's own server, so its documentation is the authority for how it works.
@@ -379,6 +392,9 @@ swizzin's discussion forum.
 - verified: 2026-10-15
 - refresh: 7d
 - prefix: /docs/
+- repo: https://github.com/Stonedestroyer/QuickBox
+- issues: https://quickbox.io/docs/support
+- tracker: other
 - status: on
 
 The QuickBox documentation, the /docs/ part of its sitemap.
@@ -405,6 +421,8 @@ How to get support for QuickBox.
 - scope: saltbox
 - verified: 2026-10-15
 - refresh: 7d
+- repo: https://github.com/saltyorg/Saltbox
+- issues: https://github.com/saltyorg/Saltbox/issues
 - status: on
 
 The Saltbox documentation.
@@ -430,6 +448,8 @@ How to get support for Saltbox.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/rakshasa/rtorrent
+- issues: https://github.com/rakshasa/rtorrent/issues
 - status: on
 
 The rTorrent project's own wiki on GitHub; the page list links to every page.
@@ -456,6 +476,8 @@ The rTorrent Handbook, written by the PyroScope project and the rTorrent communi
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/Novik/ruTorrent
+- issues: https://github.com/Novik/ruTorrent/issues
 - status: on
 
 The ruTorrent project's own wiki on GitHub (some pages also in French and Russian).
@@ -469,6 +491,8 @@ The ruTorrent project's own wiki on GitHub (some pages also in French and Russia
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/qbittorrent/qBittorrent
+- issues: https://github.com/qbittorrent/qBittorrent/issues
 - status: on
 
 The qBittorrent project's own wiki on GitHub.
@@ -483,6 +507,9 @@ The qBittorrent project's own wiki on GitHub.
 - verified: 2026-10-15
 - refresh: 30d
 - depth: 2
+- repo: https://git.deluge-torrent.org/deluge
+- issues: https://dev.deluge-torrent.org/
+- tracker: other
 - status: on
 
 The Deluge documentation (user guide and reference).
@@ -510,6 +537,8 @@ The Servarr wiki, shared by the *arr apps.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/morpheus65535/bazarr
+- issues: https://github.com/morpheus65535/bazarr/issues
 - status: on
 
 The Bazarr wiki.
@@ -523,6 +552,8 @@ The Bazarr wiki.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/autobrr/autobrr
+- issues: https://github.com/autobrr/autobrr/issues
 - status: on
 
 The autobrr documentation and release notes.
@@ -536,6 +567,8 @@ The autobrr documentation and release notes.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/Jackett/Jackett
+- issues: https://github.com/Jackett/Jackett/issues
 - status: on
 
 The Jackett project's wiki on GitHub.
@@ -550,6 +583,8 @@ The Jackett project's wiki on GitHub.
 - verified: 2026-10-15
 - refresh: 30d
 - prefix: /articles/
+- issues: https://forums.plex.tv/
+- tracker: forum
 - status: on
 
 Plex's support articles (the articles part of its sitemap index).
@@ -564,6 +599,8 @@ Plex's support articles (the articles part of its sitemap index).
 - verified: 2026-10-15
 - refresh: 30d
 - prefix: /docs/
+- repo: https://github.com/jellyfin/jellyfin
+- issues: https://github.com/jellyfin/jellyfin/issues
 - status: on
 
 The Jellyfin documentation, the /docs/ part of its sitemap.
@@ -578,6 +615,9 @@ The Jellyfin documentation, the /docs/ part of its sitemap.
 - verified: 2026-10-15
 - refresh: 30d
 - depth: 2
+- repo: https://github.com/MediaBrowser/Emby
+- issues: https://emby.media/community/
+- tracker: forum
 - status: on
 
 The Emby support articles.
@@ -591,6 +631,8 @@ The Emby support articles.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/rclone/rclone
+- issues: https://github.com/rclone/rclone/issues
 - status: on
 
 The rclone documentation.
@@ -604,6 +646,8 @@ The rclone documentation.
 - scope: all
 - verified: 2026-10-15
 - refresh: 30d
+- repo: https://github.com/restic/restic
+- issues: https://github.com/restic/restic/issues
 - status: on
 
 The restic documentation (stable release).
@@ -618,6 +662,8 @@ The restic documentation (stable release).
 - verified: 2026-10-15
 - refresh: 30d
 - depth: 2
+- repo: https://github.com/borgbackup/borg
+- issues: https://github.com/borgbackup/borg/issues
 - status: on
 
 The BorgBackup documentation (stable release; the master branch documents borg 2).
@@ -631,6 +677,8 @@ The BorgBackup documentation (stable release; the master branch documents borg 2
 - scope: pmss
 - verified: 2026-10-19
 - refresh: 30d
+- repo: https://github.com/linuxserver
+- issues: https://github.com/search?q=org%3Alinuxserver&type=issues
 - status: on
 
 The LinuxServer.io documentation. PMSS runs these images in each account's rootless Docker (its own docs/linuxserver.io.md); the PM wiki stays the official source for how that works here.
@@ -648,3 +696,329 @@ The LinuxServer.io documentation. PMSS runs these images in each account's rootl
 - status: on
 
 The SABnzbd user manual (usenet downloader; the PMSS media stack installs it).
+
+## pmss-readme
+
+- type: site
+- url: https://raw.githubusercontent.com/MagnaCapax/PMSS/main/README.md
+- trust: upstream
+- covers: PMSS, the seedbox software on this host: what it is, running it on your own server, installation, updates, upgrading Debian, where its documentation and decisions are
+- scope: pmss
+- verified: 2026-10-20
+- refresh: 7d
+- prefix: /MagnaCapax/PMSS/main/README.md
+- repo: https://github.com/MagnaCapax/PMSS
+- issues: https://github.com/MagnaCapax/PMSS/issues
+- status: on
+
+The README of PMSS, Pulsed Media's open source seedbox software, read from raw.githubusercontent.com (github.com's robots.txt disallows `/tree/`, [ADR-0027](../../docs/adr/0027-provider-and-app-documentation-scoped-to-the-detected-host.md)). Only the README is fetched (`prefix`): the PMSS `docs/` folder has no index page that links its documents yet. The Pulsed Media wiki stays the official source for how things work on Pulsed Media.
+
+## hermes-readme
+
+- type: site
+- url: https://raw.githubusercontent.com/NousResearch/hermes-agent/main/README.md
+- trust: upstream
+- covers: Hermes Agent, the agent framework Pikkumies runs on: installing it, troubleshooting the install, getting started, its command line and messaging commands, where its documentation is
+- scope: all
+- verified: 2026-10-20
+- refresh: 30d
+- prefix: /NousResearch/hermes-agent/main/README.md
+- repo: https://github.com/NousResearch/hermes-agent
+- issues: https://github.com/NousResearch/hermes-agent/issues
+- status: on
+
+The README of Hermes Agent (`HermesInstall::REPO`). Only the README is fetched (`prefix`), not its translations.
+
+## whisper-cpp-readme
+
+- type: site
+- url: https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/README.md
+- trust: upstream
+- covers: whisper.cpp, the speech-to-text engine the transcribe tool builds on this machine: building it, models, quantization, memory use, hardware acceleration options
+- scope: all
+- verified: 2026-10-20
+- refresh: 30d
+- prefix: /ggml-org/whisper.cpp/master/README.md
+- repo: https://github.com/ggml-org/whisper.cpp
+- issues: https://github.com/ggml-org/whisper.cpp/issues
+- status: on
+
+The whisper.cpp README, which is the project's documentation. Only the README is fetched (`prefix`).
+
+## rootlesskit-docs
+
+- type: site
+- url: https://raw.githubusercontent.com/rootless-containers/rootlesskit/master/README.md
+- trust: upstream
+- covers: RootlessKit, the user-namespace helper under rootless Docker: setup (subuid, sysctl, AppArmor), network and port forwarding drivers, mounts, its command line options
+- scope: all
+- verified: 2026-10-20
+- refresh: 30d
+- prefix: /rootless-containers/rootlesskit/master/docs/
+- repo: https://github.com/rootless-containers/rootlesskit
+- issues: https://github.com/rootless-containers/rootlesskit/issues
+- status: on
+
+The RootlessKit README and the documents it links in its `docs/` folder (network, port, mount, process, subid, API).
+
+## libtorrent
+
+- repo: https://github.com/rakshasa/libtorrent
+- issues: https://github.com/rakshasa/libtorrent/issues
+- docs: rtorrent-wiki
+- verified: 2026-10-20
+
+The library under rTorrent. It is not driven directly; the rtorrent tool reaches it through rTorrent.
+
+## transmission
+
+- repo: https://github.com/transmission/transmission
+- issues: https://github.com/transmission/transmission/issues
+- verified: 2026-10-20
+
+Transmission, a torrent client Pikkumies detects (`lib/Detect.php`) but no tool drives.
+
+## sonarr
+
+- repo: https://github.com/Sonarr/Sonarr
+- issues: https://github.com/Sonarr/Sonarr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Sonarr (tools/arr/sonarr). Its default branch is `develop`.
+
+## radarr
+
+- repo: https://github.com/Radarr/Radarr
+- issues: https://github.com/Radarr/Radarr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Radarr (tools/arr/radarr). Its default branch is `develop`.
+
+## lidarr
+
+- repo: https://github.com/Lidarr/Lidarr
+- issues: https://github.com/Lidarr/Lidarr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Lidarr (tools/arr/lidarr). Its default branch is `develop`.
+
+## prowlarr
+
+- repo: https://github.com/Prowlarr/Prowlarr
+- issues: https://github.com/Prowlarr/Prowlarr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Prowlarr (tools/arr/prowlarr). Its default branch is `develop`.
+
+## readarr
+
+- repo: https://github.com/Readarr/Readarr
+- issues: https://github.com/Readarr/Readarr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Readarr (tools/arr/readarr). The repository is archived: its issues can still be searched, but nothing new is filed or fixed there.
+
+## whisparr
+
+- repo: https://github.com/Whisparr/Whisparr
+- issues: https://github.com/Whisparr/Whisparr/issues
+- docs: servarr-wiki
+- verified: 2026-10-20
+
+Whisparr (tools/arr/whisparr). Its default branch is `v2-develop`.
+
+## docker
+
+- repo: https://github.com/moby/moby
+- issues: https://github.com/moby/moby/issues
+- verified: 2026-10-20
+
+Docker Engine (the Moby project): the daemon the containers tool talks to; on PMSS each account runs it rootless.
+
+## docker-cli
+
+- repo: https://github.com/docker/cli
+- issues: https://github.com/docker/cli/issues
+- verified: 2026-10-20
+
+The `docker` command, which the containers tool runs.
+
+## slirp4netns
+
+- repo: https://github.com/rootless-containers/slirp4netns
+- issues: https://github.com/rootless-containers/slirp4netns/issues
+- verified: 2026-10-20
+
+User-mode networking for network namespaces; the browse tool uses it to give the browser its own network. Its README is its documentation.
+
+## podman
+
+- repo: https://github.com/podman-container-tools/podman
+- issues: https://github.com/podman-container-tools/podman/issues
+- verified: 2026-10-20
+
+Podman: reported when present, not managed. github.com/containers/podman now leads here.
+
+## ffmpeg
+
+- repo: https://git.ffmpeg.org/ffmpeg.git
+- issues: https://code.ffmpeg.org/FFmpeg/FFmpeg/issues
+- tracker: other
+- verified: 2026-10-20
+
+FFmpeg (tools/media). Its tracker is a Forgejo site; the GitHub copy is a mirror with issues turned off.
+
+## cmake
+
+- repo: https://gitlab.kitware.com/cmake/cmake
+- issues: https://gitlab.kitware.com/cmake/cmake/-/issues
+- tracker: gitlab
+- verified: 2026-10-20
+
+CMake, which the transcribe tool uses to build whisper.cpp. The issue pages check for bots; GitLab's API answers without one. The GitHub copy is a mirror with issues turned off.
+
+## uv
+
+- repo: https://github.com/astral-sh/uv
+- issues: https://github.com/astral-sh/uv/issues
+- verified: 2026-10-20
+
+uv, which sets up Hermes' Python environment.
+
+## agent-browser
+
+- repo: https://github.com/vercel-labs/agent-browser
+- issues: https://github.com/vercel-labs/agent-browser/issues
+- verified: 2026-10-20
+
+The browser driver of the browse tool, pinned by the Hermes lock file.
+
+## chromium
+
+- repo: https://chromium.googlesource.com/chromium/src
+- issues: https://issues.chromium.org/issues
+- tracker: other
+- verified: 2026-10-20
+
+Chromium, the browser the browse tool drives. Its tracker is the Google Issue Tracker, which needs a real browser to read.
+
+## ddgs
+
+- repo: https://github.com/deedy5/ddgs
+- issues: https://github.com/deedy5/ddgs/issues
+- verified: 2026-10-20
+
+The keyless DuckDuckGo search package behind web search when it is on ([ADR-0082](../../docs/adr/0082-web-search-opt-in-keyless-ddgs.md)). Its README is its documentation.
+
+## pikkumies
+
+- repo: https://github.com/MagnaCapax/mcxPikkumies
+- issues: https://github.com/MagnaCapax/mcxPikkumies/issues
+- verified: 2026-10-20
+
+Pikkumies itself. Its documentation is on this machine (`docs/`, `pikkumies/`). Feedback for Pulsed Media goes through `/feedback`.
+
+## virsilipas
+
+- repo: https://github.com/MagnaCapax/mcxVirsilipas
+- issues: https://github.com/MagnaCapax/mcxVirsilipas/issues
+- verified: 2026-10-20
+
+Virsilipas, the Pulsed Media endpoint whose balance the credits tool reads.
+
+## php
+
+- repo: https://github.com/php/php-src
+- issues: https://github.com/php/php-src/issues
+- verified: 2026-10-20
+
+PHP, which every Pikkumies tool runs on.
+
+## iperf3
+
+- repo: https://github.com/esnet/iperf
+- issues: https://github.com/esnet/iperf/issues
+- verified: 2026-10-20
+
+iperf3, the network test the performance tool runs only on request.
+
+## fio
+
+- repo: https://github.com/axboe/fio
+- issues: https://github.com/axboe/fio/issues
+- verified: 2026-10-20
+
+fio, the disk benchmark of the performance tool.
+
+## mtr
+
+- repo: https://github.com/traviscross/mtr
+- issues: https://github.com/traviscross/mtr/issues
+- verified: 2026-10-20
+
+mtr, the route test of the performance tool.
+
+## gnupg
+
+- repo: https://github.com/gpg/gnupg
+- issues: https://dev.gnupg.org/
+- tracker: other
+- verified: 2026-10-20
+
+GnuPG, which encrypts the remote backup. The repository address is the read-only GitHub mirror (issues turned off); the project's own git server answered 429 over https. Its tracker now shows only a static ticket index.
+
+## pigz
+
+- repo: https://github.com/madler/pigz
+- issues: https://github.com/madler/pigz/issues
+- verified: 2026-10-20
+
+pigz, the parallel gzip of the remote backup.
+
+## openssh
+
+- repo: https://anongit.mindrot.org/openssh.git
+- issues: https://bugzilla.mindrot.org/
+- tracker: other
+- verified: 2026-10-20
+
+OpenSSH (portable), the transport of the remote backup. Its Bugzilla needs a login to search or read bugs.
+
+## tmux
+
+- repo: https://github.com/tmux/tmux
+- issues: https://github.com/tmux/tmux/issues
+- verified: 2026-10-20
+
+tmux, which holds the sessions PMSS restarts apps in and shows the credits line.
+
+## git
+
+- repo: https://git.kernel.org/pub/scm/git/git.git
+- issues: https://lore.kernel.org/git/
+- tracker: other
+- verified: 2026-10-20
+
+Git. It has no issue tracker: bugs go to its mailing list, archived at lore.kernel.org.
+
+## nginx
+
+- repo: https://github.com/nginx/nginx
+- issues: https://github.com/nginx/nginx/issues
+- verified: 2026-10-20
+
+nginx, which the system-status tool checks; Pikkumies does not drive it.
+
+## lighttpd
+
+- repo: https://git.lighttpd.net/lighttpd/lighttpd1.4.git
+- issues: https://redmine.lighttpd.net/projects/lighttpd/issues
+- tracker: other
+- verified: 2026-10-20
+
+lighttpd, which the system-status tool checks; Pikkumies does not drive it. Its Redmine tracker needs a real browser to read.

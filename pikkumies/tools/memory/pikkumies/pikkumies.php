@@ -18,9 +18,9 @@ require_once __DIR__ . '/Lessons.php';
 require_once __DIR__ . '/MemoryStats.php';
 require_once __DIR__ . '/MemoryLinks.php';
 
-const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions, the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing settles it, say what you searched and that it stays unknown; then save what you learn with `save`';
+const NEXT_STEP = 'nothing in tiers 1-3 (memory, this host\'s documentation, other providers\' documentation): tier 4 is deep research, the deep-research skill (subagents for wide questions; for a problem in an upstream app, its known issues and recent commits, `upstreams <name>` gives the repository; the web through a backend the user configured); for the provider\'s own policies give the support link in the notes; if nothing settles it, say what you searched and that it stays unknown; then save what you learn with `save`';
 const SAVE_NEXT = 'no lesson matched: when the task is done, save what you learned, or what you searched and why it did not settle it: ';
-const PEER_NEXT = 'only other providers\' documentation (tier 3) matched: it may not apply here, so check it on this machine; if it does not answer, tier 4 is deep research (the deep-research skill); for the provider\'s own policies give the support link in the notes; then save what you learn with `save`';
+const PEER_NEXT = 'only other providers\' documentation (tier 3) matched: it may not apply here, so check it on this machine; if it does not answer, tier 4 is deep research (the deep-research skill, which also checks an upstream app\'s known issues and recent commits); for the provider\'s own policies give the support link in the notes; then save what you learn with `save`';
 
 Cli::run($argv, [
     'search' => function ($args, $opt) {
@@ -127,6 +127,7 @@ Cli::run($argv, [
                 'url' => isset($src['url']) ? $src['url'] : '', 'origin' => $src['origin'], 'status' => isset($src['status']) ? $src['status'] : 'on',
                 'scope' => isset($src['scope']) ? $src['scope'] : 'all', 'in_scope' => DocSources::inScope($src, $host),
                 'covers' => isset($src['covers']) ? $src['covers'] : '', 'problems' => DocSources::problems($src),
+                'repo' => isset($src['repo']) ? $src['repo'] : '', 'issues' => isset($src['issues']) ? $src['issues'] : '',
                 'fetched_at' => isset($m['fetched']) ? (int) $m['fetched'] : null,
                 'age_s' => isset($m['fetched']) ? time() - (int) $m['fetched'] : null,
                 'pages' => isset($m['count']) ? (int) $m['count'] : 0,
@@ -135,4 +136,17 @@ Cli::run($argv, [
         }
         return ['records' => $out, 'status' => ['family' => isset($host['family']) ? $host['family'] : 'generic', 'stack' => isset($host['stack']) ? $host['stack'] : 'none']];
     },
-], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'tool', 'path', 'days']);
+    'upstreams' => function ($args, $opt) {
+        // The software projects behind the apps: repository, issue tracker, documentation source. Words filter by name or repository.
+        $out = [];
+        foreach (DocSources::upstreams() as $u) {
+            $hay = strtolower($u['name'] . ' ' . $u['repo']);
+            if (!$args || array_filter($args, function ($w) use ($hay) {
+                return strpos($hay, strtolower($w)) !== false;
+            })) {
+                $out[] = $u;
+            }
+        }
+        return ['records' => $out, 'status' => $out ? [] : ['note' => 'no upstream project matched; run upstreams without words for the whole list']];
+    },
+], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources|upstreams ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'tool', 'path', 'days']);

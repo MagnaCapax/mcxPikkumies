@@ -36,6 +36,10 @@ class DocSources
     /** What a source is, for the wiki and kb units (ADR-0037); the default comes from the type (KIND_BY_TYPE). */
     const KINDS = ['wiki', 'kb', 'manual', 'link'];
     const KIND_BY_TYPE = ['mediawiki' => 'wiki', 'kb-json' => 'kb', 'site' => 'manual', 'link' => 'link'];
+    /** What an upstream project's `issues` page is (`tracker:`); missing means github. */
+    const TRACKERS = ['github', 'gitlab', 'forum', 'other'];
+    /** Top-level names that are never a public project's host (`repo`, `issues`): local, private or reserved. */
+    const PRIVATE_TLDS = ['localhost', 'local', 'lan', 'internal', 'intranet', 'corp', 'home', 'home.arpa', 'arpa', 'test', 'invalid', 'onion'];
     const MAX_RESPONSE = 5242880;   // bytes per HTTP response
     const MAX_PAGE = 65536;         // bytes kept per page or article
     const MAX_REQUESTS = 40;        // per refresh of one source
@@ -72,10 +76,18 @@ class DocSources
         return [self::root() . '/config/documentationSources.md', self::root() . '/local/documentationSources.md'];
     }
 
-    /** `## name` sections that carry a `- type:` line; other sections are documentation. */
+    /** `## name` sections that carry a `- type:` line; other sections are documentation or upstream entries (upstreams()). */
     public static function parse($text)
     {
-        $sources = [];
+        return array_filter(self::sections($text), function ($src) {
+            return isset($src['type']);
+        });
+    }
+
+    /** Every `## name` section by name: its `- key: value` lines, the rest as `description`. */
+    public static function sections($text)
+    {
+        $out = [];
         $parts = preg_split('/^## +/m', (string) $text);
         array_shift($parts);
         foreach ($parts as $part) {
@@ -90,12 +102,120 @@ class DocSources
                     $desc[] = $line;
                 }
             }
-            if (isset($src['type'])) {
-                $src['description'] = trim(implode("\n", $desc));
-                $sources[$name] = $src;
+            $src['description'] = trim(implode("\n", $desc));
+            $out[$name] = $src;
+        }
+        return $out;
+    }
+
+    /**
+     * Upstream projects: every section, a source or not, with a `repo` or `issues` line, shipped then the overlay
+     * (a section with the same name replaces the shipped one). Each: name, repo, issues, tracker (empty without
+     * issues), docs (the source itself, or an entry's `docs` line), status, origin, description and problems.
+     */
+    public static function upstreams()
+    {
+        $all = [];
+        foreach (self::files() as $i => $file) {
+            if (is_file($file)) {
+                foreach (self::sections((string) file_get_contents($file)) as $name => $s) {
+                    $all[$name] = $s + ['origin' => $i === 0 ? 'shipped' : 'local'];
+                }
             }
         }
-        return $sources;
+        $out = [];
+        foreach ($all as $name => $s) {
+            if (!isset($s['repo']) && !isset($s['issues'])) {
+                continue;
+            }
+            $p = isset($s['type']) ? self::problems($s) : self::upstreamProblems($s);
+            if (!isset($s['type'])) {
+                $p = array_merge($p, self::entryProblems($s));
+                foreach (isset($s['docs']) && preg_match('/^[a-z0-9, -]+$/', $s['docs']) ? array_map('trim', explode(',', $s['docs'])) : [] as $d) {
+                    if (!isset($all[$d]['type'])) {
+                        $p[] = "docs names no source: $d";
+                    }
+                }
+            }
+            $get = function ($k) use ($s) {
+                return isset($s[$k]) ? $s[$k] : '';
+            };
+            $out[$name] = ['name' => $name, 'repo' => $get('repo'), 'issues' => $get('issues'),
+                'tracker' => isset($s['issues']) ? ($get('tracker') !== '' ? $get('tracker') : 'github') : '',
+                'docs' => isset($s['type']) ? $name : $get('docs'), 'status' => $get('status') !== '' ? $get('status') : 'on',
+                'origin' => $s['origin'], 'description' => $s['description'], 'problems' => $p];
+        }
+        return $out;
+    }
+
+    /** An upstream entry (a section without `type`): its name, status and verified date. */
+    private static function entryProblems(array $s)
+    {
+        $p = [];
+        if (!preg_match('/^[a-z0-9][a-z0-9-]*$/', $s['name'])) {
+            $p[] = 'name must be lowercase letters, digits and dashes';
+        }
+        if (!in_array(isset($s['status']) ? $s['status'] : 'on', ['on', 'off'], true)) {
+            $p[] = 'status must be on or off';
+        }
+        if (isset($s['verified']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $s['verified'])) {
+            $p[] = 'verified must be a date like 2026-10-15';
+        }
+        return $p;
+    }
+
+    /**
+     * What is wrong with a section's upstream lines: `repo` and `issues` are https addresses, `tracker` is one of
+     * TRACKERS (missing: github) and goes with `issues`, a github tracker's `issues` page is on github.com and any
+     * other's is not, and `docs` is a comma list of source names.
+     */
+    public static function upstreamProblems(array $src)
+    {
+        $p = [];
+        foreach (['repo', 'issues'] as $k) {
+            if (isset($src[$k]) && !self::isPublicAddress($src[$k])) {
+                $p[] = "$k must be an https:// address on a public host name (no IP address, port, user or password, local name)";
+            }
+        }
+        $tracker = isset($src['tracker']) ? $src['tracker'] : 'github';
+        if (!in_array($tracker, self::TRACKERS, true)) {
+            $p[] = 'tracker must be one of: ' . implode(', ', self::TRACKERS);
+        } elseif (isset($src['tracker']) && !isset($src['issues'])) {
+            $p[] = 'tracker goes with an issues line';
+        } elseif (isset($src['issues']) && ($tracker === 'github') !== (strtolower((string) parse_url($src['issues'], PHP_URL_HOST)) === 'github.com')) {
+            $p[] = $tracker === 'github' ? 'issues is not on github.com: add a tracker line (gitlab, forum or other)' : 'issues is on github.com: drop the tracker line';
+        }
+        if (isset($src['docs']) && !preg_match('/^[a-z0-9][a-z0-9-]*( *, *[a-z0-9][a-z0-9-]*)*$/', $src['docs'])) {
+            $p[] = 'docs must be a comma list of source names';
+        }
+        return $p;
+    }
+
+    /**
+     * True for an https address of a public project page: a dotted DNS name with a letters-only top-level name that is
+     * not local or reserved (PRIVATE_TLDS), no IP literal, no port, no user or password. A tool that fetches these
+     * still keeps its own list of hosts; this only keeps a typo or an internal address out of the list.
+     */
+    public static function isPublicAddress($url)
+    {
+        $url = (string) $url;
+        if (!preg_match('#^https://[^/\s?\#]+/\S*$#', $url)) {
+            return false;
+        }
+        $u = parse_url($url);
+        if (!is_array($u) || isset($u['user']) || isset($u['pass']) || isset($u['port']) || !isset($u['host'])) {
+            return false;
+        }
+        $host = strtolower($u['host']);
+        if (strlen($host) > 253 || !preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63})$/', $host, $m)) {
+            return false; // also every IPv4 and IPv6 literal: the last label must be letters, and [ ] are not allowed
+        }
+        foreach (self::PRIVATE_TLDS as $tld) {
+            if (substr($host, -strlen($tld) - 1) === '.' . $tld) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Shipped sources, then the overlay; a section with the same name replaces the shipped one. */
@@ -166,7 +286,7 @@ class DocSources
         if (isset($src['prefix']) && !preg_match('#^/\S*$#', $src['prefix'])) {
             $p[] = 'prefix must be a path starting with /';
         }
-        return $p;
+        return array_merge($p, self::upstreamProblems($src)); // repo, issues, tracker: a typo here is caught too
     }
 
     /** The source's kind: its `kind` line, or the default for its type (ADR-0037). */

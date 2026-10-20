@@ -21,6 +21,8 @@ Start here if you change this repository, by hand or with a coding agent.
 
 Each has its own `AGENTS.md`, decision records and docs. When your change touches another project, read its records first.
 
+When a bug is in an upstream project, check its issues and recent commits first (the upstream links in [config/documentationSources.md](../pikkumies/config/documentationSources.md)).
+
 | Repository | What it is | Docs | Decisions |
 |---|---|---|---|
 | [PMSS](https://github.com/MagnaCapax/PMSS) | Pulsed Media Seedbox Software, the platform Pikkumies ships on | [docs](https://github.com/MagnaCapax/PMSS/tree/main/docs) | [ADRs](https://github.com/MagnaCapax/PMSS/tree/main/docs/adr) |
