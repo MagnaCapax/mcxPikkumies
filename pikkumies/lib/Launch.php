@@ -95,7 +95,30 @@ class Launch
             && !in_array($argv[1], ['ask', 'ui', 'eternal'], true) && self::allFlags($rest))) {
             return [$argv[1], $rest];
         }
+        if (($tool = self::toolRunLine($argv[1])) !== '') {
+            return ['error', [$tool]];
+        }
         return ['run', self::promptArgs(array_slice($argv, 1))];
+    }
+
+    /**
+     * Inside an agent (PIKKUMIES_DEPTH 1 or more), `pikkumies <tool unit name> ...` almost always means the tool, and as a
+     * prompt it would start a whole second agent (seen in a test run, 2026-10-20). Returns the tool's run line, or
+     * '' (the user's own shell, a word that names no tool unit with a script). `pikkumies -- <words>` still asks an agent.
+     * ADR-0020 amendment 2026-10-20.
+     */
+    public static function toolRunLine($word)
+    {
+        if (NestedAgent::depth() < 1 || preg_match('/^[a-z0-9][a-z0-9-]*$/D', (string) $word) !== 1) {
+            return '';
+        }
+        foreach (Units::all() as $u) {
+            if ($u['name'] === $word && $u['script'] !== '') {
+                return "`$word` is a Pikkumies tool: run `php {$u['script']} <verb>`. `pikkumies <words>` starts a new agent;"
+                    . " to ask one anyway, use `pikkumies -- $word ...`.";
+            }
+        }
+        return '';
     }
 
     /** True when every word is a flag (starts with "-"); an empty list counts as all flags. */
