@@ -62,15 +62,17 @@ return [
         check(FeedbackPrompt::message(feedbackPromptSummary(true, true), '/' . str_repeat('d', 200) . "/$id.json", '/home/u') === null, 'a question that cannot fit was not refused');
         check(FeedbackPrompt::size(812) === '812 bytes' && FeedbackPrompt::size(48213) === '48.2 kB' && FeedbackPrompt::size(1499999) === '1.5 MB', 'size words');
     },
-    'feedback prompt: the guard asks with that question, and blocks the send with approvals off or at depth 2, giving the command' => function () {
+    'feedback prompt: the guard asks with that question, also under yolo, and blocks the send at depth 2 without handing it to the person' => function () {
         list($tree, $id, $d) = feedbackPromptHook([]);
         check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === "pikkumies-send:$id"
             && strpos($d['message'], 'Send to Pulsed Media at pikkumies.mcx.fi?') === 0 && HookUnits::approveShown($d["message"]), json_encode($d));
-        foreach ([['HERMES_YOLO_MODE' => '1'], ['HERMES_YOLO_MODE' => 'true'], ['HERMES_YOLO_MODE' => 'On'], ['PIKKUMIES_DEPTH' => '2']] as $env) {
-            list($tree, $id, $d) = feedbackPromptHook($env);
-            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'nobody would be asked') !== false
-                && strpos($d['message'], "php $tree/pikkumies/tools/system/feedback/feedback.php send $id") !== false, json_encode($env) . ' -> ' . json_encode($d));
+        foreach ([['HERMES_YOLO_MODE' => '1'], ['HERMES_YOLO_MODE' => 'true'], ['HERMES_YOLO_MODE' => 'On']] as $env) {
+            list(, , $d) = feedbackPromptHook($env);
+            check(is_array($d) && $d['action'] === 'approve', 'yolo (the default run mode) changed the send question: ' . json_encode($env) . ' -> ' . json_encode($d));
         }
+        list($tree, $id, $d) = feedbackPromptHook(['PIKKUMIES_DEPTH' => '2']);
+        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'It was not sent') !== false
+            && strpos($d['message'], "feedback.php send $id") === false, 'depth 2: ' . json_encode($d));
         list(, , $d) = feedbackPromptHook(['HERMES_YOLO_MODE' => '0', 'PIKKUMIES_DEPTH' => '1']);
         check(is_array($d) && $d['action'] === 'approve', "the user's own session (depth 1, yolo '0') was not asked: " . json_encode($d));
     },

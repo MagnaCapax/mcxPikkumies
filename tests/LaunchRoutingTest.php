@@ -194,4 +194,21 @@ return [
         check(Launch::route(['pikkumies', 'browse', 'the', 'web', 'for', 'cats']) === ['run', ['chat', '--query=browse the web for cats']], 'a prompt');
         check(Launch::route(['pikkumies', 'browse']) === ['run', ['chat', '--query=browse']], 'browse alone is a prompt too');
     },
+    'launch: --yolo is the default run mode for the person\'s own session, never added for an agent started by an agent' => function () {
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(preg_match("/\n    case 'run':(.*?)\n    case '/s", $bin, $m) === 1, 'could not isolate the run case');
+        $run = $m[1];
+        // The check sits after the depth export, so it reads the exported depth: 1 means the launcher ran in the person's own shell.
+        check(preg_match("/putenv\('PIKKUMIES_DEPTH=' \. NestedAgent::childDepth\(\)\);[^\n]*\n(\s*\/\/[^\n]*\n)*\s*if \(NestedAgent::depth\(\) === 1\) \{[^\n]*\n\s*putenv\('HERMES_YOLO_MODE=1'\);\s*\}/", $run) === 1,
+            'HERMES_YOLO_MODE=1 must follow the depth export and apply only when the exported depth is 1');
+        foreach (['' => true, '0' => true, '1' => false, '2' => false] as $raw => $own) {
+            check((NestedAgent::childDepth((string) $raw) === 1) === $own, "launcher at PIKKUMIES_DEPTH='$raw': exported depth 1 means the person's own shell");
+        }
+        $yolo = strpos($run, "putenv('HERMES_YOLO_MODE=1')");
+        $pass = strpos($run, '@passthru(escapeshellarg(hermesBin())');
+        $halt = strpos($run, 'exit(HaltRun::run(hermesBin(), $passArgs));');
+        check($yolo !== false && $pass !== false && $halt !== false && $yolo < $pass && $yolo < $halt, 'HERMES_YOLO_MODE must be set before Hermes starts, on both the plain and the one-shot path');
+        check(strpos($run, "putenv('HERMES_YOLO_MODE=1')") === strrpos($run, "putenv('HERMES_YOLO_MODE=1')"), 'set in one place only');
+        check(NestedAgent::approvalsOff('1') && !NestedAgent::approvalsOff(''), 'the flag Hermes reads is the one the launcher sets');
+    },
 ];

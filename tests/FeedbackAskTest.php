@@ -91,9 +91,6 @@ return [
             check(feedbackAskRun($tree, $sid, $p)[0] === '', "asked on platform '$p'");
         }
         check(feedbackAskRun($tree, $sid, 'cli', 4, ['PIKKUMIES_DEPTH' => '2'])[0] === '', 'asked at depth 2');
-        foreach (['1', 'true', 'YES', ' on '] as $yolo) {
-            check(feedbackAskRun($tree, $sid, 'cli', 4, ['HERMES_YOLO_MODE' => $yolo])[0] === '', "asked with HERMES_YOLO_MODE=$yolo");
-        }
         check(feedbackAskRun($tree, $sid, 'cli', 3)[0] === '', 'asked after 3 user messages');
         check(feedbackAskRun($tree, feedbackAskSession(false))[0] === '', 'an unsampled session was asked');
         check(feedbackAskRun($tree, 'bad id!')[0] === '', 'a session id that is not 1-128 safe characters was asked');

@@ -276,10 +276,11 @@ return [
             && strpos($m, 'files: rt.log (5 bytes)') && strpos($m, "~/pikkumies/local/state/ticket/$id.json") && HookUnits::approveShown($m)
             && strpos($m, "\n") === false && strpos($m, 'Text: "Web UI 502 | It says \\"bad gateway\\". Since Monday."') !== false, $m);
         check(AskPolicy::route(['action' => 'approve', 'unit' => 'guard/ticket-send', 'message' => $m]) === 'confirm', 'the ticket send does not need the user\'s own yes');
-        foreach ([['HERMES_YOLO_MODE' => '1'], ['PIKKUMIES_DEPTH' => '2']] as $env) {
-            $d = ticketHook($tree, 'terminal', ['command' => "php $tool send $id"], $env);
-            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], "run it themselves in their own terminal: php $tool send $id") !== false, json_encode($env) . ' -> ' . json_encode($d));
-        }
+        $d = ticketHook($tree, 'terminal', ['command' => "php $tool send $id"], ['PIKKUMIES_DEPTH' => '2']);
+        check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'It was not sent') !== false && strpos($d['message'], 'run it themselves') === false
+            && strpos($d['message'], "php $tool send") === false, 'depth 2: ' . json_encode($d));
+        $d = ticketHook($tree, 'terminal', ['command' => "php $tool send $id"], ['HERMES_YOLO_MODE' => '1']);
+        check(is_array($d) && $d['action'] === 'approve', 'yolo (the default run mode) blocked the send instead of leaving it to the review: ' . json_encode($d));
         $blocked = [
             ['terminal', ['command' => "php $tool send $id && rm -f x"]],
             ['terminal', ['command' => "php /tmp/other/tools/system/ticket/ticket.php send $id"]],

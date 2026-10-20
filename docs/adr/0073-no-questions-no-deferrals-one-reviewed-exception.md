@@ -85,3 +85,15 @@ What was found (Hermes v0.22.2):
 - `NestedAgent::approvalsOff()` still reads only `HERMES_YOLO_MODE`: under `--yolo` the feedback send keeps its stricter refusal (ADR-0056). Reading the pinned mode there too would refuse every send in every session.
 - Tests: `tests/ApprovalsOffTest.php`; the orchestrator, merge, notes, local-hook and guard tests now expect the block or the run.
 - Not verified live: the pins against a running Hermes, how a real light model answers R1 for a plain yes after a named action, and that agents follow `BLOCK_CONFIRM` and `BLOCK_UNCHECKED`. A question-suite run should include an unrequested delete (one line, then it runs after "yes"), the same in a messaging session (the command is given), and a feedback send with and without the user's yes.
+
+## Amendment 2026-10-20: --yolo is the default run mode
+
+**Context.** The operator, 2026-10-20: "I noticed --yolo potentially still isnt' the dewfault run mode, it should be the default run mode". The pinned `approvals.mode: "off"` already bypasses every gate `--yolo` bypasses (Hermes `tools/approval.py`: the bypass check reads `--yolo`, the session `/yolo` and `approvals.mode == "off"` alike), but the flag itself was never set, so a session neither ran nor showed as yolo. Two Pikkumies units still read `--yolo` as "nobody to ask": the send guard refused a feedback or ticket send under it and handed the command to the person, and the opt-in feedback question stayed silent.
+
+**Decision.**
+- `bin/pikkumies` sets `HERMES_YOLO_MODE=1` (what `--yolo` sets before Hermes loads) for the person's own session, at depth 0, on the plain and the one-shot path. It is not added for an agent started by an agent; that agent stays guarded as before (NestedAgent: no new yolo, questions become blocks).
+- `lib/SendGuard.php`: `--yolo` no longer blocks a send; the review decides, as for any send. At depth 2 or more the send is not run, and the message no longer hands the command to the person.
+- `FeedbackAsk`: the opt-in question no longer goes silent under `--yolo`.
+- `NestedAgent::approvalsOff()` stays as a reader of the flag; no unit treats it as a reason to hand work back.
+
+**Consequences.** Hermes shows the session as yolo, which matches what it does. There is no setting to turn it off: the approvals bypass is the pinned `approvals.mode`, and the flag adds nothing a person could switch back on. Tests: `tests/LaunchRoutingTest.php` (the launcher contract), and the feedback, ticket and bundle send tests.

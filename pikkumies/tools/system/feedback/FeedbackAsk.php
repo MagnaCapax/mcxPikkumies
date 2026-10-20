@@ -49,9 +49,10 @@ class FeedbackAsk
         $session = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
         $extra = isset($payload['extra']) && is_array($payload['extra']) ? $payload['extra'] : [];
         $platform = isset($extra['platform']) && is_string($extra['platform']) ? $extra['platform'] : '';
-        // Approvals off, or an agent started by an agent: no person answers the send's prompt there, so no question either.
+        // An agent started by an agent: no person reads the question there. --yolo, the default run mode, is not a reason to
+        // stay silent: the person opted in to the question (feedback.ask).
         if (!preg_match(self::SESSION_RE, $session) || !in_array($platform, self::PLATFORMS, true)
-            || NestedAgent::depth() > 1 || NestedAgent::approvalsOff()) {
+            || NestedAgent::depth() > 1) {
             return false;
         }
         $users = 0;

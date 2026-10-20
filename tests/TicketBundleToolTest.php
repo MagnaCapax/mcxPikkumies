@@ -295,7 +295,7 @@ return [
             $a = bundleHook($tree, "php $tool send $user");
             check(is_array($a) && $a['action'] === 'approve' && $a['rule_key'] === "pikkumies-send:$user" && strpos($a['message'], '3 diagnostic files (system and logs, diagnosis, transcript)') !== false, json_encode($a));
             $a = bundleHook($tree, "php $tool send $user", ['HERMES_YOLO_MODE' => '1']);
-            check(is_array($a) && $a['action'] === 'block', 'yolo did not block a user bundle: ' . json_encode($a));
+            check(is_array($a) && $a['action'] === 'approve' && $a['rule_key'] === "pikkumies-send:$user", 'yolo (the default run mode) changed the question for a user bundle: ' . json_encode($a));
             // Collected system-wide (auto off, root), then auto turned on: still asked.
             file_put_contents("$tree/pikkumies/local/config.php", str_replace("'auto' => true", "'auto' => false", (string) file_get_contents("$tree/pikkumies/local/config.php")));
             $a = bundleHook($tree, "php $tool send $agent");

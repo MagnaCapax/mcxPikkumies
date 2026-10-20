@@ -5,8 +5,8 @@
  * `php <this Pikkumies' tool> send <id>`, alone, the path absolute (or ~/) and canonical, gets an approve whose message
  * the unit builds from the draft file itself; the orchestrator's ask policy never passes it on to Hermes: the call is
  * blocked until the review finds the user's own yes in the chat, and blocked outright where no yes can be checked
- * (ADR-0073). Under --yolo (HERMES_YOLO_MODE) or at depth 2 or more it is blocked here and the person runs it in their
- * own terminal (ADR-0056 amendment 2026-10-19). One exception, for /ticket only (ADR-0100): a plain send that the unit's
+ * (ADR-0073). Under --yolo, the default run mode, the same review decides. At depth 2 or more (an agent started by an
+ * agent) it is blocked here: that agent's "user" messages are agent-written, so no request can be checked. One exception, for /ticket only (ADR-0100): a plain send that the unit's
  * $alone check accepts (a ticket the agent bundled, with ticket.auto on) runs without a question, before that block.
  * Blocked: a path to the tool followed by `send`, the sender's class names
  * with the word send, and a path to the tool with shell expansion and the word send, in a terminal command, code,
@@ -102,7 +102,6 @@ class SendGuard
             return $block("run the $word send on its own, exactly $plain, with nothing before or after it.");
         }
         $id = $m[2];
-        $yourself = "Tell the user to run it themselves in their own terminal: php $own send $id";
         require_once __DIR__ . '/Config.php';
         require_once __DIR__ . '/Cli.php';
         require_once __DIR__ . '/HookUnits.php';
@@ -116,11 +115,11 @@ class SendGuard
                 return $block($e->getMessage() . '; ' . $e->hint . '.');
             }
         }
-        // Approvals off (--yolo) or an agent started by an agent: nobody would be asked, so the person runs it in their own
-        // terminal instead (ADR-0056 amendment 2026-10-19, an exception to ADR-0020's yolo rule).
+        // An agent started by an agent: its "user" messages are written by that agent, so the person's own request cannot be
+        // checked here and the send is not run. --yolo (the default run mode) is no reason to block: the review decides.
         require_once __DIR__ . '/NestedAgent.php';
-        if (NestedAgent::approvalsOff() || NestedAgent::unattended()) {
-            return $block("approvals are off in this session, or this agent was started by another agent, so nobody would be asked before this $word leaves the machine. $yourself");
+        if (NestedAgent::unattended()) {
+            return $block("this agent was started by another agent, so the person's own request for this $word cannot be checked here. It was not sent; finish the rest and say in one line that it was skipped.");
         }
         try {
             $message = $question($id);

@@ -587,6 +587,12 @@ switch ($cmd) {
             putenv($envValue === null ? $envName : "$envName=$envValue");
         }
         putenv('PIKKUMIES_DEPTH=' . NestedAgent::childDepth()); // what the agent starts sees it was started by one (ADR-0020)
+        // --yolo is the default run mode (operator 2026-10-20, ADR-0073 amendment): the person's own session starts with
+        // HERMES_YOLO_MODE=1, what --yolo sets before Hermes loads. Hermes already approves everything under the pinned
+        // approvals.mode "off"; this makes the session run, and show, as yolo. Not added for an agent started by an agent.
+        if (NestedAgent::depth() === 1) { // the depth just exported: 1 means this launcher runs in the person's own shell
+            putenv('HERMES_YOLO_MODE=1');
+        }
         require_once dirname(__DIR__) . '/tools/system/browse/browse.inc.php';
         foreach (BrowseCheck::hermesEnv() as $envName => $envValue) { // the isolated browser on Hermes' PATH, only when every check passes (ADR-0077)
             putenv("$envName=$envValue");
