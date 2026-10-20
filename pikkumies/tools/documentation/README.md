@@ -7,6 +7,8 @@ The documentation Pikkumies downloads from the sources in `pikkumies/config/docu
 
 Both search only the downloaded copies on this machine; search words never leave it. A source's `kind` line says which tool it belongs to; without one, a MediaWiki source is a wiki, a knowledge-base export is a kb, and a documentation site is a manual (searched by the memory tool only).
 
+`report` is the one unit here that is not a documentation source: it writes documents (PDF reports) instead of searching them, so it has its own verbs and is exempt from the shared verbs below ([ADR-0091](../../../docs/adr/0091-pdf-reports.md)).
+
 The memory search (`tools/memory/pikkumies`) is still the first step on every task: it covers the lessons and every source together, in tiers ([ADR-0031](../../../docs/adr/0031-search-tiers.md)). Use these tools when you want the wiki or the knowledge base itself: more hits from one place, or the list of every page. The memory tool keeps `refresh` and `sources` for all documentation.
 
 ## Verbs (the same in every unit)
