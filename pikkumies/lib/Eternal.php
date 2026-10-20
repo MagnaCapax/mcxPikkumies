@@ -68,7 +68,9 @@ class Eternal
             return 'not-ready';
         }
         fclose($runtimeLock);
-        if (HermesInstall::checkBeforeStart()) {
+        // The start check runs Hermes, so it needs Pikkumies' Hermes home and pinned layer like every other caller;
+        // without them a never-started account fails it and Primary waits forever.
+        if (HermesInstall::checkBeforeStart(array_merge(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], HermesConfig::envArgv()))) {
             return 'not-ready';
         }
         return '';

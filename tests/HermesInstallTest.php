@@ -49,6 +49,8 @@ if (isset($argv[2]) && $argv[1] === "hooks" && $argv[2] === "test") {
     $i = array_search("--payload-file", $argv, true);
     file_put_contents(getenv("PK_FAKE_LOG"), "payload " . ($i !== false ? file_get_contents($argv[$i + 1]) : "none") . "\n", FILE_APPEND);
     $o = getenv("PK_FAKE_HOOK_OUT");
+    // PK_FAKE_REQUIRE_MANAGED: like the real one, no Pikkumies hooks without the managed layer in the environment.
+    if (getenv("PK_FAKE_REQUIRE_MANAGED") && (string) getenv("HERMES_MANAGED_DIR") === "") { $o = "      parsed: <none>\n"; }
     echo $o !== false && $o !== "" ? $o : "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies safety: filesystem format. Refused outright, not asked.\"}\n";
 }
 // `config set` of a pinned key: what Hermes prints when it refuses one, or the text in PK_FAKE_SET_OUT (exit 0).
@@ -516,6 +518,27 @@ return [
         } finally {
             HermesInstall::$root = null;
             testRmTree($t);
+        }
+    },
+    'hermes start check: Eternals readiness checks Hermes with Pikkumies\' Hermes environment, so a never-started account passes' => function () {
+        $w = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w) {
+                HermesInstall::ensure();
+                hermesTWaitReady($w);
+                $argv = HermesConfig::envArgv();
+                check($argv[0] === 'env' && array_slice($argv, 1, 2) === ['-u', 'HERMES_RUNTIME_DIR'], 'unsets come first, as env(1) requires: ' . json_encode($argv));
+                check(in_array('HERMES_MANAGED_DIR=' . HermesConfig::managedDir(HermesConfig::home()), $argv, true), 'the managed layer is passed');
+                testWithEnv(['PK_FAKE_REQUIRE_MANAGED' => '1', 'HERMES_MANAGED_DIR' => null, 'HERMES_HOME' => null], function () {
+                    check(HermesInstall::checkBeforeStart() !== [], 'without the environment the guard check must fail (the bug)');
+                    check(HermesInstall::checkBeforeStart(HermesConfig::envArgv()) === [], 'with envArgv() the check passes: ' . json_encode(HermesInstall::checkBeforeStart(HermesConfig::envArgv())));
+                    check(getenv('HERMES_MANAGED_DIR') === false, 'the caller environment is left alone');
+                });
+                $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/Eternal.php');
+                check(preg_match('/checkBeforeStart\([^;]*HermesConfig::envArgv\(\)/', $src) === 1, 'Eternal::ready() must pass HermesConfig::envArgv() to the start check');
+            });
+        } finally {
+            testRmTree($w['t']);
         }
     },
     'hermes start check: the shipped delete guard answers the rm -rf check with the block text verify() expects' => function () {

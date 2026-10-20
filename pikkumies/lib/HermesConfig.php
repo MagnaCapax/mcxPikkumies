@@ -49,6 +49,22 @@ class HermesConfig
         return ['HERMES_HOME' => $home, 'HERMES_MANAGED_DIR' => self::managedDir($home), 'HERMES_GATEWAY_LOCK_DIR' => $home . '/gateway-locks', 'HERMES_RUNTIME_DIR' => null];
     }
 
+    /** env() as an `env` argv prefix (unsets first, as env(1) requires), for one child; the caller's own environment is untouched. */
+    public static function envArgv($home = null)
+    {
+        $unset = [];
+        $set = [];
+        foreach (self::env($home) as $name => $value) {
+            if ($value === null) {
+                $unset[] = '-u';
+                $unset[] = $name;
+            } else {
+                $set[] = $name . '=' . $value;
+            }
+        }
+        return array_merge(['env'], $unset, $set);
+    }
+
     public static function write(array $config, array $profile)
     {
         $home = self::home();
