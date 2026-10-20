@@ -101,3 +101,6 @@ The first addendum above had a session with no runtime start the build and exit,
 - Ctrl-C ends only the wait: the build runs on under `nohup`, and the next `pikkumies` waits for it again.
 - Not changed: a build the daily update started keeps its idle priority, so a first session that finds one running waits for that build, which can be slower on a busy disk. Not measured.
 - Tests: `tests/HermesWaitTest.php`, `tests/HermesInstallTest.php`.
+
+## Amendment 2026-10-19: Eternal update hold
+`pikkumies run update` takes the shared Eternal lifecycle lock and terminates managed Eternal windows before changing the Hermes tree. The records remain so cron supervision can resume them. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).

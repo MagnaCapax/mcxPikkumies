@@ -73,3 +73,11 @@ PIKKUMIES_CONFIG=~/pikkumies/local/run.php pikkumies doctor
 `pikkumies doctor` names the overlay file when one is in use, and says so when the variable is set but the file is not used. The file is loaded as PHP, so it is used only when it belongs to your account and nobody else can write it; keep it in your own home, not in a shared directory such as `/tmp`. Running `pikkumies` itself with an overlay also writes the forced settings into the generated agent configuration, where they stay until the next start without it. The overlay is plain configuration: anything it can set, `local/config.php` can set too. Use it when automation would guess wrong (the model list's first entry, the detected host family) and in the question suite under `tests/testing/`.
 
 [Back to the README](../README.md)
+
+## Eternal windows
+
+On a host enabled for Eternals, the per-minute cron tick restores the `pikkumies` tmux session. Its first window, `pm1`, is Primary. `pikkumies tmux [1-9]` opens the chosen named window. `pikkumies eternal new` adds the next window, up to `pm9`, without sending it a question. `pikkumies eternal quit pmN` closes a window. `pikkumies eternal off` stops its windows and keeps their records; `on` allows them to resume. `pikkumies eternal list --json` gives each record's state. `pikkumies eternal hold --until <Unix timestamp>` pauses source-side restoration for a transfer. Turning off `cron-tick` with `cron.disabled` also stops Pikkumies windows restarting.
+
+`pikkumies ask` takes a question of up to 4000 characters from stdin and sends it to Primary only at its empty input prompt. It exits 0 when sent, 2 before setup, 3 during an approval prompt or with visible unsent input, 4 when rate capped, 5 while Primary is starting, 6 while Primary is busy or its idle state is unknown, or 1 on other errors. It does not print or log the question. For one-shot remote work, use `pikkumies run chat --query-file -` instead ([ADR-0051](adr/0051-claude-code-remote-skill.md)).
+
+`pikkumies ui start` starts the platform-installed UI server in the account's user slice. Each process has its own data, log and tmux PID files under `local/ui/`. The platform launcher calls it after login; the cron tick does not.

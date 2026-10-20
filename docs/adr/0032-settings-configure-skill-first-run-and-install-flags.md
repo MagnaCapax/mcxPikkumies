@@ -56,3 +56,6 @@ The newer ruling in [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-excep
 - Kept: the terms question at the first interactive session (the agent cannot accept the terms for the person), and the one-time feedback question ([ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md) amendment 2026-10-19). The closing line after the terms is now a statement of what the agent does, not an invitation to configure it.
 - A preinstalled PMSS account runs `pikkumies install` without flags and without a terminal, so it was never asked; it needs no change. A person who runs the PMSS skeleton installer on a terminal is no longer asked either.
 - Tests: `tests/LaunchTest.php` (no name question at install or the first session, the closing line).
+
+## Amendment 2026-10-19: named tmux windows
+`pikkumies tmux [N]` keeps its default `pm1` and attach behavior. A newly created named window starts the Eternal invocation and records its resume pointer under `local/`. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).

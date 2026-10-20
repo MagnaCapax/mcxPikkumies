@@ -50,3 +50,6 @@ For PATH:
 [ADR-0020](0020-deletes-need-the-users-approval.md) (amendment 2026-10-18): started from inside an agent (`PIKKUMIES_DEPTH` 1 or more), `pikkumies run` refuses the Hermes flags and commands that turn approvals, hooks or rules off or pick another config; for the user it stays the full passthrough.
 
 [ADR-0059](0059-settings-tiers-free-asked-and-the-persons-own.md) (2026-10-18): `pikkumies configure undo`, exactly those words, is a subcommand (the person's own: it shows the last settings change and asks before setting it back, without a session); `pikkumies configure` followed by any other words stays a prompt.
+
+## Amendment 2026-10-19: Eternal resident invocation
+`pikkumies run --eternal pmN` is the resident process of an Eternal tmux window. It takes the same launcher gates and session path as a normal `pikkumies --resume <id>` start. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).
