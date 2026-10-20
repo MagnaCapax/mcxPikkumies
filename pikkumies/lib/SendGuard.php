@@ -10,9 +10,10 @@
  * $alone check accepts (a ticket the agent bundled, with ticket.auto on) runs without a question, before that block.
  * Blocked: a path to the tool followed by `send`, the sender's class names
  * with the word send, and a path to the tool with shell expansion and the word send, in a terminal command, code,
- * process input, a file written or patched, or a scheduled job. A safety prompt that catches the agent's own and casual
- * sends, not a security boundary: an agent steered by text it reads can still run the sender some other way, as it
- * could run curl (AGENTS.md). Fails closed: an unreadable payload or a regex engine error is a block, never an allow.
+ * process input, a file written or patched, or a scheduled job, and whatever else the unit names in $also. A safety
+ * prompt that catches the agent's own and casual sends, not a security boundary: an agent steered by text it reads can
+ * still run the sender some other way, as it could run curl (AGENTS.md). Fails closed: an unreadable payload or a regex
+ * engine error is a block, never an allow.
  */
 class SendGuard
 {
@@ -25,12 +26,13 @@ class SendGuard
      * $word: the unit's name in its paths and class names ('feedback'); $script: the tool under the pikkumies directory;
      * $question: callable($id) -> the approve message, or null when it cannot be shown in full; throws CliError for a
      * draft that is missing, changed or already sent. Loaded only for a send, so every other call costs nothing.
+     * $also: regex => why, more text the unit blocks in the same places (guard/feedback-send: the exit rating, ADR-0097).
      * $alone: optional callable($id) -> true when this plain send goes out without a question (an automatic ticket the
      * person's setting allows, ADR-0100); it throws CliError to block. Only /ticket passes one.
      */
-    public static function main($word, $script, callable $question, callable $alone = null)
+    public static function main($word, $script, callable $question, array $also = [], callable $alone = null)
     {
-        $d = self::decide((string) stream_get_contents(STDIN), $word, $script, $question, $alone);
+        $d = self::decide((string) stream_get_contents(STDIN), $word, $script, $question, $also, $alone);
         if ($d !== null) {
             echo json_encode($d, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
         }
@@ -38,7 +40,7 @@ class SendGuard
     }
 
     /** The answer to one payload (see main), or null for no opinion. */
-    public static function decide($stdin, $word, $script, callable $question, callable $alone = null)
+    public static function decide($stdin, $word, $script, callable $question, array $also = [], callable $alone = null)
     {
         $block = function ($why) {
             return ['action' => 'block', 'message' => "Pikkumies safety: $why Not run."];
@@ -82,8 +84,17 @@ class SendGuard
             $verb = $hit('/' . $ref . '\S+\s+[\[("\',]*(?:' . $sendWord . '|[^\s]*[$`])/i'); // the word after the tool path
             $classes = $hit('/' . $w . '(?:send|draft)/i') && $hit('/' . $sendWord . '/i');
             $expansion = $hit('/' . $ref . '/i') && $hit('/[*?\[$`]/') && $hit('/' . $sendWord . '/i');
+            $named = null;
+            foreach ($also as $re => $why) {
+                if ($hit($re) && $named === null) {
+                    $named = $why;
+                }
+            }
             if ($error) {
                 return $block('a command too long or complex to check.');
+            }
+            if ($named !== null) {
+                return $block($named);
             }
             if ($verb || $classes || $expansion) {
                 return $block("a $word send runs only as the plain command $plain in the terminal, on its own. A $word path next to shell "

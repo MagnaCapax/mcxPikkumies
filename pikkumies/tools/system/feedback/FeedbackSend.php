@@ -93,8 +93,11 @@ class FeedbackSend
         return $key;
     }
 
-    /** Seals the draft to Pulsed Media's public key and posts it. @return array the server's receipt (id, received_at) */
-    public static function send($json, $key, $publicKeyFile, $endpoint = self::ENDPOINT)
+    /**
+     * Seals the payload to Pulsed Media's public key and posts it, within $timeout seconds (the exit rating gives it 5, so
+     * closing Pikkumies never hangs). @return array the server's receipt (id, received_at)
+     */
+    public static function send($json, $key, $publicKeyFile, $endpoint = self::ENDPOINT, $timeout = 60)
     {
         if (!function_exists('sodium_crypto_box_seal')) {
             throw new CliError('this PHP has no sodium extension, which feedback needs to lock the message',
@@ -106,7 +109,7 @@ class FeedbackSend
             throw new CliError('the Pulsed Media feedback key in this Pikkumies is missing or damaged', 'run pikkumies update; your draft is kept');
         }
         $sealed = sodium_crypto_box_seal($json, $pub);
-        $r = Http::request('POST', $endpoint, ['body' => $sealed, 'timeout' => 60, 'max' => 65536,
+        $r = Http::request('POST', $endpoint, ['body' => $sealed, 'timeout' => (int) $timeout, 'max' => 65536,
             'headers' => ['Authorization: Bearer ' . $key, 'Content-Type: application/octet-stream']]);
         $answer = json_decode($r['body'], true);
         if ($r['code'] === 201 && is_array($answer) && isset($answer['id']) && is_string($answer['id'])) {

@@ -48,7 +48,7 @@ return [
         try {
             $d = cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask on')]);
             check(is_array($d) && $d['action'] === 'approve' && $d['rule_key'] === cfgHookKey('feedback.ask', false, true)
-                && strpos($d['message'], 'the question itself sends nothing') !== false && HookUnits::approveShown($d['message']), json_encode($d));
+                && strpos($d['message'], 'a rating is sent only when you press its number') !== false && HookUnits::approveShown($d['message']), json_encode($d));
             check(cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask on')], '2')['action'] === 'block', 'an agent started by an agent turned it on');
             file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['feedback' => ['ask' => true]], true) . ";\n");
             check(cfgHook($tree, 'terminal', ['command' => cfgHookCmd($tree, 'set feedback.ask off')]) === null, 'turning it off must need no question');

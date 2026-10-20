@@ -23,7 +23,7 @@ class ConfigureSettings
         'searchFirst.disabled' => 'Turns off the first-turn search of the docs and lessons and its gate.',
         'halt.disabled' => 'Turns off the halt guard, which keeps a one-shot run going until the task is done.',
         'lowBalance.disabled' => 'Turns off the once-per-session low-credits notice.',
-        'feedback.ask' => 'Lets Pikkumies now and then ask, in a session, whether you want to send Pulsed Media feedback. Off unless you turn it on; the question itself sends nothing.',
+        'feedback.ask' => 'Lets Pikkumies now and then ask, in a session or when it closes, how it is doing or whether you want to send Pulsed Media feedback. Off unless you turn it on; asking sends nothing, and a rating is sent only when you press its number.',
         'fileopsCheck.disabled' => 'Turns off the re-check of bulk chmod, chown and mv.',
         'memoryCheck.disabled' => 'Turns off the once-a-session memory check before a tool is used.',
         'hooks.reword' => 'Lets the model turn a question with no local hit into search terms, once.',

@@ -19,7 +19,7 @@ SendGuard::main('ticket', 'tools/system/ticket/ticket.php', function ($id) {
     require_once dirname(__DIR__, 3) . '/tools/system/ticket/TicketPrompt.php';
     list(, $p) = TicketDraft::load($id);
     return TicketPrompt::message(TicketDraft::summary($p, strlen(TicketDraft::body($p))), TicketDraft::path($id), getenv('HOME'));
-}, function ($id) {
+}, [], function ($id) {
     require_once dirname(__DIR__, 3) . '/lib/Redact.php';
     require_once dirname(__DIR__, 3) . '/tools/system/ticket/TicketDraft.php';
     require_once dirname(__DIR__, 3) . '/tools/system/ticket/TicketAuto.php';

@@ -76,7 +76,7 @@ class ConfigureTiers
         'hooks.model' => 'changes the model the hooks\' judges and the goal review use; one that does not answer them well silently turns those off',
         'tools.disabled' => 'turns off whole tool categories',
         'lowBalance.disabled' => 'hides the low-credits notice',
-        'feedback.ask' => ['lets Pikkumies now and then ask, in a session, whether you want to send Pulsed Media feedback; the question itself sends nothing', null],
+        'feedback.ask' => ['lets Pikkumies now and then ask about feedback after a long session; asking sends nothing, a rating is sent only when you press its number', null],
         'cron.disabled' => ['stops the per-minute ticker, so the scheduled jobs you set up in Hermes stop running until it is turned back on',
             'lets Hermes\' scheduled jobs run unattended, every minute, from your crontab'],
         'hooks.reword' => [null, 'stops the model turning a question with no local hit into search terms, so such a question is searched with the words as typed'],

@@ -661,6 +661,12 @@ switch ($cmd) {
         if ($eternalId !== '') {
             fclose($hermesLock);
             Eternal::afterExit($eternalId, $code, $eternalStarted, $eternalSignalled);
+        } else {
+            // Hermes has exited: now and then, when the person turned feedback.ask on, the one-line session rating on the
+            // terminal, which no model can answer (ADR-0097). Never in an Eternal window: an unattended resident pane must
+            // not wait on a prompt. A no-op otherwise; it never changes the exit code.
+            require_once dirname(__DIR__) . '/tools/system/feedback/FeedbackSurvey.php';
+            FeedbackSurvey::atExit($passArgs);
         }
         exit($code);
 
