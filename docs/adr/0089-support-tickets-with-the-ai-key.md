@@ -1,0 +1,47 @@
+# ADR-0089: /ticket, a Pulsed Media support ticket opened with the AI key
+
+## Metadata
+- Author: Aleksi Ursin / MCX (with Väinämöinen)
+- Date: 2026-10-20
+- Status: Accepted. Adds the tool unit `tools/system/ticket/` and the hook unit `guard/ticket-send`; moves the draft store and the send check that `/feedback` had on its own into `lib/DraftStore.php` and `lib/SendGuard.php`, unchanged in behaviour; amends AGENTS.md's privacy rule and [ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md)'s "the one thing".
+
+## Context
+The operator's request of 2026-10-20, as passed to this change: tickets from Pikkumies through the AI key; security is paramount; nothing leaves the machine unless the user asked.
+
+Facts this rests on:
+- Pulsed Media's billing integration now takes one new support ticket per request from a client holding a Pulsed Media AI key (the credit service's `docs/SUPPORT-TICKETS.md`): `POST https://pulsedmedia.com/remote/ticket.php`, JSON `{email, subject, message, priority?, service?, attachments?}`, `Authorization: Bearer vsk-...`. The email is a second factor: the account's own address, or a user of the account who may open tickets. Subject 1-200 characters, message 1-20,000; at most 3 attachments of at most 1 MiB, names of letters, digits, `.` `_` `-` and space, types txt, log, png, jpg, jpeg, pdf; the whole request at most 4.5 MiB; HTTPS only. Answers: 201 `{"ticket": "<number>"}`, 400 `{"error": "<what is wrong>"}`, 401 `{"error": "not accepted"}` whatever failed (key, email or permission), 405/413/415, 429 (per address, per account, 5 tickets an hour and 20 a day), 503. A service that is not the account's still opens the ticket, without a service, with the same answer. Nothing about the account is returned. A ticket opened this way carries no authority for account changes: support asks for a client-area login for those.
+- `/feedback` already sends one payload to Pulsed Media after the user's yes: a content-addressed draft (ADR-0056), the guard `guard/feedback-send` that turns the plain send into an approve, and the orchestrator's ask policy that clears it only on the user's own yes in the chat and blocks it where no yes can be checked ([ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md)). `Provider` reads `~/.virsilipasKey`; `/feedback` sends only a `vsk-` key from that file, never the user's own provider key.
+- Host detection reads a Pulsed Media seedbox from `/etc/seedbox/config` (`Host::family`).
+- A ticket is read by Pulsed Media's support staff in the general queue, unlike feedback, which is sealed for later analysis.
+
+## Options Considered
+- **Point users at `/feedback`.** Feedback is stored sealed for analysis and has no reply path. Rejected for questions that need an answer.
+- **Attach the conversation and system information, as feedback does.** A ticket goes to people in the general queue; ADR-0056 kept the transcript out of it. Rejected: the ticket carries only what the user writes and the files they name.
+- **Keep the client-area login on the machine and open tickets through it.** A billing password on a server the agent runs on. Rejected; the key and an account email are what the endpoint is built for, and they authorize nothing but a new ticket.
+- **Keep the email as a setting in `local/config.php` ([ADR-0032](0032-settings-configure-skill-first-run-and-install-flags.md)).** It is personal data, not a behaviour switch, and would need tier rules and a place in the configure listing. Rejected for a 0600 file in the unit's own state, `local/state/ticket/email`.
+- **A y/N inside the tool.** The model answers it (ADR-0056). Rejected.
+- **Copy feedback's draft and hook code.** Two copies of one safety check drift apart. Rejected: both units use `lib/DraftStore.php` and `lib/SendGuard.php`.
+- **A tool hook under `hooks/tools/ticket/` ([ADR-0054](0054-tool-hooks-and-local-hooks.md)).** It runs only when the call names the tool, so a glob or a variable path is out of its sight; the feedback guard reads every call for those. Rejected for a guard unit.
+- **Read attachments when sending.** A file changed after the user's yes would go out under it. Rejected: they are read into the draft.
+- **Retry by itself, or tell a wrong key from a wrong email.** The first is a send at a time the user did not choose; the second is something the server does not say. Rejected.
+
+## Decision
+- **`tools/system/ticket/`** (a tool unit, [ADR-0015](0015-tool-units-one-skill-per-tool.md)) with `draft`, `send <id>` and `list`.
+  - `draft --subject S (--text T | --text-file F) [--email E] [--priority Low|Medium|High] [--service S | --no-service] [file ...]` saves exactly the request under `local/state/ticket/<id>.json` (DraftStore: mode 0400, `<id>` the first 32 hex digits of its sha256). Subject and message go through `lib/Redact.php` first, and the subject becomes one line; the endpoint's lengths are checked. Priority defaults to Medium. The service defaults to this Unix user when `Host::family()` is `pmss`; otherwise it is left out unless named. Files: at most 3, each a regular file of this account (no symlink), at most 1 MiB, of an allowed type; an image or PDF must start as one; a txt or log file goes through `lib/Redact.php` too (tracker passkeys and passwords are common in logs); names are cut to the endpoint's characters. The email must be a plain address; given once with `--email`, it is remembered in `local/state/ticket/email` (0600) after the draft is saved, and a later `--email` replaces it; with none remembered, the draft is refused with a hint to ask the user once. The record shows where it goes, the email, the subject, the start of the message, the service, the priority, the files and their sizes, the size and the file. Nothing leaves the machine.
+  - `send <id>` refuses a draft that is missing, changed, of unknown fields, already sent or being sent (a lock), posts the request with the `vsk-` key from `~/.virsilipasKey` (`Provider::pulsedMediaKey`, shared with `/feedback`) as the Bearer token through `lib/Http.php`, and refuses an address that is not https (plain http only to this machine, for tests). On 201 the draft becomes `<id>.sent.json`, also when no number came back, and the ticket number is printed. 400, 401, 413, 429 and 503 read as plain messages with whether sending again can help; 401 says only "the key or email was not accepted". No answer or another 5xx says the ticket may or may not have been opened. Nothing retries by itself; the key is never printed.
+- **`hooks/guard/ticket-send/`** (pre_tool_call, `failClosed: true`): the same check as `guard/feedback-send`, now `lib/SendGuard.php`. Only the plain `php <this Pikkumies' ticket.php> send <id>` gets `approve` (`rule_key` `pikkumies-send:<id>`), with a message from the draft file (`TicketPrompt`): where it goes, the email, service, priority, files with sizes, the file, then the subject and the start of the message on one line with quotes escaped, within `HookUnits::APPROVE_SHOWN`; one that cannot fit is a block. Under `HERMES_YOLO_MODE` or at `PIKKUMIES_DEPTH` 2 or more the send is blocked and the message gives the command for the user's own terminal. The other forms it can see are blocked. `AskPolicy::CONFIRM_UNITS` gains the unit, so only the user's explicit yes clears it, and it stays blocked where no yes can be checked.
+- **The skill** drafts from the user's own words, asks for the email once, shows the draft, says that a ticket goes to Pulsed Media's support staff on the account, what was removed and what was not checked, sends only after the user's yes, and never says whether a refused key or email was the wrong one.
+- **AGENTS.md's privacy rule** names both things Pikkumies sends to Pulsed Media.
+
+## Consequences
+- Users open tickets from the agent without a client-area login, and see and approve exactly what goes.
+- The ticket carries what the user wrote and the files they named, with the common secret forms removed from text; images and PDFs go as they are. The draft says so.
+- One more `pre_tool_call` unit: one more short PHP process per tool call, which exits at once when the call does not mention `ticket`. The `pre_tool_call` entry's timeout grows by its 3 seconds (61 to 64), so `config.yaml` changes once at the next start. A command with a path containing `ticket`, shell expansion and the word send is blocked as a possible send, as feedback's guard does.
+- The service default on a seedbox is the Unix user; a guess that is not the account's service still opens the ticket, without a service.
+- Not verified live: the real endpoint (tests use a stand-in server), and how the ask review judges a plain "yes" after the agent's one-line description of the ticket (as for feedback, ADR-0056).
+- A safety prompt, not a security boundary: an agent steered by text it reads can still post a ticket some other way, as it could run curl; the server's per-account limits bound it.
+
+## References
+- ADR-0015, [ADR-0020](0020-deletes-need-the-users-approval.md), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md), ADR-0032, ADR-0054, ADR-0056, ADR-0073
+- Code: `pikkumies/tools/system/ticket/`, `pikkumies/hooks/guard/ticket-send/`, `pikkumies/lib/DraftStore.php`, `pikkumies/lib/SendGuard.php`, `pikkumies/lib/Provider.php`, `pikkumies/lib/AskPolicy.php`
+- Tests: `tests/TicketTest.php`, `tests/GuardUsageContractTest.php`, `tests/OrchestratorTest.php`, `tests/FeedbackTest.php`

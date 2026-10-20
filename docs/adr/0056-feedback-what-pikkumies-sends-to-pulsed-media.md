@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-18
-- Status: Accepted; amended 2026-10-19 twice (the occasional question; approvals off, see the amendments at the end)
+- Status: Accepted; amended 2026-10-19 twice (the occasional question; approvals off) and 2026-10-20 (no longer the one thing; see the amendments at the end)
 
 ## Context
 The operator's request of 2026-10-18: "We should probably have feedback API option ... Basicly integrated with pikkumies, so people can /feedback and that sends us crucial information + transcript and we store it for later analysis ... private secure storage, only for us", and on the place: "should we do it separately a pikkumies.mcx.fi domain for functions like this? I think we will regardless need to create one so we can upsell power functionality".
@@ -79,3 +79,10 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 **Decision.** The send no longer depends on Hermes' prompt. The orchestrator's ask policy never passes the `approve` on: it reviews the call against the user's own recent messages with R2 forced to yes, so only the user's explicit yes to this send (R1 "yes", R3 "no") lets a re-run through; until then the call is blocked with a fixed message telling the agent to say in one line what would be sent and to run the command again after the user says yes. Where no yes can be checked (a messaging gateway, a scheduled run, an agent started by an agent, `halt.disabled`, or no review answer) the send stays blocked and the agent gives the command for the person to run. `NestedAgent::approvalsOff()` still reads only `HERMES_YOLO_MODE`, so under `--yolo` the guard keeps refusing the send outright; reading the pinned mode there too would refuse every send in every session.
 
 **Consequences.** A `/yolo` typed in a session no longer lets the send through unasked. The question `feedback.ask` adds is unchanged. Not verified live: how a real light model judges a plain "yes" after the agent's one-line description of the send. Test: `tests/ApprovalsOffTest.php`, `tests/HookMergeTest.php` (the shipped send through every shipped unit, with no session, is a block).
+
+## Amendment 2026-10-20: no longer the one thing
+**Context.** [ADR-0089](0089-support-tickets-with-the-ai-key.md) adds `/ticket`, a support ticket opened with the AI key, as a second thing Pikkumies sends to Pulsed Media.
+
+**Decision.** AGENTS.md's privacy rule names both. The draft store and the send check this ADR decided moved, unchanged in behaviour, into `lib/DraftStore.php` and `lib/SendGuard.php`, which `guard/ticket-send` shares; `FeedbackSend::pmKey` reads the key through `Provider::pulsedMediaKey`. Everything else here stands.
+
+**Consequences.** One check for both senders, so a fix to it reaches both. Tests: `tests/FeedbackTest.php` unchanged, `tests/TicketTest.php`.

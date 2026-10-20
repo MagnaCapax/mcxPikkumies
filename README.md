@@ -54,6 +54,7 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - Lessons it saves, searched together with all the documentation: [memory](pikkumies/tools/memory/pikkumies/README.md)
 - Longer research questions: [deep research](pikkumies/tools/research/deep-research/README.md)
 - Sending Pulsed Media a problem report with the conversation, locked so only Pulsed Media can read it; Pikkumies asks you before it sends, and, only if you turn it on, now and then asks whether you want to send one: [feedback](pikkumies/tools/system/feedback/README.md). For anything private use this, not Hermes' `/debug`, which uploads to a public paste site; `/debug local` shows the report without uploading.
+- Opening a Pulsed Media support ticket with your AI key, from what you say and the files you name; Pikkumies shows the draft and asks you before it sends: [ticket](pikkumies/tools/system/ticket/README.md).
 
 It is not only for server work: it answers general questions and investigates too.
 

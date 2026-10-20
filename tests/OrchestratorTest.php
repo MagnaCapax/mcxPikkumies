@@ -71,13 +71,14 @@ return [
         $log = (string) @file_get_contents("$tree/pikkumies/local/logs/hooks/" . gmdate('Ymd') . '.jsonl');
         $lines = array_values(array_filter(explode("\n", $log)));
         // Units run in name order: guard/config-change and guard/feedback-send (no opinion on rm -rf), guard/fileops-check, guard/guard-destructive (the block),
-        // guard/publish-check, search/memory-check, search/search-first-gate, guard/ssh-connect (ADR-0048, ADR-0059, ADR-0068, ADR-0081, ADR-0083): 8 units, 5 calls; the blocked
+        // guard/publish-check, search/memory-check, search/search-first-gate, guard/ssh-connect, guard/ticket-send (ADR-0048, ADR-0059, ADR-0068, ADR-0081, ADR-0083,
+        // ADR-0089): 9 units, 5 calls; the blocked
         // delete adds one ask-policy line (ADR-0073).
         $config = json_decode($lines[0], true);
         $send = json_decode($lines[1], true);
         $first = json_decode($lines[2], true);
         $guard = json_decode($lines[3], true);
-        check(count($lines) === 41 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
+        check(count($lines) === 46 && $config['unit'] === 'guard/config-change' && $config['outcome'] === 'none' && $send['unit'] === 'guard/feedback-send' && $send['outcome'] === 'none'
             && $first['unit'] === 'guard/fileops-check' && $first['outcome'] === 'none'
             && $guard['event'] === 'pre_tool_call' && $guard['unit'] === 'guard/guard-destructive' && $guard['outcome'] === 'block'
             && is_int($guard['ms']) && isset($guard['ts']), 'one log line per unit run: ' . $log);

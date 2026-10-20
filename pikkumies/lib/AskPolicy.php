@@ -8,9 +8,9 @@
  * - every other question goes to one AskReview of all of them together; the call runs unless the review finds it
  *   irreversible and not covered by what the user wrote, and then it is blocked with BLOCK_CONFIRM: the agent says in
  *   one line what it would destroy or send and runs it again after the user's yes, which the review then finds (R1);
- * - the /feedback send and the person's own local hooks are reviewed as a send: only the user's explicit yes clears them;
+ * - the /feedback and /ticket sends and the person's own local hooks are reviewed as a send: only the user's explicit yes clears them;
  * - with no evidence (a messaging gateway, a scheduled run, an agent started by an agent, halt.disabled), no time or no
- *   review answer, a yes cannot be checked: deletes, exposures, sends, mail, the feedback send and local hooks are
+ *   review answer, a yes cannot be checked: deletes, exposures, sends, mail, the feedback and ticket sends and local hooks are
  *   blocked with BLOCK_UNCHECKED; every other kind runs, since it destroys nothing that has no copy.
  * An error here blocks every question.
  */
@@ -23,7 +23,7 @@ class AskPolicy
     const DROP = ['load', 'stop'];                            // guard-destructive kinds that lose and reveal nothing
     const DISCLOSE = ['send', 'mail', 'exposure'];            // cannot be taken back: R2 is yes without asking the model
     const UNCHECKED_BLOCK = ['delete', 'exposure', 'send', 'mail']; // still blocked when no yes can be checked
-    const CONFIRM_UNITS = ['guard/feedback-send'];            // the operator asked for this confirmation (ADR-0056)
+    const CONFIRM_UNITS = ['guard/feedback-send', 'guard/ticket-send']; // the operator asked for this confirmation (ADR-0056, ADR-0089)
 
     const BLOCK_CONFIRM = 'Pikkumies safety: not run. This could destroy or send something that has no copy, and the user\'s'
         . ' own messages do not ask for exactly this. Do not reach the same effect another way. Finish the rest of the task,'
