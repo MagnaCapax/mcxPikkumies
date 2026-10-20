@@ -389,7 +389,7 @@ switch ($cmd) {
     case 'run':
         $eternalId = '';
         $eternalStarted = time();
-        $eternalSignalled = false;
+        $eternalSignalled = 0;
         if (isset($passArgs[0]) && $passArgs[0] === '--eternal') {
             $eternalId = isset($passArgs[1]) ? $passArgs[1] : '';
             if (!EternalRecord::validId($eternalId) || count($passArgs) !== 2) {
@@ -403,11 +403,16 @@ switch ($cmd) {
             if (function_exists('pcntl_async_signals')) {
                 pcntl_async_signals(true);
                 foreach ([SIGHUP, SIGTERM, SIGINT] as $signal) {
-                    pcntl_signal($signal, function () use (&$eternalSignalled) { $eternalSignalled = true; });
+                    pcntl_signal($signal, function ($received) use (&$eternalSignalled, $eternalId) {
+                        $eternalSignalled = $received;
+                        if ($received === SIGTERM) {
+                            Eternal::shutdown($eternalId);
+                        }
+                    });
                 }
                 pcntl_signal(SIGALRM, function () use (&$eternalSignalled) {
                     if (!is_dir(Config::root())) {
-                        $eternalSignalled = true;
+                        $eternalSignalled = SIGTERM;
                         exit(75);
                     }
                     pcntl_alarm(60);
@@ -460,7 +465,6 @@ switch ($cmd) {
                 out('Not updating: Pikkumies windows are changing; try again.');
                 exit(1);
             }
-            Eternal::stopManaged();
             $origin = HermesInstall::origin();
             if (!HermesInstall::originOfficial($origin)) {
                 out('Not updating: pikkumies/hermes fetches from ' . ($origin ?: '(no origin)') . ', not the official Hermes repository.');
@@ -474,6 +478,11 @@ switch ($cmd) {
             $updateArgv = CronTick::wrap(array_merge([hermesBin()], $passArgs), !empty(profile()['root']['available']));
             if (!$updateArgv) {
                 out('Not updating: root is available here and setpriv is missing; the Hermes updater may call sudo, so it runs only under setpriv --no-new-privs (ADR-0025, ADR-0033).');
+                exit(1);
+            }
+            // Stop only after the origin, lifecycle lock and privilege checks pass.
+            if (!Eternal::stopManaged()) {
+                out('Not updating: could not stop every Pikkumies window.');
                 exit(1);
             }
         }
@@ -541,8 +550,11 @@ switch ($cmd) {
         // HermesConfig::write touch is written through a temp file + rename (ADR-0022).
         try {
             generate(profile());
-        } catch (Exception $x) {
+        } catch (Throwable $x) {
             out('not starting: ' . $x->getMessage());
+            if ($eternalId !== '') {
+                Eternal::afterExit($eternalId, 1, $eternalStarted, $eternalSignalled);
+            }
             exit($eternalId !== '' ? 75 : 1);
         }
         foreach (HermesConfig::env() as $envName => $envValue) { // home, managed settings; no HERMES_RUNTIME_DIR (ADR-0033, ADR-0062)
@@ -687,6 +699,31 @@ switch ($cmd) {
         if (!preg_match('/^[1-9]$/', $n)) {
             out('usage: pikkumies tmux [1-9]');
             exit(2);
+        }
+        // Hosts without supervision keep the original tmux server and plain sessions.
+        if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
+            exec('command -v tmux 2>/dev/null', $tmuxPath, $tmuxCode);
+            if ($tmuxCode !== 0) {
+                out('tmux is not installed on this machine.');
+                exit(1);
+            }
+            exec('tmux list-windows -t ' . escapeshellarg('=' . Launch::TMUX_SESSION) . ' -F ' . escapeshellarg('#W') . ' 2>/dev/null', $windowList, $listCode);
+            $windows = $listCode === 0 ? $windowList : null;
+            $self = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__);
+            $noColor = StatusTheme::noColor();
+            $creditsCmd = ($noColor ? 'NO_COLOR=1 ' : '') . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/tools/system/credits/credits.php') . ' line --tmux';
+            $plan = Launch::tmuxPlan($n, $windows, (string) getenv('TMUX') !== '', $self, $creditsCmd, $self . ' status-line', !$noColor);
+            $attach = array_pop($plan);
+            foreach ($plan as $step) {
+                exec(implode(' ', array_map('escapeshellarg', $step)) . ' 2>&1', $stepOut, $stepCode);
+                if ($stepCode !== 0) {
+                    out('tmux failed: ' . implode(' ', $stepOut));
+                    exit(1);
+                }
+            }
+            array_splice($attach, 0, 1, ['env', '-u', 'TMUX', 'tmux']);
+            passthru(implode(' ', array_map('escapeshellarg', $attach)), $code);
+            exit($code);
         }
         $tmuxId = 'pm' . $n;
         $tmuxLock = Eternal::lock();

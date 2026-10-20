@@ -9,13 +9,19 @@ class EternalAsk
 
     public static function send($text, $nonce = '')
     {
-        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+        if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
+            return [1, 'Primary is not enabled on this host.'];
+        }
+        if (self::rootRefused(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
             return [1, 'Ask runs as the account owner, not root.'];
         }
         $text = trim(self::clean($text));
         $length = preg_match_all('/./us', $text);
         if ($text === '' || $length === false || $length > 4000) {
             return [1, 'Ask needs 1 to 4000 characters on stdin.'];
+        }
+        if (preg_match('/^[\s\p{Z}]*\//u', $text) === 1) {
+            return [1, 'Ask cannot send slash commands. Open Primary to enter one.'];
         }
         if ($nonce !== '' && preg_match('/^[A-Za-z0-9_-]{8,64}$/D', $nonce) !== 1) {
             return [1, 'Ask nonce is invalid.'];
@@ -40,27 +46,26 @@ class EternalAsk
         if ($code !== 0) {
             return [5, 'Primary is starting. Try again shortly.'];
         }
-        if (preg_match('/approval|approve|allow this|\[y\/n\]/i', $screen)) {
-            return [3, 'Primary has an approval prompt open. Answer it there first.'];
-        }
-        if (self::heldAtInput($screen)) {
+        $screenStatus = self::screenStatus($screen);
+        if ($screenStatus === 3) {
             return [3, 'Primary has unsent text at its input. Send or clear it there first.'];
         }
-        if (!self::idleAtInput($screen)) {
+        if ($screenStatus === 6) {
             return [6, 'Primary is busy. Try again shortly.'];
         }
         $path = Config::localDir() . '/eternals/ask-rate';
         $noncePath = Config::localDir() . '/eternals/ask-nonces';
         $nonces = json_decode((string) @file_get_contents($noncePath), true);
         $nonces = is_array($nonces) ? array_filter($nonces, function ($at) { return is_int($at) && $at >= time() - 3600; }) : [];
-        if ($nonce !== '' && isset($nonces[$nonce])) {
-            return [0, 'Already sent.'];
-        }
         $state = json_decode((string) @file_get_contents($path), true);
         $now = time();
         $state = is_array($state) && isset($state['minute'], $state['count']) && $state['minute'] === (int) floor($now / 60)
             ? $state : ['minute' => (int) floor($now / 60), 'count' => 0];
-        if ($state['count'] >= 5) {
+        $quota = self::quota($nonce, $state, $nonces);
+        if ($quota === 0) {
+            return [0, 'Already sent.'];
+        }
+        if ($quota === 4) {
             return [4, 'Ask is rate capped. Try again next minute.'];
         }
         if (!self::cancelCopyMode($paneParts[2])) {
@@ -94,9 +99,27 @@ class EternalAsk
         return [0, 'Sent to Primary.'];
     }
 
+    public static function rootRefused($uid)
+    {
+        return $uid === 0;
+    }
+
+    public static function quota($nonce, array $state, array $nonces)
+    {
+        if ($nonce !== '' && isset($nonces[$nonce])) {
+            return 0;
+        }
+        return $state['count'] >= 5 ? 4 : -1;
+    }
+
     public static function idleAtInput($screen)
     {
         return self::inputLine($screen) === 'empty';
+    }
+
+    public static function screenStatus($screen)
+    {
+        return self::heldAtInput($screen) ? 3 : (self::idleAtInput($screen) ? 0 : 6);
     }
 
     public static function heldAtInput($screen)

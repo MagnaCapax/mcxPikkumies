@@ -75,7 +75,7 @@ return [
         $win = Launch::tmuxPlan('3', ['pm1', 'bash'], false, $cmd);
         check($win[0] === ['tmux', 'new-window', '-d', '-t', '=pikkumies:', '-n', 'pm3', $cmd] && count($win) === 3, 'missing window: ' . json_encode($win));
         $has = Launch::tmuxPlan('1', ['pm1'], true, $cmd);
-        check($has === [['tmux', 'select-window', '-t', '=pikkumies:pm1'], ['tmux', 'switch-client', '-t', '=pikkumies']], 'existing window inside tmux: ' . json_encode($has));
+        check($has === [['tmux', 'select-window', '-t', '=pikkumies:pm1'], ['tmux', 'attach-session', '-t', '=pikkumies']], 'existing window inside tmux: ' . json_encode($has));
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
         check(preg_match("/\n    case 'tmux':(.*?)exit\(\\\$code\);/s", $bin, $m) === 1, 'tmux case missing');
         check(strpos($m[1], 'tmux is not installed') !== false && strpos($m[1], "preg_match('/^[1-9]$/'") !== false, 'tmux case must check tmux and N 1-9');

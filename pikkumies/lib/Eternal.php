@@ -220,8 +220,16 @@ class Eternal
 
     public static function tmuxArgv(array $args)
     {
-        $argv = ['env', '-u', 'TMUX'];
-        foreach (self::tmuxEnvironment() as $name => $value) {
+        $allowed = ['HOME', 'USER', 'LOGNAME', 'SHELL', 'PATH', 'LANG', 'TERM', 'XDG_RUNTIME_DIR', 'DOCKER_HOST'];
+        $environment = [];
+        foreach (getenv() as $name => $value) {
+            if (in_array($name, $allowed, true) || strpos($name, 'LC_') === 0) {
+                $environment[$name] = $value;
+            }
+        }
+        $environment = array_merge($environment, self::tmuxEnvironment());
+        $argv = ['env', '-i'];
+        foreach ($environment as $name => $value) {
             $argv[] = $name . '=' . $value;
         }
         $argv[] = 'tmux';
@@ -233,6 +241,7 @@ class Eternal
 
     public static function start($id, $hasSession)
     {
+        @unlink(self::stopPath($id));
         $command = implode(' ', array_map('escapeshellarg', self::invocation($id)));
         $args = $hasSession ? ['new-window', '-d', '-t', '=pikkumies:', '-n', $id, $command]
             : ['new-session', '-d', '-s', 'pikkumies', '-n', $id, $command];
@@ -241,7 +250,11 @@ class Eternal
                 array_splice($args, 1, 0, ['-e', $name . '=' . $value]);
             }
         }
-        return self::tmux($args)[0] === 0;
+        $started = self::tmux($args)[0] === 0;
+        if ($started) {
+            @unlink(self::quitPath($id));
+        }
+        return $started;
     }
 
     public static function invocation($id)
@@ -289,17 +302,71 @@ class Eternal
     {
         list($code, $rows) = self::tmux(['list-windows', '-t', '=pikkumies', '-F', '#W|#{pane_start_command}|#{pane_pid}']);
         if ($code !== 0) {
-            return;
+            return true;
         }
+        $stopped = true;
         foreach (explode("\n", $rows) as $row) {
             $parts = explode('|', $row, 3);
             if (count($parts) === 3 && self::paneOwns($parts[1], $parts[0]) && ctype_digit($parts[2])) {
+                $stopPath = self::stopPath($parts[0]);
+                if (!self::shutdown($parts[0])) {
+                    $stopped = false;
+                    continue; // no marker means HUP would be mistaken for a user quit
+                }
                 if (function_exists('posix_kill')) {
                     @posix_kill((int) $parts[2], 15);
                 }
-                self::tmux(['kill-window', '-t', '=pikkumies:' . $parts[0]]);
+                if (self::tmux(['kill-window', '-t', '=pikkumies:' . $parts[0]])[0] !== 0) {
+                    @unlink($stopPath);
+                    $stopped = false;
+                }
             }
         }
+        return $stopped;
+    }
+
+    public static function stopPath($id)
+    {
+        return EternalRecord::path($id) . '.stop';
+    }
+
+    public static function shutdown($id)
+    {
+        $path = self::stopPath($id);
+        @mkdir(dirname($path), 0700, true);
+        return @file_put_contents($path, "stop\n") !== false;
+    }
+
+    /** Called after releasing the lifecycle lock: residents need it to finish afterExit. */
+    public static function waitStopped($seconds = 10)
+    {
+        $until = microtime(true) + $seconds;
+        do {
+            $running = false;
+            foreach (range(1, 9) as $n) {
+                $id = 'pm' . $n;
+                $runPath = EternalRecord::path($id) . '.run';
+                if (!is_file($runPath)) {
+                    continue;
+                }
+                $lock = EternalLock::take($runPath);
+                if (!$lock) {
+                    $running = true;
+                    break;
+                }
+                fclose($lock);
+            }
+            if (!$running) {
+                return true;
+            }
+            usleep(100000);
+        } while (microtime(true) < $until);
+        return false;
+    }
+
+    public static function quitPath($id)
+    {
+        return EternalRecord::path($id) . '.quit';
     }
 
     public static function capture($id, array $record, $tty)
@@ -337,7 +404,11 @@ class Eternal
         if ($record === null) {
             return;
         }
-        if ($signalled || $code === 75) {
+        // A HUP from a live tmux server means the person closed the window. During an
+        // update or transfer, stopManaged marks the pane before signalling it.
+        if (defined('SIGHUP') && $signalled === SIGHUP && !is_file(self::stopPath($id)) && self::tmux(['has-session', '-t', '=pikkumies'])[0] === 0) {
+            $code = 0;
+        } elseif ($signalled || $code === 75) {
             return;
         }
         if ($code === 0) {
@@ -345,6 +416,7 @@ class Eternal
                 $record['sessionId'] = '';
                 $record['fails'] = 0;
                 EternalRecord::write($id, $record);
+                @file_put_contents(self::quitPath($id), "quit\n");
             } else {
                 @unlink(EternalRecord::path($id));
             }

@@ -4,6 +4,9 @@ class EternalUi
 {
     public static function start()
     {
+        if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
+            return 'UI is not enabled on this host.';
+        }
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         if (!Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), $uid)) {
             return 'UI needs the account user slice.';
@@ -17,6 +20,7 @@ class EternalUi
             return 'UI is not installed on this host.';
         }
         $base = Config::localDir() . '/ui';
+        self::removeDeadInstances($base);
         $instance = $base . '/ui-' . bin2hex(random_bytes(8));
         foreach ([$base, $base . '/tokens', $instance] as $dir) {
             if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
@@ -43,6 +47,32 @@ class EternalUi
         $log = $instance . '/launcher-error.log';
         exec(implode(' ', array_map('escapeshellarg', $parts)) . ' </dev/null >>' . escapeshellarg($log) . ' 2>&1', $out, $code);
         return $code === 0 ? '' : 'UI could not start; see ' . $log;
+    }
+
+    public static function removeDeadInstances($base)
+    {
+        foreach (glob($base . '/ui-*') ?: [] as $dir) {
+            if (!is_dir($dir) || is_link($dir)) {
+                continue;
+            }
+            $pid = trim((string) @file_get_contents($dir . '/tmux-server.pid'));
+            if (!ctype_digit($pid) || is_dir('/proc/' . $pid)) {
+                continue;
+            }
+            try {
+                $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+                foreach ($files as $file) {
+                    if ($file->isDir() && !$file->isLink()) {
+                        @rmdir($file->getPathname());
+                    } else {
+                        @unlink($file->getPathname());
+                    }
+                }
+                @rmdir($dir);
+            } catch (UnexpectedValueException $x) {
+                // A directory removed concurrently needs no cleanup here.
+            }
+        }
     }
 
     public static function environment($home, $base, $instance)

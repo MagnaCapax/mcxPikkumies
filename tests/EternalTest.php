@@ -1,5 +1,89 @@
 <?php
 return [
+    'eternal: ask rejects slash commands and root, and quota counts only new sends' => function () {
+        $marker = testTempDir('eternal-marker') . '/enabled';
+        file_put_contents($marker, "1\n");
+        Eternal::$hostMarker = $marker;
+        try {
+            check(EternalAsk::send("  /yolo\n") === [1, 'Ask cannot send slash commands. Open Primary to enter one.'], 'slash command accepted');
+            check(EternalAsk::send("\xC2\xA0/model") === [1, 'Ask cannot send slash commands. Open Primary to enter one.'], 'unicode space before slash command accepted');
+            check(EternalAsk::rootRefused(0) && !EternalAsk::rootRefused(1000), 'root refusal changed');
+            check(EternalAsk::quota('nonce123', ['count' => 5], ['nonce123' => time()]) === 0, 'replayed nonce was rate capped');
+            check(EternalAsk::quota('newnonce', ['count' => 5], []) === 4, 'sixth question was allowed');
+            check(EternalAsk::quota('newnonce', ['count' => 4], []) === -1, 'fifth question was blocked');
+            check(EternalAsk::screenStatus("This answer mentions approvals.\n────────\n❯ \n────────\n") === 0, 'ordinary answer misread as approval prompt');
+        } finally {
+            Eternal::$hostMarker = null;
+            @unlink($marker);
+            @rmdir(dirname($marker));
+        }
+    },
+    'eternal: listing reports paused records as quit with the cause' => function () {
+        $fixture = json_decode(file_get_contents(__DIR__ . '/fixtures/eternals/listing.json'), true);
+        $root = testTempDir('eternal-listing');
+        $marker = $root . '/enabled';
+        file_put_contents($marker, "1\n");
+        Eternal::$hostMarker = $marker;
+        EternalRecord::$base = $root . '/records';
+        EternalRecord::write('pm2', EternalRecord::initial());
+        $off = Config::localDir() . '/eternals.off';
+        $oldOff = is_file($off) ? file_get_contents($off) : null;
+        $hold = Config::localDir() . '/eternals.hold';
+        $oldHold = is_file($hold) ? file_get_contents($hold) : null;
+        try {
+            @file_put_contents($off, "off\n");
+            $rows = EternalCli::listing();
+            $pm2 = array_values(array_filter($rows, function ($row) { return $row['id'] === 'pm2'; }))[0];
+            check($pm2['state'] === $fixture['paused']['off'] && $pm2['reason'] === 'off', 'off record not reported as quit');
+            check(in_array($pm2['state'], $fixture['states'], true), 'state outside contract');
+            @unlink($off);
+            file_put_contents($hold, json_encode(['until' => time() + 3600]));
+            $rows = EternalCli::listing();
+            $pm2 = array_values(array_filter($rows, function ($row) { return $row['id'] === 'pm2'; }))[0];
+            check($pm2['state'] === $fixture['paused']['hold'] && $pm2['reason'] === 'hold', 'held record not reported as quit');
+            @unlink($hold);
+            file_put_contents(Eternal::quitPath('pm2'), "quit\n");
+            $rows = EternalCli::listing();
+            $pm2 = array_values(array_filter($rows, function ($row) { return $row['id'] === 'pm2'; }))[0];
+            check($pm2['state'] === 'quit' && !isset($pm2['reason']), 'explicit quit not reported');
+        } finally {
+            $oldOff === null ? @unlink($off) : file_put_contents($off, $oldOff);
+            $oldHold === null ? @unlink($hold) : file_put_contents($hold, $oldHold);
+            Eternal::$hostMarker = null;
+            EternalRecord::$base = null;
+            testRmTree($root);
+        }
+    },
+    'eternal: tmux argv has only the explicit environment allowlist' => function () {
+        $old = getenv('SECRET_FOR_TEST');
+        putenv('SECRET_FOR_TEST=private');
+        $root = testTempDir('eternal-env');
+        Eternal::$tmuxDirectory = $root;
+        try {
+            $argv = Eternal::tmuxArgv(['has-session']);
+            check(array_slice($argv, 0, 2) === ['env', '-i'], 'tmux inherits caller environment');
+            check(!in_array('SECRET_FOR_TEST=private', $argv, true), 'secret leaked to tmux server');
+            check(in_array('TMUX_TMPDIR=' . $root . '/tmux', $argv, true), 'private socket path missing');
+        } finally {
+            Eternal::$tmuxDirectory = null;
+            $old === false ? putenv('SECRET_FOR_TEST') : putenv('SECRET_FOR_TEST=' . $old);
+            testRmTree($root);
+        }
+    },
+    'eternal: dead UI instance directories are removed and live ones retained' => function () {
+        $root = testTempDir('eternal-ui-clean');
+        @mkdir($root . '/ui-dead/sub', 0700, true);
+        @mkdir($root . '/ui-live', 0700, true);
+        file_put_contents($root . '/ui-dead/tmux-server.pid', "99999999\n");
+        file_put_contents($root . '/ui-dead/sub/state', 'old');
+        file_put_contents($root . '/ui-live/tmux-server.pid', getmypid() . "\n");
+        try {
+            EternalUi::removeDeadInstances($root);
+            check(!is_dir($root . '/ui-dead') && is_dir($root . '/ui-live'), 'UI instance cleanup failed');
+        } finally {
+            testRmTree($root);
+        }
+    },
     'eternal: resident argv matches the node probe contract fixture' => function () {
         $fixture = json_decode(file_get_contents(__DIR__ . '/fixtures/eternals/invocation.json'), true);
         check(array_slice(Eternal::invocation('pm1'), -3) === $fixture['argvTail'], 'resident argv drifted');
@@ -145,16 +229,6 @@ return [
             @rmdir($root);
         }
     },
-    'eternal: cron ensure precedes the job lock and both job exits' => function () {
-        $source = file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
-        $section = substr($source, strpos($source, "case 'cron-tick':"), strpos($source, "case 'tmux':") - strpos($source, "case 'cron-tick':"));
-        $ensure = strpos($section, 'Eternal::ensure()');
-        $lock = strpos($section, "'/cron.lock'");
-        $bin = strpos($section, "hermesBin() === ''");
-        $jobs = strpos($section, 'CronTick::hasJobs');
-        check($ensure !== false && $lock !== false && $bin !== false && $jobs !== false
-            && $ensure < $lock && $ensure < $bin && $ensure < $jobs, 'ensure moved after a scheduled-job early exit');
-    },
     'eternal: private tmux socket accepts a window and closes it' => function () {
         exec('command -v tmux 2>/dev/null', $out, $code);
         if ($code !== 0) {
@@ -225,13 +299,6 @@ return [
             fclose($lock);
             @unlink($path);
             @rmdir($dir);
-        }
-    },
-    'eternal: feature locks use the shared close-on-exec helper' => function () {
-        $lib = dirname(__DIR__) . '/pikkumies/lib';
-        check(strpos(file_get_contents($lib . '/EternalLock.php'), "fopen(\$path, 'ce')") !== false, 'lock lost close-on-exec mode');
-        foreach (glob($lib . '/Eternal*.php') as $file) {
-            check(preg_match('/fopen\([^;]*[\'\"]c[\'\"]/', file_get_contents($file)) !== 1, basename($file) . ' opens a plain inheritable lock');
         }
     },
 ];

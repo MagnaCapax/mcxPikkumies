@@ -75,15 +75,24 @@ class Launch
         if ($argv[1] === 'websearch') {
             return count($rest) === 1 && in_array($rest[0], ['on', 'off', 'status'], true) ? ['websearch', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
         }
-        if ($argv[1] === 'eternal' || $argv[1] === 'ask' || $argv[1] === 'ui') {
-            return [$argv[1], $rest];
+        if ($argv[1] === 'ask' && ($rest === [] || (count($rest) === 1 && strncmp($rest[0], '--nonce=', 8) === 0 && strlen($rest[0]) > 8))) {
+            return ['ask', $rest];
+        }
+        if ($argv[1] === 'ui' && $rest === ['start']) {
+            return ['ui', $rest];
+        }
+        if ($argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new']], true)
+            || (count($rest) === 2 && $rest[0] === 'quit' && preg_match('/^pm[1-9]$/D', $rest[1]) === 1)
+            || (count($rest) === 3 && $rest[0] === 'hold' && $rest[1] === '--until' && ctype_digit($rest[2])))) {
+            return ['eternal', $rest];
         }
         // `configure undo`: the person's own undo of the last settings change, no session (ADR-0059); other words after configure are a prompt.
         if ($argv[1] === 'configure' && $rest === ['undo']) {
             return ['configure', $rest];
         }
         // `run [hermes args]` is a documented passthrough (README, ADR-0033) and keeps every word.
-        if ($argv[1] === 'run' || (in_array($argv[1], self::SUBCOMMANDS, true) && self::allFlags($rest))) {
+        if ($argv[1] === 'run' || (in_array($argv[1], self::SUBCOMMANDS, true)
+            && !in_array($argv[1], ['ask', 'ui', 'eternal'], true) && self::allFlags($rest))) {
             return [$argv[1], $rest];
         }
         return ['run', self::promptArgs(array_slice($argv, 1))];
@@ -112,7 +121,7 @@ class Launch
 
     /**
      * tmux commands for `pikkumies tmux N`, as argv lists to run in order; the last one attaches
-     * (switch-client when already inside tmux). Window pmN of session "pikkumies" runs $cmd, made
+     * in a new client when already inside tmux. Window pmN of session "pikkumies" runs $cmd, made
      * when missing; named windows, so tmux's base-index and other windows never matter. $windows: the
      * session's window names, or null when the session does not exist. $statusCmd, when given, is a shell command
      * whose output leads the session's status-right, refreshed every minute: the credits line (ADR-0040). Set on
@@ -146,7 +155,7 @@ class Launch
             }
         }
         $plan[] = ['tmux', 'select-window', '-t', "$s:$w"];
-        $plan[] = $insideTmux ? ['tmux', 'switch-client', '-t', $s] : ['tmux', 'attach-session', '-t', $s];
+        $plan[] = ['tmux', 'attach-session', '-t', $s];
         return $plan;
     }
 

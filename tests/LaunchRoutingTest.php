@@ -8,6 +8,30 @@
  * here.
  */
 return [
+    'launch: Eternal verbs claim only their exact command shapes' => function () {
+        foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['eternal'], ['eternal', 'list'], ['eternal', 'list', '--json'], ['eternal', 'ensure'], ['eternal', 'new'], ['eternal', 'on'], ['eternal', 'off'], ['eternal', 'quit', 'pm2'], ['eternal', 'hold', '--until', '123']] as $words) {
+            check(Launch::route(array_merge(['pikkumies'], $words))[0] === $words[0], 'command rejected: ' . json_encode($words));
+        }
+        foreach ([['ask', 'how', 'big', 'is', 'my', 'disk'], ['ask', '--nonce='], ['ask', '--bad'], ['ask', '--nonce=abc', 'please'], ['ui', 'show', 'me'], ['ui', '--help'], ['ui', 'start', 'please'], ['eternal', 'life', 'is', 'short'], ['eternal', '--bad'], ['eternal', 'quit', 'bad'], ['eternal', 'hold', '--until', 'tomorrow']] as $words) {
+            check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'prompt claimed: ' . json_encode($words));
+        }
+    },
+    'launch: inside tmux opens a new client with no inherited TMUX' => function () {
+        $plan = Launch::tmuxPlan('2', ['pm1', 'pm2'], true, 'ignored');
+        check(end($plan) === ['tmux', 'attach-session', '-t', '=pikkumies'], 'an existing client was switched');
+        $root = testTempDir('launch-tmux-argv');
+        $oldTmux = getenv('TMUX');
+        putenv('TMUX=/foreign/socket,1,0');
+        Eternal::$tmuxDirectory = $root;
+        try {
+            $argv = Eternal::tmuxArgv(array_slice(end($plan), 1));
+            check(array_slice($argv, 0, 2) === ['env', '-i'] && !in_array('TMUX=/foreign/socket,1,0', $argv, true), 'attach inherited another client');
+        } finally {
+            Eternal::$tmuxDirectory = null;
+            $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            testRmTree($root);
+        }
+    },
     'launch: help ignores trailing words; subcommand matching is case-sensitive' => function () {
         list($cmd, $args) = Launch::route(['pikkumies', 'help', 'ignored']);
         check($cmd === 'help' && $args === [], 'help with a trailing word must stay help, never a prompt: ' . json_encode([$cmd, $args]));

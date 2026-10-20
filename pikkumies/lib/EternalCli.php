@@ -4,6 +4,17 @@ class EternalCli
     public static function run(array $args)
     {
         $verb = isset($args[0]) ? $args[0] : 'list';
+        if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)) {
+            if ($verb === 'list' && (!isset($args[1]) || $args[1] === '--json')) {
+                echo "[]\n";
+                return 0;
+            }
+            if ($verb === 'ensure' && count($args) === 1) {
+                return 0;
+            }
+            echo "Pikkumies windows are not enabled on this host.\n";
+            return 1;
+        }
         if ($verb === 'list' && (!isset($args[1]) || $args[1] === '--json')) {
             echo json_encode(self::listing(), JSON_UNESCAPED_SLASHES) . "\n";
             return 0;
@@ -19,7 +30,13 @@ class EternalCli
             }
             $path = Config::localDir() . '/eternals.hold';
             $tmp = $path . '.tmp-' . getmypid();
-            return @file_put_contents($tmp, json_encode(['until' => (int) $args[2]]) . "\n") !== false && @rename($tmp, $path) ? 0 : 1;
+            if (@file_put_contents($tmp, json_encode(['until' => (int) $args[2]]) . "\n") === false || !@rename($tmp, $path)) {
+                @unlink($tmp);
+                return 1;
+            }
+            $stopped = Eternal::stopManaged();
+            fclose($lock);
+            return $stopped && Eternal::waitStopped() ? 0 : 1;
         }
         if (($verb === 'on' || $verb === 'off') && count($args) === 1) {
             $lock = Eternal::lock();
@@ -27,11 +44,12 @@ class EternalCli
                 return 1;
             }
             $path = Config::localDir() . '/eternals.off';
+            $stopped = true;
             if ($verb === 'off') {
                 if (@file_put_contents($path, "off\n") === false) {
                     return 1;
                 }
-                Eternal::stopManaged();
+                $stopped = Eternal::stopManaged();
             } else {
                 @unlink($path);
             }
@@ -39,7 +57,7 @@ class EternalCli
             if ($verb === 'on') {
                 Eternal::ensure();
             }
-            return 0;
+            return $stopped && ($verb !== 'off' || Eternal::waitStopped()) ? 0 : 1;
         }
         if ($verb === 'new' && count($args) === 1) {
             if (!is_file(Eternal::$hostMarker !== null ? Eternal::$hostMarker : Eternal::HOST_MARKER)
@@ -108,6 +126,7 @@ class EternalCli
                 if ($record !== null) {
                     $record['sessionId'] = '';
                     EternalRecord::write($id, $record);
+                    @file_put_contents(Eternal::quitPath($id), "quit\n");
                 }
             } else {
                 @unlink(EternalRecord::path($id));
@@ -123,6 +142,7 @@ class EternalCli
     {
         $out = [];
         $ready = null;
+        $paused = is_file(Config::localDir() . '/eternals.off') ? 'off' : (Eternal::held() ? 'hold' : '');
         foreach (range(1, 9) as $n) {
             $id = 'pm' . $n;
             $record = EternalRecord::read($id);
@@ -136,14 +156,14 @@ class EternalCli
             if ($lock && $ready === null) {
                 $ready = Eternal::ready();
             }
-            $state = $lock ? ($ready ?: 'starting') : 'running';
-            if ($lock && !Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
+            $state = $paused !== '' || is_file(Eternal::quitPath($id)) ? 'quit' : ($lock ? ($ready ?: 'starting') : 'running');
+            if ($state !== 'quit' && $lock && !Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
                 $state = 'not-ready';
             }
             if ($lock) {
                 fclose($lock);
             }
-            $out[] = ['id' => $id, 'state' => $state];
+            $out[] = ['id' => $id, 'state' => $state] + ($paused !== '' ? ['reason' => $paused] : []);
         }
         return $out;
     }
