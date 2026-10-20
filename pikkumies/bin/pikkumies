@@ -708,6 +708,19 @@ switch ($cmd) {
         if ($listCode === 0) {
             $windows = $windowList;
         }
+        if ($n !== '1' && Eternal::primaryMissing($windows)) {
+            $primary = EternalRecord::read('pm1');
+            if ($primary === null) {
+                $primary = EternalRecord::initial();
+            }
+            $primary['lastStart'] = time();
+            EternalRecord::write('pm1', $primary);
+            if (!Eternal::start('pm1', $windows !== null)) {
+                out('Could not start Primary.');
+                exit(1);
+            }
+            $windows = Eternal::withPrimary($windows);
+        }
         $insideTmux = (string) getenv('TMUX') !== '';
         // The session's status line shows the credits line, refreshed every minute (ADR-0040).
         // NO_COLOR at this start reaches the credits line tmux runs, and keeps the status colours off (ADR-0061).

@@ -18,6 +18,9 @@ return [
         check(EternalCli::nextFreeId([], []) === 'pm2', 'first extra window changed');
         check(EternalCli::nextFreeId(['pm2'], ['pm3']) === 'pm4', 'occupied or foreign window reused');
         check(EternalCli::nextFreeId(['pm2', 'pm3', 'pm4', 'pm5', 'pm6', 'pm7', 'pm8', 'pm9'], []) === null, 'cap not enforced');
+        check(Eternal::primaryMissing(null) && Eternal::primaryMissing(['pm2']), 'new session or missing Primary was accepted');
+        check(!Eternal::primaryMissing(['pm1', 'pm2']), 'existing Primary was treated as missing');
+        check(Eternal::withPrimary(null) === ['pm1'] && Eternal::withPrimary(['pm2']) === ['pm2', 'pm1'], 'existing window was lost when Primary started');
     },
     'eternal: records reject extra fields and unsafe session ids' => function () {
         $dir = sys_get_temp_dir() . '/eternal-record-' . getmypid();

@@ -95,6 +95,16 @@ class Eternal
         return $seconds >= $delay;
     }
 
+    public static function primaryMissing($windows)
+    {
+        return $windows === null || !in_array('pm1', $windows, true);
+    }
+
+    public static function withPrimary($windows)
+    {
+        return $windows === null ? ['pm1'] : array_merge($windows, ['pm1']);
+    }
+
     /** This is called before cron.lock and every scheduled-job early return. */
     public static function ensure()
     {

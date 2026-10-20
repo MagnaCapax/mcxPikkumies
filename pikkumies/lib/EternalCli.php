@@ -60,6 +60,20 @@ class EternalCli
             }
             list($tmuxCode, $windowRows) = Eternal::tmux(['list-windows', '-t', '=pikkumies', '-F', '#W']);
             $windows = $tmuxCode === 0 ? explode("\n", trim($windowRows)) : [];
+            if (Eternal::primaryMissing($tmuxCode === 0 ? $windows : null)) {
+                $primary = EternalRecord::read('pm1');
+                if ($primary === null) {
+                    $primary = EternalRecord::initial();
+                }
+                $primary['lastStart'] = time();
+                EternalRecord::write('pm1', $primary);
+                if (!Eternal::start('pm1', $tmuxCode === 0)) {
+                    echo "Could not start Primary.\n";
+                    return 1;
+                }
+                $tmuxCode = 0;
+                $windows = Eternal::withPrimary($tmuxCode === 0 ? $windows : null);
+            }
             $used = [];
             foreach (range(2, 9) as $n) {
                 if (file_exists(EternalRecord::path('pm' . $n))) {
