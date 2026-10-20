@@ -16,7 +16,10 @@ class Http
      * a multipart/form-data request, curl builds it; exclusive with body), timeout (s, default 15),
      * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener, or 'system'),
      * discard (true: count the response bytes and keep none, for a throughput test; reaching max or the timeout
-     * after the first byte ends the transfer and is not an error).
+     * after the first byte ends the transfer and is not an error), unix_socket (path: the request is made over
+     * this unix socket instead of a TCP connection to $url's host/port -- $url still supplies the scheme, host
+     * and path curl puts on the request line and in the Host header; the socket's OWNERSHIP is checked instead
+     * of the usual local-TCP-port check, since there is no port to check, ADR-0019).
      * Returns ['code' => int (0 when no response), 'body' => string, 'headers' => [lowercase name => [values]],
      * 'error' => string]; with discard also 'bytes' (received), 'total_time' and 'start_time' (s, curl's own
      * clock: whole transfer, and until the first byte) and 'stopped' ('bytes', 'time' or null when it ended itself);
@@ -30,10 +33,29 @@ class Http
         if (isset($o['body']) && isset($o['fields'])) {
             return ['code' => 0, 'body' => '', 'headers' => [], 'error' => "'body' and 'fields' are exclusive; pass one or the other"];
         }
-        $refusal = self::foreignLocalListener($url, isset($o['owners']) ? $o['owners'] : [], $pin);
-        if ($refusal !== '') {
-            return ['code' => 0, 'body' => '', 'headers' => [], 'error' => $refusal];
+        $unixSocket = isset($o['unix_socket']) && is_string($o['unix_socket']) && $o['unix_socket'] !== '' ? $o['unix_socket'] : null;
+        $pin = null;
+        $local = false;
+        if ($unixSocket !== null) {
+            $u = parse_url((string) $url);
+            $scheme = is_array($u) && isset($u['scheme']) ? strtolower($u['scheme']) : '';
+            if (!in_array($scheme, ['http', 'https'], true) || !isset($u['host']) || $u['host'] === '') {
+                return ['code' => 0, 'body' => '', 'headers' => [], 'error' => 'not an http or https address with a host name; not connecting'];
+            }
+            $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+            if (!Host::ownsSocket($unixSocket, $uid)) {
+                return ['code' => 0, 'body' => '', 'headers' => [], 'error' => "unix socket $unixSocket is not this account's own listening socket; not connecting"];
+            }
+        } else {
+            $refusal = self::foreignLocalListener($url, isset($o['owners']) ? $o['owners'] : [], $pin, $local);
+            if ($refusal !== '') {
+                return ['code' => 0, 'body' => '', 'headers' => [], 'error' => $refusal];
+            }
         }
+        // A unix socket has no network path a proxy could sit on; a loopback/own-address target must
+        // never be handed to an env-configured http_proxy/https_proxy (the ownership check above covers
+        // the URL's own target, never a proxy's), so both force no proxy regardless of the environment.
+        $noProxy = $unixSocket !== null || $local;
         $max = isset($o['max']) ? (int) $o['max'] : self::MAX;
         $discard = !empty($o['discard']);
         $bytes = 0;
@@ -45,7 +67,6 @@ class Http
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
-            CURLOPT_RESOLVE => [$pin], // connect to the address foreignLocalListener checked
             CURLOPT_TIMEOUT => isset($o['timeout']) ? (int) $o['timeout'] : 15,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_USERAGENT => isset($o['agent']) ? $o['agent'] : 'pikkumies',
@@ -62,6 +83,15 @@ class Http
                 return strlen($body) > $max ? 0 : strlen($chunk);
             },
         ];
+        if ($noProxy) {
+            $opts[CURLOPT_PROXY] = ''; // curl: an empty proxy string explicitly disables any env-configured proxy
+            $opts[CURLOPT_NOPROXY] = '*';
+        }
+        if ($unixSocket !== null) {
+            $opts[CURLOPT_UNIX_SOCKET_PATH] = $unixSocket;
+        } else {
+            $opts[CURLOPT_RESOLVE] = [$pin]; // connect to the address foreignLocalListener checked
+        }
         if (isset($o['body'])) {
             $opts[CURLOPT_POSTFIELDS] = (string) $o['body'];
         } elseif (isset($o['fields'])) {
@@ -101,11 +131,16 @@ class Http
      * machine is used only when the listening socket is this user's own (ADR-0019). Returns '' or
      * the refusal text. $pin receives "host:port:ip" so curl connects to the address checked here
      * and DNS cannot change between the check and the connection. $owners: extra allowed uids;
-     * 'system' allows uids below 1000 (root and service accounts, never another customer).
+     * 'system' allows uids below 1000 (root and service accounts, never another customer). $local
+     * receives whether the target is loopback or one of this machine's own addresses: request()
+     * forces no proxy for it, because an env-configured http_proxy/https_proxy would otherwise carry
+     * a loopback app request to an external proxy, and the ownership check above never covers that
+     * proxy's own target, only the URL's.
      */
-    public static function foreignLocalListener($url, $owners = [], &$pin = null)
+    public static function foreignLocalListener($url, $owners = [], &$pin = null, &$local = null)
     {
         $pin = null;
+        $local = false;
         $u = parse_url((string) $url);
         $scheme = is_array($u) && isset($u['scheme']) ? strtolower($u['scheme']) : '';
         if (!in_array($scheme, ['http', 'https'], true) || !isset($u['host']) || $u['host'] === '') {
@@ -141,7 +176,7 @@ class Http
             || preg_match('/^(127\.|0\.|::1$|::$|::ffff:(127\.|0\.))/i', $ips[0])
             || in_array(strtolower($ips[0]), $mine, true);
         if (!$local) {
-            return '';
+            return ''; // not loopback or this machine's own address: a real proxy may legitimately apply
         }
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         $allowed = array_merge([$uid], $owners === 'system' ? range(0, 999) : (array) $owners);

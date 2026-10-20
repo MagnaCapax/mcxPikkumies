@@ -1,6 +1,6 @@
 <?php
 /**
- * TorrentClient: what each torrent-client unit implements (rtorrent, qbittorrent, deluge).
+ * TorrentClient: what each torrent-client unit implements (rtorrent, qbittorrent, deluge, transmission).
  * Records follow tools/torrent-clients/README.md: `id` (40 hex, lower case) first, plus `native`,
  * the client's own id string (kept internal, used for every call back to the client).
  * Failures throw CliError with a hint the agent can act on; a client that does not answer in

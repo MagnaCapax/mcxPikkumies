@@ -1,6 +1,6 @@
 # torrent-clients
 
-Tools for the user's own torrent clients: `rtorrent`, `qbittorrent` and `deluge`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Every unit has the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the list below.
+Tools for the user's own torrent clients: `rtorrent`, `qbittorrent`, `deluge` and `transmission`, one unit each ([ADR-0015](../../../docs/adr/0015-tool-units-one-skill-per-tool.md)). Every unit has the same verbs, arguments and record fields, so the agent learns them once; `lib/` holds the shared code and the contract test checks every unit against the list below. `move` is not a client and is exempt: it moves torrents between the user's boxes through these units (each unit adds `export` for it: the .torrent, checked against the id, saved to a 0600 file under `local/state/exports`).
 
 ## Verbs (the same in every unit)
 
@@ -63,6 +63,7 @@ The shared-file check sees only the torrents of the client being called: when tw
 | rtorrent | SCGI socket `~/.rtorrent.socket` | the `network.scgi.open_local` or `scgi_local` / `scgi_port` line in the rtorrent rc file |
 | qbittorrent | WebUI on 127.0.0.1, port in `~/.qbittorrentPort`; password set once by the user with `login` | `WebUI\Port` in `~/.config/qBittorrent/qBittorrent.conf` |
 | deluge | deluge-web on 127.0.0.1, port in `~/.delugeWebPort`; secret from `~/.config/deluge/auth` | `port` in `~/.config/deluge/web.conf` |
+| transmission | a unix socket, `~/.lighttpd/transmission.sock` | `rpc-bind-address` / `rpc-port` in `~/.config/transmission-daemon/settings.json` |
 
 A client on a port owned by another account is never contacted ([ADR-0019](../../../docs/adr/0019-hosts-and-credentials.md)). When a client cannot be reached, the error says which: not installed, not enabled, not running (with the config file it found when that file names the client but no binary is on `PATH`: a stopped client, or one run in a container), busy (no answer in time: unknown, not down), refused, or the port belongs to another account.
 
@@ -79,3 +80,7 @@ Things to ask that use only the verbs above and a publisher's own download page.
 | "Seed Big Buck Bunny, the Blender open movie" | Adds `archive.org/download/BigBuckBunny_124/BigBuckBunny_124_archive.torrent` (Creative Commons Attribution). |
 
 Checked on a PMSS account on 2026-10-17: rTorrent fetched the Debian 13.7.0 netinst torrent from its URL, downloaded the 792 MB image and was seeding it within 20 seconds. Seeding counts against the account's upload allowance (`stats`, `traffic`).
+
+## find
+
+`find` is exempt from the shared verb table above: it does not control one client, it locates one torrent -- by info-hash, name or words -- across every client this account has (and, with `--service`/`--all`, remote services too), so the agent knows which client and id the verbs above should actually use. See `find/README.md` and `find/USAGE.md`.

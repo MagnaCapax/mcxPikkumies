@@ -95,4 +95,30 @@ return [
             proc_close($proc);
         }
     },
+    'http: a set http_proxy/https_proxy is ignored for a loopback target and for a unix socket (CURLOPT_PROXY disabled, never the proxy\'s own target)' => function () {
+        if (!function_exists('curl_init')) {
+            skip('curl extension missing (CI installs it; a machine without it cannot run the tools either)');
+        }
+        list($proc, $base) = httpFixtureServer();
+        $old = ['http_proxy' => getenv('http_proxy'), 'https_proxy' => getenv('https_proxy')];
+        // Port 1 is privileged and unbound in this test: if the proxy were used, curl would try to
+        // reach it and fail/refuse at once, instead of the real loopback request succeeding.
+        putenv('http_proxy=http://127.0.0.1:1');
+        putenv('https_proxy=http://127.0.0.1:1');
+        try {
+            $r = Http::request('GET', "$base/echo");
+            check($r['code'] === 200, 'a set http_proxy reached a loopback target through the proxy instead of ignoring it: ' . json_encode($r));
+        } finally {
+            foreach ($old as $k => $v) {
+                putenv($v === false ? $k : "$k=$v");
+            }
+            proc_terminate($proc);
+            proc_close($proc);
+        }
+        // foreignLocalListener()'s $local output is scoped to loopback/own-address targets: a request that
+        // never resolves to one of those must not be told to skip the proxy either (the fix is not blanket).
+        $notLocal = null;
+        Http::foreignLocalListener('http://203.0.113.10/', [], $pin, $notLocal);
+        check($notLocal === false, 'a non-loopback, non-own-interface address was treated as local: proxy-skipping would wrongly apply to it too');
+    },
 ];
