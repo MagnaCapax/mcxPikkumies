@@ -7,9 +7,10 @@
  * are never looked at. For a push: the commits the remote does not have (all reachable ones for a remote with no
  * remote-tracking branches), their messages, added lines and file names; for gh: the title, body and notes, and the files
  * it publishes. Read with Redact::secrets() until PUBLISH_CHECK_SECONDS; anything left unread counts like a hit.
- * On a hit the call is blocked once with the lines as Redact masks them, for the agent to show the user; the same call
- * again (marker local/state/publish-check/<sha1>, 7 days) becomes a send question for the ask policy, which runs it only
- * after the user's yes (ADR-0073). With no session id or no marker the block stays. Fails closed (hook.md). A safety
+ * On a hit the call is blocked once with the lines as Redact masks them, and the agent takes the value out itself and
+ * publishes again (ADR-0101); the same call again (marker local/state/publish-check/<sha1>, 7 days) becomes a send
+ * question for the ask policy, which runs it only when what the user asked for covers it, else refuses it (ADR-0073).
+ * With no session id or no marker the block stays. Fails closed (hook.md). A safety
  * prompt, not security (AGENTS.md): a push run from code, a script or an alias is out of its sight.
  */
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
@@ -159,7 +160,7 @@ function publishCheckAnswer(array $payload, $localDir, $home, $visibility = 'pub
         $message = "Pikkumies: publishes to $places what looks like a secret, readable by everyone for good: "
             . (strlen($first) > 110 ? substr($first, 0, 110) . '...' : $first)
             . (count($hits) + count($notes) > 1 ? ' and ' . (count($hits) + count($notes) - 1) . ' more' : '')
-            . '. Only the user\'s yes after being shown these lines counts. Command [' . substr($sig, 0, 16) . ']';
+            . '. It runs only when what the user asked for covers publishing these lines. Command [' . substr($sig, 0, 16) . ']';
         if (HookUnits::approveShown($message)) {
             return ['action' => 'approve', 'kind' => 'send', 'rule_key' => 'pikkumies-publish:' . substr($sig, 0, 16), 'message' => $message];
         }
@@ -176,9 +177,9 @@ function publishCheckAnswer(array $payload, $localDir, $home, $visibility = 'pub
         . ($hits ? "\nWhat would go out looks like it holds a password, key or token, or a credential file (values masked):\n- "
             . implode("\n- ", array_slice($hits, 0, PUBLISH_CHECK_SHOWN)) . ($more > 0 ? "\n- and $more more" : '') : '')
         . ($notes ? "\nNot checked: " . implode('; ', $notes) . '.' : '')
-        . "\nShow the user these lines and ask whether they really want them published. Usually the value should come out first (rewrite the commit, keep it in a file that is not tracked)."
-        . ($recorded ? ' If the user says yes, run the same command again; their yes is then checked.'
-            : ' A yes cannot be checked here: tell the user the lines and the exact command, so they can fix it or run it themselves.')];
+        . "\nTake the value out yourself first (rewrite the commit, keep it in a file that is not tracked), then publish again: what goes out is checked again."
+        . ($recorded ? ' If it is meant to be public, run the same command again: it is then reviewed as a send and runs only when what the user asked for covers publishing it; otherwise it is refused.'
+            : ' Here it cannot be reviewed, so it is not run while it still holds these lines; list it as skipped, with this reason, in the final answer.')];
 }
 
 if (realpath((string) $_SERVER['SCRIPT_FILENAME']) === __FILE__) {

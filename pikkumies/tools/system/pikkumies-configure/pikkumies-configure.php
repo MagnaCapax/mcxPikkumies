@@ -2,8 +2,8 @@
 /**
  * pikkumies-configure: show, explain and change Pikkumies' own settings (ADR-0032, ADR-0059). Every change is one of
  * three tiers (ConfigureTiers): the agent makes the free ones, the orchestrator's ask policy decides the others (the
- * config-change hook): it runs when the user's own words already asked for it, and otherwise is blocked until the user
- * says yes in the chat (ADR-0073); the person's own are refused here with how the person makes them. note-add, notes and
+ * config-change hook): it runs when what the user asked for covers it, and otherwise is refused and reported
+ * (ADR-0073, ADR-0101); the person's own are refused here with how the person makes them. note-add, notes and
  * note-remove keep the user's own rules for one tool or category (ConfigureNotes, ADR-0076).
  */
 $lib = dirname(__DIR__, 3) . '/lib';
@@ -17,7 +17,7 @@ $usage = <<<'U'
 usage: php pikkumies-configure.php <verb> [arguments] [--human]
   show                    the current settings
   get <key>               one setting
-  set <key> <value>       one setting; review says which changes the agent may make, which ask the person, which are theirs
+  set <key> <value>       one setting; review says which changes the agent may make, which the safety check decides, which are theirs
   skills disable <name>   hide a shipped skill; `skills enable <name>` shows it again
   review                  every setting with what it means, which change the agent may make, and any warning
   note-add <tool or category> --text <note> | --text-file <file>

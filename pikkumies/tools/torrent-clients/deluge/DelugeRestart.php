@@ -31,7 +31,7 @@ class DelugeRestart
             throw new CliError('Deluge is not enabled, so it is not restarted', 'the user enables Deluge in the PMSS web panel (Deluge: start)');
         }
         if (!DelugeLocate::installed('pmss')) {
-            throw new CliError('Deluge is not installed on this machine', 'ask the provider');
+            throw new CliError('Deluge is not installed on this machine', 'the provider installs it: report it in your answer');
         }
         if (!function_exists('posix_kill')) {
             throw new CliError('the PHP posix extension is missing, so the tool cannot stop Deluge gracefully', 'use the PMSS web panel: Deluge, restart');

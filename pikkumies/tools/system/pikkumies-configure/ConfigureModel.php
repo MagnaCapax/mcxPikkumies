@@ -3,7 +3,7 @@
  * ConfigureModel: a model id is checked against the endpoint's own model list before provider.model or hooks.model is
  * written (ADR-0059). A model the endpoint does not serve would break every next start (or silently switch the hooks'
  * judges off), so the check fails closed: no endpoint, no key, no answer or no such id refuses the change. Runs in the
- * tool after the ask policy clears or the user's yes runs the command again (ADR-0073), never in the hook, which has
+ * tool after the ask policy clears the command (ADR-0073), never in the hook, which has
  * seconds to answer. The rate shown is the endpoint's own
  * credits_per_million_tokens (ADR-0050), when it sends one.
  */

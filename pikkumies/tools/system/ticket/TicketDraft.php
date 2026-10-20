@@ -48,7 +48,7 @@ class TicketDraft
         $email = $email === null ? self::rememberedEmail($stateDir) : trim((string) $email);
         // A plain address only: a quoted local part could carry quotes and words into the question before sending.
         if (strlen($email) > 254 || !preg_match('/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/D', $email) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            throw new CliError('the account email is not an email address', 'ask the user for the email of their Pulsed Media account and pass --email');
+            throw new CliError('the account email is not an email address', 'the email of their Pulsed Media account is needed: say so in your answer, then pass --email');
         }
         $subject = trim((string) preg_replace('/\s+/u', ' ', Redact::secrets((string) $subject)));
         $message = Redact::secrets(trim((string) $message));
@@ -164,14 +164,14 @@ class TicketDraft
         return ['name' => $name, 'data' => base64_encode($data)];
     }
 
-    /** The remembered account email, or a refusal telling the agent to ask the user once. */
+    /** The remembered account email, or a refusal telling the agent to say once that it is needed. */
     public static function rememberedEmail($stateDir = null)
     {
         $f = self::dir($stateDir) . '/email';
         $email = is_file($f) && !is_link($f) ? trim((string) file_get_contents($f, false, null, 0, 1024)) : '';
         if ($email === '') {
             throw new CliError('no account email yet: the ticket needs the email of the Pulsed Media account (the owner, or a user who may open tickets)',
-                'ask the user for it once and draft again with --email <address>; it is remembered for the next ticket');
+                'say once in your answer that it is needed, then draft again with --email <address>; it is remembered for the next ticket');
         }
         return $email;
     }

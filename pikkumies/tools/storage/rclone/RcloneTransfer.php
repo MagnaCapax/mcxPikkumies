@@ -23,7 +23,7 @@ class RcloneTransfer
         $status = ['verified' => $after['copy'] === 0 && $after['error'] === 0 && ($replace ? $after['replace'] === 0 : true)];
         if (!$replace && $after['replace'] > 0) {
             $status['note'] = "{$after['replace']} files already on the destination differ and were left as they are; --replace"
-                . ' overwrites them (the user is asked first)';
+                . ' overwrites them (the safety check decides)';
         }
         return ['records' => [$r], 'status' => $status];
     }

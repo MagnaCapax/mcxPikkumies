@@ -36,7 +36,7 @@ class PerfLimits
     const DISK_QUOTA_FACTOR = 2;          // provisional: refuse when free quota < this x probe bytes
     const PROBE_IO_MAX_BYTES = 327680;    // provisional: light probe I/O ceiling, 64 KiB written + 256 KiB read
 
-    // heavy (only on the user's yes, through the guard)
+    // heavy (only when the user asked for a load test; the guard names it)
     const HEAVY_DISK_READ_S = 30;         // provisional: fio read test duration
     const HEAVY_DISK_READ_MAX = 1073741824; // provisional: fio read test byte ceiling, 1 GiB
     const HEAVY_DISK_WRITE_BYTES = 268435456; // provisional: write test, 256 MiB, only when the server is not shared

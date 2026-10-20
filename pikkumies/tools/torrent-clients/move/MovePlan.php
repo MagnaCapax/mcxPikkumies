@@ -32,7 +32,7 @@ class MovePlan
         if ($to !== 'local') {
             return ['records' => [['run_on' => $to, 'command' => 'php ~/pikkumies/tools/torrent-clients/move/move.php plan ' . implode(' ', array_map('escapeshellarg', $args))
                 . ' --from <this box\'s name in the services list of ' . $to . '>']], 'status' => ['planned' => false,
-                'why' => 'a move runs on the box that receives the data (it pulls the files); ask Pikkumies there (`services remote ' . $to . '`) or run the command on that box']];
+                'why' => 'a move runs on the box that receives the data (it pulls the files); it is started there, by Pikkumies on ' . $to . ', with this command']];
         }
         $from = isset($opt['from']) && is_string($opt['from']) ? $opt['from'] : '';
         if ($from === '' || $from === 'local') {

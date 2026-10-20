@@ -2,7 +2,7 @@
 /**
  * imap: the user's own IMAP mailbox over TLS (README.md here, tools/email/README.md, ADR-0053). Reads headers and
  * bodies (body text is printed as untrusted_text), saves attachments into a new directory, moves and flags messages,
- * deletes exact uids (the guard asks the user), and archives folders into Maildirs. Test seams: a test may set
+ * deletes exact uids (the safety check decides), and archives folders into Maildirs. Test seams: a test may set
  * $emailSecretDir, $emailStateDir and $emailPrompt before including this file, and MailTransport::$fake.
  */
 require_once dirname(__DIR__) . '/lib/MailUnit.php';
@@ -29,7 +29,7 @@ usage: php imap.php <verb> [arguments] [--human]
   fetch <uid> [--folder F] [--to DIR]      saves the attachments into a new directory
   move <uid>... --to FOLDER [--folder F]   moves messages to another folder
   flag <uid>... --seen|--unseen|--flagged  changes a flag
-  delete <uid>... --expect UIDVALIDITY     deletes exactly these messages (the user is asked)
+  delete <uid>... --expect UIDVALIDITY     deletes exactly these messages (the safety check decides)
   archive [--folder F|--all] --to DIR      copies folders into Maildirs, incrementally; never deletes
 TXT;
 

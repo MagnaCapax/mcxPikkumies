@@ -122,8 +122,8 @@ return [
     },
     'configure: review says which direction of a switch is whose, and for a *.disabled key that true turns it off (ADR-0059)' => function () {
         check(ConfigureSettings::changes('halt.disabled') === 'turning it off (true): only the person; back on (false): the agent may', 'halt: ' . ConfigureSettings::changes('halt.disabled'));
-        check(ConfigureSettings::changes('hooks.reword') === 'on (true): the agent may; off (false): the person is asked', 'reword: ' . ConfigureSettings::changes('hooks.reword'));
-        check(ConfigureSettings::changes('cron.disabled') === 'turning it off (true): the person is asked; back on (false): the person is asked', 'cron: ' . ConfigureSettings::changes('cron.disabled'));
+        check(ConfigureSettings::changes('hooks.reword') === 'on (true): the agent may; off (false): the safety check decides', 'reword: ' . ConfigureSettings::changes('hooks.reword'));
+        check(ConfigureSettings::changes('cron.disabled') === 'turning it off (true): the safety check decides; back on (false): the safety check decides', 'cron: ' . ConfigureSettings::changes('cron.disabled'));
     },
     "CLI: 'get' with no arguments is a usage error at exit 1, distinct from an unrecognized verb at exit 2" => function () {
         // #39, #40: wrong-arg-count is deliberately exit 1 ("error", CliError); an unknown VERB is exit 2

@@ -28,7 +28,7 @@ return [
     },
     'guard hook asks the user (approve) for data deletes, one decision per command' => function () use ($guardOrchestrator, $guardUnit) {
         list(, $out) = runPhp($guardOrchestrator, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => 'rclone sync ~/data remote:backup']]));
-        check(json_decode($out, true) === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'through the orchestrator, with no yes to check, the delete is blocked: ' . $out);
+        check(json_decode($out, true) === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'through the orchestrator, with no yes to check, the delete is blocked: ' . $out);
         $hook = $guardUnit;
         $ask = function ($cmd) use ($hook) {
             list(, $out) = runPhp($hook, ['pre_tool_call'], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));

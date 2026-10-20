@@ -2,7 +2,7 @@
 /**
  * RclonePlan: what a copy, sync or move between two places would do. On rclone 1.66 or newer the plan is
  * `rclone sync --dry-run --combined -`: sync itself decides, with the rule the real sync and move use
- * (both go through NeedTransfer, fs/sync/sync.go:379, 1.69.1), so the counts the user approves are the
+ * (both go through NeedTransfer, fs/sync/sync.go:379, 1.69.1), so the counts the safety check reviews are the
  * counts that run. `--combined` lines (rclone_sync.md "Logger Flags", 1.69.1): "= path" identical, "- path"
  * only in the destination, "+ path" only in the source, "* path" different, "! path" error; directories
  * are not listed (cmd/sync/sync.go:44-49). `--retries 1`, because a retried run repeats lines (same

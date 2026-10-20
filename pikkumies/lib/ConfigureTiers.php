@@ -3,9 +3,9 @@
  * ConfigureTiers: who makes a settings change (ADR-0059). Every key of Config::defaults(), host.* and arr.<app>.config
  * has a rule, and the change from the current value to the new one is one of three tiers:
  * - free: the agent makes it when the user asks (the tightening direction, or harmless either way);
- * - approve: the orchestrator's ask policy decides first (the config-change hook, ADR-0073): it runs when the user's
- *   own words already asked for it, and otherwise is blocked until the user says yes in the chat; with no evidence of
- *   the user's words (cron and other unattended runs) a setting that deletes history stays blocked, every other
+ * - approve: the orchestrator's ask policy decides first (the config-change hook, ADR-0073, ADR-0101): it runs when what
+ *   the user asked for covers it, and otherwise is refused and reported, never asked; where the user's words cannot be
+ *   checked (a scheduled job made without them, other unattended runs) a setting that deletes history stays refused, every other
  *   setting in this tier runs;
  * - person: the configure tool refuses; the person edits local/config.php or uses an install flag.
  * The one decision the configure tool, the config-change hook and Config::set (which refuses the person's changes for
@@ -70,7 +70,7 @@ class ConfigureTiers
      * person's; any other unit may call the model on the user's credits, so less often or off is free and more often asks.
      */
     const EVERY = '/^hooks\.every\.([a-z0-9][a-z0-9-]{0,63})\z/';
-    /** What an asked change does, for the person reading Hermes' prompt; a switch has [when set true, when set false]. */
+    /** What an asked change does, for the ask review and the person reading the log; a switch has [when set true, when set false]. */
     const WHY = [
         'provider.model' => 'changes the model every session uses, and so what a session costs',
         'hooks.model' => 'changes the model the safety hooks\' judges use; one that does not answer them well silently turns those judges off',
@@ -82,8 +82,8 @@ class ConfigureTiers
         'hooks.reword' => [null, 'stops the model turning a question with no local hit into search terms, so such a question is searched with the words as typed'],
         'update.channel' => 'makes updates follow every change on that branch, code that has not been through a release',
         'sessions.retentionDays' => 'makes Hermes delete ended sessions older than that at its next start',
-        'ssh.allow' => 'lets the agent connect over SSH to these hosts without asking you each time (it still says why)',
-        'ssh.blockUnknown' => [null, 'lets the agent ask you about SSH hosts that are not on the allow list, instead of refusing them'],
+        'ssh.allow' => 'lets the agent connect over SSH to these hosts without the safety check each time (it still says why)',
+        'ssh.blockUnknown' => [null, 'lets SSH hosts that are not on the allow list go through the safety check, instead of refusing them'],
         'hooks.every' => 'runs that background check more often, and each run may call the model on your credits',
     ];
 

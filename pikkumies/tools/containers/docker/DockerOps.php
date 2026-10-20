@@ -411,11 +411,11 @@ class DockerOps
             $name = self::nameOf($i);
             if (count($ids) > 1) {
                 throw new CliError("nothing changed: $name was started with --rm, so docker deletes it when it stops; stop it on its own",
-                    "tell the user it will be deleted, then: stop $name --expect 1");
+                    "say in your message that it will be deleted, then: stop $name --expect 1");
             }
             if (!isset($opt['expect']) || !is_string($opt['expect']) || trim($opt['expect']) !== '1') {
                 throw new CliError("nothing changed: $name was started with --rm, so stopping it deletes it; that needs --expect 1",
-                    "tell the user it will be deleted, then: stop $name --expect 1");
+                    "say in your message that it will be deleted, then: stop $name --expect 1");
             }
         }
     }

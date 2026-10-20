@@ -28,9 +28,9 @@ usage: php docker.php <verb> [arguments] [--human]
   show <container> [--record <dir>]       one container's settings (env names only, never values); --record also writes them
   logs <container> [--lines N] [--since T]
   start|stop|restart <container>...       stop/restart wait 30 s; stopping an auto-remove container needs --expect 1
-  remove <container>... --expect <n>      stopped containers only; asks the user
+  remove <container>... --expect <n>      stopped containers only; the safety check decides
   images [--prune-plan [--all]]           images; --prune-plan shows what prune would remove and its --expect
-  prune --expect <n> [--all]              removes what images --prune-plan listed; asks the user
+  prune --expect <n> [--all]              removes what images --prune-plan listed; the safety check decides
   diagnose [<container> | --compose <file> | --network | --changes]
   launch-plan --image I --name N [--count K] [--port P] [--volume SRC:DST] [--env-file F] [--public] [--accept-shared-exposure]
   launch ...                              the exact line launch-plan printed

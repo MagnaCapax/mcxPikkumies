@@ -84,7 +84,7 @@ class RffmpegServices
     {
         if (!$this->loaded()) {
             throw new CliError('the Services list (pikkumies/lib/Services.php) is not installed on this Pikkumies yet',
-                'update Pikkumies, or ask the operator; rffmpeg needs it to reach a GPU host');
+                'update Pikkumies (the pikkumies-update skill); if it is still missing, report it in your answer: rffmpeg needs it to reach a GPU host');
         }
     }
 

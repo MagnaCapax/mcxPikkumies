@@ -35,9 +35,9 @@ class ConfigureSettings
         'autoUpdate.disabled' => 'Stops the daily `pikkumies update` from the crontab.',
         'cron.disabled' => 'Stops the per-minute ticker that runs Hermes\' scheduled jobs.',
         'hermes.lazyInstalls' => 'Lets Hermes download optional packages and a browser while it runs.',
-        'ssh.allow' => 'SSH hosts the agent may connect to without asking you (names, addresses or patterns such as *.home.example). Each connection still says why.',
+        'ssh.allow' => 'SSH hosts the agent may connect to without the safety check (names, addresses or patterns such as *.home.example). Each connection still says why.',
         'ssh.deny' => 'SSH hosts the agent must never connect to; this list wins over ssh.allow. Only you remove a host from it.',
-        'ssh.blockUnknown' => 'Refuses SSH hosts on neither list instead of asking you about them.',
+        'ssh.blockUnknown' => 'Refuses SSH hosts on neither list instead of passing them to the safety check.',
         'ticket.auto' => 'Whether a support ticket Pikkumies bundles by itself, when it is stuck, goes out without asking. Unset: on on a Pulsed Media server, off elsewhere. A ticket the user asks for is always shown to them first.',
         'provider.endpoint' => 'The AI endpoint. Empty: the one in the key file.',
         'provider.keyFile' => 'The AI key file read first.',
@@ -45,7 +45,7 @@ class ConfigureSettings
         'terms.accepted' => 'Whether the person accepted the terms of service and privacy policy. Only the person sets it.',
     ];
     /** What each rule's tiers read as in `review`. */
-    const TIER_WORDS = ['free' => 'the agent may', 'approve' => 'the person is asked', 'person' => 'only the person'];
+    const TIER_WORDS = ['free' => 'the agent may', 'approve' => 'the safety check decides', 'person' => 'only the person'];
 
     /** One record per setting: key and its effective value. */
     public static function show(array $config)

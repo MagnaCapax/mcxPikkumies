@@ -25,7 +25,7 @@ class RtorrentLocate
         $found = self::fromRc($home);
         if ($found === null) {
             throw new CliError(self::installed() ? 'rtorrent is not enabled: no rc file opens an SCGI socket or port (looked in ~/' . implode(', ~/', self::RC_FILES) . ')'
-                : 'rtorrent is not installed (no rtorrent binary and no rc file in ~/' . implode(', ~/', self::RC_FILES) . ')', 'add `network.scgi.open_local = ~/.rtorrent.socket` to the rc file and restart rtorrent, or ask the provider');
+                : 'rtorrent is not installed (no rtorrent binary and no rc file in ~/' . implode(', ~/', self::RC_FILES) . ')', 'add `network.scgi.open_local = ~/.rtorrent.socket` to the rc file (back it up first) and restart rtorrent; when rtorrent is not installed, report it in your answer');
         }
         list($kind, $value, $rc) = $found;
         if ($kind === 'local') {
@@ -58,7 +58,7 @@ class RtorrentLocate
                     'start rtorrent the way your provider says (it may run in a container or under another name)');
             }
             if (!self::installed()) {
-                throw new CliError("rtorrent is not installed (no $label and no rtorrent binary)", 'ask the provider to install rtorrent');
+                throw new CliError("rtorrent is not installed (no $label and no rtorrent binary)", 'the provider installs rtorrent: report it in your answer');
             }
             if (is_file("$home/.rtorrentDisable")) {
                 throw new CliError('rtorrent is not enabled: it was stopped in the panel (~/.rtorrentDisable)', 'the user starts it again with the start button in the panel');

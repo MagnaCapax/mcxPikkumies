@@ -128,7 +128,7 @@ return [
             && strpos($d['message'], 'cfg.yml:1: secret: REDACTED') !== false, 'unknown visibility was not scanned: ' . json_encode($d));
         for ($i = 0; $i < 2; $i++) {
             $d = pubAnswer($tree, 'git push', 'unknown', $calls, '');
-            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'A yes cannot be checked here') !== false, 'no session: ' . json_encode($d));
+            check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'Here it cannot be reviewed') !== false && strpos($d['message'], 'run it themselves') === false, 'no session: ' . json_encode($d));
         }
         testRmTree($tree);
     },

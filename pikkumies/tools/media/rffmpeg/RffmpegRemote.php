@@ -47,7 +47,7 @@ class RffmpegRemote
             $gap = self::DRI_DEVICE . ' does not exist on this host; no GPU render node to use';
         } elseif (!$driRw) {
             $gap = self::DRI_DEVICE . ' exists but this account cannot read and write it (groups: '
-                . (isset($vals['GROUPS']) ? $vals['GROUPS'] : '?') . '); ask whoever administers that host to add it to the device group';
+                . (isset($vals['GROUPS']) ? $vals['GROUPS'] : '?') . '); report it in your answer: adding the account to the device group needs whoever administers that host';
         }
         return ['ffmpeg_path' => isset($vals['FFMPEG']) ? $vals['FFMPEG'] : '', 'ffprobe_path' => isset($vals['FFPROBE']) ? $vals['FFPROBE'] : '',
             'gpu_usable' => $gap === null, 'gpu_gap' => $gap, 'groups' => isset($vals['GROUPS']) ? $vals['GROUPS'] : '',

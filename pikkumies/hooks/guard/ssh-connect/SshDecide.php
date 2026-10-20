@@ -21,7 +21,7 @@ class SshDecide
         foreach ($found['conns'] as $conn) {
             foreach ($conn['names'] as $name) {
                 if (SshLists::decide($config, [$name]) === SshLists::DENY) {
-                    return self::block("$name is on the user's SSH deny list. Not run. Tell the user; only they change that list.");
+                    return self::block("$name is on the user's SSH deny list, which only the user changes. Not run. Do not reach it another way; list it as skipped, with this reason, in the final answer.");
                 }
                 $names[$name] = true;
             }
@@ -47,7 +47,7 @@ class SshDecide
             $what = ($unknown ? 'SSH to ' . implode(', ', $unknown) . ', not on your SSH allow list' : 'an SSH connection')
                 . ($routes ? ' (through ' . implode('; ', $routes) . ', which this check cannot follow)' : '');
             if (SshLists::blockUnknown($config)) {
-                return self::block("$what, and the user refuses unknown hosts (ssh.blockUnknown). Not run. Tell the user; they can add the host to ssh.allow.");
+                return self::block("$what, and the user refuses unknown hosts (ssh.blockUnknown, their own setting; ssh.allow is theirs too). Not run. Do not reach it another way; list it as skipped, with this reason, in the final answer.");
             }
             $what .= ($why !== '' ? ". The agent says why: $why" : '') . ($configNote !== '' ? "; it also $configNote" : '');
         } elseif ($configNote !== '') {
@@ -62,8 +62,7 @@ class SshDecide
         $id = substr(sha1($call['key']), 0, 16);
         $message = "Pikkumies: $what. Command [$id]: {$call['shown']}";
         if (!HookUnits::approveShown($message)) {
-            return self::block("$what, and the question is too long to show the user in full. Not run. Shorten the command or its intent, or split it; the user"
-                . ' can also add the host to ssh.allow.');
+            return self::block("$what, and the question is too long to show the user in full. Not run. Shorten the command or its intent, or split it.");
         }
         self::remember($call, $names);
         return ['action' => 'approve', 'rule_key' => 'pikkumies-ssh:' . $id, 'message' => $message];

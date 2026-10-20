@@ -35,7 +35,7 @@ If a round changes the pick, run another round on the new pick. Stop when a roun
 
 - The answer you settled on, its source, trust level and page address.
 - That another source says otherwise, what it says, and why you did not follow it.
-- If three rounds did not settle it: say so plainly, give both claims with their sources, and say what would settle it (often: ask the provider's support).
+- If three rounds did not settle it: say so plainly, give both claims with their sources, and say what would settle it (often the provider's support, which the ticket skill reaches when the user asked for a ticket).
 
 Never present an unresolved conflict as settled, and never merge two claims into one that neither source makes.
 

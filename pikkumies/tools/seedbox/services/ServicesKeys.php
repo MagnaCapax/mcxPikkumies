@@ -109,7 +109,7 @@ class ServicesKeys
             $seen[] = $fp;
         }
         throw new CliError("no host key of {$svc['host']} (" . implode(', ', array_unique(array_filter($seen))) . ") is $want; nothing was sent",
-            'someone may be in between, or the fingerprint is wrong: ask the owner of that machine');
+            'someone may be in between, or the fingerprint is wrong: report the mismatch in your answer; it is a security matter for the owner of that machine, never something to work around');
     }
 
     /** `pubkey <nick>`: this box's key for that service (made when missing) and the command to run on the other box. */

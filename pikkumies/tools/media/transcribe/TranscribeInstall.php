@@ -65,7 +65,7 @@ class TranscribeInstall
     {
         foreach (['gcc', 'g++', 'make'] as $need) {
             if (ToolProc::which($need) === null) {
-                throw new CliError("$need is not installed on this machine; nothing was built", 'ask the provider to install a C/C++ build toolchain');
+                throw new CliError("$need is not installed on this machine; nothing was built", 'the provider installs a C/C++ build toolchain: report it in your answer');
             }
         }
         $home = HomePath::home();
@@ -79,7 +79,7 @@ class TranscribeInstall
         $needMem = TranscribePins::memNeeded($model);
         if ($mem !== null && $mem < $needMem) {
             throw new CliError("not enough free memory to build the local engine (" . $model . " needs about $needMem bytes, $mem available);"
-                . ' nothing was built', 'try --model=base, or ask the provider for more memory');
+                . ' nothing was built', 'try --model=base; more memory is the provider\'s to give: report it in your answer');
         }
     }
 
@@ -103,7 +103,7 @@ class TranscribeInstall
         $arch = php_uname('m');
         if (!in_array($arch, ['x86_64', 'amd64'], true)) {
             throw new CliError("no cmake is on PATH and this machine's architecture ($arch) is not x86_64; nothing was downloaded",
-                'ask the provider to install cmake 3 or newer');
+                'the provider installs cmake 3 or newer: report it in your answer');
         }
         self::fetchAndExtract($pin['url'], $pin['sha256'], $destDir, $pin['dirname'], "$destDir/{$pin['dirname']}");
     }

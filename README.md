@@ -33,7 +33,7 @@ bash install-pikkumies.sh # the installer again: it updates an existing install
 
 The agent runtime (Hermes) is updated separately, when you choose: `/update` inside a session, or `pikkumies run update` with no session open. Updates follow releases; to follow every change on `main` instead, install with `--channel=git/main` or run `pikkumies configure` ([docs/install.md](docs/install.md)). To stop the daily update, set `autoUpdate.disabled` in `~/pikkumies/local/config.php`. An update never touches your settings, lessons or sessions; if you edited a shipped file, it stops and names the file. Details in [docs/install.md](docs/install.md), section Update.
 
-**Experimental:** Pikkumies is early software. Keep backups of anything that matters. It asks before deleting data, but it can still be wrong, so read what it proposes before you say yes.
+**Experimental:** Pikkumies is early software. Keep backups of anything that matters. It does the work you ask for without asking you questions; a delete, send or exposure that cannot be taken back runs only when your own words cover it, and is otherwise refused and reported in its answer. It can still be wrong, so check the results that matter to you.
 
 **Compatibility:** we aim never to break existing installs, but Pikkumies is changing fast right now. We cannot promise when it will settle, or that an update will never break something that worked before.
 
@@ -53,8 +53,8 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - The provider's wiki and knowledge base, searched on your machine: [wiki](pikkumies/tools/documentation/wiki/README.md), [knowledge base](pikkumies/tools/documentation/kb/README.md)
 - Lessons it saves, searched together with all the documentation: [memory](pikkumies/tools/memory/pikkumies/README.md)
 - Longer research questions: [deep research](pikkumies/tools/research/deep-research/README.md)
-- Sending Pulsed Media a problem report with the conversation, locked so only Pulsed Media can read it; Pikkumies asks you before it sends, and, only if you turn it on, now and then asks whether you want to send one: [feedback](pikkumies/tools/system/feedback/README.md). For anything private use this, not Hermes' `/debug`, which uploads to a public paste site; `/debug local` shows the report without uploading.
-- Opening a Pulsed Media support ticket with your AI key, from what you say and the files you name; Pikkumies shows the draft and asks you before it sends: [ticket](pikkumies/tools/system/ticket/README.md).
+- Sending Pulsed Media a problem report with the conversation, locked so only Pulsed Media can read it; it is sent only when you asked for it, and, only if you turn it on, Pikkumies now and then asks whether you want to send one: [feedback](pikkumies/tools/system/feedback/README.md). For anything private use this, not Hermes' `/debug`, which uploads to a public paste site; `/debug local` shows the report without uploading.
+- Opening a Pulsed Media support ticket with your AI key, from what you say and the files you name; it is sent only when you asked for a ticket, and the answer shows what was sent: [ticket](pikkumies/tools/system/ticket/README.md).
 
 It is not only for server work: it answers general questions and investigates too.
 

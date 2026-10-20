@@ -196,7 +196,7 @@ if ($hookEvent === 'pre_llm_call') {
     }
     $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);
     if ($hookEvent === 'pre_tool_call' && is_array($answer) && $answer['action'] === 'approve') {
-        $answer = ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED]; // never reached: AskPolicy leaves no approve
+        $answer = ['action' => 'block', 'message' => AskPolicy::refused(true)]; // never reached: AskPolicy leaves no approve
     }
     if ($hookEvent === 'pre_tool_call' && $answer === null) {
         $answer = HookFeed::hold($feed, $payload); // an interval unit's notice, only when no unit had an opinion

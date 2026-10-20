@@ -216,7 +216,7 @@ class Services
                 'only the person removes a host from that list, by hand in local/config.php (docs/ssh.md)');
         }
         if ($decision !== SshLists::ALLOW && SshLists::blockUnknown($config)) {
-            throw new CliError("$host is not on the SSH allow list and ssh.blockUnknown is on; nothing was sent", 'ask the person to add it to ssh.allow (docs/ssh.md)');
+            throw new CliError("$host is not on the SSH allow list and ssh.blockUnknown is on; nothing was sent", 'ssh.allow is the person\'s own setting (docs/ssh.md): list this step as skipped, with this reason, in your answer');
         }
     }
 

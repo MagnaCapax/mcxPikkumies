@@ -1,18 +1,21 @@
 <?php
 /**
- * AskPolicy (ADR-0073, amended 2026-10-19): what happens to hook questions ("approve" answers on pre_tool_call).
+ * AskPolicy (ADR-0073, ADR-0101): what happens to hook questions ("approve" answers on pre_tool_call).
  * Hermes runs with approvals.mode "off", which approves every hook question silently (Hermes v0.22.2 tools/approval.py
  * _run_approval_gate), so no question ever leaves this policy: each is dropped (the call runs) or becomes a block with
- * one fixed message (no model text). Applied by hooks/orchestrator.php to the units' answers before they are merged:
+ * one fixed message (no model text). Nothing is ever asked: a refused step is reported, never handed to the person.
+ * Applied by hooks/orchestrator.php to the units' answers before they are merged:
  * - a load test or stopping the container daemon runs: neither loses or reveals anything;
  * - every other question goes to one AskReview of all of them together; the call runs unless the review finds it
- *   irreversible and not covered by what the user wrote, and then it is blocked with BLOCK_CONFIRM: the agent says in
- *   one line what it would destroy or send and runs it again after the user's yes, which the review then finds (R1);
- * - the /feedback and /ticket sends and the person's own local hooks are reviewed as a send: only the user's explicit yes clears them;
- * - with no evidence (a messaging gateway, a scheduled run, an agent started by an agent, halt.disabled), no time or no
- *   review answer, a yes cannot be checked: deletes, exposures, sends, mail, the feedback and ticket sends and local hooks are
- *   blocked with BLOCK_UNCHECKED; every other kind runs, since it destroys nothing that has no copy.
- * An error here blocks every question.
+ *   irreversible and not covered by what the user asked for, and then it is refused with refused(): the agent finishes
+ *   the rest and lists the step as skipped, with the reason, in its final answer;
+ * - the /feedback and /ticket sends and the person's own local hooks are reviewed as a send (R2 is yes whatever the
+ *   model says), so only the user's own request covering them (R1 yes, R3 no) clears them;
+ * - with no evidence (a scheduled run with no record of the person's words, a gateway that lets anyone write, an agent
+ *   started by an agent, halt.disabled), no time or no review answer, the check cannot run: deletes, exposures, sends,
+ *   mail, the feedback and ticket sends and local hooks are refused (the unchecked reason); every other kind runs,
+ *   since it destroys nothing that has no copy.
+ * An error here refuses every question.
  */
 require_once __DIR__ . '/AskReview.php';
 require_once __DIR__ . '/HaltState.php';
@@ -22,29 +25,34 @@ class AskPolicy
 {
     const DROP = ['load', 'stop'];                            // guard-destructive kinds that lose and reveal nothing
     const DISCLOSE = ['send', 'mail', 'exposure'];            // cannot be taken back: R2 is yes without asking the model
-    const UNCHECKED_BLOCK = ['delete', 'exposure', 'send', 'mail']; // still blocked when no yes can be checked
-    const CONFIRM_UNITS = ['guard/feedback-send', 'guard/ticket-send']; // the operator asked for this confirmation (ADR-0056, ADR-0089)
+    const UNCHECKED_BLOCK = ['delete', 'exposure', 'send', 'mail']; // still refused when the check cannot run
+    const CONFIRM_UNITS = ['guard/feedback-send', 'guard/ticket-send']; // data leaves for Pulsed Media: reviewed as a send (ADR-0056, ADR-0089)
 
-    const BLOCK_CONFIRM = 'Pikkumies safety: not run. This could destroy or send something that has no copy, and the user\'s'
-        . ' own messages do not ask for exactly this. Do not reach the same effect another way. Finish the rest of the task,'
-        . ' say to the user in one line what this command would destroy or send, and run the same command again only after'
-        . ' they say yes in the chat.';
-    const BLOCK_UNCHECKED = 'Pikkumies safety: not run. This could destroy or send something that has no copy, and a yes from'
-        . ' the user cannot be checked in this session. Do not reach the same effect another way. Finish the rest of the task,'
-        . ' and say to the user in one line what this command would destroy or send, with the exact command, so they can run'
-        . ' it themselves if they want it.';
+    /** The one refusal (ADR-0101): %s is WHY_UNCOVERED or WHY_UNCHECKED. It never asks and never hands the step over. */
+    const BLOCK_REFUSED = 'Pikkumies safety: not run. This could destroy or send something that has no copy, and %s.'
+        . ' Do not reach the same effect another way. Finish the rest of the task, and in the final answer list this step'
+        . ' as skipped, with this reason. Do not offer to run it, and do not give the command to the user.';
+    const WHY_UNCOVERED = 'what the user asked for in their own messages does not cover it';
+    const WHY_UNCHECKED = 'the check of what the user asked for could not run in this session';
 
     /** Test seam: a callable($tool, $questions, $evidence, $timeout) returning parsed R answers, instead of the model. */
     public static $reviewer = null;
 
+    /** The fixed refusal text: the review found the step not covered, or ($unchecked) it could not run. */
+    public static function refused($unchecked = false)
+    {
+        return sprintf(self::BLOCK_REFUSED, $unchecked ? self::WHY_UNCHECKED : self::WHY_UNCOVERED);
+    }
+
     /**
      * $results: the directives of every unit (approve ones carry 'unit', and 'local' => true from a local unit).
      * $evidence: the halt snapshot's asked entries (AskReview::evidence). $seconds: time left for a review.
-     * Returns [the directives with every approve removed or turned into a block, counts for the hook log].
+     * Returns [the directives with every approve removed or turned into a block, counts for the hook log: numbers and
+     * the reason code 'unchecked' (refusals because the check could not run), never the person's words or the command].
      */
     public static function apply(array $results, $tool, array $evidence, $seconds)
     {
-        $counts = ['blocked' => 0, 'dropped' => 0, 'cleared' => 0, 'ran' => 0];
+        $counts = ['blocked' => 0, 'dropped' => 0, 'cleared' => 0, 'ran' => 0, 'unchecked' => 0];
         $original = $results;
         try {
             foreach ($results as $r) {
@@ -73,11 +81,12 @@ class AskPolicy
                     unset($results[$i]);
                     $counts['cleared']++;
                 } elseif ($keep === true) {
-                    $results[$i] = ['action' => 'block', 'message' => self::BLOCK_CONFIRM];
+                    $results[$i] = ['action' => 'block', 'message' => self::refused()];
                     $counts['blocked']++;
                 } elseif (self::route($r) === 'confirm' || in_array(self::kind($r), self::UNCHECKED_BLOCK, true)) {
-                    $results[$i] = ['action' => 'block', 'message' => self::BLOCK_UNCHECKED];
+                    $results[$i] = ['action' => 'block', 'message' => self::refused(true)];
                     $counts['blocked']++;
+                    $counts['unchecked']++;
                 } else {
                     unset($results[$i]);
                     $counts['ran']++;
@@ -86,15 +95,15 @@ class AskPolicy
         } catch (\Throwable $e) {
             foreach ($original as $i => $r) {
                 if (is_array($r) && isset($r['action']) && $r['action'] === 'approve') {
-                    $original[$i] = ['action' => 'block', 'message' => self::BLOCK_UNCHECKED];
+                    $original[$i] = ['action' => 'block', 'message' => self::refused(true)];
                 }
             }
-            return [array_values($original), ['blocked' => 0, 'dropped' => 0, 'cleared' => 0, 'ran' => 0, 'error' => 1]];
+            return [array_values($original), ['blocked' => 0, 'dropped' => 0, 'cleared' => 0, 'ran' => 0, 'unchecked' => 0, 'error' => 1]];
         }
         return [array_values($results), $counts];
     }
 
-    /** 'confirm' (cleared only by the user's explicit yes), 'drop' or 'review' for one approve directive. */
+    /** 'confirm' (reviewed as a send: only the user's own request clears it), 'drop' or 'review' for one approve directive. */
     public static function route(array $approve)
     {
         $unit = isset($approve['unit']) ? (string) $approve['unit'] : '';
@@ -109,7 +118,7 @@ class AskPolicy
         return isset($approve['kind']) ? (string) $approve['kind'] : '';
     }
 
-    /** One review for all reviewed questions of this call: true blocks them all, false clears them, null: no answer. */
+    /** One review for all reviewed questions of this call: true refuses them all, false clears them, null: no answer. */
     private static function keepAfterReview(array $review, $tool, array $evidence, $timeout)
     {
         $questions = [];

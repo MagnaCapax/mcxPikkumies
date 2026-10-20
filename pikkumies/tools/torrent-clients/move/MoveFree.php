@@ -38,11 +38,11 @@ class MoveFree
         $files = $src->files($from, $sc, $ids)['status'];
         $now = isset($files['expect']) ? (string) $files['expect'] : '';
         if ($now !== $expect) {
-            throw new CliError("source not freed: its files now total $now, not $expect", "show the user the new total; run {$move['id']} --free-source --expect $now --intent \"...\" only after they confirm it");
+            throw new CliError("source not freed: its files now total $now, not $expect", "find why it changed (`show <ids> --files` on the source); run {$move['id']} --free-source --expect $now --intent \"...\" only while the move's torrents still seed complete here");
         }
         if (!empty($files['refused']) || !empty($files['unchecked'])) {
             throw new CliError('source not freed: a file is shared with another torrent on the source, or a torrent\'s files could not be listed there',
-                'the source keeps its copy; tell the user which torrents share files (`show <ids> --files` on the source)');
+                'the source keeps its copy; say in your answer which torrents share files (`show <ids> --files` on the source)');
         }
         $command = "php ~/pikkumies/tools/torrent-clients/$sc/$sc.php remove " . implode(' ', $ids) . " --with-data --expect $expect";
         $this->state->intent(['move' => $move['id'], 'from' => $from, 'ids' => $ids, 'sizes' => array_map(function ($m) {
@@ -56,7 +56,7 @@ class MoveFree
             $this->state->log($move['id'], 'free', '', 'not allowed by the source key', ['command' => $command]);
             return ['records' => [['run_on' => $from, 'command' => $command]], 'status' => ['move' => $move['id'], 'freed' => false,
                 'why' => "the key for $from was not set up with --allow-delete, so this box cannot delete there; the source is untouched",
-                'next' => "run the command on $from (or add --allow-delete to that key with `services` and run this again)"]];
+                'next' => "the old copy stays on $from: say so in the answer, and that its key has no --allow-delete; do not reach it another way"]];
         }
         try {
             $r = $this->run->unit($from, $sc, array_merge(['remove'], $ids, ['--with-data', '--expect', $expect]), null, 600);

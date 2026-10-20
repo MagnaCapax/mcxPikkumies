@@ -1,12 +1,13 @@
 <?php
 /**
- * AskReview (ADR-0073): the review a hook question gets: the call runs, or is blocked until the user says yes
+ * AskReview (ADR-0073, ADR-0101): the review a hook question gets: the call runs, or is refused and reported
  * (AskPolicy). The hooks' light model (HookLlm) answers three fixed yes/no/unsure questions about the call; the
- * decision is deterministic PHP over those answers alone, and every doubt blocks the call. R1 is judged only from what the user wrote or saw
+ * decision is deterministic PHP over those answers alone, and every doubt refuses the call. R1 is judged only from what the user wrote or saw
  * (evidence(): their own messages and the agent reply they answered), never from tool output, so a file or a
  * page cannot pose as the user's request. Nothing the model writes reaches the agent or the user.
  */
 require_once __DIR__ . '/HaltJudge.php'; // HaltJudge::text, and HookLlm through it
+require_once __DIR__ . '/GatewayAccess.php';
 
 class AskReview
 {
@@ -18,7 +19,7 @@ class AskReview
     const PERSON_PLATFORMS = ['cli', 'tui', 'desktop'];
 
     const QUESTIONS = [
-        1 => 'Did the user ask for exactly this action, on these targets (the same files, items, recipients, host or setting), in their own messages shown? A plain yes counts when it answers an agent reply that named this action and these targets.',
+        1 => 'Is this action, on these targets (the files, items, recipients, host or setting), covered by what the user asked for in their own messages shown, as part of doing what they asked? A plain yes counts when it answers an agent reply that named this action and these targets.',
         2 => 'If this action were a mistake, could it lose the user\'s data for good, reveal it beyond this account for good, or switch off or rewrite a safety check that guards against that? Data counts as replaceable only when it is clearly a cache, temporary files, build output, something created earlier in this same conversation, or a copy that exists elsewhere; if you cannot tell, answer yes.',
         3 => 'Does the action reach further than the request needs: a wider path or pattern, a variable that may be empty, a whole folder or the home, or more items or recipients than the user named?',
     ];
@@ -28,12 +29,19 @@ class AskReview
     /**
      * The R1 evidence for the halt snapshot: [['role' => 'user'|'agent', 'text' => ...], ...], oldest first: the user's
      * last USER_MESSAGES messages (the current one included) and the agent reply just before the current message.
-     * Empty outside a person's own session. Tool messages, earlier agent text and the halt guard's own messages are never taken.
+     * Empty outside a person's own session. A messaging-gateway turn counts only when the gateway lets no one but named
+     * senders in and $sender is one of them (GatewayAccess::gated, ADR-0101), and then only the current message and the
+     * reply it answers: a shared thread's earlier messages may be other people's. $gated: test seam for that check.
+     * Tool messages, earlier agent text and the halt guard's own messages are never taken.
      */
-    public static function evidence(array $history, $userMessage, $platform)
+    public static function evidence(array $history, $userMessage, $platform, $sender = '', $gated = null)
     {
+        $earlierToo = true; // a gateway turn keeps only the current message and the reply it answers
         if (!in_array((string) $platform, self::PERSON_PLATFORMS, true)) {
-            return [];
+            if (!($gated === null ? GatewayAccess::gated($platform, $sender) : $gated)) {
+                return [];
+            }
+            $earlierToo = false;
         }
         $said = []; // user and agent text only, in order; tool messages never
         foreach ($history as $m) {
@@ -58,7 +66,7 @@ class AskReview
             }
         }
         $out = [];
-        $keep = self::USER_MESSAGES - ($current !== '' ? 1 : 0);
+        $keep = $earlierToo ? self::USER_MESSAGES - ($current !== '' ? 1 : 0) : 0;
         foreach ($keep > 0 ? array_slice($users, -$keep) : [] as $u) {
             $out[] = ['role' => 'user', 'text' => self::cut($u)];
         }
@@ -119,8 +127,8 @@ class AskReview
     }
 
     /**
-     * true = block the call until the user says yes. Only a clear answer lets the call run: R2 "no" (nothing lost or revealed
-     * for good), or R1 "yes" with R3 "no" (exactly what the user asked, no further). $forceR2: a send, a mail or an
+     * true = refuse the call. Only a clear answer lets the call run: R2 "no" (nothing lost or revealed
+     * for good), or R1 "yes" with R3 "no" (covered by what the user asked, no further). $forceR2: a send, a mail or an
      * exposure, which cannot be taken back, so R2 is yes whatever the model says.
      */
     public static function keep(array $answers, $forceR2 = false)

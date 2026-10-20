@@ -61,7 +61,7 @@ class MoveSource
         }
         throw new CliError("nothing planned: $query matches " . count($found) . " torrents on $nick: " . implode('; ', array_map(function ($f) {
             return "{$f['client']} {$f['id']} {$f['name']} ({$f['size']} bytes)";
-        }, array_slice($found, 0, 5))), 'name the one meant by its id; compare size and files (`show <id> --files`) and ask the user once if still unsure');
+        }, array_slice($found, 0, 5))), 'name the one meant by its id; compare size and files (`show <id> --files`); if more than one still fits, say in your answer which candidates remain');
     }
 
     /** Exact name matches, else the names that contain the query (case-insensitive). */

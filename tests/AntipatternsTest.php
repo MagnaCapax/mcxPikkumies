@@ -176,9 +176,9 @@ return [
             testRmTree($tree2);
         }
     },
-    'antipatterns: the Never line on user data says the 2026-10-19 rule word for word (a copy, or the exact request plus a clean review); Changing data, the Python rule and the common-mistakes pointer reach SOUL.md (ADR-0063)' => function () {
+    'antipatterns: the Never line on user data says the rule word for word (a copy, or a request that covers it plus a clean review, ADR-0101); Changing data, the Python rule and the common-mistakes pointer reach SOUL.md (ADR-0063)' => function () {
         $safety = (string) file_get_contents(Config::root() . '/doctrine/safety.md');
-        check(explode("\n", $safety)[6] === "- Never delete, overwrite or truncate user data that has no copy, unless the user asked for exactly that and an adversarial review found nothing they would not want. Size does not matter: one byte or one terabyte.", 'safety.md line 7 changed: ' . explode("\n", $safety)[6]);
+        check(explode("\n", $safety)[6] === "- Never delete, overwrite or truncate user data that has no copy, unless what the user asked for covers it and an adversarial review found nothing they would not want. Size does not matter: one byte or one terabyte.", 'safety.md line 7 changed: ' . explode("\n", $safety)[6]);
         check(strpos($safety, "## Never\n") < strpos($safety, "## Changing data\n") && strpos($safety, "## Changing data\n") < strpos($safety, "## Always\n"), 'Changing data must sit between Never and Always');
         $doctrine = (string) file_get_contents(Config::root() . '/doctrine/doctrine.md');
         $accuracy = substr($doctrine, 0, (int) strpos($doctrine, "\n## Sources and trust"));

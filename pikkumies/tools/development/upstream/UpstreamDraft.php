@@ -44,12 +44,12 @@ class UpstreamDraft
         list($url, $complete) = self::url($repo, $t2, $b2);
         return ['records' => [
             ['draft' => $file, 'repo' => $repo, 'title' => $t2, 'text' => $b2, 'replaced' => $replaced,
-                'public' => 'a public, permanent issue under the user\'s own GitHub name; show the user this whole text and the replaced list first'],
+                'public' => 'a public, permanent issue under the user\'s own GitHub name; put this whole text and the replaced list in your answer'],
             ['open' => $url, 'complete' => $complete, 'how' => $complete
                 ? 'default: the user opens this link in their own logged-in browser, reviews it and submits it there'
                 : 'the link holds the start of the text only: the user pastes the rest from the draft file before submitting'],
             ['gh' => 'gh issue create -R ' . $repo . ' --title ' . escapeshellarg($t2) . ' --body-file ' . escapeshellarg($file),
-                'how' => 'only when `gh auth status` shows the user is already logged in, and only after the user\'s own yes; never gh api, curl, --web or --editor'],
+                'how' => 'only when `gh auth status` shows the user is already logged in, and only when the user asked for it to be filed with gh; never gh api, curl, --web or --editor'],
         ], 'status' => ['sent' => false]];
     }
 

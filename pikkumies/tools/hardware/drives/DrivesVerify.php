@@ -53,10 +53,10 @@ class DrivesVerify
         if ($role === 'data' && empty($opt['with-data'])) {
             throw new CliError("this disk holds data ($detail): an interrupted pass can lose the block under test, and anything that still writes"
                 . ' to the disk during the pass (a VM, an export, a program using the raw device) loses those writes',
-                'stop whatever uses it and copy anything you need off it first (a lone disk is the only copy), then add --with-data; the user is asked once');
+                'stop whatever uses it and copy anything you need off it first (a lone disk is the only copy), then add --with-data; the safety check decides');
         }
         if (!empty($opt['fix-unreadable']) && empty($opt['with-data'])) {
-            throw new CliError('--fix-unreadable writes over the unreadable blocks', 'add --with-data; the user is asked once');
+            throw new CliError('--fix-unreadable writes over the unreadable blocks', 'add --with-data; the safety check decides');
         }
         $busy = $host->mdBusy();
         if ($busy !== '') {

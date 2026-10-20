@@ -102,6 +102,7 @@ class SendGuard
             return $block("run the $word send on its own, exactly $plain, with nothing before or after it.");
         }
         $id = $m[2];
+        $yourself = "Do not reach the same effect another way; finish the rest and list this send as skipped, with this reason, in the final answer, without the command.";
         require_once __DIR__ . '/Config.php';
         require_once __DIR__ . '/Cli.php';
         require_once __DIR__ . '/HookUnits.php';

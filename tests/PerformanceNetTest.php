@@ -119,7 +119,7 @@ return [
             perfDone($fx);
         }
     },
-    'performance net: no target refuses with the target to pass (--target ssh, no question); ssh without an SSH connection refuses and asks the user for their address; nothing runs' => function () {
+    'performance net: no target refuses with the target to pass (--target ssh, no question); ssh without an SSH connection refuses and says the address is a fact only the user has; nothing runs' => function () {
         $fx = perfFixture();
         try {
             list($code, $recs) = perfRun($fx, ['net']);
@@ -127,7 +127,7 @@ return [
             check($code === 2 && strpos($last['hint'], '--target ssh') !== false && strpos($last['hint'], 'ask the user') === false, 'dispatcher: ' . json_encode($last));
             list($code, $recs) = perfRun($fx, ['net', '--target', 'ssh'], [], ['SSH_CONNECTION' => null]);
             $last = $recs[count($recs) - 1];
-            check($code === 1 && strpos($last['error'], 'no SSH connection') !== false && strpos($last['hint'], 'ask the user') !== false, 'ssh without SSH_CONNECTION: ' . json_encode($last));
+            check($code === 1 && strpos($last['error'], 'no SSH connection') !== false && strpos($last['hint'], 'a fact only they have') !== false && strpos($last['hint'], 'ask the user') === false, 'ssh without SSH_CONNECTION: ' . json_encode($last));
             list($code, $recs) = perfRun($fx, ['net', '--target', 'ssh'], [], ['SSH_CONNECTION' => 'not-an-ip 1 2 3']);
             check($code === 1, 'a malformed SSH_CONNECTION must refuse, got ' . $code);
             check(perfFakeCalls($fx) === [], 'a program ran: ' . json_encode(perfFakeCalls($fx)));

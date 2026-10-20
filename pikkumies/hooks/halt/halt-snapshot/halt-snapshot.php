@@ -10,6 +10,8 @@ require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/HaltState.php';
 require_once dirname(__DIR__, 3) . '/lib/HaltJudge.php';
 require_once dirname(__DIR__, 3) . '/lib/AskReview.php';
+require_once dirname(__DIR__, 3) . '/lib/CronAuth.php';
+require_once dirname(__DIR__, 3) . '/lib/HookLog.php';
 
 const HALT_SNAPSHOT_SESSION_RE = '/^[A-Za-z0-9._-]{1,128}$/';
 
@@ -25,6 +27,13 @@ $extra = isset($payload['extra']) && is_array($payload['extra']) ? $payload['ext
 $messages = isset($extra['conversation_history']) && is_array($extra['conversation_history']) ? $extra['conversation_history'] : [];
 $userMessage = isset($extra['user_message']) ? $extra['user_message'] : '';
 $tail = HaltJudge::tail($messages, $userMessage);
-// What the user wrote or saw, for the ask review (ADR-0073); empty outside a person's own session (cron, a subagent).
+// What the user wrote or saw, for the ask review (ADR-0073, ADR-0101): a person's own session, or a gateway turn from a
+// sender on the gateway's explicit allowlist; in a scheduled run, what the person asked when the job was made.
 $platform = isset($extra['platform']) && is_string($extra['platform']) ? $extra['platform'] : '';
-HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail, AskReview::evidence($messages, $userMessage, $platform));
+$sender = isset($extra['sender_id']) && is_scalar($extra['sender_id']) ? (string) $extra['sender_id'] : '';
+$asked = AskReview::evidence($messages, $userMessage, $platform, $sender);
+if (!$asked && $platform === 'cron') {
+    $asked = CronAuth::lookup(HaltJudge::text($userMessage));
+    HookLog::add('pre_llm_call', 'cron-auth', 0, $asked ? 'hit' : 'miss'); // a reason code only, never the words
+}
+HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail, $asked);

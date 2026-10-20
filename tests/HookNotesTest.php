@@ -71,7 +71,7 @@ return [
         localHookStart($tree);
         try {
             list($d, $raw) = localHookRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls']]);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'a local question with no yes to check must block (ADR-0073): ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'a local question with no yes to check must block (ADR-0073): ' . $raw);
             check(strpos($raw, '"unit"') === false && strpos($raw, '"local"') === false, 'the internal unit fields leaked into the answer');
             $merged = HookAnswers::mergePreToolCall([
                 ['action' => 'approve', 'message' => str_repeat('a', 400), 'unit' => 'a/one'], ['action' => 'approve', 'message' => 'b', 'unit' => 'a/two'],

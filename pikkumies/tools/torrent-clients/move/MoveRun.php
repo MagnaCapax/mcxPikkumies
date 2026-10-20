@@ -30,7 +30,7 @@ class MoveRun
         $str = function ($k) use ($opt) { return isset($opt[$k]) && is_string($opt[$k]) ? trim($opt[$k]) : ''; };
         if ($free !== isset($opt['expect']) || $free !== isset($opt['ids']) || ($free && ($str('expect') === '' || $str('intent') === ''))) {
             throw new CliError('nothing done: freeing the source needs all of --free-source, --ids <id,id...>, --expect <value> and --intent "<the user\'s own words>"',
-                'run <move> alone copies and starts the torrents here; add them only when the user asked for the old copy gone');
+                'run <move> alone copies and starts the torrents here; add them only when the user\'s request covers the old copy going');
         }
         $lock = $this->state->lock($id); // one run of a move at a time: never two copies into the same files
         $move = $this->state->load($id);
@@ -47,7 +47,7 @@ class MoveRun
         }
         if (!$free) {
             return ['records' => self::summary($move), 'status' => ['move' => $id, 'result' => 'copied and seeding on both boxes; the source is untouched',
-                'expect' => $move['expect'], 'next' => "to free the source when the user asks: run $id --free-source --ids $ids --expect {$move['expect']} --intent \"<their words>\""]];
+                'expect' => $move['expect'], 'next' => "to free the source when the user's request covers it: run $id --free-source --ids $ids --expect {$move['expect']} --intent \"<their words>\""]];
         }
         $out = (new MoveFree($this->run, $this->state))->free($move, $str('expect'), $str('intent'));
         if (!empty($out['status']['freed'])) {
@@ -128,7 +128,7 @@ class MoveRun
         $r = $this->run->unit('local', $move['target_client'], ['add', $item['torrent'], '--paused', '--dir', $this->copy()->dir($move, $item)]);
         (new MoveTarget($this->run, $this->state))->live($move, $item); // listed here now, under the id the .torrent gives
         return ['result' => isset($r['records'][0]['result']) ? $r['records'][0]['result'] : '', 'label' => $item['label'],
-            'label_set' => false]; // the client units' add takes no label yet: the user sets it in the target client
+            'label_set' => false]; // the client units' add takes no label yet: the answer names the label it had
     }
 
 }

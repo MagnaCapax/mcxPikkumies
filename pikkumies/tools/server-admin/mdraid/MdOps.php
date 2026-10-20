@@ -65,7 +65,7 @@ class MdOps
             }
             if ($d['verdict'] === 'holds-data' && ($d['serial'] === '' || !in_array($d['serial'], $destroy, true))) {
                 throw new CliError("{$d['disk']} (serial {$d['serial']}) holds data: " . self::evidence($d) . '; nothing was done',
-                    "tell the user in one line what is on it; only if they want it destroyed, run the same command with --destroy {$d['serial']}");
+                    "say in one line what is on it; run the same command with --destroy {$d['serial']} only when what the user asked for covers destroying it (the safety check decides)");
             }
             $out[$k] = $d;
         }

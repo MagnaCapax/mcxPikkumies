@@ -201,7 +201,7 @@ class ServeGate
                 $name = $eq === false ? substr($a, 2) : substr($a, 2, $eq - 2);
                 if (in_array($name, self::FLAGS, true) && $eq === false) {
                     if ($name === 'with-data' && (!$allowDelete || $verb !== 'remove')) {
-                        throw new CliError('--with-data is refused: this key may not delete data on this box', 'the box owner adds --allow-delete to the key line (services accept --allow-delete) if they want that');
+                        throw new CliError('--with-data is refused: this key may not delete data on this box', 'deleting here is the box owner\'s choice for this key (services accept --allow-delete); report the refusal, do not work around it');
                     }
                     $args[] = $a;
                     continue;

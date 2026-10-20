@@ -87,11 +87,11 @@ class RtorrentRestart
         $kept = array_intersect_assoc($before, $after);
         if (count($after) > 1) {
             throw new CliError('not restarted cleanly: ' . count($after) . ' rTorrent processes are running for this account and share one session',
-                'do not stop either by hand; the PMSS watchdog checks every 2 minutes and restarts rTorrent when more than one runs; check `stats` in a few minutes and open a support ticket if two still run');
+                'do not stop either by hand; the PMSS watchdog checks every 2 minutes and restarts rTorrent when more than one runs; check `stats` in a few minutes; if two still run, report it in your answer for the provider\'s support');
         }
         if ($kept) {
             throw new CliError('not restarted: the rTorrent process from before the restart is still running, so the platform restart did not take effect (a known platform issue, PMSS #717; the panel\'s restart button runs the same script)',
-                'do not stop rTorrent by hand; tell the user, and open a support ticket with this message');
+                'do not stop rTorrent by hand; report this message in your answer for the provider\'s support (the ticket skill opens one when the user\'s request or ticket.auto covers it)');
         }
         return ['processes_before' => count($before), 'processes_after' => count($after)];
     }

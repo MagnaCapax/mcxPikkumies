@@ -90,7 +90,7 @@ class TransmissionLocate
         if (!self::installed($family)) {
             return $family === 'pmss'
                 ? new CliError('no Transmission build is selected on this account', 'select one in the PMSS panel (torrent client switch)')
-                : new CliError('Transmission is not installed on this machine', 'ask the provider');
+                : new CliError('Transmission is not installed on this machine', 'the provider installs it: report it in your answer');
         }
         $hint = $family === 'pmss' ? 'start it from the PMSS panel (torrent client switch), or run `restart`'
             : 'start Transmission the way your provider documents it';

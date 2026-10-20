@@ -25,7 +25,7 @@ class RemoteDest
         RemotePipe::$localDir = $this->localDir; // the stages' stderr files go to local/tmp too (ADR-0099)
     }
 
-    /** Refuse a host on the person's SSH deny list (ADR-0068); allow and unknown do not apply here (setup is asked, ADR-0049). */
+    /** Refuse a host on the person's SSH deny list (ADR-0068); allow and unknown do not apply here (setup goes through the safety check, ADR-0049). */
     public function refuseDenied($host)
     {
         $config = SshLists::config($this->configFile);

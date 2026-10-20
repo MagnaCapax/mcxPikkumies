@@ -199,7 +199,7 @@ function fileopsCheckAnswer(array $payload, array $config, $localDir, array $lim
     $why = $asks ? implode('; ', array_unique($asks)) : "$verbText needs a check, and this session's check could not be recorded";
     $approveMessage = "Pikkumies: $why. $about Command [$id]: $command";
     if (!HookUnits::approveShown($approveMessage)) {
-        return ['action' => 'block', 'message' => 'Pikkumies fileops check: a command that needs the user\'s approval, and it is too long to show the user in full. Not run. Split it into smaller commands.'];
+        return ['action' => 'block', 'message' => 'Pikkumies fileops check: a command for the ask review, and it is too long to show the user in full. Not run. Split it into smaller commands.'];
     }
     return ['action' => 'approve', 'rule_key' => 'pikkumies-fileops:' . $id, 'message' => $approveMessage] + ($replaces ? ['kind' => 'delete'] : []);
 }

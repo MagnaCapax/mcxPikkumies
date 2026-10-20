@@ -35,7 +35,7 @@ class TransmissionRestart
         $stopped = self::stop($uid);
         $script = $home . '/www/torrentClientsResolve.php';
         if (!is_file($script)) {
-            throw new CliError('the PMSS launcher script is missing (~/www/torrentClientsResolve.php)', 'ask the provider to restore it');
+            throw new CliError('the PMSS launcher script is missing (~/www/torrentClientsResolve.php)', 'the provider restores it: report it in your answer');
         }
         $cmd = 'cd ' . escapeshellarg($home) . ' && php ' . escapeshellarg($script) . ' transmission --launch';
         $output = [];

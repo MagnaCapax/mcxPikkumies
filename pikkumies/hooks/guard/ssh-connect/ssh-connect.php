@@ -21,7 +21,7 @@ const SSH_WRITES_RE = '#(>|\btee\b|\b(sed|perl)\b[^\n]*\s-[a-zA-Z]*i|\b(cp|mv|in
 function sshSay(array $answer)
 {
     if ($answer['action'] === 'approve' && class_exists('NestedAgent') && NestedAgent::unattended()) {
-        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so the one answering this question would be an agent, not the user. Not run. Tell the user the command. Asked: ' . $answer['message']];
+        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so what the user asked for cannot be checked here. Not run. Do not reach the same effect another way; finish the rest and list this step as skipped, with this reason, in the final answer. Checked: ' . $answer['message']];
     }
     echo json_encode($answer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n";
     exit(0);

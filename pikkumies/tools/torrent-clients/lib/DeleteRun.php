@@ -28,11 +28,11 @@ class DeleteRun
                 . ' or remove without --with-data');
         }
         if ($expect === '') {
-            throw new CliError('nothing deleted: --expect is missing', 'run `show <ids> --files` first, show the user the files, then add --expect ' . $plan['expect']);
+            throw new CliError('nothing deleted: --expect is missing', 'run `show <ids> --files` first, say the files in your message, then add --expect ' . $plan['expect']);
         }
         $why = DeletePlan::mismatch($expect, $plan);
         if ($why !== '') {
-            throw new CliError("nothing deleted: $why", 'run `show <ids> --files` again and show the user the new list; a torrent that is still downloading changes size, pause it first');
+            throw new CliError("nothing deleted: $why", 'run `show <ids> --files` again and say the new list in your message; a torrent that is still downloading changes size, pause it first');
         }
         return self::finish(self::outcome($plan, $c->remove(Torrents::natives($targets), true)));
     }

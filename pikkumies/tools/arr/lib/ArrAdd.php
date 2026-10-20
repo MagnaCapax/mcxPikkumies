@@ -85,7 +85,7 @@ class ArrAdd
         $rows = array_values(array_filter((array) $c->call('GET', 'metadataprofile'), 'is_array'));
         if (count($rows) !== 1) {
             throw new CliError("nothing added: the root folder {$root['path']} has no default metadata profile, and there are "
-                . count($rows) . ' metadata profiles', 'the user sets a default metadata profile on the root folder in the app');
+                . count($rows) . ' metadata profiles', 'the root folder needs a default metadata profile, set in the app\'s own settings; say so in your answer');
         }
         return (int) $rows[0]['id'];
     }

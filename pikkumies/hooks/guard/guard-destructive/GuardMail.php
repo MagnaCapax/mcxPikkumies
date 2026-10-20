@@ -30,7 +30,7 @@ function guardMail($command, array $texts)
     $word = '(?=[\s"\',\])]|$)';
     $email = $hit('#tools/email/|\b(imap|pop|smtp|antispam)\.php\b#');
     if ($email && $hit('/(^|[\s"\',\[(])login' . $word . '/')) {
-        return ['action' => 'block', 'message' => 'Pikkumies safety: email logins are typed by the user in their own terminal, never run by the agent. Not run. Tell the user the command to run.'];
+        return ['action' => 'block', 'message' => 'Pikkumies safety: email logins are typed by the user in their own terminal, never run by the agent. Not run. Say in your answer that the user logs in once with the tool login verb in their own terminal.'];
     }
     if (!$hit('#\bsmtp\.php\b|tools/email/smtp\b|(^|[\s"\',\[(])send-(draft|self)' . $word . '#')) {
         return null;

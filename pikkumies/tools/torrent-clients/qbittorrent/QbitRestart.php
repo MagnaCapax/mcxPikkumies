@@ -37,7 +37,7 @@ class QbitRestart
             $r['how'] = 'Ultra.cc: app-qbittorrent restart';
         } else {
             $hints = [
-                'feral' => 'Feral restarts qBittorrent by itself within five minutes and it cannot be started by hand (feralhosting.com/wiki/software/qbittorrent); wait, or ask Feral support',
+                'feral' => 'Feral restarts qBittorrent by itself within five minutes and it cannot be started by hand (feralhosting.com/wiki/software/qbittorrent); wait five minutes and check again; if it is still down, report it in your answer for Feral support',
                 'whatbox' => 'restart it from the Manage page of the Whatbox website (whatbox.ca/wiki/bittorrent_clients)',
             ];
             throw new CliError("restart is not supported on this host ({$ep->family}): no documented restart command for qBittorrent", isset($hints[$ep->family]) ? $hints[$ep->family] : 'restart it the way your provider documents it (control panel or support)');

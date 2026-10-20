@@ -2,7 +2,7 @@
 /**
  * ADR-0073 amendment 2026-10-19 (approvals off): Hermes' approval prompt never shows. approvals.mode is pinned "off",
  * which also approves every hook "approve" answer silently (Hermes v0.22.2 tools/approval.py _run_approval_gate), so a
- * question that survives the ask policy becomes a block with one fixed message, and a re-run passes only when the
+ * question that survives the ask policy becomes a block with one fixed refusal that reports and never asks (ADR-0101); a re-run passes when the
  * review finds the user's yes. Without evidence or a review answer only deletes, exposures, sends and mail stay blocked.
  * What a real light model answers is not tested here.
  */
@@ -21,10 +21,17 @@ if (!function_exists('cfgHookTree')) {
 }
 
 if (!function_exists('offConst')) {
-    /** AskPolicy's fixed block message by name, or '' on a tree without it (so the test fails, not the runner). */
-    function offConst($name)
+    /** AskPolicy's one refusal (ADR-0101): $unchecked picks the reason; '' on a tree without it (so the test fails, not the runner). */
+    function offConst($unchecked)
     {
-        return defined("AskPolicy::$name") ? constant("AskPolicy::$name") : '';
+        return method_exists('AskPolicy', 'refused') ? AskPolicy::refused($unchecked) : '';
+    }
+
+    /** True when a refusal text asks nothing and hands nothing over (ADR-0101). */
+    function offReportsOnly($msg)
+    {
+        return $msg !== '' && stripos($msg, 'not run') !== false && preg_match('/\byes\b|\bask\b|run it themselves|so they can|tell the user the command/i', $msg) === 0
+            && strpos($msg, 'list this step as skipped') !== false && strpos($msg, 'do not give the command to the user') !== false;
     }
 }
 
@@ -41,8 +48,8 @@ return [
         check(HermesInstall::CONFIG_FACTS['approvals.mode'][1] === '_VALID_MODES = ("manual", "smart", "off")', 'the fact must name "off": a Hermes without it is refused');
     },
     'approvals off: a question the review keeps becomes a block with the fixed message, never an approve' => function () {
-        $msg = offConst('BLOCK_CONFIRM');
-        check($msg !== '' && stripos($msg, 'not run') !== false && strpos($msg, 'yes') !== false, 'AskPolicy::BLOCK_CONFIRM missing or wrong: ' . $msg);
+        $msg = offConst(false);
+        check(offReportsOnly($msg) && strpos($msg, AskPolicy::WHY_UNCOVERED) !== false, 'the refusal must report, never ask or hand the command over: ' . $msg);
         foreach (['delete', 'schedule', null] as $kind) {
             list($out, $counts) = askApply([askApprove($kind), askApprove('load')], ['R1' => 'no', 'R2' => 'yes', 'R3' => 'no']);
             check($out === [['action' => 'block', 'message' => $msg]] && $counts['blocked'] === 1, var_export($kind, true) . ': ' . json_encode([$out, $counts]));
@@ -62,7 +69,7 @@ return [
             askOrchSnapshot($tree, 'sess-off', [['role' => 'user', 'text' => 'what uses my space?']]);
             file_put_contents("$dir/reply", "R1: no\nR2: yes\nR3: no");
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check($d === ['action' => 'block', 'message' => offConst('BLOCK_CONFIRM')], 'expected the fixed confirm block: ' . $raw);
+            check($d === ['action' => 'block', 'message' => offConst(false)], 'expected the fixed confirm block: ' . $raw);
         } finally {
             proc_terminate($proc);
             testRmTree($tree);
@@ -76,8 +83,8 @@ return [
         check(strpos($p[1]['content'], 'A plain yes counts') !== false, 'R1 must say that a yes to the agent\'s named action counts: ' . $p[1]['content']);
     },
     'approvals off: with no evidence or no review answer, only deletes, exposures, sends and mail stay blocked' => function () use ($yes) {
-        $unchecked = offConst('BLOCK_UNCHECKED');
-        check($unchecked !== '', 'AskPolicy::BLOCK_UNCHECKED missing');
+        $unchecked = offConst(true);
+        check(offReportsOnly($unchecked) && strpos($unchecked, AskPolicy::WHY_UNCHECKED) !== false && $unchecked !== offConst(false), 'the unchecked refusal: ' . $unchecked);
         foreach ([[[], 8, $yes], [$yes, 1, ['R1' => 'yes']], [$yes, 8, []]] as $case) { // no evidence; no time; an empty review
             list($evidence, $seconds, $answers) = $case;
             foreach (['schedule', 'local', 'brand-new', null] as $kind) {
@@ -97,12 +104,12 @@ return [
         $local = askApprove(null, ['local' => true, 'unit' => 'my/hook']);
         foreach ([$send, $local] as $q) {
             list($out, , $calls) = askApply([$q], ['R1' => 'unsure', 'R2' => 'no', 'R3' => 'no'], [['role' => 'user', 'text' => 'thanks']]);
-            check($out === [['action' => 'block', 'message' => offConst('BLOCK_CONFIRM')]] && $calls === 1, 'an R2 "no" alone must not clear it: ' . json_encode($out));
+            check($out === [['action' => 'block', 'message' => offConst(false)]] && $calls === 1, 'an R2 "no" alone must not clear it: ' . json_encode($out));
             list($out) = askApply([$q], ['R1' => 'yes', 'R2' => 'no', 'R3' => 'no'], $yes);
             check($out === [], 'the user\'s yes must clear it: ' . json_encode($out));
         }
         list($out) = askApply([$send], ['R1' => 'yes', 'R2' => 'no', 'R3' => 'no'], []);
-        check($out === [['action' => 'block', 'message' => offConst('BLOCK_UNCHECKED')]], 'no evidence: the send stays blocked: ' . json_encode($out));
+        check($out === [['action' => 'block', 'message' => offConst(true)]], 'no evidence: the send stays blocked: ' . json_encode($out));
     },
     'approvals off: an mv that replaces a file is a delete, so it stays blocked where no yes can be checked' => function () {
         $tree = fileopsTree();
@@ -139,7 +146,7 @@ return [
             list($d, $raw) = testWithEnv(['PIKKUMIES_DEPTH' => '2'], function () use ($tree, $call) {
                 return orchestratorRun($tree, 'pre_tool_call', $call);
             });
-            check($d === ['action' => 'block', 'message' => offConst('BLOCK_UNCHECKED')] && hookSearchRequests($dir) === [], 'depth 2: no evidence, no review: ' . $raw);
+            check($d === ['action' => 'block', 'message' => offConst(true)] && hookSearchRequests($dir) === [], 'depth 2: no evidence, no review: ' . $raw);
             list($d, $raw) = testWithEnv(['PIKKUMIES_DEPTH' => '1'], function () use ($tree, $call) {
                 return orchestratorRun($tree, 'pre_tool_call', $call);
             });

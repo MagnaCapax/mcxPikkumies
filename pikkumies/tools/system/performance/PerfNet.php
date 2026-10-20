@@ -3,7 +3,7 @@
  * PerfNet: `net`, the route from this server to a target (README.md, ADR-0035). The dispatcher has checked the target
  * grammar; this class
  *  - resolves `ssh` to the client address of the user's own SSH connection (SSH_CONNECTION), and refuses when there is
- *    none, so the agent asks the user for an address instead of guessing one,
+ *    none, so the agent says in its answer that it needs an address instead of guessing one,
  *  - runs `mtr --report -n -c N`, then `traceroute -n`, then `ping -n -c N` when the one before cannot run, each in
  *    measure mode with a deadline (PerfProbe), and parses the report in-process,
  *  - reads the result by direction and persistence: this is the forward run (server to target); loss counts only
@@ -31,7 +31,7 @@ class PerfNet
             $target = self::sshClient(getenv('SSH_CONNECTION'));
             if ($target === null) {
                 throw new CliError('there is no SSH connection to test (SSH_CONNECTION is not set here); nothing was run',
-                    'ask the user for the address to test (their own connection\'s public address), then --target <IP>');
+                    'the address to test is their own connection\'s public address, a fact only they have: say so in your answer; then --target <IP>');
             }
             $kind = 'ssh';
         } elseif (filter_var($target, FILTER_VALIDATE_IP) !== false) {
@@ -189,7 +189,7 @@ class PerfNet
         $low = $method === 'traceroute' ? ['confidence' => 'low: ' . self::TRACEROUTE_PROBES . ' probes per hop; mtr with more cycles is the real test'] : [];
         if (!$answering) {
             return ['class' => null, 'reading' => 'no_reply', 'evidence' => ['no hop answered'], 'negation' => 'not a route verdict: nothing answered at all',
-                'disproved_by' => 'any hop answering', 'next_step' => 'the probes may be filtered here; run check, and ask the user for the reverse run'] + $low;
+                'disproved_by' => 'any hop answering', 'next_step' => 'the probes may be filtered here; run check, and give the user the reverse run instructions in your answer'] + $low;
         }
         if ($run) {
             $k = $run[0]['hop'];
@@ -203,7 +203,7 @@ class PerfNet
                 'disproved_by' => 'the same test with more cycles showing no loss at the later hops',
                 'next_step' => $near
                     ? "the loss starts within the first " . PerfLimits::NEAR_HOPS . " hops from this server: open a ticket with this output; add `check --share --with-ip` only if the user agrees to include the addresses"
-                    : 'the loss starts further along the route; ask the user to run the reverse test from their own computer (the reverse record) and paste it: both directions together show where it starts'] + $low;
+                    : 'the loss starts further along the route; give the user the reverse test from their own computer (the reverse record) in your answer, to paste back: both directions together show where it starts'] + $low;
         }
         if ($silentAfter) {
             return ['class' => 'destination_silent', 'reading' => 'destination_silent', 'last_answering_hop' => $last,
@@ -228,12 +228,12 @@ class PerfNet
         $base = ['class' => null, 'confidence' => 'no hops: mtr and traceroute could not run, so where loss starts is unknown'];
         if ($e['received'] === 0) {
             return $base + ['reading' => 'no_reply', 'evidence' => ['the target answered none of ' . $e['sent'] . ' pings'],
-                'negation' => 'not proven loss: the target may not answer ping', 'disproved_by' => 'the target answering', 'next_step' => 'ask the user for the reverse run from their computer'];
+                'negation' => 'not proven loss: the target may not answer ping', 'disproved_by' => 'the target answering', 'next_step' => 'give the user the reverse run from their computer in your answer'];
         }
         if ($e['loss_pct'] > 0) {
             return $base + ['reading' => 'end_to_end_loss', 'evidence' => [$e['loss_pct'] . '% of ' . $e['sent'] . ' pings lost end to end'],
                 'negation' => 'no route verdict: without hops the place it starts is unknown', 'disproved_by' => 'a longer run without loss',
-                'next_step' => 'ask the user for the reverse run from their computer; a route verdict needs mtr'];
+                'next_step' => 'give the user the reverse run from their computer in your answer; a route verdict needs mtr'];
         }
         return $base + ['reading' => 'clean', 'evidence' => ['no loss end to end'], 'negation' => 'one direction only', 'disproved_by' => 'loss in a longer run',
             'next_step' => 'the reverse run from the user\'s computer covers the other direction'];

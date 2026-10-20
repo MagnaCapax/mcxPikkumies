@@ -3,9 +3,9 @@
  * ticket: one Pulsed Media support ticket, opened with the Pulsed Media AI key (ADR-0089, ADR-0015 tool unit). draft
  * saves exactly what would be posted and shows it; bundle does the same for a ticket with the diagnostics attached (the
  * system facts, process list and logs, the diagnosis and searches, the transcript; ADR-0100); send posts a draft only
- * after the user says yes in the chat (hooks/guard/ticket-send, the orchestrator's ask policy, ADR-0073), except a
- * ticket the agent bundled by itself while ticket.auto is on, which goes out alone within the caps. Nothing is sent by
- * draft, bundle or list, and nothing is ever sent twice: a sent draft becomes <id>.sent.json.
+ * when the user's own request covers it (hooks/guard/ticket-send, the orchestrator's ask policy, ADR-0073, ADR-0101),
+ * except a ticket the agent bundled by itself while ticket.auto is on, which goes out alone within the caps. Nothing is
+ * sent by draft, bundle or list, and nothing is ever sent twice: a sent draft becomes <id>.sent.json.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
 foreach (['Config', 'Provider', 'Cli', 'Http', 'Host', 'Redact', 'ConfigureTiers'] as $c) {
@@ -50,7 +50,7 @@ usage: php ticket.php draft --subject S (--text T | --text-file F) [--email E] [
           1 MiB, txt, log, png, jpg, jpeg or pdf
   bundle  save a ticket with the diagnostics attached: system facts, process list and logs; the diagnosis, review and
           searches; the transcript. --by agent (the default) needs the searches and a ten-round review
-  send    open the ticket <id> at Pulsed Media with the Pulsed Media AI key; Pikkumies asks you first, except for an
+  send    open the ticket <id> at Pulsed Media with the Pulsed Media AI key, when you asked for a ticket, or for an
           agent bundle while ticket.auto is on
   list    the drafts kept here, sent ones marked
 U;

@@ -14,11 +14,11 @@ class StorageStats
             . ' tools (torrent client remove --with-data)',
         'over_hard'   => 'at the hard limit: new writes fail, torrent clients and the panel stop working; free space through the owning'
             . ' tools',
-        'off_on_host' => 'quota is switched off on this server, so the figures may be old; tell support (this is not something to fix'
+        'off_on_host' => 'quota is switched off on this server, so the figures may be old; report it as a server problem for support (this is not something to fix'
             . ' in the account)',
-        'no_data'     => 'the provider has not written quota figures for this account yet (~/.quota holds a placeholder); ask support'
+        'no_data'     => 'the provider has not written quota figures for this account yet (~/.quota holds a placeholder); report it for support'
             . ' if it stays so',
-        'unavailable' => 'no quota command here and no ~/.quota file; ask the provider how much space the plan has',
+        'unavailable' => 'no quota command here and no ~/.quota file; say that the plan\'s space is not known here (the provider\'s client area shows it)',
         'none'        => 'no quota is set for this account on this filesystem',
         'unknown'     => 'no quota figure could be read; run `quota -s` in a terminal to see what it says',
     ];

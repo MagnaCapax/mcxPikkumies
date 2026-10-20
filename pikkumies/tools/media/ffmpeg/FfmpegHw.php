@@ -28,9 +28,9 @@ class FfmpegHw
         if ($rec['readable'] && $rec['writable']) {
             $rec['gap'] = null;
         } elseif ($groupName !== null && !in_array($groupName, $rec['account_groups'], true)) {
-            $rec['gap'] = "the device belongs to group $groupName and this account is not in it; ask your provider";
+            $rec['gap'] = "the device belongs to group $groupName and this account is not in it; that is the provider's to change: report it";
         } else {
-            $rec['gap'] = "$device is not readable/writable by this account (owner or mode); ask your provider";
+            $rec['gap'] = "$device is not readable/writable by this account (owner or mode); that is the provider's to change: report it";
         }
         $rec['vainfo'] = self::vainfo();
         return $rec;

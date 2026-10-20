@@ -55,7 +55,7 @@ return [
         localHookStart($tree);
         try {
             list($d, $raw) = localHookRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm f']]);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'no session: the delete and the local question must block (ADR-0073): ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'no session: the delete and the local question must block (ADR-0073): ' . $raw);
             $log = hookFailOutcomes($tree);
             $policy = array_pop($log);
             check(end($log) === 'local/mine/aaa=approve' && count($log) > 1 && strpos($policy, 'ask-policy=') === 0, 'the local unit did not run last, under local/, before the ask policy: ' . json_encode($log));

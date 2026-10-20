@@ -60,9 +60,9 @@ return [
     },
     'AskPolicy::apply: a clear review clears the question; a block skips the review; no evidence, no time, an empty or failed review block a delete' => function () use ($cleared) {
         $block = ['action' => 'block', 'message' => 'no'];
-        $unchecked = ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED];
+        $unchecked = ['action' => 'block', 'message' => AskPolicy::refused(true)];
         list($out, $counts, $calls) = askApply([askApprove('delete'), askApprove('load'), ['action' => 'modify', 'args' => []]], $cleared);
-        check($out === [['action' => 'modify', 'args' => []]] && $counts === ['blocked' => 0, 'dropped' => 1, 'cleared' => 1, 'ran' => 0] && $calls === 1, 'cleared: ' . json_encode([$out, $counts, $calls]));
+        check($out === [['action' => 'modify', 'args' => []]] && $counts === ['blocked' => 0, 'dropped' => 1, 'cleared' => 1, 'ran' => 0, 'unchecked' => 0] && $calls === 1, 'cleared: ' . json_encode([$out, $counts, $calls]));
         list($out, $counts, $calls) = askApply([askApprove('delete'), $block], $cleared);
         check(count($out) === 2 && $calls === 0 && $counts['cleared'] === 0, 'a block in the answers must skip the review: ' . json_encode([$counts, $calls]));
         list($out, , $calls) = askApply([askApprove('delete')], $cleared, []);
@@ -74,7 +74,7 @@ return [
         list($out, $counts) = askApply([askApprove('delete'), askApprove('load')], new Exception('boom'));
         check($out === [$unchecked, $unchecked] && !empty($counts['error']), 'an error blocks every question, the dropped one too: ' . json_encode($counts));
         list($out) = askApply([askApprove('mail')], ['R1' => 'unsure', 'R2' => 'no', 'R3' => 'no']);
-        check($out === [['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM]], 'a mail is not cleared by an R2 "no" alone');
+        check($out === [['action' => 'block', 'message' => AskPolicy::refused()]], 'a mail is not cleared by an R2 "no" alone');
         list($out, , $calls) = askApply([askApprove('send', ['unit' => 'guard/feedback-send']), askApprove('stop')], $cleared);
         check($out === [] && $calls === 1, 'stop dropped, the feedback send reviewed and cleared by the user\'s yes');
     },

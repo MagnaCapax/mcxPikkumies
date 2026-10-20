@@ -92,7 +92,7 @@ class StorageScan
     /** Runs one bounded scan; returns status fields (partial, stopped_by). */
     private function scan(array $argv, callable $onLine)
     {
-        ToolProc::need($argv[0], 'it comes with the base system (coreutils / findutils); ask the provider');
+        ToolProc::need($argv[0], 'it comes with the base system (coreutils / findutils); report it missing, for the provider');
         $lock = $this->lock();
         $n = 0;
         $r = ToolProc::run(ToolProc::gentle($argv, self::TIMEOUT), [], function ($line) use (&$n, $onLine) {

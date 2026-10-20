@@ -2,8 +2,8 @@
 
 Use for an authorized host upgrade or kernel reboot. Read both sections first on Proxmox.
 This is a checklist for the existing server-admin skill, not an unattended upgrade command.
-Confirm OS-granted root access and announce its use; shared-host downtime needs the owner's explicit yes.
-An authorized campaign covers its named hosts/windows; do not ask again between successful units.
+Confirm OS-granted root access and announce its use; shared-host downtime only when the task needs it, reviewed first and said in one line (doctrine/safety.md).
+An authorized campaign covers its named hosts/windows; go on between successful units without stopping.
 Search local lessons with the memory skill first, then check the platform's current official upgrade guide.
 Commands below are templates: resolve devices, versions, units and guest IDs from this host before execution.
 Use the distro's equivalents outside Debian/systemd; never install GRUB over another boot scheme.

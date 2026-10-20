@@ -25,7 +25,7 @@ require_once "$root/lib/ConfigureTiers.php";
 require_once __DIR__ . '/ConfigChangePaths.php';
 $say = function (array $answer) {
     if ($answer['action'] === 'approve' && NestedAgent::unattended()) {
-        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so the one answering this question would be an agent, not the user. Not run. Tell the user the command. Asked: ' . $answer['message']];
+        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so what the user asked for cannot be checked here. Not run. Do not reach the same effect another way; finish the rest and list this step as skipped, with this reason, in the final answer. Checked: ' . $answer['message']];
     }
     echo json_encode($answer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) . "\n";
     exit(0);
@@ -104,7 +104,7 @@ $hit = function ($re) use ($hay, $must) {
 };
 if ($hit('/(?<![\w-])pikkumies[\s"\',\[\]]+configure[\s"\',\[\]]+undo(?![\w-])/')) {
     $say(['action' => 'block', 'message' => 'Pikkumies safety: `pikkumies configure undo` is the user\'s own shell command (it asks them on their terminal). Not run. '
-        . 'To go back, set the setting to its old value with pikkumies-configure (set prints the old value), or tell the user to run it in their own shell.']);
+        . 'To go back, set the setting to its old value with pikkumies-configure yourself (set prints the old value).']);
 }
 $words = $tool === 'terminal' ? configChangeWords($text) : null;
 if ($words !== null) {

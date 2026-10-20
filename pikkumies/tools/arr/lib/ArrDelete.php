@@ -75,9 +75,9 @@ class ArrDelete
         }
         if ($expect === '') {
             throw new CliError('nothing deleted: --expect is missing',
-                'run `show <ids> --files --limit 0` first, show the user every file, then add --expect ' . $plan['expect']);
+                'run `show <ids> --files --limit 0` first, say every file in your message, then add --expect ' . $plan['expect']);
         }
-        $again = 'run `show <ids> --files --limit 0` again with exactly these ids and show the user the new list';
+        $again = 'run `show <ids> --files --limit 0` again with exactly these ids and say the new list in your message';
         if (!preg_match('/^[0-9.]+[a-z]*:([0-9]+):([0-9a-f]{6})$/i', trim($expect), $m)) {
             throw new CliError("nothing deleted: --expect $expect is not the value `show --files` printed ({$plan['expect']})",
                 'give it as printed: size, exact bytes and the id check');

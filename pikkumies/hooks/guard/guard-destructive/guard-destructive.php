@@ -1,8 +1,8 @@
 <?php
 /**
  * Hook unit (pre_tool_call, run by hooks/orchestrator.php, ADR-0030): refuses obviously destructive terminal commands outright;
- * data deletes the user may want (backup prunes, torrent data) are asked, and the orchestrator's ask policy decides
- * which of those questions reach the user (ADR-0020, ADR-0073). Reads the hook JSON on stdin, prints a
+ * data deletes the user may want (backup prunes, torrent data) are questions for the orchestrator's ask policy, which decides
+ * whether each runs or is refused and reported (ADR-0020, ADR-0073, ADR-0101). Reads the hook JSON on stdin, prints a
  * JSON decision on stdout (agent/shell_hooks.py _parse_pre_tool_call).
  *
  * This is a safety prompt for the agent's own mistakes, NOT a security boundary: the user
@@ -15,7 +15,7 @@ require_once dirname(__DIR__, 3) . '/lib/HookUnits.php'; // HookUnits::approveSh
 function guardSay(array $answer)
 {
     if ($answer['action'] === 'approve' && NestedAgent::unattended()) {
-        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so the one answering this question would be an agent, not the user. Not run. Tell the user the command. Asked: ' . $answer['message']];
+        $answer = ['action' => 'block', 'message' => 'Pikkumies safety: this agent was started by another agent, so what the user asked for cannot be checked here. Not run. Do not reach the same effect another way; finish the rest and list this step as skipped, with this reason, in the final answer. Checked: ' . $answer['message']];
     }
     echo json_encode($answer) . "\n";
     exit(0);
@@ -86,8 +86,10 @@ $secretPatterns = [
     // `credits balance` answers balance questions without it.
     '#\.(virsilipas|pikkumies)Key\b|hermes(-managed)?/\.env\b|HERMES_(HOME|MANAGED_DIR)\}?/\.env\b|\bvsk-#' => 'a command on the AI key (~/.virsilipasKey, ~/.pikkumiesKey, the Hermes .env); what the agent reads goes to the model. For the balance use credits balance; the user edits key files in a terminal',
     '/\.docker\b.*\bconfig\.json\b/s' => 'a command on registry passwords (~/.docker/config.json); what the agent reads goes to the model',
-    // The halt snapshot holds what the user wrote, the only evidence the ask review trusts (ADR-0073): the agent never touches it.
+    // The halt snapshot and the scheduled-job record hold what the user wrote, the only evidence the ask review trusts
+    // (ADR-0073, ADR-0101): the agent never touches them.
     '#state/+halt\b#' => 'a command on the halt guard\'s state (~/pikkumies/local/state/halt/), which records what the user asked; the agent never needs it',
+    '#state/+ask\b#' => 'a command on the ask review\'s record (~/pikkumies/local/state/ask/), which records what the user asked for scheduled jobs; the agent never needs it',
 ];
 if ($fileTool) {
     // A V4A patch has no path: each file its headers name, both sides of a Move, is checked like a path (ADR-0020).
@@ -117,6 +119,20 @@ if ($fileTool) {
     exit(0);
 }
 if ($scheduleTool) {
+    // A job made from the person's own words (ADR-0101): their words are recorded for the job's runs, so those runs
+    // get the same ask review. Never blocks: a job with no record simply gets no evidence when it runs.
+    $action = isset($input['action']) && is_string($input['action']) ? strtolower(trim($input['action'])) : '';
+    if (($action === 'create' || $action === 'update') && isset($input['prompt']) && is_string($input['prompt']) && trim($input['prompt']) !== '') {
+        require_once dirname(__DIR__, 3) . '/lib/AskPolicy.php';
+        require_once dirname(__DIR__, 3) . '/lib/CronAuth.php';
+        require_once dirname(__DIR__, 3) . '/lib/HookLog.php';
+        try {
+            $why = CronAuth::record($input['prompt'], AskPolicy::evidenceFor(isset($payload['session_id']) ? $payload['session_id'] : ''));
+        } catch (\Throwable $e) {
+            $why = 'error';
+        }
+        HookLog::add('pre_tool_call', 'cron-auth-record', 0, $why); // a reason code only, never the words or the prompt
+    }
     $script = false;
     foreach (['script', 'monitor_script', 'monitor', 'no_agent'] as $k) {
         $script = $script || !empty($input[$k]);
@@ -233,10 +249,10 @@ if ($hit !== 0) {
     exit(0);
 }
 
-// Deletes the user can ask for still carry a kind (ADR-0073): the orchestrator's ask policy runs the command when
-// the user's own words already asked for exactly this, and otherwise blocks it with a fixed message until the user
-// says yes in the chat; with no evidence of the user's words (cron, one-shot, a nested agent) the irreversible kinds
-// stay blocked. Hermes shows no approval prompt (approvals.mode "off").
+// Deletes the user can ask for still carry a kind (ADR-0073, ADR-0101): the orchestrator's ask policy runs the command
+// when what the user asked for covers it, and otherwise refuses it with a fixed message, reported, never asked; with no
+// evidence of the user's words (a scheduled job with no record, a nested agent) the irreversible kinds stay refused.
+// Hermes shows no approval prompt (approvals.mode "off").
 // Each rule is [kind, why]; the kind picks the end of the question (delete, exposure, stop, load, send).
 // rule_key names this exact command, used to merge two units' questions into one (ADR-0054).
 // Patterns read the whole command (.* and /s): a false match only sends it to the ask policy, a missed one
@@ -336,7 +352,7 @@ $approve = [
     "/(^|[\\s;&|(`\"'])PIKKUMIES_REMOTE_PASSWORD=|\\bremote\\.php\\b.*{$v}(setup|schedule)\\b|(^|[\\s\"',\\[(])--daily\\b/s"
         => ['send', 'sets up or schedules backups of this account to another machine'],
 ] + guardDriveApproves($v); // the drives tool's selftest is asked as a load (GuardDrives.php, ADR-0094)
-// What the user is asked about, after the reason; a load test has its own rule_key prefix.
+// What the ask review reads, after the reason; a load test has its own rule_key prefix.
 $suffix = [
     'delete'   => ', which cannot be undone',
     'exposure' => ', which can make a service or files reachable beyond this account',
@@ -348,7 +364,7 @@ foreach ($approve as $re => $rule) {
     list($kind, $why) = $rule;
     $hit = guardMatch($re, $texts);
     if ($hit === false) {
-        list($kind, $why) = ['delete', 'a command too long or complex to check']; // fail toward asking the user, never allow
+        list($kind, $why) = ['delete', 'a command too long or complex to check']; // fail toward the review, never allow
     }
     if ($hit !== 0) {
         $id = substr(sha1($command), 0, 16);

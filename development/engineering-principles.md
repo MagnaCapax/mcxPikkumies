@@ -80,7 +80,7 @@ Most of the value is in steps 1 and 2. The best part is no part.
 
 **Taught by:**
 - Pikkumies keeps itself up to date by default, with one setting to turn that off (`autoUpdate.disabled`), rather than leaving every install to age until someone remembers to update it.
-- A destructive action proposed by the agent asks first, and in an unattended run it is refused unless the person approved that exact command before.
+- A destructive action the person's own words do not cover is refused and reported, never asked about and never handed to the person to run; a scheduled job gets the same review against what the person asked when the job was made ([ADR-0101](../docs/adr/0101-refuse-and-report-never-ask.md)).
 
 ## 7. Never break old users
 

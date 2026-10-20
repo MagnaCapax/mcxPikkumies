@@ -163,8 +163,8 @@ class HookAnswers
 
     /**
      * Two or more approves (ADR-0054): one question holding every unit's question unaltered, in run order, so no unit can
-     * replace another's (the delete guard's command and per-command key). The rule_key hashes the sorted keys, so Hermes'
-     * "always" answer covers exactly this set, whatever the order. Too long to show in full: a block, never a cut question.
+     * replace another's (the delete guard's command and per-command key). The rule_key hashes the sorted keys, so the
+     * same set of questions keeps one key whatever the order (Hermes remembers no answer: approvals are off, ADR-0073). Too long to show in full: a block.
      */
     public static function mergeApproves(array $approves, array $units = [])
     {
@@ -180,7 +180,7 @@ class HookAnswers
         if (!HookUnits::approveShown($message)) {
             // Name the units: the cause may be two checks asking about one call, which splitting the call does not cure.
             return ['action' => 'block', 'message' => 'Pikkumies safety: ' . count($approves) . ' checks ask about this call (' . implode(', ', $units ?: ['unnamed'])
-                . '), and their questions together are too long to show the user in full. Not run. Tell the user which checks asked; split the call into smaller steps, or the user can change one of those checks.'];
+                . '), and their questions together are too long to review in full. Not run. Split the call into smaller steps.'];
         }
         return ['action' => 'approve', 'message' => $message, 'rule_key' => 'pikkumies-multi:' . substr(sha1(implode("\n", $keys)), 0, 16)];
     }

@@ -57,7 +57,7 @@ return [
         check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'filesystem format') !== false, 'mkfs not blocked through the orchestrator');
         list($d) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rclone sync ~/a remote:a']]);
         // No session, so no yes can be checked: the ask policy blocks the delete (ADR-0073); approvals are off, so it never asks.
-        check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'delete not blocked through the orchestrator: ' . json_encode($d));
+        check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'delete not blocked through the orchestrator: ' . json_encode($d));
         list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ls -la']]);
         check(trim($raw) === '', 'harmless command got an answer: ' . $raw);
         // memory-check holds the first write of a file in a session once (ADR-0081); then the search-first gate runs: with a

@@ -2,7 +2,7 @@
 /**
  * pop: the user's own POP3 mailbox over TLS (port 995; README.md here, ADR-0053). Lists messages, downloads new ones
  * into a Maildir (by UIDL, so each message once; never deletes on the server), and deletes exact messages after
- * checking their UIDL (the guard asks the user). Test seams as in tools/email/imap/imap.php.
+ * checking their UIDL (the safety check decides). Test seams as in tools/email/imap/imap.php.
  */
 require_once dirname(__DIR__) . '/lib/MailUnit.php';
 
@@ -42,7 +42,7 @@ usage: php pop.php <verb> [arguments] [--human]
   status                           the stored login: host and user, never the password
   list                             message numbers, sizes and UIDLs
   fetch --to MAILDIR [--limit N]   downloads new messages into a Maildir; never deletes on the server
-  delete <n>... --expect UIDL,...  deletes exactly these messages (the user is asked)
+  delete <n>... --expect UIDL,...  deletes exactly these messages (the safety check decides)
 TXT;
 
 Cli::run($argv, [

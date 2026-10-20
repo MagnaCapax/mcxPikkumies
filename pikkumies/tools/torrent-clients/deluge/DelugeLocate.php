@@ -67,7 +67,7 @@ class DelugeLocate
             return new CliError("$why; found $found but no deluged binary is on PATH", 'start Deluge the way your provider documents it');
         }
         if (!self::installed($family, $binaries)) {
-            return new CliError('Deluge is not installed on this machine', 'ask the provider; on PMSS Deluge comes with the server');
+            return new CliError('Deluge is not installed on this machine', 'the provider installs it (on PMSS Deluge comes with the server): report it in your answer');
         }
         if ($family === 'pmss' && !file_exists("$home/.delugeEnable")) {
             // The PMSS watchdog starts Deluge only while ~/.delugeEnable exists (PMSS scripts/cron/checkDelugeInstances.php:18; etc/skel/www/deluge.php:6).

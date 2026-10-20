@@ -225,7 +225,7 @@ class DockerLaunch
             if ($concrete) {
                 $blockers[] = 'a published port on a server shared with other accounts needs --accept-shared-exposure (every account here can reach 127.0.0.1)';
             } else {
-                $notes[] = 'this server is shared with other accounts: the launch line carries --accept-shared-exposure, which asks the user once; tell them every account here can reach the port';
+                $notes[] = 'this server is shared with other accounts: the launch line carries --accept-shared-exposure, an exposure for the safety check; say in your answer that every account here can reach the port';
             }
         }
 

@@ -49,20 +49,20 @@ return [
         $call = ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm -r ~/old'], 'session_id' => 'sess-1'];
         try {
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED] && hookSearchRequests($dir) === [], 'no snapshot: the delete must be blocked without a model call: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)] && hookSearchRequests($dir) === [], 'no snapshot: the delete must be blocked without a model call: ' . $raw);
             askOrchSnapshot($tree, 'sess-1', [['role' => 'user', 'text' => 'delete the old folder in my home']]);
             file_put_contents("$dir/reply", "R1: yes\nR2: yes\nR3: no");
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
             check($d === null, 'a clear review must let the call run: ' . $raw);
             $req = hookSearchRequests($dir);
             check(count($req) === 1 && $req[0]['body']['model'] === 'acme/light' && strpos($req[0]['body']['messages'][1]['content'], '[user wrote] delete the old folder in my home') !== false, 'one review with the light model: ' . json_encode($req));
-            check(in_array('ask-policy={"blocked":0,"dropped":0,"cleared":1,"ran":0}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
+            check(in_array('ask-policy={"blocked":0,"dropped":0,"cleared":1,"ran":0,"unchecked":0}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
             file_put_contents("$dir/reply", "R1: unsure\nR2: yes\nR3: no");
             list($d) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM], 'a doubtful review must block until the user says yes');
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused()], 'a doubtful review must block until the user says yes');
             file_put_contents("$dir/reply", "Sure, go ahead!");
             list($d) = orchestratorRun($tree, 'pre_tool_call', $call);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'an unparsable review must block a delete');
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'an unparsable review must block a delete');
         } finally {
             proc_terminate($proc);
             testRmTree($tree);
@@ -85,7 +85,7 @@ return [
             check($d === null, 'a load test must run unasked: ' . $raw);
             check(hookSearchRequests($dir) === [], 'a load test must not call the model');
             list($d, $raw) = orchestratorRun($sendTree, 'pre_tool_call', $call);
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_CONFIRM], 'the model\'s R2 "no" must not clear the feedback send: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused()], 'the model\'s R2 "no" must not clear the feedback send: ' . $raw);
             askOrchSnapshot($sendTree, 'sess-2', [['role' => 'user', 'text' => 'send my feedback'], ['role' => 'agent', 'text' => 'This sends the draft to Pulsed Media. Send it?'], ['role' => 'user', 'text' => 'yes']]);
             file_put_contents("$dir/reply", "R1: yes\nR2: no\nR3: no");
             list($d, $raw) = orchestratorRun($sendTree, 'pre_tool_call', $call);

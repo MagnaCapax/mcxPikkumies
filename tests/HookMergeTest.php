@@ -52,7 +52,7 @@ return [
             file_put_contents("$dir/$name.php", "<?php\n" . $sayHM(['action' => 'approve', 'message' => 'tool asks', 'rule_key' => 'k']));
             try {
                 list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'rm f']]);
-                check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], "$name: the delete must stay blocked (no session): $raw");
+                check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], "$name: the delete must stay blocked (no session): $raw");
             } finally {
                 testRmTree($tree);
             }
@@ -96,7 +96,7 @@ return [
                 return orchestratorRun($tree, 'pre_tool_call', $payload);
             });
             check(is_array($direct) && $direct['action'] === 'approve' && $direct['rule_key'] === 'pikkumies-send:' . $rec['id'], 'the unit itself still asks: ' . json_encode($direct));
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'with no session nobody\'s yes can clear the send, and Hermes must never get an approve: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'with no session nobody\'s yes can clear the send, and Hermes must never get an approve: ' . $raw);
         } finally {
             testRmTree($tree);
         }
@@ -124,12 +124,12 @@ return [
         try {
             $cmd = 'rsync -a --delete d/ unknown.example:d/ # intent: mirror the reports folder';
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'the delete must block: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'the delete must block: ' . $raw);
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => 'ssh unknown.example uptime # intent: check the load']]);
             check($d === null, 'an unknown host alone is not a delete or a send: it runs: ' . $raw);
             file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['ssh' => ['allow' => ['unknown.example']]], true) . ";\n");
             list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', ['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]); // no session: search-first-gate stays out
-            check($d === ['action' => 'block', 'message' => AskPolicy::BLOCK_UNCHECKED], 'only the delete blocks: ' . $raw);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)], 'only the delete blocks: ' . $raw);
         } finally {
             testRmTree($tree);
         }

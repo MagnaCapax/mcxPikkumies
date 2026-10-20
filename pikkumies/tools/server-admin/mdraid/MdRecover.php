@@ -158,7 +158,7 @@ class MdRecover
         $v = MdState::verdict($members, $level, $first['devices']);
         if ($v['verdict'] === 'stop') {
             throw new CliError("assemble refused: {$v['why']}; nothing was done",
-                'keep the disks untouched and tell the owner; this needs Pulsed Media support or a data recovery specialist, not another command');
+                'keep the disks untouched and report it: this needs Pulsed Media support or a data recovery specialist, not another command');
         }
         foreach (array_keys($members) as $p) {
             self::notHeld(PathName::base((string) readlink(MdRun::path($p))), $md);
