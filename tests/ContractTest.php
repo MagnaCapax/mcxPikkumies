@@ -136,7 +136,9 @@ return [
     },
     'units: every tool of a category has the verbs its category README lists (ADR-0015)' => function () {
         // Named exemptions only, each with its reason and named in its category README.
-        $exempt = ['backup/remote' => 'ADR-0049: archives streamed over ssh, not a snapshot repository'];
+        $exempt = ['backup/remote' => 'ADR-0049: archives streamed over ssh, not a snapshot repository',
+            'torrent-clients/find' => 'finds which client/service has a torrent before any shared verb can use its id; its own single verb, not the per-client contract above',
+            'torrent-clients/move' => 'not a client: it moves torrents between boxes through the client units'];
         foreach (Tree::scan(Units::toolsDir(), 'skill.md')['categories'] as $category => $dir) {
             $readme = "$dir/README.md";
             $shared = is_file($readme) ? array_column(Units::verbs((string) file_get_contents($readme)), 'verb') : [];

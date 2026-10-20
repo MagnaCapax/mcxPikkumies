@@ -12,8 +12,9 @@ require_once "$lib/Http.php";
 require_once "$lib/SecretFile.php";
 require_once dirname(__DIR__) . '/lib/Torrents.php';
 require_once dirname(__DIR__) . '/lib/Bencode.php';
+require_once dirname(__DIR__) . '/lib/TorrentExport.php';
 foreach (['QbitSecret', 'QbitEndpoint', 'QbitApi', 'QbitProc', 'QbitRestart', 'QbitStats', 'QbitAdd', 'QbitChange', 'QbitDetails',
-    'QbitExtras', 'QbittorrentClient'] as $qbitClass) {
+    'QbitExtras', 'QbittorrentClient', 'Export'] as $qbitClass) {
     require_once __DIR__ . "/$qbitClass.php";
 }
 
@@ -26,6 +27,7 @@ usage: php qbittorrent.php <verb> [arguments] [--human]
   pause <id>...     resume <id>...
   stats             traffic             restart
   recheck <id>...   reannounce <id>...  limit [--down <rate>] [--up <rate>]
+  export <id>       (the .torrent as base64 parts, for move)
   login             (the user types the WebUI password at a terminal; stored for this tool)
 Ids are the 40-hex ids `list` prints. Output: JSON Lines; --human for people. See USAGE.md.
 TXT;
@@ -41,7 +43,7 @@ $qbitMake = function () use ($qbitSecretDir, $qbitFamily) {
     return [new QbitApi($ep, $secret), $secret];
 };
 
-$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'recheck', 'reannounce', 'limit', 'login'];
+$qbitVerbs = ['list', 'show', 'add', 'remove', 'pause', 'resume', 'stats', 'traffic', 'restart', 'recheck', 'reannounce', 'limit', 'export', 'login'];
 list($qbitVerb, , $qbitOpt) = Cli::parse($argv, $qbitVerbs);
 if ($qbitVerb === null && !empty($qbitOpt['verbs'])) {
     echo implode("\n", $qbitVerbs), "\n"; // Torrents::run lists only the shared verbs
@@ -77,4 +79,4 @@ Torrents::run($argv, function () use ($qbitMake, $qbitProcRoot, $qbitPage) {
         $client->page = (int) $qbitPage;
     }
     return $client;
-}, $usage);
+}, $usage, ['export' => ['QbitExport', 'verb']]);

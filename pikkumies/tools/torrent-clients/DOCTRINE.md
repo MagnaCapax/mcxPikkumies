@@ -9,3 +9,7 @@
 - After the download, check the file against the checksum list the publisher puts next to it (`SHA256SUMS` or the like) and report the result. No published checksum: say so.
 - Seeding uses the account's upload allowance: say so when adding large releases, and show `stats` or `traffic` if the user asks how much is left.
 - A client's config file (`.rtorrent.rc`, qBittorrent's or Deluge's settings) changes when the user asked for that change or asked how to make it on this account: back up the file, change it, check it, and say how to undo it. When `restart` refuses, tell the user why and stop: never restart by hand (marker files, the provider's restart scripts, killing the process).
+- Moving torrents between the user's boxes is the `move` tool, run on the box that receives them. Do not hand-copy the data and then re-add and delete in the clients yourself: that skips the check that the copy is complete and seeding before the old copy goes.
+- A move frees the old box only after the torrent seeds here at 100 % under the same id, and only when the user asked for the old copy gone, in their own words: `run <move> --free-source --ids <ids> --expect <value> --intent "<their words>"`. Without that request, stop at "seeding on both boxes" and say so.
+- A recheck below 100 % keeps the old copy: run the move again (it copies the differences); never resume a short copy to let a private tracker fill it.
+- When the old box's key does not allow deletes, give the user the command `move` printed for that box; do not find another way in.

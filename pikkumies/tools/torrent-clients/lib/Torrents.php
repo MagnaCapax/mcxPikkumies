@@ -8,6 +8,7 @@ $lib = dirname(__DIR__, 3) . '/lib';
 require_once "$lib/Cli.php";
 require_once "$lib/CliHuman.php";
 require_once "$lib/Quota.php";
+require_once __DIR__ . '/TorrentsTelemetry.php'; // local-only history of `stats`, one shared place for every client (docs/adr/0084-...)
 require_once __DIR__ . '/TorrentClient.php';
 require_once __DIR__ . '/DeleteFreed.php';
 require_once __DIR__ . '/DeletePlan.php';
@@ -20,8 +21,8 @@ class Torrents
 {
     const STATES = ['downloading', 'seeding', 'paused', 'checking', 'queued', 'error', 'stalled', 'unknown'];
 
-    /** $connect: fn() => TorrentClient, called only when a verb needs the client. */
-    public static function run(array $argv, callable $connect, $usage)
+    /** $connect: fn() => TorrentClient, called only when a verb needs it. $extra: unit verbs, name => fn($client, $args, $opt). */
+    public static function run(array $argv, callable $connect, $usage, array $extra = [])
     {
         $client = null;
         $c = function () use (&$client, $connect) {
@@ -70,7 +71,9 @@ class Torrents
             },
             'stats' => function ($args, $opt) use ($c) {
                 // The user's quota, not the filesystem's free space, which on shared servers is the whole array.
-                return [$c()->stats() + Quota::fields((string) getenv('HOME'))];
+                $record = $c()->stats() + Quota::fields((string) getenv('HOME'));
+                TorrentsTelemetry::record($c(), $record);
+                return [$record];
             },
             'traffic' => function ($args, $opt) use ($c) {
                 return [$c()->traffic()];
@@ -78,7 +81,9 @@ class Torrents
             'restart' => function ($args, $opt) use ($c) {
                 return [$c()->restart()];
             },
-        ] + TorrentChange::verbs($c), $usage, ['with-data', 'files', 'paused', 'trackers', 'reverse'], ['state', 'search', 'dir', 'expect',
+        ] + TorrentChange::verbs($c) + array_map(function ($fn) use ($c) {
+            return function ($args, $opt) use ($fn, $c) { return call_user_func($fn, $c(), $args, $opt); };
+        }, $extra), $usage, ['with-data', 'files', 'paused', 'trackers', 'reverse'], ['state', 'search', 'dir', 'expect',
             'sort', 'down', 'up']);
     }
 
