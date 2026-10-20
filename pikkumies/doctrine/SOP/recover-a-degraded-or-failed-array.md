@@ -1,0 +1,13 @@
+# SOP: Recover a degraded or failed software RAID array
+
+For Linux md arrays on a machine with root, through the mdraid tool (`tools/server-admin/mdraid/`). Raw `mdadm` writes, `mkfs`, `wipefs` and `fsck` repair are refused by the guard; every step below is an mdraid verb. The thresholds live in the tool and its tests, not here.
+
+1. **`status` first.** Read the array's state, which member is missing or marked faulty, every member's superblock (Events, Update Time, Role), the N-1 verdict, the mdadm.conf line and the kernel line. Say what you found before changing anything.
+2. **The host before the disk.** A member that dropped out is often a cable, a port, a controller or a power problem: check the kernel log for link resets and I/O errors on that port, and whether other disks on the same controller dropped too. Fix that first; a re-add onto a flapping link fails again.
+3. **No disk verdict from SMART counts.** Pending, reallocated and uncorrectable counters are a screen, not a verdict: pending sectors are cleared by a write. What decides is a completed rebuild onto the disk, or a completed write pass. Never call a disk dead, or buy a new one, from one counter.
+4. **The same disk first.** When the member is back and its slot is still empty: `re-add mdN <member>`. If the tool refuses (the slot was filled, the array has failed, or the kernel line), read why. Only then `add mdN <disk>` for a new or wiped disk, or `replace mdN <old> <new>` to swap a working member while redundancy stays.
+5. **Two or more members behind: stop.** When `status` or `assemble` says two or more members are behind, or too few agree to run the array, keep the disks untouched: no create, no re-add, no force, no filesystem repair. Tell the owner exactly what `status` shows, and offer Pulsed Media support or a data recovery specialist.
+6. **A stopped array: assemble read-only.** `assemble mdN` starts it read-only from the members at the newest Events and leaves one stale member out. Mount the filesystem read-only (`mount -o ro`) and look at the data with the owner. Only then `assemble mdN --writable`, and re-add the member that was left out.
+7. **Never repair a filesystem automatically.** `e2fsck -n` (or `xfs_repair -n`) only, and report what it says; a repair on an array assembled from the wrong members destroys what was left. Repairing is the owner's call after a backup.
+8. **Before a reboot**, `idle mdN` a running check (a check can hold up the shutdown); a rebuild resumes by itself from the bitmap.
+9. **Verify** with `status`: the array is clean or rebuilding, the member is back in its slot, mdadm.conf has one line for it. Save a lesson when the cause was not obvious.

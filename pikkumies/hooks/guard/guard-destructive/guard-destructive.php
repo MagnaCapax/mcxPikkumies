@@ -36,6 +36,7 @@ require_once dirname(__DIR__, 3) . '/lib/HookPayload.php';
 require __DIR__ . '/GuardLocal.php';
 // The media apps' logins in plain text (ADR-0078): named, globbed or swept up by a search from the home folder.
 require __DIR__ . '/GuardMediaCreds.php';
+require __DIR__ . '/GuardDrives.php';
 require_once dirname(__DIR__, 3) . '/lib/Host.php';
 $mediaHome = Host::home(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());
 $mediaCwd = isset($payload['cwd']) && is_string($payload['cwd']) ? $payload['cwd'] : '';
@@ -148,7 +149,8 @@ $patterns = $secretPatterns + [
     "/\\b(docker|podman|nerdctl)\\b.*\\blogin\\b.*$v(-p|--password(?!-stdin))/s" => 'a registry password on the command line, where other processes can read it; the user types docker login in a terminal',
     // backup remote (ADR-0049): the gpg passphrase is shown only on the user's own terminal; what the agent reads goes to the model.
     "/\\bphp\\b.*{$v}passphrase\\b/s" => 'the backup passphrase is for the user\'s own terminal only, never the chat (it would reach the model provider)',
-] + NestedAgent::guardPatterns(); // another agent with approvals, hooks or rules off (ADR-0020 amendment 2026-10-18)
+] + NestedAgent::guardPatterns() // another agent with approvals, hooks or rules off (ADR-0020 amendment 2026-10-18)
+    + guardDrivePatterns(); // raw drive writes: badblocks -w, hdparm write/erase, md repair (GuardDrives.php, ADR-0094)
 // backup remote (ADR-0049) and services setup (ADR-0084): a command that names the tool and builds anything with $, backticks or eval cannot be checked
 // (V=passphrase; php remote.php $V). The setup prefix's own value is skipped when it is single-quoted only, so a login
 // value holding a $ stays usable; a double-quoted or unquoted one is expanded by the shell and counts.
@@ -169,6 +171,14 @@ foreach ($patterns as $re => $why) {
         echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $why. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
         exit(0);
     }
+}
+// Raw disk and md RAID commands (ADR-0095): formatting, discarding, repairing without -n, mdadm that changes an array,
+// md control-file writes. Refused outright; the message names the mdraid tool, which checks the live device state first.
+require __DIR__ . '/GuardDisk.php';
+$disk = GuardDisk::check($texts);
+if ($disk !== null) {
+    echo json_encode(['action' => 'block', 'message' => "Pikkumies safety: $disk. Refused outright, not asked. Do not reach the same effect another way; finish the rest of the task and say in one line what was refused and why."]) . "\n";
+    exit(0);
 }
 // The media apps' logins after the stored-password and AI-key rules above, so those keep their own reason.
 $media = GuardMediaCreds::check($tool, $input, $texts, $mediaCwd, $mediaHome);
@@ -279,7 +289,7 @@ $approve = [
     '/delete[-_]local[-_]data/i'                                                              => ['delete', 'deletes torrent data through a local app'],
     // The tool convention anywhere in the command: `php $Q remove <id> --with-data` names no .php file, and
     // `php $R sync|move|prune ... --expect <n>` names no rclone/restic/borg: every deleting tool verb carries --expect.
-    '/(^|[\s"\',\[(])--(with-data|delete-files|expect)\b/'                                   => ['delete', 'deletes data through a Pikkumies tool'],
+    '/(^|[\s"\',\[(])--(with-data|delete-files|expect|destroy)\b/'                           => ['delete', 'deletes data through a Pikkumies tool'],
     "/\\bphp\\b.*{$v}(prune|forget|purge)\\b/s"                                                => ['delete', 'removes data through a Pikkumies tool'],
     '/\bcore\.remove_torrents?\b/'                                                            => ['delete', 'removes torrents, and with remove_data their files, through Deluge'],
     '/\bexecute[a-z0-9.]*\b.*\brm\b/s'                                                         => ['delete', 'runs rm through rTorrent'],
@@ -321,7 +331,7 @@ $approve = [
     // backup remote (ADR-0049): where the account's files go, and a job that sends them by itself, are the user's decision.
     "/(^|[\\s;&|(`\"'])PIKKUMIES_REMOTE_PASSWORD=|\\bremote\\.php\\b.*{$v}(setup|schedule)\\b|(^|[\\s\"',\\[(])--daily\\b/s"
         => ['send', 'sets up or schedules backups of this account to another machine'],
-];
+] + guardDriveApproves($v); // the drives tool's selftest is asked as a load (GuardDrives.php, ADR-0094)
 // What the user is asked about, after the reason; a load test has its own rule_key prefix.
 $suffix = [
     'delete'   => ', which cannot be undone',
