@@ -14,18 +14,22 @@ class HookQuotes
 {
     const MAX = 8;
     const CHARS = 200;
+    const KEY_MAX = 999999; // a request number - 1: a session's spool (1 MiB) holds far fewer
 
-    /** A unit's quotes: a list of at most MAX strings of at most CHARS characters; anything else is dropped and logged. */
+    /**
+     * A unit's quotes: at most MAX strings of at most CHARS characters, keyed by their number - 1 (0 to KEY_MAX; a list
+     * numbers them in order); anything else is dropped and logged.
+     */
     public static function clean($quotes, $id)
     {
         $ok = is_array($quotes) && count($quotes) <= self::MAX;
-        foreach ($ok ? $quotes : [] as $q) {
-            $ok = $ok && is_string($q) && HookUnits::charCount($q) <= self::CHARS;
+        foreach ($ok ? $quotes : [] as $k => $q) {
+            $ok = $ok && is_int($k) && $k >= 0 && $k <= self::KEY_MAX && is_string($q) && HookUnits::charCount($q) <= self::CHARS;
         }
         if (!$ok) {
             HookLog::add('async', $id, 0, 'quotes-dropped');
         }
-        return $ok ? array_values($quotes) : [];
+        return $ok ? $quotes : [];
     }
 
     /** The quotes found word for word in a user row's content, numbered as the unit numbered them; '' when none. */

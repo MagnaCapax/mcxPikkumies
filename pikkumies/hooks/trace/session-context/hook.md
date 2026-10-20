@@ -1,8 +1,10 @@
 ---
 name: session-context
 event: post_api_request
-description: Keeps the context the last model request used, and the model's window, for each tmux pane where pikkumies runs, for the pikkumies tmux status line.
+description: Keeps the context the last model request used, and the model's window, for each tmux pane where pikkumies runs, for the pikkumies tmux status line; and counts every request's tokens for the run an interactive start began.
 failClosed: false
 timeout: 2
 ---
-Sets `ctx` (the request's `usage.prompt_tokens`) and `ctxMax` (`context_length`) in `local/state/session-counters/pane<N>.json` for the pane in `TMUX_PANE` (`lib/SessionCounters.php`). A delegated agent's request (`platform` "subagent") and a request without usage leave them alone. Outside tmux, or in a pane where no interactive `pikkumies` started, it writes nothing. Prints nothing ([ADR-0061](../../../../docs/adr/0061-status-line-memories-context-tool-calls-code-lines.md)).
+Sets `ctx` (the request's `usage.prompt_tokens`) and `ctxMax` (`context_length`) in `local/state/session-counters/pane<N>.json` for the pane in `TMUX_PANE` (`lib/SessionCounters.php`). A delegated agent's request (`platform` "subagent") and a request without usage leave them alone. Outside tmux, or in a pane where no interactive `pikkumies` started, it writes nothing ([ADR-0061](../../../../docs/adr/0061-status-line-memories-context-tool-calls-code-lines.md)).
+
+Every request, a delegated agent's included, also adds its tokens (`usage.total_tokens`, else `prompt_tokens` + `output_tokens`) and one request to `local/state/session-counters/run-<key>.json` for the key in `PIKKUMIES_RUN`, which an interactive start makes and Hermes and the agents it starts inherit. Goal review times itself by it. Without a key, or for a key no start zeroed, nothing is written. Prints nothing ([ADR-0096](../../../../docs/adr/0096-goal-review-v2-drift-check-by-time-and-tokens.md)).

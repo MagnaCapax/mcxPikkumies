@@ -635,6 +635,11 @@ switch ($cmd) {
             list($memTotal, $memToday) = SessionCounters::memories(MemoryMetrics::memoryFiles(), gmdate('Ymd'));
             out(SessionCounters::render($memTotal, $memToday, null, $creditsUtf8, ['CreditsFormat', 'short']));
             SessionCounters::reset(Config::localDir(), (string) getenv('TMUX_PANE'));
+            // One run key for this start (ADR-0096): Hermes and every agent it starts inherit it, so session-context
+            // counts all their tokens into one run file, and goal-review keeps its spool across a compaction.
+            $runKey = bin2hex(random_bytes(8));
+            putenv('PIKKUMIES_RUN=' . $runKey);
+            SessionCounters::resetRun(Config::localDir(), $runKey);
         }
         // A seeded prompt answered-and-exited (not a TTY on stdin or stdout, Hermes' own behaviour,
         // ADR-0022): pre_verify may never fire for this turn (it only fires after a file edit), so

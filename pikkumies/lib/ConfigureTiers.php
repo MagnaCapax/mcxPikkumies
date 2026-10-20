@@ -73,7 +73,7 @@ class ConfigureTiers
     /** What an asked change does, for the ask review and the person reading the log; a switch has [when set true, when set false]. */
     const WHY = [
         'provider.model' => 'changes the model every session uses, and so what a session costs',
-        'hooks.model' => 'changes the model the safety hooks\' judges use; one that does not answer them well silently turns those judges off',
+        'hooks.model' => 'changes the model the hooks\' judges and the goal review use; one that does not answer them well silently turns those off',
         'tools.disabled' => 'turns off whole tool categories',
         'lowBalance.disabled' => 'hides the low-credits notice',
         'feedback.ask' => ['lets Pikkumies now and then ask, in a session, whether you want to send Pulsed Media feedback; the question itself sends nothing', null],

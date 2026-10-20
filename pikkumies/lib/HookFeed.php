@@ -2,9 +2,14 @@
 /**
  * HookFeed: the orchestrator's side of the interval hook units (ADR-0067), in four calls, each of which never throws
  * and does nothing while no interval unit is on:
- * - start(): at pre_llm_call, post_llm_call and post_tool_call, appends this event's records to the session's spool;
+ * - start(): at pre_llm_call, post_llm_call and post_tool_call, appends this event's records to the session's spool,
+ *   whose hash is lib/HookRunCount.php's (one per launcher run and depth, so a compression keeps it, ADR-0096), and
+ *   counts tokens and lookups for the goal review (HookRunCount::record);
  * - contexts(): at pre_llm_call, the pending contexts (and notices not delivered as holds), and a prune of old state;
- * - hold(): at pre_tool_call, when no unit blocked or asked, a pending notice may hold the call once;
+ *   never to a delegated agent, which shares the run's spool but is not who the notes are for;
+ * - hold(): at pre_tool_call, when no unit blocked or asked, a pending notice may hold the call once; never a delegated
+ *   agent's call. Hermes names the platform at pre_llm_call, post_llm_call and post_api_request but not at pre_tool_call,
+ *   so start() marks a session seen as "subagent" (state/async/subagent/<sha1 of its id>, pruned with the rest);
  * - kick(): at post_tool_call and post_llm_call, after the answer is printed, starts the due units in the background.
  *   A one-shot run (HookAsync::ONESHOT_ENV) still records at post_llm_call but starts nothing there: its process ends
  *   after the turn, so a background result could never be shown, and a check judged at the end of the turn
@@ -13,6 +18,7 @@
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HookPending.php';
 require_once __DIR__ . '/PathName.php';
+require_once __DIR__ . '/HookRunCount.php';
 
 class HookFeed
 {
@@ -29,9 +35,16 @@ class HookFeed
             if (!$units) {
                 return null;
             }
-            $feed = ['event' => $event, 'session' => $session, 'hash' => HookAsync::sessionHash($session), 'units' => $units, 'config' => $config];
+            $feed = ['event' => $event, 'session' => $session, 'hash' => HookRunCount::hash($session), 'units' => $units, 'config' => $config];
             if (in_array($event, self::RECORD_EVENTS, true)) {
-                HookSpool::append(Config::localDir(), $session, HookRecords::forEvent($event, $payload), $units);
+                HookSpool::append(Config::localDir(), $session, HookRecords::forEvent($event, $payload), $units, $feed['hash']);
+            }
+            HookRunCount::record(Config::localDir(), $event, $payload, $feed['hash']);
+            if (self::platform($payload) === 'subagent' && !is_file(self::subagentFile(Config::localDir(), $session))) {
+                $dir = dirname(self::subagentFile(Config::localDir(), $session));
+                if ((is_dir($dir) || @mkdir($dir, 0700, true) || is_dir($dir)) && !is_link($dir)) {
+                    HookAsync::put(self::subagentFile(Config::localDir(), $session), '');
+                }
             }
             return $feed;
         } catch (\Throwable $e) {
@@ -43,7 +56,7 @@ class HookFeed
     /** pre_llm_call: the pending texts as one context ('' when none); $payload's conversation verifies quoted requests. */
     public static function contexts($feed, array $payload = [])
     {
-        if ($feed === null) {
+        if ($feed === null || self::subagent($payload)) {
             return '';
         }
         try {
@@ -59,7 +72,7 @@ class HookFeed
     /** pre_tool_call: a block holding the call, or null. Called only when the merged answer was no opinion. */
     public static function hold($feed, array $payload)
     {
-        if ($feed === null) {
+        if ($feed === null || self::subagent($payload)) {
             return null;
         }
         try {
@@ -72,6 +85,23 @@ class HookFeed
         }
     }
 
+    /** True for a delegated agent's event: it says so, or its session said so before. */
+    public static function subagent(array $payload)
+    {
+        $session = isset($payload['session_id']) && is_string($payload['session_id']) ? $payload['session_id'] : '';
+        return self::platform($payload) === 'subagent' || ($session !== '' && is_file(self::subagentFile(Config::localDir(), $session)));
+    }
+
+    private static function platform(array $payload)
+    {
+        return isset($payload['extra']['platform']) && is_string($payload['extra']['platform']) ? $payload['extra']['platform'] : '';
+    }
+
+    private static function subagentFile($localDir, $session)
+    {
+        return HookSpool::dir($localDir) . '/subagent/' . sha1($session);
+    }
+
     /** post_tool_call, post_llm_call: start the due units' workers. */
     public static function kick($feed)
     {
@@ -80,7 +110,7 @@ class HookFeed
             return [];
         }
         try {
-            return HookAsync::kick(Config::localDir(), $feed['units'], $feed['session'], Config::root() . '/hooks/worker.php');
+            return HookAsync::kick(Config::localDir(), $feed['units'], $feed['session'], Config::root() . '/hooks/worker.php', $feed['hash']);
         } catch (\Throwable $e) {
             HookLog::add($feed['event'], 'async', 0, 'async-start-failed');
             return [];

@@ -45,6 +45,9 @@ function skip($why)
     throw new TestSkipped($why);
 }
 
+// A run key from a pikkumies session around the suite would change every spool hash (ADR-0096).
+putenv('PIKKUMIES_RUN');
+
 require __DIR__ . '/support.php';
 
 /** Run a PHP script with arguments and stdin; returns [exit code, stdout]. */

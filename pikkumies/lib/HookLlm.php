@@ -11,15 +11,15 @@ require_once __DIR__ . '/Provider.php';
 
 class HookLlm
 {
-    /** One chat completion: the reply text, or '' on any failure. */
-    public static function chat(array $messages, $timeout = 6, $maxTokens = 60)
+    /** One chat completion: the reply text, or '' on any failure. $model: a caller's own pick (goal review), '' for model(). */
+    public static function chat(array $messages, $timeout = 6, $maxTokens = 60, $model = '')
     {
         $config = Config::load();
         if (!empty($config['hooks']['llm']['disabled'])) {
             return '';
         }
         $prov = Provider::resolve($config);
-        $model = self::model($prov, $config);
+        $model = (string) $model !== '' ? (string) $model : self::model($prov, $config);
         if ($prov['endpoint'] === '' || $prov['key'] === '' || $model === '') {
             return '';
         }

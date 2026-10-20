@@ -1,19 +1,26 @@
 <?php
 /**
  * HookSpool: one session's records for the interval hook units (ADR-0067), in
- * local/state/async/transcript/<sha1 of session_id>.jsonl (directory 0700, file 0600). append() numbers each record
+ * local/state/async/transcript/<hash>.jsonl (directory 0700, file 0600); the hash is lib/HookRunCount.php's: one per run
+ * and depth under the launcher's PIKKUMIES_RUN, else the sha1 of session_id (ADR-0096). append() numbers each record
  * (seq = the last one + 1, under the file's lock, so parallel tool calls never share a number), stamps ts and
  * scheduled (a Hermes cron session, id "cron_...", cron/scheduler.py), and then marks every unit that a record of its
  * wake kinds just reached (a flag file the scheduler checks instead of reading the spool). Past MAX bytes the oldest
- * tool records go first, then the oldest of any kind, down to half; the newest record always stays, so numbering
- * never restarts. This is a separate spool of arguments only, kept beside the command log (ADR-0044), never instead
+ * tool records go first, then the oldest agent texts and user rows that are not the user's (subagent, synthetic), then
+ * the oldest user records, down to half; the newest record
+ * always stays, so numbering never restarts. This is a separate spool of arguments only, kept beside the command log (ADR-0044), never instead
  * of it. The agent's own account can edit it: it feeds safety prompts, never an allow.
  */
 require_once __DIR__ . '/HookRecords.php';
 
 class HookSpool
 {
-    const MAX = 262144;
+    const MAX = 1048576;
+    /**
+     * What shrink() sheds, pass by pass, oldest first: tool records; then agent texts and the user rows that are not the
+     * user's (a delegated agent's prompt, a row Hermes added); then anything, so the user's own requests go last.
+     */
+    const SHED = [['"kind":"tool"'], ['"kind":"assistant"', '"kind":"reply"', '"subagent":true', '"synthetic":true'], ['']];
 
     public static function dir($localDir)
     {
@@ -32,15 +39,16 @@ class HookSpool
     }
 
     /**
-     * Store $records for the session; $units are the interval units that are on ([id => unit with 'wakes']). Returns
-     * how many were stored. Never throws for a full disk or a missing directory: it stores nothing then.
+     * Store $records for the session in the spool $hash (null: the sha1 of $sessionId); $units are the interval units that
+     * are on ([id => unit with 'wakes']). The session id still decides "scheduled". Returns how many were stored. Never
+     * throws for a full disk or a missing directory: it stores nothing then.
      */
-    public static function append($localDir, $sessionId, array $records, array $units)
+    public static function append($localDir, $sessionId, array $records, array $units, $hash = null)
     {
-        if (!is_string($sessionId) || $sessionId === '' || !$records) {
+        $hash = $hash === null ? sha1((string) $sessionId) : (string) $hash;
+        if (!is_string($sessionId) || $sessionId === '' || !$records || !preg_match('/^[0-9a-f]{40}\z/', $hash)) {
             return 0;
         }
-        $hash = sha1($sessionId);
         $file = self::file($localDir, $hash);
         $old = umask(0077);
         try {
@@ -129,18 +137,19 @@ class HookSpool
         return is_array($r) && isset($r['seq']) && is_int($r['seq']) ? $r['seq'] : 0;
     }
 
-    /** Down to half of MAX: the oldest tool records first, then the oldest of any kind; never the newest record. */
+    /** Down to half of MAX, shedding in SHED's order, oldest first; never the newest record. */
     private static function shrink($fh)
     {
         rewind($fh);
         $lines = array_values(array_filter(explode("\n", (string) stream_get_contents($fh)), 'strlen'));
         $size = array_sum(array_map('strlen', $lines)) + count($lines);
-        foreach ([true, false] as $toolsOnly) {
+        foreach (self::SHED as $kinds) {
             foreach ($lines as $i => $l) {
                 if ($size <= self::MAX / 2 || $i === count($lines) - 1) {
                     break;
                 }
-                if ($l !== '' && (!$toolsOnly || strpos($l, '"kind":"tool"') !== false)) {
+                $match = array_filter($kinds, function ($k) use ($l) { return $k === '' || strpos($l, $k) !== false; }); // JSON escapes quotes inside texts, so these cannot match a text
+                if ($l !== '' && $match) {
                     $size -= strlen($l) + 1;
                     $lines[$i] = '';
                 }

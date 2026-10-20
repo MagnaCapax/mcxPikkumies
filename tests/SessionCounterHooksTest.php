@@ -88,4 +88,53 @@ return [
             testRmTree($tree);
         }
     },
+    'session-context run: total_tokens when an integer in 0..10M, else prompt + output; a delegated agent counts too; nothing usable is null' => function () {
+        $u = function (array $usage, $platform = 'cli') {
+            return ['extra' => ['platform' => $platform, 'usage' => $usage]];
+        };
+        check(SessionCounters::requestTokens($u(['prompt_tokens' => 48000, 'output_tokens' => 500, 'total_tokens' => 48500])) === 48500, 'total_tokens');
+        check(SessionCounters::requestTokens($u(['total_tokens' => 900], 'subagent')) === 900, 'a delegated agent\'s request counts for the run');
+        check(SessionCounters::requestTokens($u(['total_tokens' => 10000001, 'prompt_tokens' => 70, 'output_tokens' => 5])) === 75, 'out of range total: prompt + output');
+        check(SessionCounters::requestTokens($u(['total_tokens' => '900', 'prompt_tokens' => 70])) === 70, 'a string total is not an integer; output missing counts 0');
+        check(SessionCounters::requestTokens($u(['total_tokens' => -1, 'output_tokens' => 12])) === 12, 'negative total ignored');
+        check(SessionCounters::requestTokens($u(['total_tokens' => 0])) === 0, 'zero is a count');
+        check(SessionCounters::requestTokens($u(['input_tokens' => 9])) === null && SessionCounters::requestTokens(['extra' => ['usage' => null]]) === null && SessionCounters::requestTokens([]) === null, 'nothing usable: null');
+        check(SessionCounters::requestTokens(['usage' => ['total_tokens' => 9]]) === null, 'Hermes sends usage under extra; top level is not read');
+    },
+    'session-context run: through the orchestrator every request adds to the run of PIKKUMIES_RUN, with or without tmux; the pane figures stay as before' => function () {
+        $tree = sessionHooksTree();
+        $local = "$tree/pikkumies/local";
+        $run = '00112233445566ff';
+        $api = function ($platform, $total) {
+            return json_encode(['hook_event_name' => 'post_api_request', 'session_id' => 's',
+                'extra' => ['platform' => $platform, 'usage' => ['prompt_tokens' => 1000, 'output_tokens' => 20, 'total_tokens' => $total], 'context_length' => 200000]]);
+        };
+        try {
+            SessionCounters::resetRun($local, $run, 100);
+            SessionCounters::reset($local, '%7');
+            testWithEnv(['TMUX_PANE' => null, 'PIKKUMIES_RUN' => $run], function () use ($tree, $api) {
+                list(, $out) = runPhp("$tree/pikkumies/hooks/orchestrator.php", ['post_api_request'], $api('cli', 1020));
+                check(trim($out) === '', 'prints nothing: ' . $out);
+                runPhp("$tree/pikkumies/hooks/orchestrator.php", ['post_api_request'], $api('subagent', 300));
+            });
+            $c = SessionCounters::readRun($local, $run);
+            check($c['tokens'] === 1320 && $c['reqs'] === 2 && $c['since'] === 100, 'outside tmux both requests count, the delegated one too: ' . json_encode($c));
+            check(SessionCounters::read($local, '%7')['ctx'] === 0, 'outside tmux the pane is untouched');
+            testWithEnv(['TMUX_PANE' => '%7', 'PIKKUMIES_RUN' => $run], function () use ($tree, $api) {
+                runPhp("$tree/pikkumies/hooks/orchestrator.php", ['post_api_request'], $api('subagent', 50));
+                runPhp("$tree/pikkumies/hooks/orchestrator.php", ['post_api_request'], $api('cli', 1020));
+            });
+            $p = SessionCounters::read($local, '%7');
+            check(SessionCounters::readRun($local, $run)['tokens'] === 2390 && $p['ctx'] === 1000 && $p['ctxMax'] === 200000, 'run and pane both counted: ' . json_encode([$p, SessionCounters::readRun($local, $run)]));
+            foreach (['nothex0123456789', '', 'ffffffffffffffff'] as $other) { // invalid, unset, a key no start zeroed
+                testWithEnv(['TMUX_PANE' => null, 'PIKKUMIES_RUN' => $other === '' ? null : $other], function () use ($tree, $api) {
+                    runPhp("$tree/pikkumies/hooks/orchestrator.php", ['post_api_request'], $api('cli', 5));
+                });
+            }
+            check(SessionCounters::readRun($local, $run)['tokens'] === 2390 && SessionCounters::readRun($local, 'ffffffffffffffff') === null, 'other keys write nothing');
+            check(count((array) glob(SessionCounters::dir($local) . '/run-*.json')) === 1, 'no other run file appeared');
+        } finally {
+            testRmTree($tree);
+        }
+    },
 ];

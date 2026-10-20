@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-19
-- Status: Accepted. Amends [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (a hook.md field and a unit-only event) and [ADR-0054](0054-tool-hooks-and-local-hooks.md) (local units may not use it). [ADR-0044](0044-every-shell-command-is-logged.md) is unchanged. The one-shot runs of [ADR-0047](0047-halt-guard.md) start no background run at the end of a turn.
+- Status: Accepted. Amends [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (a hook.md field and a unit-only event) and [ADR-0054](0054-tool-hooks-and-local-hooks.md) (local units may not use it). [ADR-0044](0044-every-shell-command-is-logged.md) is unchanged. The one-shot runs of [ADR-0047](0047-halt-guard.md) start no background run at the end of a turn. The spool and state are keyed by run and depth under the launcher since [ADR-0096](0096-goal-review-v2-drift-check-by-time-and-tokens.md).
 
 ## Context
 The operator asked on 2026-10-19 for orchestration of synchronous and asynchronous hooks, so that checks can run in the background: one that looks at the agent's tool calls about every minute and judges whether they changed data, one that looks at the user's requests at most once per ten minutes and gives the agent back at most 10k tokens, and checks over the session's transcript every five or ten minutes, fully asynchronous, each with a configurable interval.

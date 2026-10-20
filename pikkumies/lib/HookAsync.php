@@ -35,10 +35,11 @@ class HookAsync
     /**
      * Start every due unit's worker in the background, at most once per interval: the stamp is written under its lock
      * (LOCK_NB, so two tool calls never both start one) and released before the start. Returns the ids started.
+     * $hash is the spool's (lib/HookRunCount.php); null: the sha1 of $sessionId.
      */
-    public static function kick($localDir, array $units, $sessionId, $worker)
+    public static function kick($localDir, array $units, $sessionId, $worker, $hash = null)
     {
-        $hash = self::sessionHash($sessionId);
+        $hash = $hash === null ? self::sessionHash($sessionId) : (string) $hash;
         $timeout = self::bin('timeout');
         $started = [];
         $old = umask(0077);

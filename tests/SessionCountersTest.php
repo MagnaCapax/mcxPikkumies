@@ -82,4 +82,98 @@ return [
         check(SessionCounters::render(1, 0, ['ctx' => 950, 'ctxMax' => 0] + $c, true, $short) === 'Memories: 1 · Ctx: 950 · Tools: 17 · Code: +120 -8', 'no window known: used only');
         check(SessionCounters::render(1, 0, ['ctx' => 0] + $c, true, $short) === 'Memories: 1 · Tools: 17 · Code: +120 -8', 'no request yet: no Ctx');
     },
+    'session counters run: only a 16-hex key names a run file; resetRun zeroes the four keys, private, and prunes week-old runs' => function () {
+        check(SessionCounters::runFile('/l', '0123456789abcdef') === '/l/state/session-counters/run-0123456789abcdef.json', 'a launcher key must be accepted');
+        foreach (["0123456789abcdef\n", '0123456789ABCDEF', '0123456789abcde', '0123456789abcdef0', '../../x', '', null, '%3'] as $bad) {
+            check(SessionCounters::runFile('/l', $bad) === null, json_encode($bad) . ' must be refused');
+        }
+        $dir = testTempDir('pk-run');
+        $a = 'aaaaaaaaaaaaaaaa';
+        $b = 'bbbbbbbbbbbbbbbb';
+        $c = 'cccccccccccccccc';
+        try {
+            check(SessionCounters::updateRun($dir, $a, ['tokens' => 5]) === false && SessionCounters::readRun($dir, $a) === null && !is_dir(SessionCounters::dir($dir)), 'a run no start zeroed gets no file');
+            check(SessionCounters::resetRun($dir, $a, 1000) === true && SessionCounters::readRun($dir, $a) === ['since' => 1000, 'tokens' => 0, 'reqs' => 0, 'asked' => 0], 'zeroed: ' . json_encode(SessionCounters::readRun($dir, $a)));
+            check(json_decode(file_get_contents(SessionCounters::runFile($dir, $a)), true) === ['since' => 1000, 'tokens' => 0, 'reqs' => 0, 'asked' => 0], 'the file holds exactly the four keys');
+            check((fileperms(SessionCounters::dir($dir)) & 0777) === 0700 && (fileperms(SessionCounters::runFile($dir, $a)) & 0777) === 0600, 'directory 0700, file 0600');
+            check(SessionCounters::resetRun($dir, 'nope') === false, 'an invalid key resets nothing');
+            SessionCounters::resetRun($dir, $b);
+            SessionCounters::resetRun($dir, $c);
+            SessionCounters::reset($dir, '%1');
+            touch(SessionCounters::runFile($dir, $b), time() - 8 * 86400);
+            touch(SessionCounters::runFile($dir, $c), time() - 6 * 86400);
+            touch(SessionCounters::file($dir, '%1'), time() - 8 * 86400);
+            SessionCounters::resetRun($dir, $a);
+            check(!is_file(SessionCounters::runFile($dir, $b)) && is_file(SessionCounters::runFile($dir, $c)), 'a run untouched for 8 days is removed, one touched 6 days ago kept');
+            check(is_file(SessionCounters::file($dir, '%1')), 'a run reset leaves pane files to the pane reset');
+        } finally {
+            testRmTree($dir);
+        }
+    },
+    'session counters run: adds add, sets replace, readers may add integer keys; anything else is dropped; a damaged file reads as integers' => function () {
+        $dir = testTempDir('pk-run');
+        $k = '0123456789abcdef';
+        try {
+            SessionCounters::resetRun($dir, $k, 500);
+            check(SessionCounters::updateRun($dir, $k, ['tokens' => 1200, 'reqs' => 1]) === true, 'update');
+            SessionCounters::updateRun($dir, $k, ['tokens' => 800, 'reqs' => 1, 'memory' => 1, 'bad-key' => 4, 'text' => 'abc', 'x' => [1]], ['lastReviewAt' => 900]);
+            SessionCounters::updateRun($dir, $k, [], ['tokensAtLastReview' => 2000, 'lastReviewAt' => 950]);
+            check(SessionCounters::readRun($dir, $k) === ['since' => 500, 'tokens' => 2000, 'reqs' => 2, 'asked' => 0, 'memory' => 1, 'lastReviewAt' => 950, 'tokensAtLastReview' => 2000],
+                'counted: ' . json_encode(SessionCounters::readRun($dir, $k)));
+            file_put_contents(SessionCounters::runFile($dir, $k), '{"tokens":"12","reqs":[1],"since":3.9,"memory":true,"note":"hi"}');
+            check(SessionCounters::readRun($dir, $k) === ['since' => 3, 'tokens' => 12, 'reqs' => 0, 'asked' => 0], 'damaged: ' . json_encode(SessionCounters::readRun($dir, $k)));
+        } finally {
+            testRmTree($dir);
+        }
+    },
+    'session counters run: 40 writers at once lose no token' => function () {
+        $dir = testTempDir('pk-run');
+        $k = 'feedfacecafebeef';
+        try {
+            SessionCounters::resetRun($dir, $k);
+            $script = "$dir/bump.php";
+            file_put_contents($script, "<?php\nrequire " . var_export(dirname(__DIR__) . '/pikkumies/lib/SessionCounters.php', true) . ";\n"
+                . 'SessionCounters::updateRun(' . var_export($dir, true) . ", '$k', ['tokens' => 1000, 'reqs' => 1]);\n");
+            $procs = [];
+            for ($i = 0; $i < 40; $i++) {
+                $procs[] = proc_open('exec ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script), [], $pipes);
+            }
+            foreach ($procs as $p) {
+                proc_close($p);
+            }
+            $c = SessionCounters::readRun($dir, $k);
+            check($c['tokens'] === 40000 && $c['reqs'] === 40, 'parallel updates were lost: ' . json_encode($c));
+        } finally {
+            testRmTree($dir);
+        }
+    },
+    'launcher: an interactive start makes one run key, exports it before Hermes starts and zeroes its run file' => function () {
+        $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        $block = strpos($bin, 'if (Launch::isTty() && Launch::isSession($passArgs)) {');
+        $key = strpos($bin, '$runKey = bin2hex(random_bytes(8));');
+        $env = strpos($bin, "putenv('PIKKUMIES_RUN=' . \$runKey);");
+        $reset = strpos($bin, 'SessionCounters::resetRun(Config::localDir(), $runKey);');
+        $hermes = strpos($bin, '@passthru(escapeshellarg(hermesBin())');
+        check($block !== false && $key > $block && $env > $key && $reset > $env && $hermes > $reset, 'key, export and reset must sit in the interactive start block, before Hermes starts');
+        check(strlen(bin2hex(random_bytes(8))) === 16 && preg_match(SessionCounters::RUN_RE, bin2hex(random_bytes(8))) === 1, 'the key shape matches RUN_RE');
+    },
+    'session counters: a symlinked run or pane file is never written through; a reset replaces the link with a file' => function () {
+        $dir = testTempDir('pk-runlink');
+        $k = 'abababababababab';
+        try {
+            $victim = "$dir/config.php";
+            file_put_contents($victim, "<?php return [];\n");
+            SessionCounters::resetRun($dir, $k);
+            unlink(SessionCounters::runFile($dir, $k));
+            symlink($victim, SessionCounters::runFile($dir, $k));
+            check(SessionCounters::updateRun($dir, $k, ['tokens' => 5]) === false && file_get_contents($victim) === "<?php return [];\n", 'updateRun wrote through a link');
+            check(SessionCounters::resetRun($dir, $k) === true && file_get_contents($victim) === "<?php return [];\n" && !is_link(SessionCounters::runFile($dir, $k))
+                && SessionCounters::readRun($dir, $k)['tokens'] === 0, 'resetRun wrote through a link');
+            symlink($victim, SessionCounters::file($dir, '%5'));
+            check(SessionCounters::update($dir, '%5', ['tools' => 1]) === false && file_get_contents($victim) === "<?php return [];\n", 'update wrote through a link');
+            check((fileperms(SessionCounters::runFile($dir, $k)) & 0777) === 0600 && !glob(SessionCounters::dir($dir) . '/*.tmp-*'), 'private, no temporary left');
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];

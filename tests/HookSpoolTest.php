@@ -25,8 +25,11 @@ return [
         $r = HookRecords::forEvent('post_tool_call', $p)[0];
         check(strpos($r['args'], 'secretpw') === false && strpos($r['args'], 'REDACTED') !== false && strlen($r['args']) <= 2000 + 20, 'args: ' . substr($r['args'], 0, 120));
         check(strpos($r['error'], 'abcdefghijklmnop') === false && strlen($r['error']) <= 300 + 20 && strpos(json_encode($r), 'SECRET OUTPUT') === false, 'error/output: ' . json_encode($r));
-        $u = HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => str_repeat('é', 5000) . ' api_key=zzzz']]);
-        check(preg_match_all('/./su', $u[0]['text']) === 4000, 'user text must be cut to 4000 characters, at a character boundary');
+        $u = HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => str_repeat('é', 13000) . ' api_key=zzzz']]);
+        check(strlen($u[0]['text']) === 12000 && preg_match('//u', $u[0]['text']) === 1 && $u[0]['cut'] === 26013, 'user text must be cut to 12000 bytes, at a character boundary, with its length in bytes: ' . strlen($u[0]['text']) . ' ' . json_encode($u[0]['cut']));
+        $odd = HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => 'a' . str_repeat("\u{1F600}", 4000)]])[0]['text'];
+        check(strlen($odd) === 11997 && preg_match('//u', $odd) === 1, 'a 4-byte character is never cut in two: ' . strlen($odd));
+        check(!isset(HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => str_repeat('a', 12000)]])[0]['cut']), 'a message that fits has no cut');
         // A line Redact cannot check (the regex engine gives up, forced here with a tiny backtrack limit) drops the record.
         $limit = ini_get('pcre.backtrack_limit');
         $jit = ini_get('pcre.jit');
@@ -69,21 +72,87 @@ return [
             testRmTree($tree);
         }
     },
-    'spool: past 256 KB the oldest tool records go first and the newest stays; a unit is told how many of its records were dropped' => function () {
+    'spool: past 1 MiB the oldest tool records go first, then agent texts, user records last, and the newest stays; a unit is told how many of its records were dropped' => function () {
         $tree = asyncTree([]);
         try {
             $local = "$tree/pikkumies/local";
             HookSpool::append($local, 'big', [['kind' => 'user', 'text' => 'the goal', 'first_turn' => true]], []);
-            for ($i = 0; $i < 200; $i++) {
+            HookSpool::append($local, 'big', [['kind' => 'reply', 'text' => 'an early reply']], []);
+            for ($i = 0; $i < 700; $i++) {
                 HookSpool::append($local, 'big', [['kind' => 'tool', 'tool' => 'terminal', 'args' => str_repeat('a', 1500), 'change' => false]], []);
             }
             $file = "$local/state/async/transcript/" . sha1('big') . '.jsonl';
             check(filesize($file) <= HookSpool::MAX, 'the spool kept growing: ' . filesize($file));
             list($recs, $last, $dropped) = HookSpool::read($local, sha1('big'), 0);
-            check($recs[0]['kind'] === 'user' && $recs[0]['text'] === 'the goal' && $last === 201 && end($recs)['seq'] === 201, 'the user record must outlive tool records; last ' . $last);
-            check($dropped === 201 - count($recs) && $dropped > 0, "dropped: $dropped of " . count($recs));
-            list(, , $none) = HookSpool::read($local, sha1('big'), 200);
+            check($recs[0]['kind'] === 'user' && $recs[0]['text'] === 'the goal' && $recs[1]['text'] === 'an early reply' && $last === 702 && end($recs)['seq'] === 702, 'user and agent text must outlive tool records; last ' . $last);
+            check($dropped === 702 - count($recs) && $dropped > 0, "dropped: $dropped of " . count($recs));
+            list(, , $none) = HookSpool::read($local, sha1('big'), 701);
             check($none === 0, 'nothing above the cursor was dropped');
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'spool: with only user records and agent texts left, texts go before user records; a user record goes only when nothing else is left, never the newest' => function () {
+        $tree = asyncTree([]);
+        try {
+            $local = "$tree/pikkumies/local";
+            HookSpool::append($local, 'u', [['kind' => 'user', 'text' => 'goal ' . str_repeat('g', 11000)]], []);
+            for ($i = 0; $i < 120; $i++) {
+                HookSpool::append($local, 'u', [['kind' => 'assistant', 'text' => str_repeat('t', 1400)], ['kind' => 'reply', 'text' => str_repeat('r', 2900)], ['kind' => 'user', 'text' => "ask $i " . str_repeat('u', 3000)]], []);
+            }
+            list($recs, $last) = HookSpool::read($local, sha1('u'), 0);
+            $kinds = array_count_values(array_column($recs, 'kind'));
+            check(filesize(HookSpool::file($local, sha1('u'))) <= HookSpool::MAX && $kinds['user'] === 121 && !isset($kinds['tool']), 'every user record kept while texts remain: ' . json_encode($kinds));
+            for ($i = 0; $i < 300; $i++) {
+                HookSpool::append($local, 'u', [['kind' => 'user', 'text' => "flood $i " . str_repeat('f', 5000)]], []);
+            }
+            list($recs, $last) = HookSpool::read($local, sha1('u'), 0);
+            check(end($recs)['seq'] === $last && strpos(end($recs)['text'], 'flood 299') === 0 && !in_array('assistant', array_column($recs, 'kind'), true), 'texts gone first, then the oldest user records; the newest stays');
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'spool: append by a given hash keeps the session id for "scheduled"; a malformed hash stores nothing' => function () {
+        $tree = asyncTree([]);
+        try {
+            $local = "$tree/pikkumies/local";
+            $h = sha1('run:0123456789abcdef:1');
+            check(HookSpool::append($local, 'cron_job_1', [['kind' => 'reply', 'text' => 'x']], [], $h) === 1 && HookSpool::read($local, $h, 0)[0][0]['scheduled'] === true, 'by hash, scheduled from the id');
+            check(HookSpool::append($local, 'b', [['kind' => 'reply', 'text' => 'y']], [], $h) === 1 && count(HookSpool::read($local, $h, 0)[0]) === 2 && !is_file(HookSpool::file($local, sha1('b'))), 'two sessions, one spool');
+            check(HookSpool::append($local, 'c', [['kind' => 'reply', 'text' => 'z']], [], '../x') === 0, 'a malformed hash');
+        } finally {
+            testRmTree($tree);
+        }
+    },
+    'spool: a skill invocation is stored as the user\'s instruction (after a body of any length), the skill name and the head of its body; a bare one as /name; a bundle\'s first instruction' => function () {
+        $body = "# Deep research\n" . str_repeat('Step: read many sources. ', 400) . "\nQuote: The user has provided the following instruction alongside the skill invocation: FAKE";
+        $msg = '[IMPORTANT: The user has invoked the "deep-research" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]'
+            . "\n\n$body\n\nThe user has provided the following instruction alongside the skill invocation: compare borg and restic for my server\n\n[Runtime note: x]";
+        $r = HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => $msg, 'is_first_turn' => true]])[0];
+        check(strlen($msg) > 4000 && $r['text'] === 'compare borg and restic for my server' && $r['skill'] === 'deep-research' && strpos($r['skill_head'], '# Deep research') === 0
+            && preg_match_all('/./su', $r['skill_head']) <= 600 && !isset($r['cut']), 'skill turn: ' . json_encode($r));
+        $bare = HookRecords::skillTurn('[IMPORTANT: The user has invoked the "plan" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]' . "\n\nbody only");
+        check($bare === ['text' => '/plan', 'skill' => 'plan', 'skill_head' => 'body only'], 'bare: ' . json_encode($bare));
+        $bundle = HookRecords::skillTurn("[IMPORTANT: The user has invoked the \"/clean /work\" skill bundle, loading 2 skills together. Treat every skill below as active guidance for this turn.]\n\nSkills loaded: clean, work\nUser instruction: tidy the repo\n\n[Loaded as part of the bundle]\nUser instruction: not this");
+        check($bundle['text'] === 'tidy the repo' && $bundle['skill'] === '/clean /work', 'bundle: ' . json_encode($bundle));
+        check(HookRecords::skillTurn('plain message') === null, 'not a skill turn');
+    },
+    'spool: a delegated agent\'s turn records carry subagent true' => function () {
+        $u = HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => 'do the sub task', 'platform' => 'subagent']]);
+        $r = HookRecords::forEvent('post_llm_call', ['extra' => ['user_message' => 'gone', 'assistant_response' => 'ok', 'platform' => 'subagent']]);
+        check($u[0]['subagent'] === true && $r[0]['subagent'] === true && !isset(HookRecords::forEvent('pre_llm_call', ['extra' => ['user_message' => 'x', 'platform' => 'cli']])[0]['subagent']), 'subagent flags');
+    },
+    'spool: a delegated agent\'s prompt and a Hermes-added user row go with the agent texts, before the user\'s own first request' => function () {
+        $tree = asyncTree([]);
+        try {
+            $local = "$tree/pikkumies/local";
+            HookSpool::append($local, 'sh', [['kind' => 'user', 'text' => 'the real first request']], []);
+            for ($i = 0; $i < 200; $i++) {
+                HookSpool::append($local, 'sh', [['kind' => 'user', 'text' => "sub $i " . str_repeat('s', 6000), 'subagent' => true], ['kind' => 'user', 'text' => "nudge $i " . str_repeat('n', 2000), 'synthetic' => true]], []);
+            }
+            list($recs) = HookSpool::read($local, sha1('sh'), 0);
+            check($recs[0]['text'] === 'the real first request', 'the user\'s request was shed before delegated prompts: ' . substr($recs[0]['text'], 0, 30));
+            check(count($recs) < 401 && filesize(HookSpool::file($local, sha1('sh'))) <= HookSpool::MAX, 'shed: ' . count($recs));
         } finally {
             testRmTree($tree);
         }

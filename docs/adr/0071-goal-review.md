@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-19
-- Status: Accepted. An interval unit of [ADR-0067](0067-interval-hook-units.md). Moves the search-first hook's "is this a new question" rule into `lib/UserTurn.php`, unchanged ([ADR-0011](0011-documentation-sources-and-search-first.md)).
+- Status: Accepted; its cadence, window, questions and `rounds` superseded by [ADR-0096](0096-goal-review-v2-drift-check-by-time-and-tokens.md) (2026-10-20). An interval unit of [ADR-0067](0067-interval-hook-units.md). Moves the search-first hook's "is this a new question" rule into `lib/UserTurn.php`, unchanged ([ADR-0011](0011-documentation-sources-and-search-first.md)).
 
 ## Context
 The operator asked on 2026-10-19 for a background hook that reviews the user's requests at most once per ten minutes and gives the agent back at most 10k tokens, with a configurable interval and fully asynchronous. The search-first hook already reads each new question, but once per turn and only to list pages ([ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md)). Nothing looks back over several turns to ask whether what the user asked for has been done, whether the work drifted, or whether a tool or page the agent did not use would answer it.

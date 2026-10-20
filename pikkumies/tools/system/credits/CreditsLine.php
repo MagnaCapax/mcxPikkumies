@@ -100,6 +100,14 @@ class CreditsLine
         return $rates;
     }
 
+    /** The rates rates() cached for this endpoint and key, when under RATES_TTL old; never a request ([] otherwise; the goal review's pick, ADR-0096). */
+    public static function cachedRates(array $prov, $dir, $now = null)
+    {
+        $now = $now === null ? time() : (int) $now;
+        $cache = self::read("$dir/rates.json");
+        return isset($cache['rates']) && is_array($cache['rates']) && self::fresh($cache, $prov, self::RATES_TTL, $now) ? $cache['rates'] : [];
+    }
+
     /** What every cache file starts with: when, which endpoint, and which key as the first 12 hex of its sha256 (never the key). */
     private static function stamp(array $prov, $now)
     {
