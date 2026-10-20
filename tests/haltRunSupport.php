@@ -17,6 +17,20 @@ if (!function_exists('haltRunTree')) {
         return $tmp;
     }
 
+    /** haltRunTree() plus doctrine/antipatterns.md and the real review/antipattern-check unit (ADR-0088), so lib/Antipatterns.php's forTurn() finds the shared unit when HaltRun calls it. */
+    function haltRunTreeWithAntipatterns($modelPort)
+    {
+        $tmp = haltRunTree($modelPort);
+        $src = dirname(__DIR__) . '/pikkumies';
+        @mkdir("$tmp/pikkumies/doctrine", 0700, true);
+        copy("$src/doctrine/antipatterns.md", "$tmp/pikkumies/doctrine/antipatterns.md");
+        @mkdir("$tmp/pikkumies/hooks/review/antipattern-check", 0700, true);
+        foreach ((array) glob("$src/hooks/review/antipattern-check/*.*") as $f) {
+            copy($f, "$tmp/pikkumies/hooks/review/antipattern-check/" . basename($f));
+        }
+        return $tmp;
+    }
+
     /**
      * A fixture "hermes": refuses --usage-file after chat (exit 2, as Hermes v0.22.2 does); reads --query-file (a path, or "-"
      * for stdin) into the logged call's "query_file_text" and, like Hermes, exits 2 when --query is given too or the text is

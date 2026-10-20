@@ -37,6 +37,8 @@ class ConfigureTiers
         'feedback.ask' => ['bool', 'approve', 'free'],
         'fileopsCheck.disabled' => ['bool', 'person', 'free'],
         'memoryCheck.disabled' => ['bool', 'person', 'free'],
+        'antipatterns.disabled' => ['bool', 'person', 'free'],
+        'antipatterns.resume' => ['bool', 'free', 'person'], // M2: positive sense, like ssh.blockUnknown -- turning the resume OFF is the free direction, back ON needs the person
         'hooks.reword' => ['bool', 'free', 'approve'],
         'hooks.llm.disabled' => ['bool', 'person', 'free'],
         'hooks.async.disabled' => ['bool', 'person', 'free'],

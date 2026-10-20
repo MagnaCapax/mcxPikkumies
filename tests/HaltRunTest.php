@@ -145,4 +145,99 @@ return [
             testRmTree($fakeModel);
         }
     },
+    // Antipatterns (ADR-0088): lib/HaltRun.php calls Antipatterns::forTurn()/apply() right after HaltJudge::evaluate() every judged pass.
+    'HaltRun + Antipatterns: a chat verdict (no message of its own) with a flagged id gets exactly one resume carrying resumeMessage(); the check never runs twice inside its interval' => function () use ($chatReply) {
+        $fakeModel = sys_get_temp_dir() . '/pk-haltrun-model-' . getmypid() . '-' . mt_rand();
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltRunTreeWithAntipatterns($port);
+        try {
+            $flagged = 'the agent replied: load of 40.02 is basically pegging every one of the four cpu cores to the max';
+            file_put_contents("$fakeModel/replies.json", json_encode([$chatReply, 'load-is-not-cpu | pegging every one of the four cpu cores', $chatReply]));
+            putenv('PK_FAKE_HERMES_DIR=' . $tree);
+            file_put_contents("$tree/plan.json", json_encode([['output' => $flagged, 'code' => 0, 'session_id' => 'fakesess']]));
+            $hermes = haltRunFakeHermes($tree);
+            list($code, $out) = haltRunDrive($tree, $hermes, 'fakesess');
+            check($code === 0, 'exit code: ' . $out);
+            check(haltRunCalls($tree) === 2, 'expected 1 initial + exactly 1 antipatterns resume = 2 hermes calls, got ' . haltRunCalls($tree));
+            check(count(array_filter(explode("\n", (string) @file_get_contents("$fakeModel/requests.jsonl")), 'strlen')) === 3,
+                'expected 3 model requests (judge, antipatterns, judge again) -- a 4th would mean the check ran twice inside its interval');
+            $calls = array_values(array_filter(array_map(function ($l) {
+                return json_decode($l, true);
+            }, explode("\n", file_get_contents("$tree/calls.jsonl")))));
+            $resumeQuery = function ($argv) {
+                foreach ($argv as $a) {
+                    if (strpos($a, '--query=') === 0) {
+                        return substr($a, strlen('--query='));
+                    }
+                }
+                return null;
+            };
+            check($resumeQuery($calls[1]['argv']) === Antipatterns::resumeMessage(['load-is-not-cpu']), 'the resume query must be exactly resumeMessage(): ' . $resumeQuery($calls[1]['argv']));
+        } finally {
+            putenv('PK_FAKE_HERMES_DIR');
+            proc_terminate($proc, 9);
+            proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
+        }
+    },
+    'HaltRun + Antipatterns: antipatterns.resume=false suppresses the extra resume even though the check still flags an id' => function () use ($chatReply) {
+        $fakeModel = sys_get_temp_dir() . '/pk-haltrun-model-' . getmypid() . '-' . mt_rand();
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltRunTreeWithAntipatterns($port);
+        try {
+            file_put_contents("$tree/pikkumies/local/config.php", '<?php return ' . var_export(['provider' =>
+                ['endpoint' => "http://127.0.0.1:$port/v1", 'model' => 'm', 'keyFile' => "$tree/key"], 'antipatterns' => ['resume' => false]], true) . ";\n");
+            $flagged = 'the agent replied: load of 40.02 is basically pegging every one of the four cpu cores to the max';
+            file_put_contents("$fakeModel/replies.json", json_encode([$chatReply, 'load-is-not-cpu | pegging every one of the four cpu cores']));
+            putenv('PK_FAKE_HERMES_DIR=' . $tree);
+            file_put_contents("$tree/plan.json", json_encode([['output' => $flagged, 'code' => 0, 'session_id' => 'fakesess']]));
+            $hermes = haltRunFakeHermes($tree);
+            list($code, $out) = haltRunDrive($tree, $hermes, 'fakesess');
+            check($code === 0, 'exit code: ' . $out);
+            check(haltRunCalls($tree) === 1, 'antipatterns.resume=false must suppress the extra resume even with a flagged id: ' . haltRunCalls($tree) . ' calls');
+            check(count(array_filter(explode("\n", (string) @file_get_contents("$fakeModel/requests.jsonl")), 'strlen')) === 2, 'judge + antipatterns = 2 model requests, no third');
+        } finally {
+            putenv('PK_FAKE_HERMES_DIR');
+            proc_terminate($proc, 9);
+            proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
+        }
+    },
+    'HaltRun + Antipatterns: a wrap-up verdict with a flagged id gets the lines appended to the SAME resume, never a second one' => function () use ($doneReply, $chatReply) {
+        $fakeModel = sys_get_temp_dir() . '/pk-haltrun-model-' . getmypid() . '-' . mt_rand();
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltRunTreeWithAntipatterns($port);
+        try {
+            $flagged = 'the agent replied: load of 40.02 is basically pegging every one of the four cpu cores to the max';
+            file_put_contents("$fakeModel/replies.json", json_encode([$doneReply, 'load-is-not-cpu | pegging every one of the four cpu cores', $chatReply]));
+            putenv('PK_FAKE_HERMES_DIR=' . $tree);
+            file_put_contents("$tree/plan.json", json_encode([['output' => $flagged, 'code' => 0, 'session_id' => 'fakesess']]));
+            $hermes = haltRunFakeHermes($tree);
+            list($code, $out) = haltRunDrive($tree, $hermes, 'fakesess');
+            check($code === 0, 'exit code: ' . $out);
+            check(haltRunCalls($tree) === 2, 'expected 1 initial + exactly 1 wrap-up resume (never two) = 2 calls, got ' . haltRunCalls($tree));
+            check(count(array_filter(explode("\n", (string) @file_get_contents("$fakeModel/requests.jsonl")), 'strlen')) === 3, 'judge + antipatterns + judge again = 3 model requests');
+            $calls = array_values(array_filter(array_map(function ($l) {
+                return json_decode($l, true);
+            }, explode("\n", file_get_contents("$tree/calls.jsonl")))));
+            $resumeQuery = function ($argv) {
+                foreach ($argv as $a) {
+                    if (strpos($a, '--query=') === 0) {
+                        return substr($a, strlen('--query='));
+                    }
+                }
+                return null;
+            };
+            $expect = HaltJudge::WRAPUP . "\n" . Antipatterns::lines(['load-is-not-cpu']);
+            check($resumeQuery($calls[1]['argv']) === $expect, 'the one resume must carry the wrap-up text plus the lines, not a second resume: ' . $resumeQuery($calls[1]['argv']));
+        } finally {
+            putenv('PK_FAKE_HERMES_DIR');
+            proc_terminate($proc, 9);
+            proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
+        }
+    },
 ];

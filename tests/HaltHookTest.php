@@ -10,6 +10,9 @@ if (!function_exists('hookUnitsProvider')) {
 if (!function_exists('orchestratorTree')) {
     require __DIR__ . '/OrchestratorTest.php';
 }
+if (!function_exists('haltRunFakeModel')) {
+    require __DIR__ . '/haltRunSupport.php'; // its indexed replies.json fixture, for the judge call and the antipatterns call in one invocation
+}
 if (!function_exists('haltHookTree')) {
     /** A throwaway tree with lib/ and the two halt hook units; $providerPort wires local/config.php at a fake endpoint, 0 = none. */
     function haltHookTree($providerPort = 0)
@@ -31,6 +34,20 @@ if (!function_exists('haltHookTree')) {
             file_put_contents("$tmp/key", "key=k\n");
             file_put_contents("$tmp/pikkumies/local/config.php", '<?php return ' . var_export(['provider' =>
                 ['endpoint' => "http://127.0.0.1:$providerPort/v1", 'model' => 'm', 'keyFile' => "$tmp/key"]], true) . ";\n");
+        }
+        return $tmp;
+    }
+
+    /** haltHookTree() plus doctrine/antipatterns.md and the real review/antipattern-check unit (ADR-0088), so halt-guard.php's Antipatterns::forTurn() call finds the shared unit. */
+    function haltHookTreeWithAntipatterns($providerPort)
+    {
+        $tmp = haltHookTree($providerPort);
+        $src = dirname(__DIR__) . '/pikkumies';
+        @mkdir("$tmp/pikkumies/doctrine", 0700, true);
+        copy("$src/doctrine/antipatterns.md", "$tmp/pikkumies/doctrine/antipatterns.md");
+        @mkdir("$tmp/pikkumies/hooks/review/antipattern-check", 0700, true);
+        foreach ((array) glob("$src/hooks/review/antipattern-check/*.*") as $f) {
+            copy($f, "$tmp/pikkumies/hooks/review/antipattern-check/" . basename($f));
         }
         return $tmp;
     }
@@ -80,6 +97,7 @@ if (!function_exists('haltHookTree')) {
 
 $continueReply = "Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"; // Q3 no -> continue
 $doneReply = "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"; // work carried out, nothing left -> wrap-up
+$chatReply = "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"; // chat, no request -> allow with no message (Antipatterns test below)
 
 return [
     'halt-snapshot: writes {user_message, tail, turn_started, continues:0, wrapup_sent:false}, dir 0700, file 0600, prints nothing' => function () {
@@ -283,6 +301,30 @@ return [
             check(trim($raw3) === '', 'an irrelevant action must be no opinion, not an answer: ' . $raw3);
         } finally {
             testRmTree($tree3);
+        }
+    },
+    // Antipatterns (ADR-0088): halt-guard.php calls Antipatterns::forTurn()/apply() right after HaltJudge::evaluate(). The
+    // attempt>=3 refusal (never asking the model) is unchanged and already covered above ("refuses at attempt >= 3").
+    'halt-guard + Antipatterns: a chat verdict (no message of its own) with a flagged id answers one continue carrying resumeMessage(), marking wrapup_sent so a second attempt this turn stays silent' => function () use ($chatReply) {
+        $fakeModel = sys_get_temp_dir() . '/pk-halthook-ap-' . getmypid() . '-' . mt_rand();
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltHookTreeWithAntipatterns($port);
+        try {
+            $flagged = 'the agent replied: load of 40.02 is basically pegging every one of the four cpu cores to the max';
+            file_put_contents("$fakeModel/replies.json", json_encode([$chatReply, 'load-is-not-cpu | pegging every one of the four cpu cores']));
+            haltSeed($tree, 'sess-ap-chat', []);
+            list($d, $raw) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-ap-chat', 'extra' => ['attempt' => 0, 'final_response' => $flagged]]);
+            check(is_array($d) && $d['action'] === 'continue' && $d['message'] === Antipatterns::resumeMessage(['load-is-not-cpu']), 'answer: ' . $raw);
+            $state = json_decode(file_get_contents(haltStateFile($tree, 'sess-ap-chat')), true);
+            check($state['wrapup_sent'] === true, 'the one-shot resume must mark wrapup_sent, reusing the wrap-up slot: ' . json_encode($state));
+            list($d2, $raw2) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-ap-chat', 'extra' => ['attempt' => 1, 'final_response' => $flagged]]);
+            check($d2 === null && trim($raw2) === '', 'a second attempt this turn must stay silent once wrapup_sent is set: ' . $raw2);
+            check(count(array_filter(explode("\n", (string) @file_get_contents("$fakeModel/requests.jsonl")), 'strlen')) === 2, 'exactly 2 model requests total (judge + antipatterns); the silent second attempt must ask neither');
+        } finally {
+            proc_terminate($proc, 9);
+            proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
         }
     },
 ];

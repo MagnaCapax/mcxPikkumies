@@ -16,6 +16,7 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HaltState.php';
 require_once __DIR__ . '/HaltJudge.php';
 require_once __DIR__ . '/HookAsync.php';
+require_once __DIR__ . '/Antipatterns.php';
 
 class HaltRun
 {
@@ -45,6 +46,10 @@ class HaltRun
             }
             $evidence = ['commands' => HaltState::commandsSince(Config::localDir() . '/logs/commands', $sessionId, (int) $state['turn_started']), 'changedPaths' => []];
             $verdict = HaltJudge::evaluate((string) $state['user_message'], (string) $state['tail'], $evidence, $output);
+            // Antipatterns (ADR-0088): a continue/wrap-up message gets the matching lines appended (no extra turn);
+            // a verdict with no message of its own gets the run's one wrap-up slot instead ($wrappedUp below).
+            $applied = Antipatterns::apply($verdict, Antipatterns::forTurn($sessionId, $output, $evidence['commands'], 'oneshot'));
+            $verdict['message'] = $applied['message'];
             HaltState::logDecision($sessionId, 'oneshot', 0, $verdict);
             if ($verdict['verdict'] === 'continue' && $continuesLeft > 0) {
                 $continuesLeft--;
@@ -55,6 +60,11 @@ class HaltRun
                 $wrappedUp = true;
                 list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
+            }
+            if ($applied['resume'] !== null && !$wrappedUp) {
+                $wrappedUp = true;
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail));
+                continue; // same single wrap-up slot as done-wrapup above: ADR-0047's bound stays 3 continues + 1 final resume
             }
             return $code;
         }

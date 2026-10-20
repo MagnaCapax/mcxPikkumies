@@ -23,7 +23,7 @@ class HookLlm
         if ($prov['endpoint'] === '' || $prov['key'] === '' || $model === '') {
             return '';
         }
-        $body = json_encode(['model' => $model, 'messages' => $messages, 'max_tokens' => $maxTokens, 'temperature' => 0]);
+        $body = json_encode(['model' => $model, 'messages' => $messages, 'max_tokens' => $maxTokens, 'temperature' => 0], JSON_INVALID_UTF8_SUBSTITUTE); // L3: a caller's byte-cut text can land mid-character; substitute rather than fail the whole encode
         // Same rule as Provider::models: the endpoint may be a local service of root or a service account.
         $r = Http::request('POST', $prov['endpoint'] . '/chat/completions', ['timeout' => $timeout, 'max' => 65536, 'owners' => 'system',
             'headers' => ['Authorization: Bearer ' . $prov['key'], 'Content-Type: application/json'], 'body' => $body]);

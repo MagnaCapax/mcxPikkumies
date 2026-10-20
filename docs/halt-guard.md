@@ -32,6 +32,8 @@ If Pikkumies already writes a Hermes `auxiliary.*` setting for this provider (it
 - The snapshot and decision log never hold the full transcript or the final answer: the snapshot keeps a size-capped tail (`local/state/halt/`, 0700/0600) for judging only, and the decision log (`local/logs/halt-guard/`, 0700/0600) keeps only the yes/no answers.
 - `halt.disabled` in `local/config.php` turns off both hooks and the one-shot wrapper.
 
+Right after each judge call, both the hook and the one-shot wrapper also run the common-mistakes check (`lib/Antipatterns.php`, [ADR-0088](adr/0088-common-mistakes-list-and-check.md)): a continue or wrap-up message gets its matching fixed lines appended, no extra turn. A verdict that would otherwise send nothing gets one resume with the fixed correction text instead, using this same run's one wrap-up slot, so the 3-continues-plus-one-wrap-up bound above is unchanged. `antipatterns.disabled` turns this off everywhere it runs; `antipatterns.resume` turns off only that one-shot resume.
+
 ## See also
 
 - `hooks/halt/halt-snapshot/README.md`, `hooks/halt/halt-guard/README.md`: what each hook unit does.

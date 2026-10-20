@@ -23,6 +23,8 @@ class Config
             'feedback' => ['ask' => false],      // opt-in: now and then ask whether to send feedback (hooks/system/feedback-ask, ADR-0056 amendment)
             'fileopsCheck' => ['disabled' => false], // the fileops-check hook: bulk chmod/chown/mv re-check and the file list it writes first (ADR-0048)
             'memoryCheck' => ['disabled' => false], // the memory-check hook: first use in a session held once for the agent, with the linked memories (ADR-0081)
+            // disabled: off for the interval unit and both end-of-turn checks together. resume: only their one-shot resume when a verdict carries no message (ADR-0088).
+            'antipatterns' => ['disabled' => false, 'resume' => true],
             // reword: a question with no local hit is turned into search terms by the model once (hooks/search/search-first/search-first.php).
             // llm.disabled: no hook ever calls the model. model: the hooks' model; '' = the light model decided at generate (local/llm.json).
             // async.disabled: no interval hook unit runs (ADR-0067); hooks.every.<unit name> = seconds (0 = off) is set per unit, never here.
@@ -70,6 +72,8 @@ class Config
         'feedback.ask' => 'bool',
         'fileopsCheck.disabled' => 'bool',
         'memoryCheck.disabled' => 'bool',
+        'antipatterns.disabled' => 'bool',
+        'antipatterns.resume' => 'bool',
         'hooks.reword' => 'bool',
         'hooks.llm.disabled' => 'bool',
         'hooks.async.disabled' => 'bool',
