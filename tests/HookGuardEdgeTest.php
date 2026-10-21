@@ -95,28 +95,32 @@ return [
         // approve-tier rclone pattern (.* then the verb) fail the same way a pathological command
         // would in production; the earlier block-tier patterns still resolve normally at this limit.
         $ini = testTempDir('pk-guard-bt') . '/php.ini';
-        $run = function ($cmd, $backtrackLimit) use ($ini) {
-            file_put_contents($ini, "pcre.backtrack_limit=$backtrackLimit\n");
+        $raw = '';
+        $run = function ($cmd, $backtrackLimit) use ($ini, &$raw) {
+            // display_errors to stderr: a notice from the interpreter must not land in the JSON answer on stdout.
+            file_put_contents($ini, "pcre.backtrack_limit=$backtrackLimit\ndisplay_errors=stderr\n");
             $p = proc_open(escapeshellarg(PHP_BINARY) . ' -c ' . escapeshellarg($ini) . ' '
                 . escapeshellarg(dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php'),
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             fwrite($pipes[0], json_encode(['tool_name' => 'terminal', 'tool_input' => ['command' => $cmd]]));
             fclose($pipes[0]);
             $out = stream_get_contents($pipes[1]);
+            $err = stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);
-            proc_close($p);
+            $rc = proc_close($p);
+            $raw = ' (exit ' . $rc . ', stdout ' . json_encode(substr($out, 0, 600)) . ', stderr ' . json_encode(substr($err, 0, 600)) . ')';
             return json_decode($out, true);
         };
         try {
             $short = 'rclone ' . str_repeat('a', 50) . ' sync';
             $d = $run($short, 100);
             check(is_array($d) && $d['action'] === 'approve' && strpos($d['message'], 'a command too long or complex to check') !== false,
-                'a short command whose approve-rule regex fails must ask, never allow: ' . json_encode($d));
+                'a short command whose approve-rule regex fails must ask, never allow: ' . json_encode($d) . $raw);
             $long = 'rclone ' . str_repeat('a', 4100) . ' sync';
             $d = $run($long, 5000);
             check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'too long to show the user in full') !== false,
-                'a too-long command whose approve-rule regex fails must block, not approve: ' . json_encode($d));
+                'a too-long command whose approve-rule regex fails must block, not approve: ' . json_encode($d) . $raw);
         } finally {
             testRmTree(dirname($ini));
         }
