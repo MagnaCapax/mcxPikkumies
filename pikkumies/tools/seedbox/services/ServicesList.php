@@ -4,6 +4,7 @@
  * client endpoints only where a source says where they are; anything else stays unknown (null) rather than guessed.
  */
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+require_once dirname(__DIR__, 3) . '/lib/Units.php';
 
 class ServicesList
 {
@@ -116,16 +117,43 @@ class ServicesList
     }
 
     /**
-     * Memory files about $nick: lessons under memory/lessons/services/ and fact sheets under memory/reference/ that carry a
-     * line `service: <nick>` (the convention in skill.md). A plain read of those two directories, no index.
+     * Memory files about $nick: every lesson, fact sheet and research note whose frontmatter `service` array
+     * (`save --service`, ADR-0104) names it, plus the pre-ADR-0104 convention still read for files that have no
+     * usable `service` frontmatter (missing entirely, or present but not a JSON array — a hand-written
+     * `service: pm1` line is text, not JSON) — a body line `service: <nick>` under memory/lessons/services/ or
+     * memory/reference/ only (the two directories skill.md always named). Each record carries `categories` (the
+     * memory's frontmatter, kept only as a list of valid tag strings, Services::NICK_RE; null for the body-text
+     * convention, which never had one).
      */
     public static function memories($nick, $memoryDir)
     {
+        $legacy = array_merge((array) glob("$memoryDir/lessons/services/*.md"), (array) glob("$memoryDir/reference/*.md"));
+        $files = array_merge((array) glob("$memoryDir/lessons/*/*.md"), (array) glob("$memoryDir/reference/*.md"), (array) glob("$memoryDir/research/*.md"));
         $out = [];
-        foreach (array_merge((array) glob("$memoryDir/lessons/services/*.md"), (array) glob("$memoryDir/reference/*.md")) as $f) {
+        foreach ($files as $f) {
             $text = is_file($f) && !is_link($f) ? (string) @file_get_contents($f, false, null, 0, 65536) : '';
-            if (preg_match('/^service:\s*' . preg_quote($nick, '/') . '\s*$/mi', $text)) {
-                $out[] = ['path' => substr($f, strlen(dirname($memoryDir)) + 1), 'title' => preg_match('/^# (.+)$/m', $text, $m) ? trim($m[1]) : PathName::base($f, '.md')];
+            if ($text === '') {
+                continue;
+            }
+            $title = preg_match('/^# (.+)$/m', $text, $m) ? trim($m[1]) : PathName::base($f, '.md');
+            $path = substr($f, strlen(dirname($memoryDir)) + 1);
+            list($meta, ) = Units::frontmatter($text);
+            $services = isset($meta['service']) ? json_decode($meta['service'], true) : null;
+            if (is_array($services)) {
+                if (in_array((string) $nick, $services, true)) {
+                    $categories = isset($meta['categories']) ? json_decode($meta['categories'], true) : null;
+                    // Keep only string elements that match Services::NICK_RE: a hand-edited file, or data from
+                    // before the M1 fix, may hold a non-string (number, bool, nested array) or a malformed tag.
+                    $categories = is_array($categories) ? array_values(array_filter($categories, function ($t) {
+                        return is_string($t) && preg_match(Services::NICK_RE, $t);
+                    })) : null;
+                    $out[] = ['path' => $path, 'title' => $title, 'categories' => $categories];
+                }
+            } elseif (in_array($f, $legacy, true) && preg_match('/^service:\s*' . preg_quote($nick, '/') . '\s*$/mi', $text)) {
+                // No `service` frontmatter at all, or a `service` key that is not a JSON array (the old convention
+                // wrote it as plain body text, never JSON) — either way, fall through to the pre-ADR-0104 check
+                // instead of silently dropping the file.
+                $out[] = ['path' => $path, 'title' => $title, 'categories' => null];
             }
         }
         return $out;

@@ -149,4 +149,4 @@ Cli::run($argv, [
         }
         return ['records' => $out, 'status' => $out ? [] : ['note' => 'no upstream project matched; run upstreams without words for the whole list']];
     },
-], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources|upstreams ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'tool', 'path', 'days']);
+], "usage: pikkumies.php search|save|append|stats|links|list|refresh|sources|upstreams ... [--human]\n  see USAGE.md next to this file", ['offline', 'broken'], ['no-related', 'kind', 'body-file', 'title', 'topic', 'sources', 'tool', 'service', 'tags', 'path', 'days']);

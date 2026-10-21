@@ -161,6 +161,9 @@ class Services
     {
         $tags = [];
         foreach (isset($s['tags']) ? (array) $s['tags'] : [] as $t) {
+            // A list written before ADR-0104 can hold an all-digit tag as a number (1080, not "1080"): read it as the
+            // string it was typed as, so `services edit` keeps working on such a service.
+            $t = is_int($t) ? (string) $t : $t;
             if (!is_string($t) || !preg_match(self::NICK_RE, $t)) {
                 throw new CliError('not a tag: ' . json_encode($t), 'lowercase words such as seedbox, backup, webhosting, dedicated, workstation, nas, laptop, media, other');
             }
@@ -191,7 +194,10 @@ class Services
         if ($home !== '' && !preg_match('#^/[A-Za-z0-9._/-]{0,255}\z#', $home)) {
             throw new CliError("not a home directory: $home", 'an absolute path such as /home/xyzjohn');
         }
-        $out = ['nick' => self::nick(isset($s['nick']) ? $s['nick'] : null), 'tags' => array_keys($tags),
+        // array_map('strval', ...): an all-digit tag (e.g. "1080") is a valid array key, but PHP stores it as the
+        // integer 1080, not the string "1080" — written back out, a later `services edit --remove-tag 1080` (a
+        // string from argv) would then fail to match it with "not a tag" (ADR-0104 review, M1-class bug).
+        $out = ['nick' => self::nick(isset($s['nick']) ? $s['nick'] : null), 'tags' => array_map('strval', array_keys($tags)),
             'provider' => $pick('provider', self::PROVIDERS, 'generic'), 'host' => self::host(isset($s['host']) ? $s['host'] : ''),
             'port' => (int) $port, 'user' => self::user(isset($s['user']) ? $s['user'] : ''), 'home' => $home,
             'transport' => $pick('transport', self::TRANSPORTS, 'pikkumies'), 'clients' => $clients,

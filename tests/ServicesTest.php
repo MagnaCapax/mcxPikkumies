@@ -30,6 +30,28 @@ return [
             testRmTree($tmp);
         }
     },
+    'services list: an all-digit tag (e.g. "1080") is normalized and stored back as the string "1080", not the number 1080 — PHP turns an all-digit array key into an integer, so without the strval fix the line would be written as the JSON number 1080, and re-normalizing it (as a later `edit` does) would then throw "not a tag: 1080" (normalize()\'s own is_string check)' => function () {
+        $tmp = testTempDir('pk-services-digit-tag');
+        Services::$localDir = $tmp;
+        try {
+            $s = Services::put(['nick' => 'hdd1', 'host' => 'box.example.com', 'user' => 'xyzjohn', 'tags' => ['seedbox', '1080']]);
+            check($s['tags'] === ['seedbox', '1080'] && is_string($s['tags'][1]), 'tags must stay strings: ' . json_encode($s['tags']));
+            check(strpos((string) file_get_contents(Services::path()), '"1080"') !== false, 'the stored line must hold the JSON string "1080", not the number 1080: ' . file_get_contents(Services::path()));
+            // What `edit` does under the hood (get the stored record, re-normalize, put it back): must not throw
+            // "not a tag: 1080" and must still keep the tag as a string, not silently revert to a number.
+            $s2 = Services::put(Services::get('hdd1'));
+            check($s2['tags'] === ['seedbox', '1080'] && is_string($s2['tags'][1]), 're-normalizing an already-stored record must keep the tag a string: ' . json_encode($s2['tags']));
+            // A line written by the code before this fix holds the JSON number 1080: `edit` on it must still work.
+            file_put_contents(Services::path(), str_replace('"1080"', '1080', (string) file_get_contents(Services::path())));
+            $old = Services::get('hdd1');
+            check($old['tags'][1] === 1080, 'fixture: the stored tag must be the JSON number 1080: ' . json_encode($old['tags']));
+            $s3 = Services::put($old);
+            check($s3['tags'] === ['seedbox', '1080'], 'a numeric tag stored by older code must be read back as the string "1080": ' . json_encode($s3['tags']));
+        } finally {
+            Services::$localDir = null;
+            testRmTree($tmp);
+        }
+    },
     'services list: option-like hosts, bad names, tags, transports and providers are refused' => function () {
         $base = ['nick' => 'hdd1', 'host' => 'box.example.com', 'user' => 'xyzjohn'];
         foreach ([['host' => '-oProxyCommand=sh'], ['host' => 'a b'], ['host' => 'h;id'], ['host' => '127.1'], ['user' => '-l'], ['user' => 'Root'],

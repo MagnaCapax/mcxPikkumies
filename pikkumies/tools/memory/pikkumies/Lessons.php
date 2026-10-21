@@ -8,8 +8,12 @@
  * With privacy.perfLogging on, each save is also counted in the memory metrics (ADR-0041).
  * --tool links a memory to the files it is about (frontmatter `tools`, real paths); the memory-check hook shows it when a
  * tool call uses one of them (ADR-0081).
+ * --service links a memory to the services-list nicks it is about (frontmatter `service`), and --tags (or, with
+ * --service and no --tags, the named services' own current tags) record its `categories` (ADR-0104); `services
+ * show <nick>` reads both back (ServicesList::memories).
  */
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
+require_once dirname(__DIR__, 3) . '/lib/Services.php';
 
 class Lessons
 {
@@ -49,6 +53,12 @@ class Lessons
         }
         $dir = self::root() . ($kind === 'lesson' ? "/lessons/$topic" : "/$kind");
         $tools = self::toolLinks(isset($opt['tool']) ? (string) $opt['tool'] : '');
+        foreach (['service', 'tags'] as $k) {
+            if (isset($opt[$k]) && !is_string($opt[$k])) { // a bare --service/--tags (no value) parses to true; --$k=1 must never silently link nick/tag "1"
+                throw new CliError("--$k needs a value", 'e.g. --' . $k . ($k === 'service' ? ' pm1,pm2' : ' seedbox,backup'));
+            }
+        }
+        list($services, $categories) = self::serviceLinks(isset($opt['service']) ? (string) $opt['service'] : '', isset($opt['tags']) ? (string) $opt['tags'] : '');
         $related = [];
         list($hits) = DocSources::search($title, 5, true, 0.5); // free text: half of the title's words
         foreach ($hits as $h) {
@@ -77,6 +87,8 @@ class Lessons
         }
         $text = "---\ndate: " . gmdate('Y-m-d') . "\ntopic: $topic\nsources: " . json_encode($sources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
             . ($tools ? "\ntools: " . json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
+            . ($services ? "\nservice: " . json_encode($services, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
+            . ($categories ? "\ncategories: " . json_encode($categories, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
             . "\n---\n# $title\n\n" . $body;
         if ((!@mkdir($dir, 0700, true) && !is_dir($dir)) || @file_put_contents($path, $text) !== strlen($text)) {
             throw new CliError("could not write $path", 'is the disk full?');
@@ -90,7 +102,45 @@ class Lessons
         if ($why !== '') {
             $status['no_related'] = $why;
         }
-        return ['records' => [['path' => $path, 'links' => $links, 'related' => $related] + ($tools ? ['tools' => $tools] : [])], 'status' => $status];
+        return ['records' => [['path' => $path, 'links' => $links, 'related' => $related] + ($tools ? ['tools' => $tools] : [])
+            + ($services ? ['service' => $services] : []) + ($categories ? ['categories' => $categories] : [])], 'status' => $status];
+    }
+
+    /**
+     * [service nicks, categories] from --service (';' or ',' separated nicks, format-checked only: a nick need not
+     * exist in the services list, ADR-0104) and --tags (','-separated, format-checked against the same rule a
+     * service's own tag uses). Categories are the union of the given tags and the current tags of every named
+     * service that still exists in Services::all() — a missing or unreadable services file leaves that union empty,
+     * so --tags alone still works.
+     */
+    public static function serviceLinks($serviceArg, $tagsArg)
+    {
+        $services = [];
+        foreach (array_filter(array_map('trim', preg_split('/[;,]/', (string) $serviceArg)), 'strlen') as $n) {
+            $services[Services::nick($n)] = true; // format only; existence is not required
+        }
+        // array_map('strval', ...): an all-digit nick/tag (e.g. "42") is a valid array key, but PHP stores it as the
+        // integer 42, not the string "42" — json_encode would then write service: [42], and ServicesList's strict
+        // in_array('42', [42], true) would never match it back.
+        $services = array_map('strval', array_keys($services));
+        $categories = [];
+        if ($services) {
+            $all = Services::all();
+            foreach ($services as $n) {
+                foreach (isset($all[$n]['tags']) ? (array) $all[$n]['tags'] : [] as $t) {
+                    if (is_string($t) && preg_match(Services::NICK_RE, $t)) { // a hand-edited services.jsonl may hold a non-string or malformed tag
+                        $categories[$t] = true;
+                    }
+                }
+            }
+        }
+        foreach (array_filter(array_map('trim', explode(',', strtolower((string) $tagsArg))), 'strlen') as $t) {
+            if (!preg_match(Services::NICK_RE, $t)) {
+                throw new CliError('not a tag: ' . json_encode($t), 'lowercase words such as seedbox, backup, webhosting, dedicated, workstation, nas, laptop, media, other');
+            }
+            $categories[$t] = true;
+        }
+        return [$services, array_map('strval', array_keys($categories))];
     }
 
     /** The real paths of the files --tool names (';'-separated); each must be an existing file. ADR-0081. */

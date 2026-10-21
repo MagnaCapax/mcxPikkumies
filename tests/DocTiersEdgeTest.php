@@ -248,6 +248,39 @@ return [
             exec('rm -rf ' . escapeshellarg($tree));
         }
     },
+    'pikkumies.php: save --service/--tags through the real CLI (ADR-0104 C1 regression: Cli::run\'s known-options list did not include service/tags, so every --service/--tags save failed "unknown option" even though Lessons::save itself was correct); --service auto-fills categories from a fixture services.jsonl, and --tags extends that union' => function () {
+        $tree = docTiersEdgeTree();
+        try {
+            $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+            mkdir("$tree/pikkumies/local/state", 0700, true);
+            file_put_contents("$tree/pikkumies/local/state/services.jsonl", json_encode(['nick' => 'pm1', 'tags' => ['seedbox', 'backup']]) . "\n");
+            file_put_contents("$tree/body.md", "pm1 needs a scrub every sunday.\n");
+            list($code, $out) = runPhp($tool, ['save', '--topic', 'services', '--title', 'pm1 cli service tags test', '--sources', 'manual test', '--service', 'pm1', '--tags', 'nas', '--no-related', 'first', '--body-file', "$tree/body.md"]);
+            $lines = cliLines($out);
+            check($code === 0, 'save must accept --service/--tags, not "unknown option": ' . $out);
+            $content = (string) file_get_contents($lines[0]['path']);
+            check((bool) preg_match('/^service: \["pm1"\]$/m', $content), 'service frontmatter: ' . $content);
+            check((bool) preg_match('/^categories: (.*)$/m', $content, $m) && is_array($cats = json_decode($m[1], true)), 'categories frontmatter: ' . $content);
+            sort($cats);
+            check($cats === ['backup', 'nas', 'seedbox'], 'categories union via the real CLI (service tags + --tags): ' . $content);
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
+    'pikkumies.php: search finds a memory by a word that exists only in its categories frontmatter, never in the body or title (TextSearch reads the whole file text, frontmatter included — ADR-0104 M4)' => function () {
+        $tree = docTiersEdgeTree();
+        try {
+            $tool = "$tree/pikkumies/tools/memory/pikkumies/pikkumies.php";
+            mkdir("$tree/pikkumies/memory/lessons/services", 0700, true);
+            file_put_contents("$tree/pikkumies/memory/lessons/services/20261021-pm1-scrub.md",
+                "---\ndate: 2026-10-21\ntopic: services\nsources: [\"x\"]\nservice: [\"pm1\"]\ncategories: [\"zyxelqux\"]\n---\n# pm1 wants a weekly scrub\n\nnothing else in this body mentions the search word at all.\n");
+            list($code, $out) = runPhp($tool, ['search', 'zyxelqux', '--offline']);
+            $l = cliLines($out);
+            check($code === 0 && $l[0]['tier'] === 1 && strpos($l[0]['path'], '20261021-pm1-scrub.md') !== false, 'search must match the categories frontmatter word: ' . $out);
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tree));
+        }
+    },
     'docsite: resolve() — "//host/path" becomes "https://host/path"; a non-http(s) scheme (mailto:, javascript:, tel:) returns \'\'; a bare "#frag" alone returns \'\'' => function () {
         $base = 'https://x.example/page';
         check(DocSite::resolve($base, '//host.example/path') === 'https://host.example/path', 'protocol-relative resolve');
