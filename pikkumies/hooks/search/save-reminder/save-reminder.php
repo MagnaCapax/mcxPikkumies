@@ -29,4 +29,4 @@ if (@file_put_contents($marker, $time . "\n") === false) {
     exit(0); // without the marker it would repeat every turn
 }
 echo json_encode(['context' => 'The last search found no lesson; if that task is solved, save what you learned (or what did not settle it): '
-    . MemoryMetrics::saveCommand()], JSON_UNESCAPED_SLASHES) . "\n";
+    . MemoryMetrics::saveCommand() . MemoryMetrics::SOP_HINT], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";

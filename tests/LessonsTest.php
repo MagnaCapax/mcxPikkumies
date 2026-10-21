@@ -94,10 +94,38 @@ return [
                 check(false, 'an unknown --kind must refuse');
             } catch (CliError $e) {
                 check($e->getMessage() === 'unknown --kind bogus', 'message: ' . $e->getMessage());
-                check($e->hint === 'kinds: lesson (default), reference, research', 'hint: ' . $e->hint);
+                check($e->hint === 'kinds: lesson (default), reference, research, sop', 'hint: ' . $e->hint);
             }
             $r = Lessons::save(['topic' => 'rtorrent', 'title' => 'a reference fact', 'sources' => 'y', 'kind' => 'reference', 'no-related' => 'none yet'], "b\n");
             check(strpos($r['records'][0]['path'], "$tmp/memory/reference/") === 0, 'reference kind path: ' . $r['records'][0]['path']);
+        } finally {
+            lessonsCloseTree($tmp);
+        }
+    },
+    // ADR-0106. Mutation-tested by hand: dropping the heading loop lets the bare body through; dropping the prefix
+    // leaves the title as given; writing to /$kind would put the SOP in memory/sop/ instead of beside the lessons.
+    'lessons: save --kind sop refuses a body missing any of the four SOP headings and names each missing one; a full SOP lands beside the lessons as "SOP: <title>" with kind: sop, and related lessons are found by the title without the prefix' => function () {
+        $tmp = lessonsFreshTree();
+        try {
+            mkdir("$tmp/memory/lessons/rtorrent", 0700, true);
+            $lesson = "$tmp/memory/lessons/rtorrent/20261001-rtorrent-moved-to-a-new-disk.md";
+            file_put_contents($lesson, "---\ndate: 2026-10-01\ntopic: rtorrent\nsources: [\"old\"]\n---\n# rtorrent moved to a new disk\n\nWhat happened.\n");
+            $opt = ['topic' => 'rtorrent', 'title' => 'rtorrent moved to a new disk', 'sources' => 'this session', 'kind' => 'sop'];
+            try {
+                Lessons::save($opt, "## When to use\nMoving data.\n## steps\n1. Stop it.\n");
+                check(false, 'an SOP without Checks and What did not work must refuse');
+            } catch (CliError $e) {
+                check($e->getMessage() === 'an SOP needs the headings: ## Checks, ## What did not work', 'message: ' . $e->getMessage());
+            }
+            $body = "From [the lesson]($lesson).\n\n## When to use\nMove rtorrent data to another disk.\n\n## Steps\n1. Stop rtorrent.\n\n## Checks\n1. rtorrent is stopped.\n\n## What did not work\nCopying while it ran.\n";
+            $r = Lessons::save($opt, $body);
+            $path = $r['records'][0]['path'];
+            check(strpos($path, "$tmp/memory/lessons/rtorrent/" . gmdate('Ymd') . '-sop-rtorrent-moved-to-a-new-disk.md') === 0, 'SOP path: ' . $path);
+            $text = (string) file_get_contents($path);
+            check(strpos($text, "\nkind: sop\n") !== false && strpos($text, "\n# SOP: rtorrent moved to a new disk\n") !== false, 'kind and title: ' . $text);
+            check(in_array(realpath($lesson), array_map('realpath', $r['records'][0]['related']), true), 'related must find the lesson: ' . json_encode($r['records'][0]['related']));
+            $again = Lessons::save(['title' => 'SOP: rtorrent second move'] + $opt, $body);
+            check(strpos(file_get_contents($again['records'][0]['path']), "\n# SOP: rtorrent second move\n") !== false, 'a given "SOP: " prefix is not doubled');
         } finally {
             lessonsCloseTree($tmp);
         }

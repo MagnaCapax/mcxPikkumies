@@ -74,7 +74,7 @@ Cli::run($argv, [
         $status = ['matched' => $mode, 'tiers_searched' => $tiers, 'hits_per_tier' => $perTier, 'pages_per_tier' => $pages, 'notes' => $notes];
         $next = !$hits ? NEXT_STEP : ($perTier[1] + $perTier[2] === 0 ? PEER_NEXT : '');
         if ($perTier[1] === 0) { // no lesson settles it: the search ends with a saved lesson, resolved or not (ADR-0041)
-            $next = ltrim($next . ' ' . SAVE_NEXT . MemoryMetrics::saveCommand());
+            $next = ltrim($next . ' ' . SAVE_NEXT . MemoryMetrics::saveCommand() . MemoryMetrics::SOP_HINT);
         }
         if ($next !== '') {
             $status['next'] = $next;

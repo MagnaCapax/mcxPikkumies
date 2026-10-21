@@ -104,6 +104,9 @@ class MemoryMetrics
             . ' --sources "<where it came from; another>" --body-file <file>';
     }
 
+    /** Added after the save command: a hard task gets a separate SOP as well (ADR-0106). */
+    const SOP_HINT = '. If the task was hard (several approaches before one worked, deep research, help from Väinämöinen, most of the session), also save the full process as an SOP the next agent can follow for the same kind of request: the same command with --kind sop and the headings When to use, Steps, Checks and What did not work';
+
     /** Calls $visit with each record of <kind>-YYYYMM.jsonl with ts >= $since, oldest month first, a line at a time. */
     public static function each($kind, $since, callable $visit)
     {

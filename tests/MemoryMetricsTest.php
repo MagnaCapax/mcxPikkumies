@@ -177,7 +177,8 @@ return [
         try {
             memMetricsRecord($tree, time() - 30, [1 => 0, 2 => 2, 3 => 0]);
             $c = memMetricsRemind($tree);
-            check(strpos($c, 'The last search found no lesson') === 0 && strpos($c, 'pikkumies.php save --topic <topic>') !== false, 'first: ' . $c);
+            check(strpos($c, 'The last search found no lesson') === 0 && strpos($c, 'pikkumies.php save --topic <topic>') !== false
+                && strpos($c, '--kind sop') !== false, 'first (with the hard-task SOP hint, ADR-0106): ' . $c);
             check(memMetricsRemind($tree) === '', 'it repeated for the same search');
             memMetricsRecord($tree, time() - 20, [1 => 0, 2 => 0, 3 => 0]);
             check(memMetricsRemind($tree) !== '', 'a new missed search got no reminder');

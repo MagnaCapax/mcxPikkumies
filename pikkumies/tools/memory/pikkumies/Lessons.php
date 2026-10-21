@@ -18,6 +18,7 @@ require_once dirname(__DIR__, 3) . '/lib/Services.php';
 class Lessons
 {
     const EXCERPT = 1500; // bytes of the best paragraph returned with a search hit
+    const SOP_HEADINGS = ['When to use', 'Steps', 'Checks', 'What did not work']; // a --kind sop body needs each (ADR-0106)
 
     public static function root()
     {
@@ -47,11 +48,28 @@ class Lessons
             throw new CliError('save needs --topic, --title and --sources', 'e.g. --topic rtorrent --title "rtorrent stops on a full disk" --sources "df -h output; rtorrent log"');
         }
         // ADR-0018 hierarchy: lessons/<topic>/ for solved problems, reference/ for facts, research/ for longer findings.
+        // An SOP (ADR-0106) is the full process of a hard task, kept as its own file beside the task's lessons.
         $kind = isset($opt['kind']) && is_string($opt['kind']) ? $opt['kind'] : 'lesson';
-        if (!in_array($kind, ['lesson', 'reference', 'research'], true)) {
-            throw new CliError("unknown --kind $kind", 'kinds: lesson (default), reference, research');
+        $searchTitle = $title; // related memories are found by the words of the title, never by an added "SOP: "
+        if (!in_array($kind, ['lesson', 'reference', 'research', 'sop'], true)) {
+            throw new CliError("unknown --kind $kind", 'kinds: lesson (default), reference, research, sop');
         }
-        $dir = self::root() . ($kind === 'lesson' ? "/lessons/$topic" : "/$kind");
+        if ($kind === 'sop') {
+            $missing = [];
+            foreach (self::SOP_HEADINGS as $h) {
+                if (!preg_match('/^##[ \t]+' . preg_quote($h, '/') . '[ \t]*$/mi', $body)) {
+                    $missing[] = "## $h";
+                }
+            }
+            if ($missing) {
+                throw new CliError('an SOP needs the headings: ' . implode(', ', $missing),
+                    'write it so the next agent can follow it for the same kind of request: ## When to use (the requests it answers, in the user\'s words), ## Steps (numbered, each with the command), ## Checks (how each step is known to have worked), ## What did not work');
+            }
+            if (stripos($title, 'SOP: ') !== 0) {
+                $title = "SOP: $title";
+            }
+        }
+        $dir = self::root() . ($kind === 'lesson' || $kind === 'sop' ? "/lessons/$topic" : "/$kind");
         $tools = self::toolLinks(isset($opt['tool']) ? (string) $opt['tool'] : '');
         foreach (['service', 'tags'] as $k) {
             if (isset($opt[$k]) && !is_string($opt[$k])) { // a bare --service/--tags (no value) parses to true; --$k=1 must never silently link nick/tag "1"
@@ -60,7 +78,7 @@ class Lessons
         }
         list($services, $categories) = self::serviceLinks(isset($opt['service']) ? (string) $opt['service'] : '', isset($opt['tags']) ? (string) $opt['tags'] : '');
         $related = [];
-        list($hits) = DocSources::search($title, 5, true, 0.5); // free text: half of the title's words
+        list($hits) = DocSources::search($searchTitle, 5, true, 0.5); // free text: half of the title's words
         foreach ($hits as $h) {
             if ($h[3] === 'lessons' || ($kind === 'research' && $h[3] === 'research')) { // research notes are labelled research (DocSources)
                 $related[] = $h[0];
@@ -85,7 +103,7 @@ class Lessons
                 $duplicate = $p;
             }
         }
-        $text = "---\ndate: " . gmdate('Y-m-d') . "\ntopic: $topic\nsources: " . json_encode($sources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        $text = "---\ndate: " . gmdate('Y-m-d') . "\ntopic: $topic" . ($kind === 'sop' ? "\nkind: sop" : '') . "\nsources: " . json_encode($sources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
             . ($tools ? "\ntools: " . json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
             . ($services ? "\nservice: " . json_encode($services, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
             . ($categories ? "\ncategories: " . json_encode($categories, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '')
