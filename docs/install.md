@@ -28,6 +28,8 @@ Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
 On a Pulsed Media seedbox with at least 1000 MiB RAM, Pikkumies comes preinstalled on new accounts. The platform runs the installer with `PIKKUMIES_SKIP_HERMES=1`, which skips the agent runtime build. The runtime then builds at the account's daily update time, or the first time you run `pikkumies`: that run starts the build (or finds it running), shows its progress on one line while it waits, usually a few minutes, and then starts the session (ADR-0033).
 
+When OpenClaw is installed in the account, Pikkumies writes `<state dir>/skills/pikkumies/SKILL.md` at every start and update: the state directory is the non-empty `OPENCLAW_STATE_DIR` in Pikkumies' environment, otherwise `~/.openclaw`. Turn the skill off with OpenClaw setting `skills.entries.pikkumies.enabled false`; deleting the file only lasts until the next start. After removing Pikkumies, the folder `~/.openclaw/skills/pikkumies` (or its equivalent in your chosen state directory) can be deleted ([ADR-0105](adr/0105-openclaw-skill.md)).
+
 The agent is called Pikkumies; nothing asks for a name. Tell it "call yourself Kalle" in a session, or use `pikkumies configure` or `--name=`, to rename it. On a terminal, the first interactive session shows the [terms of service](https://pulsedmedia.com/terms.php) and [privacy policy](https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy) and starts only once you accept them. Flags answer every question, so a scripted install (PMSS) asks nothing:
 
 ```sh
