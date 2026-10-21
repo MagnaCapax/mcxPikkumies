@@ -327,13 +327,25 @@ class Eternal
                 if (function_exists('posix_kill')) {
                     @posix_kill((int) $parts[2], 15);
                 }
-                if (self::tmux(['kill-window', '-t', '=pikkumies:' . $parts[0]])[0] !== 0) {
+                // SIGTERM can end the pane first, and without remain-on-exit its window is then already gone:
+                // kill-window fails although the stop worked. Only a window that is still listed failed to stop.
+                if (self::tmux(['kill-window', '-t', '=pikkumies:' . $parts[0]])[0] !== 0 && self::listed($parts[0])) {
                     @unlink($stopPath);
                     $stopped = false;
                 }
             }
         }
         return $stopped;
+    }
+
+    /** Whether window $id is still in the pikkumies session; an unreadable answer (e.g. a timeout) counts as listed. */
+    public static function listed($id)
+    {
+        list($code, $rows) = self::tmux(['list-windows', '-t', '=pikkumies', '-F', '#W']);
+        if ($code === 1) {
+            return false; // no server or no session: no window either
+        }
+        return $code !== 0 || in_array($id, explode("\n", trim($rows)), true);
     }
 
     public static function stopPath($id)

@@ -78,7 +78,7 @@ class Launch
         if (Eternal::enabled() && $argv[1] === 'ask' && ($rest === [] || (count($rest) === 1 && strncmp($rest[0], '--nonce=', 8) === 0 && strlen($rest[0]) > 8))) {
             return ['ask', $rest];
         }
-        if (Eternal::enabled() && $argv[1] === 'ui' && $rest === ['start']) {
+        if (Eternal::enabled() && $argv[1] === 'ui' && in_array($rest, [['start'], ['web-build']], true)) {
             return ['ui', $rest];
         }
         if (Eternal::enabled() && $argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new']], true)

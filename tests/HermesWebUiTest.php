@@ -51,6 +51,31 @@ function webUiBuild(array $w, $root = false)
 }
 
 return [
+    'ui web-build: names a missing runtime, and exits 0 at once when the page is already there (ADR-0033 addendum 2026-10-21)' => function () {
+        $root = testTempDir('pk-webbuild');
+        $source = dirname(__DIR__) . '/pikkumies';
+        exec('cp -R ' . escapeshellarg($source . '/bin') . ' ' . escapeshellarg($source . '/lib') . ' ' . escapeshellarg($root) . '/');
+        @mkdir($root . '/local', 0700);
+        $bootstrap = $root . '/bootstrap.php';
+        file_put_contents($root . '/enabled', "1\n"); // `ui` verbs exist only on an Eternals host
+        file_put_contents($bootstrap, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/enabled"; require __DIR__ . "/bin/pikkumies";');
+        try {
+            list($code, $out) = runPhp($bootstrap, ['ui', 'web-build']);
+            check($code === 1 && strpos($out, 'agent runtime is not set up yet') !== false, 'missing runtime not named: ' . $code . ' ' . $out);
+            mkdir($root . '/hermes/.git', 0700, true);
+            mkdir($root . '/hermes/.hermes/bin', 0700, true);
+            mkdir($root . '/hermes/hermes_cli/web_dist', 0700, true);
+            mkdir($root . '/include', 0700);
+            touch($root . '/include/.hermes-ready');
+            file_put_contents($root . '/hermes/.hermes/bin/hermes', "#!/bin/sh\necho called > '" . $root . "/hermes-called'\nexit 0\n");
+            chmod($root . '/hermes/.hermes/bin/hermes', 0700);
+            file_put_contents($root . '/hermes/hermes_cli/web_dist/index.html', '<html>');
+            list($code, $out) = runPhp($bootstrap, ['ui', 'web-build']);
+            check($code === 0 && strpos($out, 'Web page ready.') !== false && !is_file($root . '/hermes-called'), 'built page not accepted as is: ' . $code . ' ' . $out);
+        } finally {
+            testRmTree($root);
+        }
+    },
     'web ui: only a dashboard start on a checkout without the page builds; --stop, --status, --skip-build, register, help, serve and chat never do' => function () {
         $w = webUiWorld();
         webUiIn($w, function () use ($w) {

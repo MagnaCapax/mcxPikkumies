@@ -104,3 +104,6 @@ The first addendum above had a session with no runtime start the build and exit,
 
 ## Amendment 2026-10-19: Eternal update hold
 `pikkumies run update` takes the shared Eternal lifecycle lock and terminates managed Eternal windows before changing the Hermes tree. The records remain so cron supervision can resume them. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).
+
+## Addendum 2026-10-21: a build-only verb for the platform launcher
+The PMSS Power user launcher starts the dashboard with `--skip-build` and waits about ten seconds for it, so on a fresh account the first start found no page and failed (live QA on a throwaway seedbox, 2026-10-21: Hermes printed "--skip-build was passed but no web dist found"). `pikkumies ui web-build` runs the same build as the dashboard start above, through the same function in `bin/pikkumies` (`buildWebUi`), and starts no server. The launcher runs it detached when the page is missing and shows its setting-up page until the page exists. It prints `Web page ready.` and exits 0 when the page is there, or names why not and exits 1.

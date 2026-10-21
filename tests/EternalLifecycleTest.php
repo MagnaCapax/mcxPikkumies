@@ -157,6 +157,40 @@ return [
             testRmTree($root);
         }
     },
+    'eternal: off succeeds when the stopped pane already closed its window, and fails while the window stays' => function () {
+        $root = testTempDir('eternal-off-gone');
+        $source = dirname(__DIR__) . '/pikkumies';
+        exec('cp -R ' . escapeshellarg($source . '/lib') . ' ' . escapeshellarg($root) . '/');
+        @mkdir($root . '/bin', 0700);
+        @mkdir($root . '/fake-bin', 0700);
+        file_put_contents($root . '/enabled', "1\n");
+        $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($root . '/bin/pikkumies') . ' run --eternal pm2';
+        $runner = $root . '/runner.php';
+        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/enabled"; exit(EternalCli::run(array_slice($argv, 1)));');
+        $oldPath = getenv('PATH');
+        putenv('PATH=' . $root . '/fake-bin:' . $oldPath);
+        try {
+            // kill-window always fails, as when the pane already exited; GONE decides whether the window is still listed.
+            foreach ([[true, 0], [false, 1]] as list($gone, $want)) {
+                @unlink($root . '/killed');
+                @unlink($root . '/local/eternals.off');
+                $resident = proc_open('exec sleep 30', [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+                file_put_contents($root . '/row', 'pm2|' . $command . '|' . proc_get_status($resident)['pid'] . "\n");
+                file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\nif [ \"\$1\" = kill-window ]; then touch '" . $root . "/killed'; exit 1; fi\n"
+                    . "if [ \"\$1\" = list-windows ]; then " . ($gone ? "[ -f '" . $root . "/killed' ] && exit 1; " : '')
+                    . "case \"\$*\" in *'#W|'*) cat '" . $root . "/row';; *) echo pm2;; esac; fi\nexit 0\n");
+                chmod($root . '/fake-bin/tmux', 0700);
+                list($code) = runPhp($runner, ['off']);
+                proc_terminate($resident);
+                proc_close($resident);
+                check($code === $want, ($gone ? 'off failed although the window was gone' : 'off reported success while the window stayed') . ': rc=' . $code);
+                check(is_file($root . '/local/eternals/pm2.stop') === $gone, 'stop marker ' . ($gone ? 'lost' : 'kept') . ' after kill-window failed');
+            }
+        } finally {
+            putenv('PATH=' . $oldPath);
+            testRmTree($root);
+        }
+    },
     'eternal: without marker interactive tmux uses the ordinary server and plain run' => function () {
         $root = testTempDir('eternal-legacy-tmux');
         $source = dirname(__DIR__) . '/pikkumies';

@@ -13,10 +13,10 @@ return [
         file_put_contents($root . '/enabled', "1\n");
         Eternal::$hostMarker = $root . '/enabled';
         try {
-        foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['eternal'], ['eternal', 'list'], ['eternal', 'list', '--json'], ['eternal', 'ensure'], ['eternal', 'new'], ['eternal', 'on'], ['eternal', 'off'], ['eternal', 'quit', 'pm2'], ['eternal', 'hold', '--until', '123']] as $words) {
+        foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['ui', 'web-build'], ['eternal'], ['eternal', 'list'], ['eternal', 'list', '--json'], ['eternal', 'ensure'], ['eternal', 'new'], ['eternal', 'on'], ['eternal', 'off'], ['eternal', 'quit', 'pm2'], ['eternal', 'hold', '--until', '123']] as $words) {
             check(Launch::route(array_merge(['pikkumies'], $words))[0] === $words[0], 'command rejected: ' . json_encode($words));
         }
-        foreach ([['ask', 'how', 'big', 'is', 'my', 'disk'], ['ask', '--nonce='], ['ask', '--bad'], ['ask', '--nonce=abc', 'please'], ['ui', 'show', 'me'], ['ui', '--help'], ['ui', 'start', 'please'], ['eternal', 'life', 'is', 'short'], ['eternal', '--bad'], ['eternal', 'quit', 'bad'], ['eternal', 'hold', '--until', 'tomorrow']] as $words) {
+        foreach ([['ask', 'how', 'big', 'is', 'my', 'disk'], ['ask', '--nonce='], ['ask', '--bad'], ['ask', '--nonce=abc', 'please'], ['ui', 'show', 'me'], ['ui', '--help'], ['ui', 'start', 'please'], ['ui', 'web-build', 'now'], ['eternal', 'life', 'is', 'short'], ['eternal', '--bad'], ['eternal', 'quit', 'bad'], ['eternal', 'hold', '--until', 'tomorrow']] as $words) {
             check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'prompt claimed: ' . json_encode($words));
         }
         } finally {
@@ -45,7 +45,7 @@ return [
         Eternal::$hostMarker = $root . '/missing';
         Eternal::$tmuxDirectory = $root;
         try {
-            foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['eternal', 'new'], ['eternal', '--bad']] as $words) {
+            foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['ui', 'web-build'], ['eternal', 'new'], ['eternal', '--bad']] as $words) {
                 check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'markerless word claimed: ' . json_encode($words));
             }
             check(Eternal::insidePrivateTmux($root . '/tmux/tmux-1000/default,1,0'), 'private socket missed');

@@ -73,8 +73,10 @@ return [
     'launcher: the dashboard gate runs before the web page build and before the shared Hermes lock' => function () {
         $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
         $gate = strpos($src, 'HermesDashboardGate::refusal($passArgs');
-        $build = strpos($src, 'HermesWebUi::build(');
+        $build = strpos($src, '$dash = buildWebUi();');
         $lock = strpos($src, '$hermesLock = HermesInstall::lock($isUpdate);');
         check($gate !== false && $build !== false && $gate < $build && $build < $lock, 'order: gate, build, lock');
+        $helper = strpos($src, 'function buildWebUi()');
+        check($helper !== false && strpos($src, 'HermesWebUi::build(', $helper) < strpos($src, "\nfunction ", $helper + 1), 'buildWebUi() is the page build');
     },
 ];

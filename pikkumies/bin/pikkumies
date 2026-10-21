@@ -87,6 +87,25 @@ function hermesBin()
     return HermesInstall::bin();
 }
 
+/** Build the dashboard's web page, alone on the tree (ADR-0033 addendum 2026-10-19); '' when it is there afterwards. */
+function buildWebUi()
+{
+    $eternalsBuildLock = Eternal::enabled() ? Eternal::lock() : null;
+    if (Eternal::enabled() && !$eternalsBuildLock) {
+        return 'Pikkumies windows are changing; try again.';
+    }
+    try {
+        if (Eternal::enabled()) {
+            Eternal::stopManaged();
+        }
+        return HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out', Eternal::enabled() ? 5 : 0);
+    } finally {
+        if ($eternalsBuildLock) {
+            fclose($eternalsBuildLock);
+        }
+    }
+}
+
 function promptRead()
 {
     return fgets(STDIN);
@@ -127,8 +146,16 @@ switch ($cmd) {
         out($askMessage);
         exit($askCode);
     case 'ui':
+        if ($passArgs === ['web-build']) {
+            // The platform's Power user launcher runs this in the background before the dashboard's first start: its
+            // start waits seconds, the build takes minutes (ADR-0033 addendum 2026-10-21).
+            $webProblem = hermesBin() === '' ? 'the agent runtime is not set up yet.'
+                : ((string) getenv('HERMES_WEB_DIST') === '' && !is_file(HermesWebUi::indexFile()) ? buildWebUi() : '');
+            out($webProblem === '' ? 'Web page ready.' : 'Web page not built: ' . $webProblem);
+            exit($webProblem === '' ? 0 : 1);
+        }
         if ($passArgs !== ['start']) {
-            out('usage: pikkumies ui start');
+            out('usage: pikkumies ui start|web-build');
             exit(2);
         }
         $uiProblem = EternalUi::start();
@@ -520,18 +547,7 @@ switch ($cmd) {
         // A dashboard: never without a login (ADR-0074); its web page built first, alone on the tree (ADR-0033 addendum 2026-10-19).
         $dash = HermesDashboardGate::refusal($passArgs, hermesBin());
         if ($dash === '' && HermesWebUi::needed($passArgs)) {
-            $eternalsBuildLock = Eternal::enabled() ? Eternal::lock() : null;
-            if (Eternal::enabled() && !$eternalsBuildLock) {
-                out('Not starting the dashboard: Pikkumies windows are changing; try again.');
-                exit(1);
-            }
-            if (Eternal::enabled()) {
-                Eternal::stopManaged();
-            }
-            $dash = HermesWebUi::build(hermesBin(), !empty(profile()['root']['available']), 'out', Eternal::enabled() ? 5 : 0);
-            if ($eternalsBuildLock) {
-                fclose($eternalsBuildLock);
-            }
+            $dash = buildWebUi();
         }
         if ($dash !== '') {
             out('Not starting the dashboard: ' . $dash);
