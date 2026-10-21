@@ -4,7 +4,7 @@
  * pinned host keys live in local/; another box is reached only through a key its owner limited to serve.php there.
  */
 $servicesLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SshLists', 'Host', 'Services'] as $servicesClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SshLists', 'Host', 'Http', 'SecretFile', 'SecretsCache', 'Secrets', 'Services'] as $servicesClass) {
     require_once "$servicesLib/$servicesClass.php";
 }
 foreach (['ServeGate', 'ServicesKeys', 'ServicesSetup', 'ServicesList', 'ServicesRemote'] as $servicesClass) {
@@ -14,6 +14,7 @@ foreach (['ServeGate', 'ServicesKeys', 'ServicesSetup', 'ServicesList', 'Service
 $usage = <<<'TXT'
 usage: php services.php <verb> [arguments] [--human]
   add <nick> --host H --user U [--port N] [--provider P] [--tags a,b] [--transport pikkumies|tunnel|shell] [--home /home/u] [--notes "..."] [--clients JSON]
+      [--account-auth secret:<handle>]
   list [--tag T]                      show <nick>              remove <nick>
   edit <nick> [the add options] [--add-tag t] [--remove-tag t] [--allow-delete|--no-allow-delete]
   setup <nick> [--fingerprint SHA256:...] [--allow-delete] [--allow-shell]

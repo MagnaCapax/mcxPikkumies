@@ -2,12 +2,15 @@
 /**
  * Secrets: the encrypted secret store (ADR-0085). Passwords and API keys that cannot be an SSH key live in one file,
  * local/secrets/vault.enc: a JSON envelope {version, kdf {alg, ops, mem, salt}, nonce, ct}, where ct is
- * sodium_crypto_secretbox of {"kdf": <a copy of the header's>, "secrets": {handle: {value, kind, added_at, rotated_at}}} under a key that
+ * sodium_crypto_secretbox of {"kdf": <a copy of the header's>, "secrets": {handle: {value, kind, added_at, rotated_at[, host, path]}}} under a key that
  * Argon2id13 (sodium_crypto_pwhash, OPSLIMIT/MEMLIMIT_INTERACTIVE) derives from the user's passphrase. Nothing keeps
  * the passphrase; the derived key is cached outside the home for a TTL (lib/SecretsCache.php), so a lost or copied
  * vault.enc is ciphertext only. Other tools read a value with Secrets::get($handle) (a services entry names it as
- * "secret:<handle>") and never print it; locked means the user unlocks in their own terminal.
+ * "secret:<handle>") and never print it; locked means the user unlocks in their own terminal. A secret may carry a pin
+ * (host, optionally a path prefix) that limits where a tool may send it (ADR-0105).
  */
+require_once __DIR__ . '/SshLists.php';
+
 class Secrets
 {
     const VERSION = 1;
@@ -63,13 +66,112 @@ class Secrets
     /** The value of one secret for a tool to use (never to print). Throws CliError when locked or missing. */
     public static function get($ref)
     {
+        return (string) self::entry($ref)['value'];
+    }
+
+    /**
+     * The host one secret is pinned to (`secrets set|rotate <handle> --host <host>[/path/]`, normalised when stored), or null
+     * when it has none. Throws CliError when locked or missing, as get().
+     */
+    public static function host($ref)
+    {
+        $p = self::pin($ref);
+        return $p === null ? null : $p['host'];
+    }
+
+    /**
+     * The pin of one secret: ['host' => normalised host, 'path' => a path prefix ending in "/", or null for any path], or null
+     * when it has none. A tool that sends the secret over the network refuses a request pinAllows() does not allow (ADR-0105).
+     * Only set and rotate write it, each together with a new value.
+     */
+    public static function pin($ref)
+    {
+        $e = self::entry($ref);
+        if (!isset($e['host']) || !is_string($e['host']) || $e['host'] === '') {
+            return null;
+        }
+        return ['host' => $e['host'], 'path' => isset($e['path']) && is_string($e['path']) && $e['path'] !== '' ? $e['path'] : null];
+    }
+
+    /**
+     * A pin as `--host` takes it, "host" (any path on that host, the weaker form) or "host/path/prefix" (only URLs under that
+     * prefix, on a "/" boundary): ['host', 'path'], or null when it cannot be read. The host is normalised by SshLists::host;
+     * the path is plain characters only, with no empty, "." or ".." segment and no %-encoding, so nothing can be read two ways.
+     */
+    public static function parsePin($text)
+    {
+        $text = (string) $text;
+        if ($text === '' || strlen($text) > 300 || preg_match('/[\x00-\x20\x7f%?#@\\\\]/', $text) !== 0) {
+            return null;
+        }
+        $cut = $text[0] === '[' ? strpos($text, ']') : strpos($text, '/');
+        if ($text[0] === '[') {
+            $cut = $cut === false ? false : $cut + 1;
+            if ($cut === false) {
+                return null;
+            }
+        }
+        $host = SshLists::host($cut === false ? $text : substr($text, 0, $cut));
+        $rest = $cut === false ? '' : (string) substr($text, $cut);
+        if ($host === null) {
+            return null;
+        }
+        if ($rest === '' || $rest === '/') {
+            return ['host' => $host, 'path' => null];
+        }
+        $path = self::cleanPath($rest);
+        return $path === null ? null : ['host' => $host, 'path' => $path];
+    }
+
+    /** A URL path or pin prefix ending in "/" ("/a/b" -> "/a/b/"), or null when it holds an empty, "." or ".." segment or other characters. */
+    public static function cleanPath($p)
+    {
+        $p = (string) $p === '' ? '/' : (string) $p;
+        if (preg_match('#^/[A-Za-z0-9._~/+=,:-]*\z#', $p) !== 1) {
+            return null;
+        }
+        $inner = trim($p, '/');
+        foreach ($inner === '' ? [] : explode('/', $inner) as $seg) {
+            if ($seg === '' || $seg === '.' || $seg === '..') {
+                return null;
+            }
+        }
+        if (strpos(substr($p, 1), '//') !== false || strpos($p, '//') === 0) {
+            return null;
+        }
+        return $inner === '' ? '/' : '/' . $inner . '/';
+    }
+
+    /** Whether $pin (from pin()) allows a request to $host (normalised) at URL path $path: same host, and under the prefix when it has one. */
+    public static function pinAllows(array $pin, $host, $path)
+    {
+        if (!isset($pin['host']) || $pin['host'] !== $host) {
+            return false;
+        }
+        if (empty($pin['path'])) {
+            return true;
+        }
+        $p = self::cleanPath($path);
+        return $p !== null && strncmp($p, $pin['path'], strlen($pin['path'])) === 0;
+    }
+
+    /** A pin as the user wrote it, for messages: host, or host plus path prefix (an IPv6 host in brackets). */
+    public static function pinText(array $pin)
+    {
+        $h = strpos($pin['host'], ':') !== false ? '[' . $pin['host'] . ']' : $pin['host'];
+        return $h . (empty($pin['path']) ? '' : $pin['path']);
+    }
+
+    /** One stored entry {value, kind, added_at, rotated_at[, host, path]} with the cached key. */
+    private static function entry($ref)
+    {
         $h = self::handle($ref);
         list($data, $key) = self::openWithCache();
         sodium_memzero($key);
         if (!isset($data['secrets'][$h])) {
             throw new CliError("no secret named $h", 'list the handles with `secrets list`; the user adds one with `secrets set ' . $h . '` in their own terminal');
         }
-        return (string) $data['secrets'][$h]['value'];
+        return $data['secrets'][$h];
     }
 
     /** [data, key, envelope] with the cached key; CliError "locked" when there is none. Caller memzeroes the key. */

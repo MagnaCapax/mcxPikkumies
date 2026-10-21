@@ -23,31 +23,45 @@ class RtorrentClient implements TorrentClient
     public $home;
     public $uid;
     private $scgi = null;
+    /** An injected transport (address + call($method, $params), e.g. RtorrentHttpRpc), or null: this account's own SCGI socket. */
+    private $transport = null;
     /** d.directory of each torrent from the last list (RtorrentFiles::many). */
     public $dirs = [];
     /** d.state, d.is_active and d.is_open of each torrent from the last list, raw (pause/resume read them back). */
     public $flags = [];
     private $byNative = [];
 
-    public function __construct($family, $home, $uid)
+    /**
+     * $transport: null for the local client (its SCGI endpoint found on first use), or an object with the RtorrentScgi
+     * shape (public $address, call($method, $params)) that every call goes through instead, with its own timeout
+     * (services remote reads a third-party box this way, ADR-0105). Local callers pass nothing and nothing changes.
+     */
+    public function __construct($family, $home, $uid, $transport = null)
     {
         $this->family = $family;
         $this->home = rtrim($home, '/');
         $this->uid = (int) $uid;
+        $this->transport = $transport;
     }
 
     /** One XML-RPC call; the endpoint is found on first use, so `restart` works while rtorrent is down. */
     public function call($method, array $params = [], $timeout = 5)
     {
+        if ($this->transport !== null) {
+            return $this->transport->call($method, $params);
+        }
         if ($this->scgi === null) {
             $this->scgi = new RtorrentScgi(RtorrentLocate::address($this->family, $this->home, $this->uid), 5);
         }
         return $timeout === 5 ? $this->scgi->call($method, $params) : (new RtorrentScgi($this->scgi->address, $timeout))->call($method, $params);
     }
 
-    /** The SCGI address in use (unix:///path or tcp://127.0.0.1:port), once a call was made. */
+    /** The SCGI address in use (unix:///path or tcp://127.0.0.1:port), once a call was made; an injected transport's address. */
     public function address()
     {
+        if ($this->transport !== null) {
+            return (string) $this->transport->address;
+        }
         return $this->scgi === null ? '' : $this->scgi->address;
     }
 

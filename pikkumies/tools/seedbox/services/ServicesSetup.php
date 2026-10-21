@@ -29,6 +29,7 @@ class ServicesSetup
         if ($secret === false || $secret === '') {
             throw new CliError('no remote login given; nothing done', 'pass it only as a prefix: ' . self::ENV . "='...' php <this tool> setup <nick> (never as an argument)");
         }
+        $opens = $svc['transport'] === 'tunnel' ? ServicesKeys::permitOpen($svc) : []; // before any connection: a bad endpoint refuses here
         ToolProc::need('ssh', 'install openssh-client');
         $dir = Services::secretDir($svc['nick']);
         $new = ['key.new', 'key.new.pub', 'known_hosts.new', 'install.sh.new', 'install.out.new'];
@@ -38,7 +39,7 @@ class ServicesSetup
             list($type, $b64) = ServicesKeys::keygen($dir, '.new');
             list($svc['host_key'], $svc['host_key_alg']) = ServicesKeys::pinHost($svc, "$dir/known_hosts.new", $want);
             $label = ServicesKeys::label();
-            self::install($svc, $dir, ServicesKeys::keyLine($svc['transport'], $label, $allowDelete, $type, $b64), $secret, $askpass);
+            self::install($svc, $dir, ServicesKeys::keyLine($svc['transport'], $label, $allowDelete, $type, $b64, $opens), $secret, $askpass);
             $secret = null;
             $proof = ServicesKeys::prove($svc, '.new');
             if (!$proof['works']) {

@@ -4,6 +4,7 @@
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-20
 - Status: Accepted
+- Amended by [ADR-0105](0105-third-party-seedbox-stats-through-the-clients-own-rpc.md): `set` and `rotate` take `--host <host>`, a pin stored with the value; `Secrets::host()` returns it, and a tool that sends the secret over the network refuses any other host.
 
 ## Context
 The request of 2026-10-20, verbatim: "prefer SSH keys, and for passwords where needed or API Keys we need a proper encrypted store ... not easily decrypted if files lost etc. but is not inconvenient neither".

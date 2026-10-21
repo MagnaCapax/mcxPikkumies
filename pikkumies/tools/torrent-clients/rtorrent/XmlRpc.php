@@ -64,8 +64,11 @@ class RtorrentXmlRpc
         return htmlspecialchars($s, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    /** The first value of a methodResponse; a fault throws CliError naming the method. */
-    public static function response($xml, $method)
+    /**
+     * The first value of a methodResponse; a fault throws CliError naming the method. $remote: a reply from another machine
+     * (RtorrentHttpRpc): parsed without LIBXML_PARSEHUGE and its fault text capped at 300 characters; the local socket is unchanged.
+     */
+    public static function response($xml, $method, $remote = false)
     {
         if (!preg_match('//u', $xml)) {
             $xml = (string) json_decode(json_encode($xml, JSON_INVALID_UTF8_SUBSTITUTE)); // torrent names are not always UTF-8
@@ -73,13 +76,14 @@ class RtorrentXmlRpc
         if (stripos($xml, '<!DOCTYPE') !== false || !function_exists('simplexml_load_string')) {
             throw new CliError("rtorrent answered $method with something that is not an XML-RPC reply", 'the PHP SimpleXML extension is needed; check that the socket belongs to rtorrent');
         }
-        $doc = @simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NONET | LIBXML_PARSEHUGE);
+        $doc = @simplexml_load_string($xml, 'SimpleXMLElement', $remote ? LIBXML_NONET : LIBXML_NONET | LIBXML_PARSEHUGE);
         if ($doc === false) {
             throw new CliError("rtorrent answered $method with XML that does not parse", 'try again; if it repeats, restart rtorrent');
         }
         if (isset($doc->fault->value)) {
             $f = self::decode($doc->fault->value);
-            $why = is_array($f) && isset($f['faultString']) ? $f['faultString'] : 'unknown fault';
+            $why = is_array($f) && isset($f['faultString']) ? (string) $f['faultString'] : 'unknown fault';
+            $why = $remote && preg_match('/^.{300}(?=.)/su', $why, $cut) === 1 ? $cut[0] . ' [cut]' : $why; // whole characters (the reply is UTF-8 by now)
             throw new CliError("rtorrent refused $method: $why", 'check the id with `list`; the method may not exist in this rtorrent version');
         }
         if (!isset($doc->params->param->value)) {

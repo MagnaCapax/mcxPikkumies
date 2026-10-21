@@ -19,7 +19,7 @@ class ServicesList
         'pmss' => ['rtorrent' => ['socket' => '~/.rtorrent.socket', 'data' => '~/data'], 'transmission' => ['socket' => '~/.lighttpd/transmission.sock']],
         'feral' => ['rtorrent' => ['socket' => '~/private/rtorrent/.socket', 'data' => null]],
     ];
-    const VALUED = ['host', 'user', 'port', 'provider', 'tags', 'transport', 'home', 'notes', 'clients', 'add-tag', 'remove-tag', 'tag'];
+    const VALUED = ['host', 'user', 'port', 'provider', 'tags', 'transport', 'home', 'notes', 'clients', 'add-tag', 'remove-tag', 'tag', 'account-auth'];
 
     /** The provider a host name points at (Host::TABLE suffixes), or generic. PMSS boxes have no fixed suffix: pass --provider pmss. */
     public static function providerOf($host)
@@ -83,6 +83,9 @@ class ServicesList
                 throw new CliError('--clients takes JSON', 'e.g. --clients \'{"qbittorrent":{"port":12345}}\'');
             }
             $svc['clients'] = $c;
+        }
+        if (isset($opt['account-auth'])) {
+            $svc['account_auth'] = (string) $opt['account-auth']; // secret:<handle> of Bytesized's API key (ADR-0105); '' clears it
         }
         if (!empty($opt['allow-delete']) || !empty($opt['no-allow-delete'])) {
             $svc['allow_delete'] = empty($opt['no-allow-delete']); // records what the key line on that box allows

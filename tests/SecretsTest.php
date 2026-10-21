@@ -408,4 +408,51 @@ return [
             scDone($fx);
         }
     },
+    'secrets: set --host pins a secret to one normalised host or host and path prefix, list shows it, rotate keeps it or sets a new one with the value, nothing else changes it; a bad host stores nothing (ADR-0105)' => function () {
+        $fx = scFixture();
+        try {
+            scSeed($fx, []);
+            list($code, $l, $out) = scRun($fx, ['set', 'feral1-rpc', '--host', 'Kepler.FeralHosting.com.'], SC_VALUE . "\n");
+            check($code === 0 && $l[0]['host'] === 'kepler.feralhosting.com' && end($l)['verified'] === true, 'set --host: ' . $out);
+            check(Secrets::host('feral1-rpc') === 'kepler.feralhosting.com' && Secrets::get('feral1-rpc') === SC_VALUE, 'Secrets::host after set');
+            list($code, $l, $out) = scRun($fx, ['set', 'plain'], SC_VALUE . "\n");
+            check($code === 0 && $l[0]['host'] === null && Secrets::host('plain') === null, 'a secret set without --host is unpinned: ' . $out);
+            foreach ([['--host', 'a b'], ['--host', '127.1'], ['--host']] as $i => $bad) {
+                list($code, $l, $out) = scRun($fx, array_merge(['set', "bad$i"], $bad), SC_VALUE . "\n");
+                check($code === 1 && strpos(end($l)['error'], '--host') !== false, 'bad host accepted: ' . $out);
+            }
+            list($code, $l, $out) = scRun($fx, ['list']);
+            $by = [];
+            foreach ($l as $rec) {
+                if (isset($rec['handle'])) {
+                    $by[$rec['handle']] = array_key_exists('host', $rec) ? $rec['host'] : 'missing';
+                }
+            }
+            check($code === 0 && $by === ['feral1-rpc' => 'kepler.feralhosting.com', 'plain' => null] && strpos($out, SC_VALUE) === false && array_key_exists('path', $l[0]), 'list: ' . $out);
+            scRun($fx, ['status']);
+            check(Secrets::host('feral1-rpc') === 'kepler.feralhosting.com', 'list or status changed the pin');
+            list($code, $l, $out) = scRun($fx, ['rotate', 'feral1-rpc'], "New-Value-1\n");
+            check($code === 0 && $l[0]['host'] === 'kepler.feralhosting.com' && Secrets::host('feral1-rpc') === 'kepler.feralhosting.com' && Secrets::get('feral1-rpc') === 'New-Value-1',
+                'rotate without --host must keep the pin: ' . $out);
+            list($code, $l, $out) = scRun($fx, ['rotate', 'feral1-rpc', '--host', 'other.example.org'], "New-Value-2\n");
+            check($code === 0 && Secrets::host('feral1-rpc') === 'other.example.org' && Secrets::get('feral1-rpc') === 'New-Value-2', 'rotate --host: ' . $out);
+            list($code, $l, $out) = scRun($fx, ['set', 'pathed', '--host', 'Kepler.FeralHosting.com/xyzjohnny'], SC_VALUE . "\n");
+            check($code === 0 && $l[0]['host'] === 'kepler.feralhosting.com' && $l[0]['path'] === '/xyzjohnny/'
+                && Secrets::pin('pathed') === ['host' => 'kepler.feralhosting.com', 'path' => '/xyzjohnny/'], 'a host and path prefix pin: ' . $out);
+            check(Secrets::pinAllows(Secrets::pin('pathed'), 'kepler.feralhosting.com', '/xyzjohnny/rtorrent/rpc')
+                && !Secrets::pinAllows(Secrets::pin('pathed'), 'kepler.feralhosting.com', '/xyzjohnnyx/rtorrent/rpc')
+                && !Secrets::pinAllows(Secrets::pin('pathed'), 'kepler.feralhosting.com', '/xyzjohnny/../other/rpc'), 'a path pin matches on a / boundary only');
+            foreach (['kepler.feralhosting.com/a/../b', 'kepler.feralhosting.com/a%2fb', 'kepler.feralhosting.com//a', 'kepler.feralhosting.com/a?b'] as $bad) {
+                list($code, $l, $out) = scRun($fx, ['set', 'badpath', '--host', $bad], SC_VALUE . "\n");
+                check($code === 1 && strpos(end($l)['error'], '--host') !== false, "bad path pin accepted: $bad -> $out");
+            }
+            list($code, $l, $out) = scRun($fx, ['rotate', 'pathed', '--host', 'kepler.feralhosting.com'], "New-Value-9\n");
+            check($code === 0 && $l[0]['path'] === null && Secrets::pin('pathed') === ['host' => 'kepler.feralhosting.com', 'path' => null],
+                'a host-only rotate --host must drop the old path prefix: ' . $out);
+            list($code, $l, $out) = scRun($fx, ['rotate', 'feral1-rpc', '--host', 'x y'], "New-Value-3\n");
+            check($code === 1 && Secrets::host('feral1-rpc') === 'other.example.org' && Secrets::get('feral1-rpc') === 'New-Value-2', 'a bad rotate --host changed something: ' . $out);
+        } finally {
+            scDone($fx);
+        }
+    },
 ];

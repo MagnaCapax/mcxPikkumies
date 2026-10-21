@@ -394,4 +394,82 @@ return [
             check(svGuard($cmd) === null, "asked or blocked: $cmd");
         }
     },
+    'services list: clients auth is only secret:<handle>; a key shaped like a secret, a url with user:...@ or a query, and a bad user are refused without echoing the value (ADR-0105)' => function () {
+        $base = ['nick' => 'feral1', 'host' => 'kepler.feralhosting.com', 'user' => 'xyzjohnny', 'transport' => 'tunnel'];
+        $ok = Services::normalize($base + ['clients' => ['rtorrent' => ['url' => 'https://kepler.feralhosting.com/xyzjohnny/rtorrent/rpc', 'user' => 'rutorrent',
+            'auth' => 'secret:feral1-rpc']], 'account_auth' => 'secret:bz1-api']);
+        $plain = Services::normalize($base + ['clients' => ['rtorrent' => ['socket' => '~/private/rtorrent/.socket', 'data' => null, 'endpoint' => 'tcp://127.0.0.1:5000'],
+            'qbittorrent' => ['port' => 12345, 'user' => 'xyzjohnny']]]);
+        check($plain['clients']['qbittorrent']['port'] === 12345 && $plain['clients']['rtorrent']['endpoint'] === 'tcp://127.0.0.1:5000', 'ordinary endpoint keys must pass: ' . json_encode($plain));
+        check($ok['clients']['rtorrent']['auth'] === 'secret:feral1-rpc' && $ok['clients']['rtorrent']['user'] === 'rutorrent' && $ok['account_auth'] === 'secret:bz1-api', json_encode($ok));
+        check(!array_key_exists('account_auth', Services::normalize($base + ['account_auth' => ''])), 'an empty account_auth must clear it');
+        $value = 'Inline-Login-0racle';
+        foreach ([['rtorrent' => ['password' => $value]], ['rtorrent' => ['Pass' => $value]], ['rtorrent' => ['passwd' => $value]], ['qbittorrent' => ['token' => $value]],
+            ['deluge' => ['api_key' => $value]], ['deluge' => ['APIKEY' => $value]], ['rtorrent' => ['secret' => $value]], ['rtorrent' => ['auth' => $value]],
+            ['rtorrent' => ['auth' => "secret:bad handle $value"]], ['rtorrent' => ['auth' => 7]], ['rtorrent' => ['url' => "https://rutorrent:$value@kepler.feralhosting.com/rpc"]],
+            ['rtorrent' => ['user' => 'ru:torrent']], ['rtorrent' => ['user' => "ru torrent"]], ['rtorrent' => ['rpc_password' => $value]], ['rtorrent' => ['Cookie' => $value]],
+            ['rtorrent' => ['passkey' => $value]], ['rtorrent' => ['basic_auth' => $value]], ['qbittorrent' => ['Session-Token' => $value]], ['deluge' => ['web_key' => $value]],
+            ['rtorrent' => ['url' => "https://kepler.feralhosting.com/rpc?token=$value"]], ['rtorrent' => ['url' => "https://kepler.feralhosting.com/rpc#$value"]]] as $clients) {
+            $threw = false;
+            try {
+                Services::normalize($base + ['clients' => $clients]);
+            } catch (CliError $e) {
+                $threw = strpos($e->getMessage() . $e->hint, $value) === false;
+            }
+            check($threw, 'accepted, or the refusal echoed the value: ' . json_encode($clients));
+        }
+        $threw = false;
+        try {
+            Services::normalize($base + ['account_auth' => $value]);
+        } catch (CliError $e) {
+            $threw = strpos($e->getMessage(), 'account_auth must be secret:<handle>') !== false && strpos($e->getMessage() . $e->hint, $value) === false;
+        }
+        check($threw, 'an inline account_auth was accepted or echoed');
+    },
+    'services setup: a tunnel service with only TCP client endpoints installs a key line with permitopen; one that also has a socket gets none' => function () {
+        $fx = svFixture();
+        try {
+            foreach (['tun1' => '{"qbittorrent":{"port":12345}}', 'tun2' => '{"rtorrent":{"socket":"~/.rtorrent.socket"},"qbittorrent":{"port":12346}}'] as $nick => $clients) {
+                list($code, , $out) = svRun($fx, ['add', $nick, '--host', BR_HOST, '--user', 'xyzjohn', '--transport', 'tunnel', '--clients', $clients]);
+                check($code === 0, "add $nick: $out");
+                svRun($fx, ['setup', $nick], ['PIKKUMIES_REMOTE_PASSWORD' => BR_LOGIN]); // the fake ssh runs no port forwards, so its proof fails; the line is the oracle
+            }
+            $keys = (array) @file($fx['remote'] . '/.ssh/authorized_keys', FILE_IGNORE_NEW_LINES);
+            check(count(preg_grep('#^restrict,port-forwarding,permitopen="127\.0\.0\.1:12345",command="/bin/false" ssh-ed25519 #', $keys)) === 1, 'tun1 line: ' . json_encode($keys));
+            check(count(preg_grep('#^restrict,port-forwarding,command="/bin/false" ssh-ed25519 #', $keys)) === 1 && count(preg_grep('#12346#', $keys)) === 0,
+                'tun2 (a socket too) must keep the plain line: ' . json_encode($keys));
+        } finally {
+            stDone($fx);
+        }
+    },
+    'services keys: a tunnel key gets permitopen for each TCP client endpoint; a socket, an https url or none leaves the line as it was; a bad endpoint refuses' => function () {
+        require_once dirname(__DIR__) . '/pikkumies/tools/seedbox/services/ServicesKeys.php';
+        $plain = 'restrict,port-forwarding,command="/bin/false" ssh-ed25519 AAAA pikkumies-box';
+        $line = function (array $clients) {
+            return ServicesKeys::keyLine('tunnel', 'box', false, 'ssh-ed25519', 'AAAA', ServicesKeys::permitOpen(['clients' => $clients]));
+        };
+        check($line(['rtorrent' => ['endpoint' => 'tcp://127.0.0.1:5000']]) === 'restrict,port-forwarding,permitopen="127.0.0.1:5000",command="/bin/false" ssh-ed25519 AAAA pikkumies-box',
+            $line(['rtorrent' => ['endpoint' => 'tcp://127.0.0.1:5000']]));
+        check($line(['qbittorrent' => ['port' => 12345], 'deluge' => ['endpoint' => '[::1]:58846']])
+            === 'restrict,port-forwarding,permitopen="127.0.0.1:12345",permitopen="[::1]:58846",command="/bin/false" ssh-ed25519 AAAA pikkumies-box', 'port and IPv6');
+        foreach ([[], ['rtorrent' => ['socket' => '~/private/rtorrent/.socket', 'data' => null]], ['rtorrent' => ['endpoint' => '/srv/fixtureuserx/.rtorrent.socket']],
+            ['rtorrent' => ['endpoint' => 'unix:///srv/fixtureuserx/.rtorrent.socket']], ['rtorrent' => ['url' => 'https://kepler.feralhosting.com/xyzjohnny/rtorrent/rpc']],
+            ['rtorrent' => ['socket' => '~/private/rtorrent/.socket'], 'qbittorrent' => ['port' => 12345]],
+            ['rtorrent' => ['endpoint' => '/srv/fixtureuserx/.rtorrent.socket'], 'deluge' => ['endpoint' => 'tcp://127.0.0.1:58846']]] as $c) {
+            check($line($c) === $plain, 'changed for ' . json_encode($c) . ': ' . $line($c));
+        }
+        foreach ([['rtorrent' => ['endpoint' => 'tcp://127.0.0.1:99999']], ['rtorrent' => ['endpoint' => 'tcp://127.1:5000']], ['rtorrent' => ['port' => 'abc']],
+            ['rtorrent' => ['endpoint' => 'tcp://a"b:5000']]] as $c) {
+            $threw = false;
+            try {
+                $line($c);
+            } catch (CliError $e) {
+                $threw = strpos($e->getMessage(), 'nothing was set up') !== false;
+            }
+            check($threw, 'a bad endpoint did not refuse: ' . json_encode($c));
+        }
+        check(ServicesKeys::keyLine('pikkumies', 'box', false, 'ssh-ed25519', 'AAAA', ['127.0.0.1:5000'])
+            === 'restrict,command="' . ServicesKeys::SERVE . ' box" ssh-ed25519 AAAA pikkumies-box', 'a pikkumies key line must not change');
+        check(ServicesKeys::keyLine('shell', 'box', false, 'ssh-ed25519', 'AAAA', ['127.0.0.1:5000']) === 'no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA pikkumies-box', 'shell line');
+    },
 ];

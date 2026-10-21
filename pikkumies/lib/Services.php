@@ -13,6 +13,7 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/SshLists.php';
 require_once __DIR__ . '/ToolProc.php';
 require_once __DIR__ . '/PathName.php';
+require_once __DIR__ . '/Secrets.php'; // Secrets::HANDLE_RE for clients.<c>.auth and account_auth
 
 class Services
 {
@@ -24,6 +25,13 @@ class Services
     const USER_RE = '/^[a-z_][a-z0-9_.-]{0,31}\z/';
     /** One remote command word for the forced command (serve.php tokenizes the same way): no quote, space or shell character. */
     const TOKEN_RE = '/^[A-Za-z0-9._:\/@%+=,~-]{1,512}\z/';
+    /**
+     * A clients key shaped like a secret (password, passkey, api_key, rpc_token, cookie, basic_auth...), refused so it never sits
+     * in services.jsonl in plain text (ADR-0105); `auth` itself is allowed and must be secret:<handle>. A shape, not a list of
+     * names: an innocent-looking key (login, pw) still cannot be told apart from a user name, so the README claims no more.
+     */
+    const SECRET_KEY_RE = '/pass|secret|token|key|cookie|auth/';
+    const SECRET_HINT = 'a password or API key lives only in the encrypted store (ADR-0085): the user adds it in their own terminal with `secrets set <handle> --host <host>`, and the entry names it as "secret:<handle>"';
 
     /** Test seams: the local directory and the settings file read for ssh.deny/ssh.allow. */
     public static $localDir = null;
@@ -185,9 +193,9 @@ class Services
             if (!in_array($c, self::CLIENTS, true) || !is_array($conf)) {
                 throw new CliError("unknown client $c", 'clients: ' . implode(', ', self::CLIENTS));
             }
-            $clients[$c] = array_filter($conf, function ($v) {
+            $clients[$c] = self::client($c, array_filter($conf, function ($v) {
                 return is_scalar($v) || $v === null;
-            });
+            }));
         }
         $notes = isset($s['notes']) ? Cli::cleanString((string) $s['notes']) : '';
         $home = isset($s['home']) ? (string) $s['home'] : '';
@@ -208,7 +216,51 @@ class Services
                 $out[$k] = $s[$k];
             }
         }
+        if (isset($s['account_auth']) && $s['account_auth'] !== '') { // Bytesized's read-only accounts API key (ADR-0105)
+            $out['account_auth'] = self::secretRef($s['account_auth'], 'account_auth');
+        }
         return $out;
+    }
+
+    /**
+     * One clients.<c> entry: no key that would hold a secret in plain text, `auth` only as "secret:<handle>", a `url` without
+     * user:password@, a `user` with no colon, space or control character (it goes into a basic-auth header). Never echoes a value.
+     */
+    private static function client($c, array $conf)
+    {
+        foreach (array_keys($conf) as $k) {
+            $lk = strtolower((string) $k);
+            if ($lk !== 'auth' && preg_match(self::SECRET_KEY_RE, $lk) !== 0) { // an engine error refuses too
+                throw new CliError("clients.$c.$k would keep a secret in the services list in plain text; nothing was saved", self::SECRET_HINT);
+            }
+        }
+        if (isset($conf['auth'])) {
+            $conf['auth'] = self::secretRef($conf['auth'], "clients.$c.auth");
+        }
+        if (isset($conf['url']) && strpbrk((string) $conf['url'], '?#') !== false) {
+            throw new CliError("clients.$c.url holds a query or fragment, where a token would sit in the services list in plain text; nothing was saved",
+                'give the plain https address the provider documents; ' . self::SECRET_HINT);
+        }
+        if (isset($conf['url']) && preg_match('#^[A-Za-z][A-Za-z0-9+.-]*://[^/?\#]*@#', (string) $conf['url']) !== 0) {
+            throw new CliError("clients.$c.url carries a user or login (user:...@), which would sit in the services list in plain text; nothing was saved",
+                'give the address without it; the user goes in clients.' . $c . '.user and ' . self::SECRET_HINT);
+        }
+        if (isset($conf['user']) && !preg_match('/^[^:\x00-\x20\x7f]{1,128}\z/', (string) $conf['user'])) {
+            throw new CliError("clients.$c.user must be 1-128 characters with no colon, space or control character", 'the login name the provider documents for that client');
+        }
+        return $conf;
+    }
+
+    /**
+     * "secret:<handle>" (Secrets::HANDLE_RE), or a CliError naming $field; the given value is never echoed (it may be the secret
+     * itself). Also checked where a record is read for use, since services.jsonl can be edited by hand.
+     */
+    public static function secretRef($v, $field)
+    {
+        if (!is_string($v) || strncmp($v, 'secret:', 7) !== 0 || !preg_match(Secrets::HANDLE_RE, substr($v, 7))) {
+            throw new CliError("$field must be secret:<handle>, never the secret itself; it was not saved or used", self::SECRET_HINT);
+        }
+        return $v;
     }
 
     /** Refuses a host on ssh.deny, and with ssh.blockUnknown one not on ssh.allow (ADR-0068). */

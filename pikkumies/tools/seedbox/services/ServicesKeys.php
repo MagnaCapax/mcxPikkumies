@@ -47,14 +47,61 @@ class ServicesKeys
         return [$m[1], $m[2]];
     }
 
-    /** The authorized_keys line for $transport (comment pikkumies-<label>, which also names it for removal). */
-    public static function keyLine($transport, $label, $allowDelete, $type, $b64)
+    /**
+     * The authorized_keys line for $transport (comment pikkumies-<label>, which also names it for removal). $permitOpen: the
+     * "host:port" list from permitOpen(), each a permitopen= option on a tunnel key, so it forwards only there (ADR-0105).
+     */
+    public static function keyLine($transport, $label, $allowDelete, $type, $b64, array $permitOpen = [])
     {
         $tail = "$type $b64 pikkumies-$label";
         if ($transport === 'pikkumies') {
             return 'restrict,command="' . self::SERVE . " $label" . ($allowDelete ? ' --allow-delete' : '') . "\" $tail";
         }
-        return $transport === 'tunnel' ? "restrict,port-forwarding,command=\"/bin/false\" $tail" : "no-agent-forwarding,no-X11-forwarding $tail";
+        if ($transport !== 'tunnel') {
+            return "no-agent-forwarding,no-X11-forwarding $tail";
+        }
+        $opens = '';
+        foreach ($permitOpen as $hp) {
+            $opens .= ',permitopen="' . $hp . '"';
+        }
+        return "restrict,port-forwarding$opens,command=\"/bin/false\" $tail";
+    }
+
+    /**
+     * The TCP endpoints a tunnel key may forward to, as permitopen takes them ("127.0.0.1:5000", "[::1]:5000"): each client's
+     * `endpoint` written tcp://H:P or H:P, or its `port` alone (127.0.0.1:P). A unix socket, an https `url` or no endpoint adds
+     * none. sshd applies permitopen to TCP forwards and, once any is set, refuses every unix-socket forward of that key too
+     * (OpenSSH channels.c, open_match and channel_permit_all; ADR-0105), so a service with ANY socket endpoint (a `socket` key,
+     * or an `endpoint` that is a path) gets none: permitopen would silently take its socket forward away. A malformed TCP
+     * endpoint refuses, never a silently unscoped key.
+     */
+    public static function permitOpen(array $svc)
+    {
+        $out = [];
+        $socket = false;
+        foreach (isset($svc['clients']) && is_array($svc['clients']) ? $svc['clients'] : [] as $c => $conf) {
+            $socket = $socket || (is_array($conf) && isset($conf['socket']) && is_string($conf['socket']) && $conf['socket'] !== '');
+            $ep = is_array($conf) && isset($conf['endpoint']) && is_string($conf['endpoint']) ? $conf['endpoint'] : '';
+            if ($ep === '' && is_array($conf) && isset($conf['port']) && $conf['port'] !== null && $conf['port'] !== '') {
+                $ep = '127.0.0.1:' . $conf['port'];
+            }
+            if ($ep !== '' && (in_array($ep[0], ['/', '~'], true) || preg_match('#^(unix|file)://#i', $ep))) {
+                $socket = true; // a socket path: no TCP forward, and no permitopen for this key at all
+                continue;
+            }
+            if ($ep === '' || (strpos($ep, '://') !== false && stripos($ep, 'tcp://') !== 0)) {
+                continue; // another kind of address: no TCP forward
+            }
+            $hp = stripos($ep, 'tcp://') === 0 ? substr($ep, 6) : $ep;
+            $m = [];
+            $host = preg_match('#^(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+):([0-9]{1,5})\z#', $hp, $m) ? SshLists::host($m[1]) : null;
+            if ($host === null || (int) $m[2] < 1 || (int) $m[2] > 65535) {
+                throw new CliError("clients.$c endpoint " . json_encode($ep) . ' is not a TCP host:port the key could be limited to; nothing was set up',
+                    'write it as tcp://127.0.0.1:<port> (or a unix socket path), then run setup again');
+            }
+            $out[] = (strpos($host, ':') !== false ? "[$host]" : $host) . ':' . (int) $m[2];
+        }
+        return $socket ? [] : array_values(array_unique($out));
     }
 
     /** Makes key$suffix / key$suffix.pub in $dir (ed25519, no passphrase); returns [type, base64]. */

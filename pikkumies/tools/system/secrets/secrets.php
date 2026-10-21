@@ -6,7 +6,7 @@
  * a terminal and kept nowhere, so the agent cannot unlock: the user does, in their own terminal.
  */
 $lib = dirname(__DIR__, 3) . '/lib';
-foreach (['Config', 'Cli', 'CliHuman', 'SecretFile', 'ToolProc', 'Secrets', 'SecretsCache'] as $c) {
+foreach (['Config', 'Cli', 'CliHuman', 'SecretFile', 'ToolProc', 'SshLists', 'Secrets', 'SecretsCache'] as $c) {
     require_once "$lib/$c.php";
 }
 require_once __DIR__ . '/SecretsInput.php';
@@ -26,11 +26,12 @@ try {
 }
 
 $usage = <<<'U'
-usage: php secrets.php status | unlock [--ttl 8h] | lock | list | set <handle> [--kind password|apikey|token]
-       | rotate <handle> | remove <handle> --with-data | passphrase-change
+usage: php secrets.php status | unlock [--ttl 8h] | lock | list | set <handle> [--kind password|apikey|token] [--host H[/path/]]
+       | rotate <handle> [--host H[/path/]] | remove <handle> --with-data | passphrase-change
        | use <handle> --env NAME [--any-command] -- <command...>
   Values are typed at the terminal (not shown) or piped on stdin, never put on the command line.
   unlock and passphrase-change ask for the passphrase at a terminal: the user runs them in their own terminal.
+  --host pins the secret to the one host (and path prefix) a tool may send it to; only set and rotate write it, with a value.
 U;
 
 $iso = function ($t) {
@@ -45,6 +46,27 @@ $change = function ($args, $mustExist) {
             $mustExist ? 'list the handles with `secrets list`' : "to replace its value use `secrets rotate $h`");
     }
     return [$h, $data, $key, $env, $checked];
+};
+// --host H or H/path/prefix/: where a tool may send this secret (ADR-0105), as Secrets::parsePin() reads it: ['host', 'path'],
+// or null when not given. Read before the value, so a bad pin never consumes a typed or piped value.
+$pinOf = function (array $opt) {
+    if (!isset($opt['host'])) {
+        return null;
+    }
+    $pin = is_string($opt['host']) ? Secrets::parsePin($opt['host']) : null;
+    if ($pin === null) {
+        throw new CliError('--host takes the host the secret may be sent to, e.g. box.example.com, or a host and path prefix, e.g. server.example.com/user/'
+            . ' (plain characters, no %, no empty, . or .. part); nothing was stored', 'type the address you know for that box, the way its provider documents it');
+    }
+    return $pin;
+};
+// The stored entry with $pin applied: host and path replace the old pin together (no path: any path on that host).
+$withPin = function (array $entry, $pin) {
+    if ($pin === null) {
+        return $entry;
+    }
+    unset($entry['host'], $entry['path']);
+    return $entry + ['host' => $pin['host']] + ($pin['path'] !== null ? ['path' => $pin['path']] : []);
 };
 $save = function ($h, array $data, $key, array $env, $expect) {
     Secrets::write($data, $key, $env['kdf']);
@@ -113,34 +135,40 @@ Cli::run($argv, [
         sodium_memzero($key);
         $out = [];
         foreach ($data['secrets'] as $h => $s) {
-            $out[] = ['handle' => (string) $h, 'kind' => $s['kind'], 'added_at' => $s['added_at'], 'rotated_at' => $s['rotated_at']];
+            $out[] = ['handle' => (string) $h, 'kind' => $s['kind'], 'added_at' => $s['added_at'], 'rotated_at' => $s['rotated_at'],
+                'host' => isset($s['host']) ? $s['host'] : null, 'path' => isset($s['path']) ? $s['path'] : null];
         }
         usort($out, function ($a, $b) {
             return strcmp($a['handle'], $b['handle']);
         });
         return ['records' => $out, 'status' => ['total' => count($out)]];
     },
-    'set' => function ($args, $opt) use ($change, $save, $iso) {
+    'set' => function ($args, $opt) use ($change, $save, $iso, $pinOf, $withPin) {
         $kind = isset($opt['kind']) ? $opt['kind'] : 'password';
         if (!in_array($kind, Secrets::KINDS, true)) {
             throw new CliError('--kind is password, apikey or token', 'leave it out for password');
         }
+        $pin = $pinOf($opt);
         list($h, $data, $key, $env, $checked) = $change($args, false);
         $v = SecretsInput::value($h);
-        $data['secrets'][$h] = ['value' => $v, 'kind' => $kind, 'added_at' => $iso(Secrets::now()), 'rotated_at' => null];
+        $data['secrets'][$h] = $withPin(['value' => $v, 'kind' => $kind, 'added_at' => $iso(Secrets::now()), 'rotated_at' => null], $pin);
         $ok = $save($h, $data, $key, $env, $v);
         sodium_memzero($v);
-        return ['records' => [['handle' => $h, 'kind' => $kind, 'added_at' => $data['secrets'][$h]['added_at'], 'passphrase_checked' => $checked]], 'status' => ['verified' => $ok]];
+        return ['records' => [['handle' => $h, 'kind' => $kind, 'added_at' => $data['secrets'][$h]['added_at'],
+            'host' => $pin !== null ? $pin['host'] : null, 'path' => $pin !== null ? $pin['path'] : null, 'passphrase_checked' => $checked]],
+            'status' => ['verified' => $ok]];
     },
-    'rotate' => function ($args) use ($change, $save, $iso) {
+    'rotate' => function ($args, $opt) use ($change, $save, $iso, $pinOf, $withPin) {
+        $pin = $pinOf($opt); // a new pin only together with a new value; without --host the old pin stays
         list($h, $data, $key, $env, $checked) = $change($args, true);
         $v = SecretsInput::value($h);
         $prev = Secrets::keepPrev(); // only once the new value is in hand
-        $data['secrets'][$h] = array_merge($data['secrets'][$h], ['value' => $v, 'rotated_at' => $iso(Secrets::now())]);
+        $data['secrets'][$h] = $withPin(array_merge($data['secrets'][$h], ['value' => $v, 'rotated_at' => $iso(Secrets::now())]), $pin);
         $ok = $save($h, $data, $key, $env, $v);
         sodium_memzero($v);
-        return ['records' => [['handle' => $h, 'rotated_at' => $data['secrets'][$h]['rotated_at'], 'previous_store' => Config::shown($prev),
-            'passphrase_checked' => $checked]], 'status' => ['verified' => $ok]];
+        return ['records' => [['handle' => $h, 'rotated_at' => $data['secrets'][$h]['rotated_at'], 'host' => isset($data['secrets'][$h]['host']) ? $data['secrets'][$h]['host'] : null,
+            'path' => isset($data['secrets'][$h]['path']) ? $data['secrets'][$h]['path'] : null,
+            'previous_store' => Config::shown($prev), 'passphrase_checked' => $checked]], 'status' => ['verified' => $ok]];
     },
     'remove' => function ($args, $opt) use ($change, $save) {
         if (empty($opt['with-data'])) {
@@ -179,4 +207,4 @@ Cli::run($argv, [
         sodium_memzero($v);
         return ['records' => [['handle' => $h, 'env' => $name] + $r], 'status' => ['exit_code' => $r['exit_code']]];
     },
-], $usage, ['any-command', 'with-data'], ['env', 'kind', 'ttl']);
+], $usage, ['any-command', 'with-data'], ['env', 'kind', 'ttl', 'host']);
