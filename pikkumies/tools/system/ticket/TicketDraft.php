@@ -3,7 +3,7 @@
  * A support ticket draft (ADR-0089): exactly what will be posted, saved once under local/state/ticket/<id>.json through
  * lib/DraftStore.php (mode 0400, named by its own sha256, never sent twice). Subject, message and text attachments go
  * through lib/Redact.php first. Attachments are files the user named, read when the draft is made, so a file changed
- * after the user saw the draft cannot go out under that yes. The account email is remembered in local/state/ticket/email.
+ * after the draft was made cannot go out under the user's request. The account email is remembered in local/state/ticket/email.
  */
 require_once dirname(__DIR__, 3) . '/lib/DraftStore.php';
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
@@ -108,7 +108,7 @@ class TicketDraft
         return [$json, $p];
     }
 
-    /** What the user sees before saying yes: where it goes, from which email, subject, message start, service, files. */
+    /** What the send review and the answer show: where it goes, from which email, subject, message start, service, files. */
     public static function summary(array $p, $bytes)
     {
         $start = function_exists('mb_strcut') ? mb_strcut($p['message'], 0, 400, 'UTF-8') : substr($p['message'], 0, 400);

@@ -2,7 +2,7 @@
 
 Opens a Pulsed Media support ticket from inside Pikkumies, with your Pulsed Media AI key, so you do not need to log in to the client area for a question about your service.
 
-You type `/ticket` and say what is wrong. The agent writes a subject and a message in your words, and shows you the draft: where it goes, the account email, the subject, how the message starts, the service, the priority and any files you named to attach, with their sizes. Common password and key forms are removed from the subject, the message and attached text and log files before the draft is saved; that catches the usual forms, not every secret, so read the draft before sending it. Images and PDFs are sent as they are. Nothing else is attached: no conversation, no system information.
+You type `/ticket` and say what is wrong. The agent writes a subject and a message in your words, and saves the draft: where it goes, the account email, the subject, how the message starts, the service, the priority and any files you named to attach, with their sizes. Common password and key forms are removed from the subject, the message and attached text and log files before the draft is saved; that catches the usual forms, not every secret, so keep passwords out of what you ask it to send. Images and PDFs are sent as they are. Nothing else is attached: no conversation, no system information.
 
 The ticket needs the email of your Pulsed Media account (the owner's, or a user's who may open tickets) next to the key. The agent says once that it needs it, and remembers it in `~/pikkumies/local/state/ticket/email` once you give it. On a Pulsed Media seedbox the ticket names this account's service; elsewhere you can name the service or leave it out.
 

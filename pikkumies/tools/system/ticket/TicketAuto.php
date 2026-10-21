@@ -5,7 +5,7 @@
  * 2026-10-20); read from local/config.php, never the overlay. The guard lets such a ticket through only when its draft
  * is exactly what `ticket bundle` makes (checkFiles) and carries this account's processes and files only; the send
  * verb then holds one lock over the cap check, the request and its auto.jsonl line, at most AUTO_PER_DAY attempts in
- * 24 hours and never the same subject twice in 24 hours. A ticket the user asked for always waits for their yes.
+ * 24 hours and never the same subject twice in 24 hours. A ticket the user asked for goes only when the user's own words cover the send (ADR-0101).
  */
 require_once dirname(__DIR__, 3) . '/lib/Config.php';
 require_once dirname(__DIR__, 3) . '/lib/ConfigureTiers.php';

@@ -1,11 +1,11 @@
 <?php
 /**
- * SendGuard: the check shared by the hook units that hold a send to Pulsed Media until the user's yes (pre_tool_call,
+ * SendGuard: the check shared by the hook units that hold a send to Pulsed Media until the user's own words cover it (pre_tool_call,
  * ADR-0030): guard/feedback-send (ADR-0056) and guard/ticket-send (ADR-0089). The terminal command exactly
  * `php <this Pikkumies' tool> send <id>`, alone, the path absolute (or ~/) and canonical, gets an approve whose message
  * the unit builds from the draft file itself; the orchestrator's ask policy never passes it on to Hermes: the call is
- * blocked until the review finds the user's own yes in the chat, and blocked outright where no yes can be checked
- * (ADR-0073). Under --yolo, the default run mode, the same review decides. At depth 2 or more (an agent started by an
+ * blocked until the review finds that the user's own words in the chat cover the send, and blocked outright where they cannot be checked
+ * (ADR-0073, ADR-0101). Under --yolo, the default run mode, the same review decides. At depth 2 or more (an agent started by an
  * agent) it is blocked here: that agent's "user" messages are agent-written, so no request can be checked. One exception, for /ticket only (ADR-0100): a plain send that the unit's
  * $alone check accepts (a ticket the agent bundled, with ticket.auto on) runs without a question, before that block.
  * Blocked: a path to the tool followed by `send`, the sender's class names
