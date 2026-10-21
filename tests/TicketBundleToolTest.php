@@ -205,7 +205,10 @@ return [
                 $p = bundleDraft($tree, $id);
                 $label = ['root' => 'root (running as root', 'sudo' => 'sudo (passwordless sudo', 'none' => 'none (no root'][$c[0]];
                 check(is_array($p) && $p['bundle']['process_scope'] === $c[4] && $p['bundle']['privilege'] === $c[0] && strpos($sys, "- Privilege: $label") !== false, json_encode($c) . " $id " . substr($sys, 0, 700));
-                check($c[7] === '' ? strpos($sys, 'skipped') === false : strpos($sys, "(system-wide reads skipped: {$c[7]})") !== false, json_encode($c) . ' skip note');
+                // The bare word "skipped" also turns up in real /var/log content (anacron, cron.daily, NetworkManager, ...)
+                // that root or sudo privilege legitimately attaches (ADR-0100): match the one marker TicketBundleRun
+                // writes, never a plain substring search over a whole log attachment it does not control.
+                check($c[7] === '' ? strpos($sys, '(system-wide reads skipped: ') === false : strpos($sys, "(system-wide reads skipped: {$c[7]})") !== false, json_encode($c) . ' skip note');
                 check(strpos($sys, '- Hostname: box.example.org (box)') !== false && strpos($sys, '- IP addresses: 192.0.2.10') !== false, 'hostname and address');
                 $ps = array_values(array_filter(array_map('json_decode', file("$tree/argv.jsonl")), function ($a) {
                     return in_array('ps', $a, true);
