@@ -2,8 +2,8 @@
 /**
  * The feedback send's question (ADR-0056, amendment 2026-10-19): it opens with where it goes and what goes (the whole
  * conversation transcript, its newest 1.5 MB, or none, and system information), then size, file and the start of the
- * text, and the whole question passes HookUnits::approveShown(); one that cannot fit is a block. With approvals off
- * (HERMES_YOLO_MODE) or at depth 2 or more the plain send is blocked and the user is given the command to run.
+ * text, and the whole question passes HookUnits::approveShown(); one that cannot fit is a block. At depth 2 or more
+ * (an agent started by an agent) the plain send is blocked and reported as skipped; --yolo is no reason to block.
  */
 require_once dirname(__DIR__) . '/pikkumies/tools/system/feedback/FeedbackDraft.php';
 require_once dirname(__DIR__) . '/pikkumies/tools/system/feedback/FeedbackPrompt.php';

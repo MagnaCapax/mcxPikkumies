@@ -8,7 +8,7 @@ The ticket needs the email of your Pulsed Media account (the owner's, or a user'
 
 It is sent when you asked for a ticket: the safety check reviews the send against your own words ([ADR-0101](../../../../docs/adr/0101-refuse-and-report-never-ask.md)), and the answer shows where it went, from which email, for which service, with which files, and how the text starts. You get the ticket number back, and your account gets the usual new-ticket email. A sent draft is kept, marked sent, and never sent twice. If sending fails, the draft stays and the error says whether trying again later can help. When the key or the email is not accepted, the answer is the same whichever it was, so check both.
 
-With approvals turned off (`pikkumies run --yolo`), or in an agent started by another agent, the agent cannot send a ticket: your words cannot be checked there. It says so and keeps the draft.
+In an agent started by another agent, the agent cannot send a ticket: your words cannot be checked there. It says so and keeps the draft. Under `--yolo`, the default run mode, a send goes through the same check as any other.
 
 The check before sending catches the agent's own and casual sends. It is a safety prompt, not a security boundary: an agent steered by text it reads could still post a ticket some other way, as it could run curl.
 

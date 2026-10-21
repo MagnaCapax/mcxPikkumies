@@ -20,7 +20,7 @@ php /home/USER/pikkumies/pikkumies/tools/system/ticket/ticket.php send 012345678
 ```
 
 - The send path must be absolute (as in the last line, with your own home directory) or start with `~/`, and point at this Pikkumies' own tool with no symlink in it; any other form is blocked.
-- With approvals off (`HERMES_YOLO_MODE`, set by `--yolo`) or at `PIKKUMIES_DEPTH` 2 or more, the agent's `send` is blocked: the user's words cannot be checked there. The agent reports it as skipped and keeps the draft. A question that would not fit what the ask review can show in full (a very long email or file names) is blocked the same way.
+- At `PIKKUMIES_DEPTH` 2 or more (an agent started by an agent) the agent's `send` is blocked: the user's words cannot be checked there. The agent reports it as skipped and keeps the draft. Under `--yolo` (`HERMES_YOLO_MODE`), the default run mode, the send goes through the same review as any other. A question that would not fit what the ask review can show in full (a very long email or file names) is blocked the same way.
 - A ticket opened this way carries no authority for account changes: for a cancellation, refund, transfer, or a change of the account email or owner, support asks for a client-area login.
 - Drafts stay until you remove them (`rm ~/pikkumies/local/state/ticket/<id>.json`). The remembered email: `~/pikkumies/local/state/ticket/email`; pass `--email` again to change it.
 - A bundle's diagnosis file is Markdown with `## Problem`, `## Error`, `## Impact`, `## Tried` and `## Roadblocks`; each roadblock is a bullet `- <kind>: <why you could not do it>`, the kind one of `root`, `console`, `fleet`, `billing`, `platform`, `code`, `memory`. Other sections (`## Searched`, `## Next step`) are kept in the attachment.

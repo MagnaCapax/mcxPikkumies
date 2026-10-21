@@ -1,7 +1,7 @@
 ---
 name: feedback-send
 event: pre_tool_call
-description: Holds a /feedback send until the user's own request covers it (the ask policy reviews it as a send and refuses it otherwise; the refusal is reported, ADR-0073, ADR-0101); blocked under --yolo or in an agent started by an agent; the other forms of a feedback send it can see are blocked.
+description: Holds a /feedback send until the user's own request covers it (the ask policy reviews it as a send and refuses it otherwise; the refusal is reported, ADR-0073, ADR-0101); blocked in an agent started by an agent; the other forms of a feedback send it can see are blocked.
 failClosed: true
 timeout: 3
 ---
