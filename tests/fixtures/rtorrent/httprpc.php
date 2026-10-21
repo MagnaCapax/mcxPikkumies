@@ -25,11 +25,13 @@ function hrFixture(array $secrets = ['feral1-rpc' => [HR_SECRET, HR_HOST]])
         skip('this PHP has no sodium extension');
     }
     $dir = testTempDir('pk-httprpc');
-    $fx = ['dir' => $dir, 'vault' => "$dir/local/secrets/vault.enc", 'log' => "$dir/requests.jsonl"];
-    foreach (['run' => 0700, 'shm' => 01777, 'local' => 0700] as $k => $mode) {
+    $fx = ['dir' => $dir, 'vault' => "$dir/local/secrets/vault.enc", 'log' => "$dir/requests.jsonl", 'oldHome' => getenv('HOME')];
+    foreach (['home' => 0700, 'run' => 0700, 'shm' => 01777, 'local' => 0700] as $k => $mode) {
         @mkdir("$dir/$k", 0700, true);
         chmod("$dir/$k", $mode);
     }
+    // The run dir must be outside HOME: the suite's temp dir can be inside the real home.
+    putenv('HOME=' . "$dir/home");
     Secrets::$vaultFile = $fx['vault'];
     SecretsCache::$runtimeBase = "$dir/run";
     SecretsCache::$shmDir = "$dir/shm";
@@ -53,6 +55,7 @@ function hrDone(array $fx)
     Secrets::$vaultFile = Secrets::$now = SecretsCache::$runtimeBase = SecretsCache::$shmDir = null;
     Services::$localDir = Services::$configFile = null;
     ServicesRemote::$requester = null;
+    putenv('HOME=' . $fx['oldHome']);
     testRmTree($fx['dir']);
 }
 

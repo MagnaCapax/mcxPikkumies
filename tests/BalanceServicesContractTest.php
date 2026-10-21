@@ -28,9 +28,9 @@ function bsctFixture()
     foreach ([$lib, $serveDir, $bin, $local] as $d) {
         mkdir($d, 0700, true);
     }
-    // All six files are THIS repo's own real, currently-checked-out copies -- read-only, into a
+    // All seven files are THIS repo's own real, currently-checked-out copies -- read-only, into a
     // throwaway temp fixture; none of them is written back, and none is part of this patch.
-    foreach (['Cli.php', 'Config.php', 'SshLists.php', 'ToolProc.php', 'Services.php', 'PathName.php'] as $f) {
+    foreach (['Cli.php', 'Config.php', 'SshLists.php', 'ToolProc.php', 'Services.php', 'PathName.php', 'Secrets.php'] as $f) {
         copy(dirname(__DIR__) . "/pikkumies/lib/$f", "$lib/$f");
     }
     copy(dirname(__DIR__) . '/pikkumies/tools/seedbox/services/ServeGate.php', "$serveDir/ServeGate.php");
