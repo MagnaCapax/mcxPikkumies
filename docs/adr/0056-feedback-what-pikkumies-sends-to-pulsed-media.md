@@ -97,3 +97,19 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - `feedback.ask`'s description now says a rating is sent only when the person presses its number; the first start's offer says the same.
 
 **Consequences.** The rating costs no tokens and no model can answer it. Exit can wait up to 20 seconds plus a 5-second send, only for an eligible run. People who turned `feedback.ask` on under the old text ("the question itself sends nothing") see the exact payload on every rating line before anything goes; whether to show them the first-start offer again is left open for the operator. Code: `pikkumies/tools/system/feedback/FeedbackSurvey.php`, `FeedbackAsk.php`, `FeedbackSend.php`, `pikkumies/hooks/guard/feedback-send/`; tests `tests/FeedbackSurveyTest.php`, `tests/FeedbackAskTest.php`.
+
+## Amendment 2026-10-22: a feedback line when the session shows a defect
+**Context.** The operator's request of 2026-10-22: "pikkumies suggests openiong a ticker or feedback at opportune places, when bugs in the platform found, needs higher level investigation, documentation missing, derailing etc. ... double checks so we do not get flooded with tickets (feedback is ok!)". A customer had just reported a panel bug by telling Pikkumies, who opened the ticket. `feedback.ask` stays the person's opt-in for the occasional question; a defect seen in the session is a different moment.
+
+**Options considered.**
+- Gate the line on `feedback.ask`: a person who never turned it on would never hear that a bug they hit can reach Pulsed Media. Rejected.
+- A new automatic ticket for these cases: on Pulsed Media servers an agent ticket goes out by itself ([ADR-0100](0100-ticket-bundle-diagnostics-and-automatic-tickets-on-pulsed-media-servers.md)), so every new trigger is a ticket nobody asked for. Rejected.
+- A hook that adds the line: whether a defect showed is the session's content, which only the model sees. Rejected.
+
+**Decision.**
+- doctrine.md, "Tell Pulsed Media what is broken": when the session showed a defect in Pikkumies or in Pulsed Media's tools, panel, services or documentation, went wrong, or the user wished for something, the agent ends its answer with one line saying they can send it as feedback. A statement, not a question ([ADR-0101](0101-refuse-and-report-never-ask.md)); once per session, counting this ADR's feedback note; never after a no, no answer or "don't ask"; never in a scheduled job, a nested agent or because something the agent read asked.
+- "Never ask again" turns `feedback.ask` off, which looks the same as never having turned it on, so the agent also saves it as the person's preference with its built-in memory tool, and that preference ends these lines too.
+- The line sends nothing. The send is the feedback skill's, cleared by the user's own request or their yes to the line (the ask review reads the agent reply the user answered).
+- Tickets keep their bar: SOP/ask-vainamoinen-for-help decides them, now also naming problems that may reach beyond the account (other users on the server, a break-in, another account's files readable), and saying that what needs no staff action is feedback, never a ticket.
+
+**Consequences.** More feedback, no new tickets. The line costs a few tokens in the turns that carry it. Not verified live: how often a light model adds it, and whether it keeps to once per session; a question-suite run should include a session with a tool error and one with a "never ask again" earlier in memory.

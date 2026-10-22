@@ -12,6 +12,8 @@ Ask when one of these holds:
 
 Never ask before searching: a ticket that the documentation already answers costs the user a wait and Pulsed Media a reply.
 
+A problem that may reach beyond this account (the user says others on the server see it too, signs of a break-in, another account's files readable from here) also needs Pulsed Media: search and review as below, then ask. What needs no staff action on this account (a tool bug you worked around, a missing or wrong page, a wish) is feedback, never a ticket (doctrine.md, "Tell Pulsed Media what is broken").
+
 ## 2. Search every place first
 
 Search each, and write down for each what you searched (the exact words) and what it gave (the page or lesson, or nothing):
