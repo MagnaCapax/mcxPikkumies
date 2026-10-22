@@ -298,11 +298,13 @@ $approve = [
         => ['exposure', 'launches containers whose ports other accounts or the internet can reach'],
     '/\b(pkill|killall|kill)\b.*\b(rootlesskit|dockerd|containerd)\b|\bsystemctl\b.*\b(stop|restart|kill)\b.*\bdocker(\.service|\.socket)?\b/s'
         => ['stop', 'stops or restarts the container daemon'],
+    // A write over a named file is a delete, not a load test: the ask policy runs a load unreviewed (review 2026-10-22).
+    '/\bdd\b(?=[^;&|\n]*\bof=(?!\/dev\/null\b))(?=[^;&|\n]*\b(bs|count)=)/' => ['delete', 'dd writes over the named file'],
+    '/(^|[\s;&|(`\/"\',\[])fio(?=[\s"\',\])])(?=[^;&|\n]*--filename[=\s])(?![^;&|\n]*--readonly\b)/' => ['delete', 'fio writes to the named file or device'],
     // Load tests (ADR-0020 amendment): cron runs are refused like every approve.
     "/\\bphp\\b.*{$v}heavy\\b/s" => ['load', 'a heavy performance test through a Pikkumies tool'],
     '/^(?!\s*(which|type|command\s+-v|man)\s)(?=.*(^|[\s;&|(`\/"\',\[])(fio|iperf3?|speedtest(-cli)?|yabs(\.sh)?|stress(-ng)?|sysbench|bonnie\+\+)(?=[\s"\',\])]|$)(?!\s+(--version|--help|-v|-V|-h)\s*($|[;&|])))/s'
         => ['load', 'a benchmark or load test'],
-    '/\bdd\b(?=[^;&|\n]*\bof=(?!\/dev\/null\b))(?=[^;&|\n]*\b(bs|count)=)/' => ['load', 'a large test write with dd'],
     // imap and pop delete exact messages on the server (ADR-0053); their --expect is also caught below.
     "/\\b(imap|pop)\\.php\\b.*{$v}delete\\b/s" => ['delete', 'deletes mail on the server'],
     "/\\brclone\\b.*$v(sync|bisync|move|moveto|purge|delete|deletefile|rmdirs?|cleanup|dedupe)\\b/s" => ['delete', 'rclone can delete or overwrite files'],

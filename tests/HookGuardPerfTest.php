@@ -29,7 +29,9 @@ return [
             ['stress-ng --cpu 4 --timeout 60', 'approve', 'load'],
             ['sysbench cpu run', 'approve', 'load'],
             ['bonnie++ -d ~/tmp', 'approve', 'load'],
-            [$dd, 'approve', 'load'],
+            [$dd, 'approve', 'delete'], // writes over a named file: reviewed as a delete, never run as a load
+            ['fio --name=w --rw=write --size=1G --filename=~/data/disk.img', 'approve', 'delete'],
+            ['fio --name=r --rw=randread --size=1G --filename=~/data/disk.img --readonly', 'approve', 'load'],
             ["$p check", 'none'],
             ["$p check --symptom slow-download", 'none'],
             ["$p disk", 'none'],
