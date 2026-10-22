@@ -375,7 +375,7 @@ return [
             list($code, $recs) = containersRun($fx, ['expose', 'web', '--port', '38001', '--public', '--keep-path'], $seams);
             $text = (string) @file_get_contents($fx['home'] . '/.lighttpd/custom.d/pikkumies-web.conf');
             check($code === 0 && $recs[0]['url_path'] === '/public-exampleuser/web/' && $recs[0]['access'] === 'public', 'public: ' . json_encode($recs));
-            check(strpos($text, '"^/web($|/)"') !== false && strpos($text, 'Authorization') === false && strpos($text, 'map-urlpath') === false, "public, kept path:\n$text");
+            check(strpos($text, '"^/web($|/)"') !== false && strpos($text, 'setenv.set-request-header = ( "Authorization" => "" )') !== false && strpos($text, 'map-urlpath') === false, "public, kept path, login header stripped:\n$text");
         } finally {
             containersDone($fx);
         }

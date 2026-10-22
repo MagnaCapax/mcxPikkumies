@@ -12,7 +12,7 @@
  * and only then is the fragment put in place and the real config checked again (a failure removes it). The web server is
  * not restarted here: the platform's lighttpd watchdog restarts it within about two minutes when a fragment is newer
  * than the running server (PMSS root.cron, checkLighttpdInstances.php), the same rule the doctrine keeps for the
- * Docker daemon. The panel login's Authorization header is not passed to the app (an image is someone else's code),
+ * Docker daemon. The panel login's Authorization header is not passed to the app, panel or public (an image is someone else's code),
  * as PMSS does for its own qBittorrent fragment (PMSS ADR-0111). `expose <app> --remove` deletes only a fragment
  * this tool wrote (its first line says so) and prints the line that writes it again.
  * Seams (DockerCli's, plus): user (account name), listener_tables (Host::ownsListener), lighttpd_bin.
@@ -136,9 +136,8 @@ class DockerExpose
             . "# Written by Pikkumies (docker expose): $shown -> 127.0.0.1:$port" . ($public ? ', no panel login' : ', behind the panel login') . ".\n"
             . '# Undo: ' . self::line([$app, '--remove']) . "\n\n"
             . '$HTTP["url"] =~ "^' . $base . "(\$|/)\" {\n";
-        if (!$public) {
-            $text .= '  setenv.set-request-header = ( "Authorization" => "" )' . "\n";
-        }
+        // Every exposed app, panel or public: an image is someone else's code and never sees a panel login.
+        $text .= '  setenv.set-request-header = ( "Authorization" => "" )' . "\n";
         $text .= "  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => $port\n  ) ) ),\n"
             . "  proxy.forwarded = ( \"for\" => 1,\n                      \"host\" => 1,\n                      \"by\" => 1\n  ),\n"
             . "  proxy.header = (\n      \"upgrade\" => \"enable\"";

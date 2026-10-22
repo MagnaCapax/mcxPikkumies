@@ -7,9 +7,9 @@
  * neighbours' paths at all: a neighbour's page on the same origin could script the account's own panel.
  *
  * Answers ('action'):
- *  - auth:  continue with this account's Authorization added. Only for /user-<self>/ and /public-<self>/, and only
+ *  - auth:  continue with this account's Authorization added. Only for /user-<self>/, and only
  *           when the page asking is the account's own (both the requesting frame's document and the top-level
- *           document are on one of those prefixes) or the request is a top-level GET navigation the CLI asked for.
+ *           document are on that prefix) or the request is a top-level GET navigation the CLI asked for.
  *           A redirect keeps the login only when the hop it came from carried it. A foreign page's or frame's img,
  *           fetch, iframe or form POST to the own prefix, or a foreign site's redirect to it, goes out without the
  *           login, so it gets the 401 and the guard cancels it.
@@ -17,7 +17,9 @@
  *           routes, and any path that is not plain once decoded (dot segment, backslash, a second encoding, a
  *           control character), because nginx decodes and resolves those before it picks the account's location.
  *  - strip: continue with any Authorization header removed. Every other site, and the own routes that need no
- *           panel login from the browser (/~<self>/, /webdav-<self>/, /deluge-<self>/).
+ *           panel login from the browser (/~<self>/, /public-<self>/, /webdav-<self>/, /deluge-<self>/). /public-<self>/
+ *           asks for no login and hosts third-party apps (Servarr, Jellyfin, `docker expose --public`), so the panel
+ *           password never goes there.
  */
 class WebGuardDecision
 {
@@ -56,8 +58,8 @@ class WebGuardDecision
 
     /**
      * kind: external (not http(s)/ws(s) on a panel host), bad (not a plain path once decoded), foreign (on the panel
-     * host, outside the own routes), own (an own route without the browser login), login (/user-<self>/ or
-     * /public-<self>/). why: the reason for bad/foreign. prefix: the first raw path segment, at most 64 bytes.
+     * host, outside the own routes), own (an own route without the browser login), login (/user-<self>/). why: the
+     * reason for bad/foreign. prefix: the first raw path segment, at most 64 bytes.
      */
     public static function classify($url, $self, array $hosts)
     {
@@ -86,12 +88,12 @@ class WebGuardDecision
             return $bad('dot segment in the path');
         }
         $named = preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/', (string) $self) === 1; // no name: nothing is own
-        foreach ($named ? ['user-', 'public-'] : [] as $route) {
+        foreach ($named ? ['user-'] : [] as $route) {
             if (self::under($path, '/' . $route . $self)) {
                 return ['kind' => 'login', 'why' => null, 'prefix' => $prefix];
             }
         }
-        foreach ($named ? ['~', 'webdav-', 'deluge-'] : [] as $route) {
+        foreach ($named ? ['~', 'public-', 'webdav-', 'deluge-'] : [] as $route) {
             if (self::under($path, '/' . $route . $self)) {
                 return ['kind' => 'own', 'why' => null, 'prefix' => $prefix];
             }

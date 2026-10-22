@@ -21,11 +21,12 @@ return [
         $cases = [
             // [url, extra request fields, expected action, what it shows]
             ["$p/user-exampleuser/", ['mainNav' => true, 'cli' => true], 'auth', 'the CLI opens the own panel'],
-            ["$p/public-exampleuser/sonarr/", ['mainNav' => true, 'cli' => true], 'auth', 'the CLI opens an own public app'],
+            ["$p/public-exampleuser/sonarr/", ['mainNav' => true, 'cli' => true], 'strip', 'an own public app asks no login: the panel password never goes there'],
             ["$p/user-exampleuser/", ['mainNav' => true], 'strip', 'a navigation nobody asked for, from a blank tab'],
             ["$p/user-exampleuser/", ['mainNav' => true, 'cli' => true, 'method' => 'POST'], 'strip', 'the CLI never navigates with POST'],
             ["$p/user-exampleuser/x.js", ['type' => 'Script', 'top' => $own, 'frame' => $own], 'auth', 'the own page loads its own script'],
-            ["$p/public-exampleuser/sonarr/api", ['type' => 'XHR', 'top' => "$p/public-exampleuser/sonarr/", 'frame' => "$p/public-exampleuser/sonarr/"], 'auth', 'an own public app calls its API'],
+            ["$p/public-exampleuser/sonarr/api", ['type' => 'XHR', 'top' => "$p/public-exampleuser/sonarr/", 'frame' => "$p/public-exampleuser/sonarr/"], 'strip', 'an own public app calls its API without the panel login'],
+            ["$p/user-exampleuser/api", ['type' => 'XHR', 'top' => "$p/public-exampleuser/app/", 'frame' => "$p/public-exampleuser/app/"], 'strip', 'a third-party app on the own public path cannot use the panel login'],
             ["$p/user-exampleuser/img", ['type' => 'Image', 'top' => $foreign, 'frame' => $foreign], 'strip', 'a foreign page\'s img'],
             ["$p/user-exampleuser/api", ['type' => 'Fetch', 'top' => $foreign, 'frame' => $foreign], 'strip', 'a foreign page\'s fetch'],
             ["$p/user-exampleuser/post", ['method' => 'POST', 'mainNav' => true, 'top' => $foreign, 'frame' => $foreign], 'strip', 'a foreign page\'s form POST'],
