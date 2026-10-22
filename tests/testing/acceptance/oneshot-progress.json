@@ -1,0 +1,299 @@
+{
+    "feature": "ADR-0109: one-shot progress lines, --no-progress, --stats",
+    "note": "Run by the weekly QA run's acceptance stage as the throwaway account, after the candidate install and the QA key. {bin} is the account's pikkumies. stderr lines are prefixed with the epoch second they arrived (LIVE wrapper) where a case checks that lines arrive while the run works. Patterns are PCRE; a case passes when every expectation holds.",
+    "cases": [
+        {
+            "id": "UC01",
+            "actor": "operator (Vainamoinen agent)",
+            "journey": "asks over ssh without a terminal with --no-progress --stats and the question on stdin",
+            "command": "{bin} --no-progress --stats --prompt-file - <<'Q'\nHow much disk space is used in my home directory? Answer in one short sentence.\nQ",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "\\S",
+                "stderr_re": [
+                    "^wall time +\\d",
+                    "^model requests +\\d+",
+                    "^tool calls +\\d+",
+                    "^tokens +in \\d+, out \\d+"
+                ],
+                "stderr_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] ",
+                    "\\{\"type\""
+                ],
+                "stdout_not_re": [
+                    "\\{\"type\"",
+                    "^wall time"
+                ]
+            }
+        },
+        {
+            "id": "UC02",
+            "actor": "customer",
+            "journey": "pipes a several-step question and watches the step lines arrive while the agent works",
+            "command": "LIVE {bin} 'List the three biggest files in my home directory and tell me how much disk space is free.' | cat",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "\\S",
+                "stderr_re": [
+                    "^\\d+ \\[\\d\\d:\\d\\d:\\d\\d\\] (ran|read|searched files for) "
+                ],
+                "stderr_span_min": 3,
+                "stdout_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ]
+            }
+        },
+        {
+            "id": "UC03",
+            "actor": "customer",
+            "journey": "pipes the same kind of question with --no-progress",
+            "command": "{bin} --no-progress 'How much disk space is free? One sentence.' | cat",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "\\S",
+                "stderr_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] ",
+                    "↳"
+                ]
+            }
+        },
+        {
+            "id": "UC04",
+            "actor": "other-system (Claude Code remote skill)",
+            "journey": "runs the documented run chat --query-file - call",
+            "command": "{bin} run chat --query-file - <<'Q'\nWhat is today's date on this server? One line.\nQ",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "\\S",
+                "stdout_not_re": [
+                    "\\{\"type\""
+                ],
+                "stderr_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ]
+            }
+        },
+        {
+            "id": "UC05",
+            "actor": "other-system (ticket job)",
+            "journey": "runs run chat with its own --format stream-json and parses the raw stream",
+            "command": "{bin} run chat --query-file - --format stream-json <<'Q'\nHow many files are in my home directory (not recursive)? One line.\nQ",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": [
+                    "^\\{\"type\": ?\"system\"",
+                    "^\\{\"type\": ?\"result\""
+                ],
+                "stderr_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ]
+            }
+        },
+        {
+            "id": "UC06",
+            "actor": "customer",
+            "journey": "types a question with --stats on a real terminal",
+            "command": "script -qec \"timeout 40 {bin} --stats 'say hello in one word'\" /dev/null",
+            "timeout": 120,
+            "expect": {
+                "stdout_re": "--no-progress and --stats are for a one-shot question"
+            }
+        },
+        {
+            "id": "UC07",
+            "actor": "customer",
+            "journey": "asks the agent to write a config file with a token in it and run a command with a password argument",
+            "command": "{bin} 'Create the file ~/accept-uc07.conf containing the line api_token=uc07SECRETvalue12345 and then run: mysql --version --password=uc07PASSWORDvalue || true' | cat; rm -f ~/accept-uc07.conf",
+            "timeout": 900,
+            "expect": {
+                "stderr_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] (wrote|edited|ran) "
+                ],
+                "stderr_not_re": [
+                    "uc07SECRETvalue12345",
+                    "uc07PASSWORDvalue"
+                ]
+            }
+        },
+        {
+            "id": "UC08",
+            "actor": "customer",
+            "journey": "asks the agent to read a file that does not exist",
+            "command": "{bin} 'Read the file ~/this-file-does-not-exist-uc08.txt with your file reading tool and tell me what it says.' | cat",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "\\S",
+                "stderr_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] read .*this-file-does-not-exist-uc08"
+                ]
+            }
+        },
+        {
+            "id": "UC09",
+            "actor": "customer",
+            "journey": "runs a question with the halt guard on and sees any continue said on stderr, never mixed into stdout",
+            "command": "{bin} 'Make a directory ~/accept-uc09, put three small text files in it, then list them.' | cat; rm -rf ~/accept-uc09",
+            "timeout": 1200,
+            "expect": {
+                "stdout_re": "\\S",
+                "stdout_not_re": [
+                    "Not finished, continuing",
+                    "^Wrapping up"
+                ]
+            }
+        },
+        {
+            "id": "UC10",
+            "actor": "customer",
+            "journey": "resumes the session from the session_id line with a follow-up question",
+            "command": "id=$({bin} --no-progress 'Remember the word kantele. Reply OK.' 2>&1 >/dev/null | sed -n 's/^session_id: //p' | tail -1); test -n \"$id\" && {bin} --no-progress --resume \"$id\" 'Which word did I ask you to remember? One word.' | cat",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "(?i)kantele"
+            }
+        },
+        {
+            "id": "UC11",
+            "actor": "customer",
+            "journey": "runs a piped question under LANG=C with stderr to a file",
+            "command": "LANG=C LC_ALL=C {bin} 'How much disk space is free? One sentence.' 2>~/accept-uc11.err | cat; cat ~/accept-uc11.err >&2; rm -f ~/accept-uc11.err",
+            "timeout": 900,
+            "expect": {
+                "stdout_re": "\\S",
+                "stderr_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ],
+                "stderr_not_re": [
+                    "\\x1b",
+                    "❌",
+                    "↳"
+                ]
+            }
+        },
+        {
+            "id": "UC12",
+            "actor": "customer",
+            "journey": "types --stats with no question",
+            "command": "{bin} --stats </dev/null | cat; echo \"exit=${PIPESTATUS[0]}\"",
+            "timeout": 60,
+            "expect": {
+                "stdout_re": "exit=[1-9]",
+                "stderr_re": [
+                    "--stats needs a question"
+                ]
+            }
+        },
+        {
+            "id": "UC13",
+            "actor": "customer",
+            "journey": "the candidate installed over the latest release shows a clean doctor and the switches work",
+            "command": "{bin} doctor >/dev/null && {bin} --stats 'Reply with the single word ready.' | cat",
+            "timeout": 900,
+            "expect": {
+                "exit": 0,
+                "stdout_re": "(?i)ready",
+                "stderr_re": [
+                    "^Hermes runs +\\d"
+                ]
+            }
+        },
+        {
+            "id": "UC14",
+            "actor": "customer",
+            "journey": "asks a question that makes the agent start a helper agent",
+            "command": "{bin} --stats 'Use your delegate_task tool to start one helper agent that reports the free disk space, then tell me what it found.' | cat",
+            "timeout": 1200,
+            "expect": {
+                "stderr_re": [
+                    "started a helper:",
+                    "^model requests +\\d+"
+                ]
+            }
+        },
+        {
+            "id": "UC15",
+            "actor": "other-system (an agent started Pikkumies)",
+            "journey": "runs a piped question with PIKKUMIES_DEPTH=1 set as an agent would",
+            "command": "PIKKUMIES_DEPTH=1 {bin} 'How much disk space is free? One sentence.' | cat",
+            "timeout": 900,
+            "expect": {
+                "stdout_re": "\\S",
+                "stderr_not_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ]
+            }
+        },
+        {
+            "id": "UC16",
+            "actor": "customer",
+            "journey": "asks with an unreachable model endpoint for this run",
+            "command": "{bin} -m no-such-model-uc16 'hello' | cat; echo \"exit=${PIPESTATUS[0]}\"",
+            "timeout": 300,
+            "expect": {
+                "stderr_re": [
+                    "❌ Hermes"
+                ]
+            }
+        },
+        {
+            "id": "UC17",
+            "actor": "customer",
+            "journey": "the run is killed while it works",
+            "command": "timeout -s KILL 25 {bin} 'Count slowly from 1 to 50 using the terminal tool, one sleep 1 per number.' | cat; true",
+            "timeout": 120,
+            "expect": {
+                "stderr_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] ran "
+                ]
+            }
+        },
+        {
+            "id": "UC18",
+            "actor": "customer",
+            "journey": "with the halt guard turned off a piped question still shows its steps",
+            "command": "cp ~/pikkumies/local/config.php ~/accept-uc18.bak; php -r '$f=getenv(\"HOME\").\"/pikkumies/local/config.php\";$c=is_file($f)?include $f:[];$c[\"halt\"][\"disabled\"]=true;file_put_contents($f,\"<?php return \".var_export($c,true).\";\\n\");'; {bin} 'How much disk space is free? One sentence.' | cat; mv ~/accept-uc18.bak ~/pikkumies/local/config.php",
+            "timeout": 900,
+            "expect": {
+                "stdout_re": "\\S",
+                "stderr_re": [
+                    "^\\[\\d\\d:\\d\\d:\\d\\d\\] "
+                ],
+                "stderr_not_re": [
+                    "Not finished, continuing"
+                ]
+            }
+        },
+        {
+            "id": "UC19",
+            "actor": "customer",
+            "journey": "sees narration lines under the steps, and none once the day's narration calls are used up",
+            "command": "{bin} 'List the files in my home directory and say how many there are.' | cat; cp ~/pikkumies/local/config.php ~/accept-uc19.bak; php -r '$f=getenv(\"HOME\").\"/pikkumies/local/config.php\";$c=is_file($f)?include $f:[];$c[\"hooks\"][\"dailyCalls\"][\"narrate\"]=0;file_put_contents($f,\"<?php return \".var_export($c,true).\";\\n\");'; {bin} 'How many files are in my home directory? One line.' 2>&1 >/dev/null | grep -c 'no more narration today' >&2; mv ~/accept-uc19.bak ~/pikkumies/local/config.php",
+            "timeout": 1200,
+            "expect": {
+                "stderr_re": [
+                    "↳ ",
+                    "^1$"
+                ]
+            }
+        },
+        {
+            "id": "UC20",
+            "actor": "customer",
+            "journey": "puts --no-progress alone in an alias and starts an interactive session on a terminal",
+            "command": "script -qec \"timeout 20 {bin} --no-progress\" /dev/null; true",
+            "timeout": 60,
+            "expect": {
+                "stdout_not_re": [
+                    "--stats needs a question"
+                ]
+            }
+        }
+    ]
+}

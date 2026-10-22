@@ -235,6 +235,8 @@ return [
             'tools/approval_context.py' => ['_VALID_MODES = ("manual", "smart", "off")'],                    // ADR-0073: we set off
             'hermes_cli/config.py' => ['def _deep_merge('],                                                   // ADR-0020: approvals.mode alone keeps the other defaults
             'hermes_cli/_parser.py' => ['_query_group.add_argument("--query-file"'],                          // ADR-0052: the launcher's --prompt-file is chat's --query-file
+            'hermes_cli/stream_json.py' => ['{"type": "tool_use", "name": name}', '"tokens": {"input":', 'agent.tool_progress_callback = self.on_tool_progress'], // ADR-0109: what StreamProgress reads
+            'hermes_state_common.py' => ['api_call_count INTEGER DEFAULT 0,', 'parent_session_id TEXT'],          // ADR-0109: --stats model requests
         ];
         foreach ($facts as $file => $needles) {
             $text = (string) @file_get_contents($src . '/' . $file);

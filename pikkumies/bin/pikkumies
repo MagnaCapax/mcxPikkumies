@@ -116,7 +116,7 @@ function promptWrite($text)
     fwrite(STDOUT, $text);
 }
 
-list($cmd, $passArgs) = Launch::route($argv);
+list($cmd, $passArgs, $runOpts) = Launch::routeWithOptions($argv) + [2 => null]; // $runOpts: a question's output switches (ADR-0109)
 if ($cmd === 'error') { // a launcher flag without its value (ADR-0052): nothing is started
     out('Not starting: ' . $passArgs[0]);
     exit(2);
@@ -661,6 +661,28 @@ switch ($cmd) {
             $runKey = bin2hex(random_bytes(8));
             putenv('PIKKUMIES_RUN=' . $runKey);
             SessionCounters::resetRun(Config::localDir(), $runKey);
+        }
+        $oneShot = isset($passArgs[0]) && $passArgs[0] === 'chat' && (!Launch::isTty(STDIN) || !Launch::isTty(STDOUT));
+        if (!$oneShot && is_array($runOpts) && ($runOpts['noProgress'] || $runOpts['stats'])) {
+            fwrite(STDERR, "--no-progress and --stats are for a one-shot question (output to a pipe or a file); starting the session.\n");
+        }
+        // A question on the prompt path, not on a terminal and without a caller's own --format (ADR-0109): Hermes writes
+        // stream-json, Pikkumies prints a line per step on stderr (with a light-model narration line, off with
+        // --no-progress or when an agent started Pikkumies) and the answer on stdout; --stats prints the run's figures.
+        // Judged by the halt guard unless it is off (ADR-0047 amendment 2026-10-22).
+        if (Launch::oneShotRender($passArgs, $runOpts, Launch::isTty(STDIN), Launch::isTty(STDOUT))) {
+            $passArgs[] = '--format=stream-json';
+            require_once dirname(__DIR__) . '/tools/system/credits/CreditsFormat.php';
+            $showProgress = !$runOpts['noProgress'] && NestedAgent::depth() <= 1; // the depth just exported: 1 = the person's own shell
+            $render = new StreamProgress($showProgress, CreditsFormat::utf8Locale(), $showProgress ? StreamProgress::narrator() : null);
+            $usageBefore = $runOpts['stats'] ? HermesUsage::snapshot() : null;
+            $runStarted = microtime(true);
+            $code = HaltRun::run(hermesBin(), $passArgs, $render);
+            if ($runOpts['stats']) {
+                $requests = HermesUsage::requests($usageBefore, $render->sessionId());
+                fwrite(STDERR, implode("\n", StreamProgress::statsLines($render->stats(), microtime(true) - $runStarted, $requests)) . "\n");
+            }
+            exit($code);
         }
         // A seeded prompt answered-and-exited (not a TTY on stdin or stdout, Hermes' own behaviour,
         // ADR-0022): pre_verify may never fire for this turn (it only fires after a file edit), so

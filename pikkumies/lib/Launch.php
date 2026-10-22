@@ -40,6 +40,16 @@ class Launch
      */
     public static function route(array $argv)
     {
+        return array_slice(self::routeWithOptions($argv), 0, 2);
+    }
+
+    /**
+     * route() plus a third element: the one-shot output options (ADR-0109) when the words were a question, `--` text or a
+     * prompt file: ['noProgress' => bool, 'stats' => bool]; null for everything else, the
+     * `run` passthrough included, whose words reach Hermes unchanged (ADR-0033).
+     */
+    public static function routeWithOptions(array $argv)
+    {
         if (!isset($argv[1])) {
             return ['run', []];
         }
@@ -47,33 +57,37 @@ class Launch
             return ['help', []];
         }
         if ($argv[1] === '--') {
-            return ['run', self::promptArgs(array_slice($argv, 2))];
+            return self::prompt(self::promptArgs(array_slice($argv, 2)));
         }
         // Leading RunFlags pairs: everything after them is prompt text, a subcommand name too; `--` may end them. With a prompt file, no words.
         if (RunFlags::isFlag($argv[1])) {
-            list($flags, $words, $error) = RunFlags::peel(array_slice($argv, 1));
+            list($flags, $words, $error, $switches) = RunFlags::peel(array_slice($argv, 1));
             if ($error !== '') {
                 return ['error', [$error]];
             }
             $words = isset($words[0]) && $words[0] === '--' ? array_slice($words, 1) : $words;
-            return ['run', array_merge(['chat'], $flags, array_slice(self::promptArgs($words), 1))];
+            $args = array_merge(['chat'], $flags, array_slice(self::promptArgs($words), 1));
+            if ($switches['stats'] && !self::hasQuestion($args)) {
+                return ['error', ['--stats needs a question, for example: pikkumies --stats how much disk space do I have']];
+            }
+            return self::prompt($args, $switches);
         }
         $rest = array_slice($argv, 2);
         // `tmux` or `tmux <number>`; "tmux kill my session" is a prompt.
         if ($argv[1] === 'tmux') {
-            return $rest === [] || (count($rest) === 1 && ctype_digit($rest[0])) ? ['tmux', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+            return $rest === [] || (count($rest) === 1 && ctype_digit($rest[0])) ? ['tmux', $rest] : self::prompt(self::promptArgs(array_slice($argv, 1)));
         }
         // `browse up|down|status`: the isolated browser (tools/system/browse); "browse the web for X" is a prompt.
         if ($argv[1] === 'browse') {
-            return count($rest) === 1 && in_array($rest[0], ['up', 'down', 'status'], true) ? ['browse', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+            return count($rest) === 1 && in_array($rest[0], ['up', 'down', 'status'], true) ? ['browse', $rest] : self::prompt(self::promptArgs(array_slice($argv, 1)));
         }
         // `access status|rotate|remove`: the agent's own panel login (PanelAccess, ADR-0079); "access my files" is a prompt.
         if ($argv[1] === 'access') {
-            return count($rest) === 1 && in_array($rest[0], ['status', 'rotate', 'remove'], true) ? ['access', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+            return count($rest) === 1 && in_array($rest[0], ['status', 'rotate', 'remove'], true) ? ['access', $rest] : self::prompt(self::promptArgs(array_slice($argv, 1)));
         }
         // `websearch on|off|status`: the person's switch for web search (WebSearch, ADR-0082); "websearch cats" is a prompt.
         if ($argv[1] === 'websearch') {
-            return count($rest) === 1 && in_array($rest[0], ['on', 'off', 'status'], true) ? ['websearch', $rest] : ['run', self::promptArgs(array_slice($argv, 1))];
+            return count($rest) === 1 && in_array($rest[0], ['on', 'off', 'status'], true) ? ['websearch', $rest] : self::prompt(self::promptArgs(array_slice($argv, 1)));
         }
         if (Eternal::enabled() && $argv[1] === 'ask' && ($rest === [] || (count($rest) === 1 && strncmp($rest[0], '--nonce=', 8) === 0 && strlen($rest[0]) > 8))) {
             return ['ask', $rest];
@@ -98,7 +112,7 @@ class Launch
         if (($script = self::toolScript($argv[1])) !== '') {
             return ['tool', array_merge([$script], array_slice($argv, 2))];
         }
-        return ['run', self::promptArgs(array_slice($argv, 1))];
+        return self::prompt(self::promptArgs(array_slice($argv, 1)));
     }
 
     /**
@@ -145,6 +159,33 @@ class Launch
             }
         }
         return true;
+    }
+
+    /** ['run', $args] with the one-shot options when $args carry a question (--query= or --query-file=), else none. */
+    private static function prompt(array $args, array $switches = null)
+    {
+        return ['run', $args, self::hasQuestion($args) ? ($switches === null ? ['noProgress' => false, 'stats' => false] : $switches) : null];
+    }
+
+    /**
+     * Whether a run is a prompt-path question Pikkumies renders itself (ADR-0109): chat args, stdin or stdout not a
+     * terminal, routed with options (a question), and no --format of the caller's own.
+     */
+    public static function oneShotRender(array $passArgs, $runOpts, $stdinTty, $stdoutTty)
+    {
+        require_once __DIR__ . '/HaltRun.php'; // formatArgs; only this function needs it
+        return isset($passArgs[0]) && $passArgs[0] === 'chat' && (!$stdinTty || !$stdoutTty) && is_array($runOpts) && HaltRun::formatArgs($passArgs) === [];
+    }
+
+    /** Whether chat args carry the question itself (--query=, --query-file=), as opposed to flags for a session. */
+    public static function hasQuestion(array $args)
+    {
+        foreach ($args as $a) {
+            if (strncmp((string) $a, '--query=', 8) === 0 || strncmp((string) $a, '--query-file=', 13) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

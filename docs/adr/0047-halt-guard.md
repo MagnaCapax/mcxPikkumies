@@ -60,3 +60,9 @@ Question-suite run 3 asked "is there a way to make rTorrent load a watched file 
 ## References
 - [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md) (hook units, the hook log, the merge rules this ADR extends to `pre_verify`), [ADR-0028](0028-search-first-every-turn-and-a-light-model-for-hooks.md) (search-first's own light-model use, the same pattern `HookLlm::chat` already follows), ADR-0044 (the command log this ADR reads as evidence)
 - Hermes v2026.9.24: `agent/turn_stop_gates.py`, `agent/verify_hooks.py`, `agent/shell_hooks.py`, `agent/turn_context.py`, `hermes_cli/hooks.py`, `hermes_cli/goals.py`, `hermes_cli/_parser.py`, `hermes_cli/oneshot.py`
+
+## Amendment 2026-10-22: the prompt-path one-shot prints a session id and is judged ([ADR-0109](0109-one-shot-progress-and-stats.md))
+
+- The Decision bullet above says a plain-text one-shot prints no session id and is not judged, while the Consequences say the wrapper covers the one-shot path end to end. From ADR-0109 on, a question on the prompt path (`pikkumies <question>` or `--prompt-file`, no terminal, no `--format` of the caller's own) runs as `--format=stream-json`, so it prints a session id and is judged, as the Consequences said. `pikkumies run chat ...` without a `--format` stays plain text and unjudged.
+- Cost, unchanged per judged turn: one light-model call per judged turn and at most 3 continues and one wrap-up, on the user's own endpoint and credits. `halt.disabled` still turns it off; the question then still gets its progress lines.
+- Output on that path: stdout carries the answer of the first run and of each continue, a blank line between them; the wrap-up turn's text goes to stderr; the steps "Not finished, continuing (1 of 3)" and "Wrapping up" are said on stderr.

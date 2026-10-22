@@ -11,12 +11,17 @@
  * Every Hermes run here carries PIKKUMIES_ONESHOT=1 (HookAsync::ONESHOT_ENV): the interval hook units' records are still
  * kept, but post_llm_call starts no background run, which could never be shown and would take the run a check made at
  * the end of the judged turn needs (ADR-0067).
+ * With a StreamProgress renderer (a one-shot question on the prompt path, ADR-0109) the runs are `--format=stream-json`:
+ * the renderer prints progress on stderr, each answering run's text goes to stdout (a blank line between), the wrap-up
+ * turn's text goes to stderr, and the halt guard's steps are said on stderr. That path also comes here with the halt
+ * guard off; then Hermes runs once and nothing is judged.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/HaltState.php';
 require_once __DIR__ . '/HaltJudge.php';
 require_once __DIR__ . '/HookAsync.php';
 require_once __DIR__ . '/Antipatterns.php';
+require_once __DIR__ . '/StreamProgress.php';
 
 class HaltRun
 {
@@ -26,10 +31,16 @@ class HaltRun
     const START_FAILED = 'Could not start Hermes. If the prompt is long (over about 128 KB), it does not fit on a command line:'
         . " put it in a file, `pikkumies --prompt-file FILE`, or send it on stdin with `pikkumies --prompt-file -`.\n";
 
-    /** Runs $hermesBin with $passArgs (['chat', '--query=...']), judging and resuming as needed; returns the exit code. */
-    public static function run($hermesBin, array $passArgs)
+    /**
+     * Runs $hermesBin with $passArgs (['chat', '--query=...']), judging and resuming as needed; returns the exit code.
+     * $render: a StreamProgress for a prompt-path question (ADR-0109), else null (plain passthrough, judged as before).
+     */
+    public static function run($hermesBin, array $passArgs, ?StreamProgress $render = null)
     {
-        list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs);
+        list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs, $render);
+        if ($render !== null && !empty(Config::load()['halt']['disabled'])) {
+            return $code; // halt guard off: the question still gets its progress lines, nothing is judged
+        }
         if ($sessionId === '') {
             return $code; // no session id in the output (plain text answer): nothing to judge against
         }
@@ -53,7 +64,11 @@ class HaltRun
             HaltState::logDecision($sessionId, 'oneshot', 0, $verdict, 0, $continuesLeft === 0); // no continue left after this one (ADR-0102)
             if ($verdict['verdict'] === 'continue' && $continuesLeft > 0) {
                 $continuesLeft--;
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
+                if ($render !== null) {
+                    $render->say('Not finished, continuing (' . (self::MAX_CONTINUES - $continuesLeft) . ' of ' . self::MAX_CONTINUES . ')');
+                }
+                // after the wrap-up turn, a further continue is still wrap-up talk, not an answer: stderr (ADR-0109)
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $render, $wrappedUp);
                 continue;
             }
             if ($verdict['verdict'] === 'done-wrapup' && !$wrappedUp) {
@@ -61,7 +76,10 @@ class HaltRun
                 if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $sessionId)) {
                     return $code; // unattended: the answer is out; the wrap-up runs on its own (ADR-0103)
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail));
+                if ($render !== null) {
+                    $render->say('Wrapping up');
+                }
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $render, true);
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
             }
             if ($applied['resume'] !== null && !$wrappedUp) {
@@ -69,7 +87,10 @@ class HaltRun
                 if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail), $sessionId)) {
                     return $code;
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail));
+                if ($render !== null) {
+                    $render->say('Wrapping up');
+                }
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail), $render, true);
                 continue; // same single wrap-up slot as done-wrapup above: ADR-0047's bound stays 3 continues + 1 final resume
             }
             return $code;
@@ -121,9 +142,11 @@ class HaltRun
      * --usage-file is a top-level, one-shot-only flag, and after `chat` it is an unrecognised argument
      * that stops the run (Hermes v0.22.2 hermes_cli/_parser.py). The session id comes from the
      * stream-json `init`/`result` event when the caller asked for `--format=stream-json`.
-     * Returns [exit code, captured output, session id ('' when none was printed or it is not valid)].
+     * Returns [exit code, captured output, session id ('' when none was printed or it is not valid)]. With $render the
+     * stream goes to it instead of stdout; the run's answer text is printed (to stderr for a wrap-up turn, $aside) and
+     * returned as the captured output, and the session id comes from the renderer.
      */
-    private static function exec($hermesBin, array $argv)
+    private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
     {
         $cmd = 'exec ' . escapeshellarg($hermesBin);
         foreach ($argv as $a) {
@@ -133,6 +156,7 @@ class HaltRun
         $env[HookAsync::ONESHOT_ENV] = '1';
         $p = @proc_open($cmd, [0 => STDIN, 1 => ['pipe', 'w'], 2 => STDERR], $pipes, null, $env);
         $output = '';
+        $raw = 0;
         $code = 1;
         $started = is_resource($p);
         if ($started) {
@@ -142,6 +166,11 @@ class HaltRun
                     if (feof($pipes[1])) {
                         break;
                     }
+                    continue;
+                }
+                $raw += strlen($chunk);
+                if ($render !== null) {
+                    $render->feed($chunk);
                     continue;
                 }
                 fwrite(STDOUT, $chunk);
@@ -154,8 +183,20 @@ class HaltRun
             $code = proc_close($p);
         }
         // Not started: proc_open fails (PHP 8.3+, posix_spawn), or the forked child cannot exec sh and exits 127 silently (older PHP).
-        if (!$started || ($code === 127 && $output === '')) {
+        if (!$started || ($code === 127 && $raw === 0)) {
             fwrite(STDERR, self::START_FAILED);
+            return [$code, '', $render !== null ? $render->sessionId() : ''];
+        }
+        if ($render !== null) {
+            $answer = $render->finishRun($code);
+            if ($answer !== '') {
+                // Model-written text reaching a terminal is cleaned of control characters, line breaks kept (ADR-0109): the
+                // wrap-up always goes to stderr, the answer when stdout is a terminal; a pipe or file gets the answer as written.
+                $toTerminal = $aside || (function_exists('stream_isatty') && @stream_isatty(STDOUT));
+                $shown = $toTerminal ? Cli::cleanString(rtrim($answer, "\n")) : rtrim($answer, "\n");
+                fwrite($aside ? STDERR : STDOUT, ($aside ? '' : $render->answerSeparator()) . $shown . "\n");
+            }
+            return [$code, strlen($answer) > self::CAPTURE_MAX ? substr($answer, -self::CAPTURE_MAX) : $answer, $render->sessionId()];
         }
         $output = strlen($output) > self::CAPTURE_MAX ? substr($output, -self::CAPTURE_MAX) : $output;
         return [$code, $output, self::streamSessionId($output)];

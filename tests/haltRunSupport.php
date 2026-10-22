@@ -57,9 +57,11 @@ if (!function_exists('haltRunTree')) {
             . '$chatAt = array_search("chat", $argv, true);' . "\n"
             . 'if ($chatAt !== false) {' . "\n"
             . '    foreach (array_slice($argv, $chatAt + 1) as $a) {' . "\n"
-            . '        if (strpos($a, "--usage-file") === 0) { fwrite(STDERR, "hermes: error: unrecognized arguments: $a\n"); exit(2); }' . "\n"
+            . '        if (strpos($a, "--usage-file") === 0 || $a === "--no-progress" || $a === "--stats") { fwrite(STDERR, "hermes: error: unrecognized arguments: $a\n"); exit(2); }' . "\n"
             . '    }' . "\n"
             . '}' . "\n"
+            // A planned stream-json run (ADR-0109 tests): each event printed as one line, flushed, in order; no result is added.
+            . 'if (isset($step["events"]) && is_array($step["events"])) { foreach ($step["events"] as $ev) { echo is_string($ev) ? $ev : json_encode($ev); echo "\n"; flush(); } exit(isset($step["code"]) ? (int) $step["code"] : 0); }' . "\n"
             . 'echo isset($step["output"]) ? $step["output"] : "";' . "\n"
             // A stream-json run ends with a result event that carries the session id.
             . 'if (!empty($step["session_id"])) { echo "\n" . json_encode(["type" => "result", "session_id" => $step["session_id"], "exit_code" => 0]) . "\n"; }' . "\n"

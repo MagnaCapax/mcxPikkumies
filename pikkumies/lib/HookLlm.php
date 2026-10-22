@@ -4,7 +4,8 @@
  * (Provider::resolve); the model is the light one decided at generate time (local/llm.json,
  * Provider::lightModel). Hooks never call /models. Returns '' on any error, timeout or when
  * hooks.llm.disabled is set, so a hook stays silent rather than slow or wrong.
- * Callers send only what the user typed in this turn; nothing is logged here.
+ * Callers send only what the user typed in this turn, except the one-shot narration (ADR-0109), which sends the agent's own
+ * step lines, already redacted and framed as data; nothing is logged here.
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Provider.php';
