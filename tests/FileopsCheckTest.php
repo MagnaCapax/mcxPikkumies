@@ -11,10 +11,7 @@ if (!function_exists('fileopsTree')) {
     /** A tree with home/data/{a,b} and a copy of lib/ and the unit; returns its directory. */
     function fileopsTree()
     {
-        // A short, fixed-width name: three copies of this path go into one ask message, and on a testing host with a long
-        // temp base a pid-and-random name pushed it past HookUnits::APPROVE_SHOWN, so a case expecting approve saw a block.
-        $tmp = sys_get_temp_dir() . '/f' . bin2hex(random_bytes(3));
-        mkdir($tmp, 0700, true);
+        $tmp = testTempDir('pk-fileops');
         $src = dirname(__DIR__) . '/pikkumies';
         @mkdir("$tmp/pikkumies/lib", 0700, true);
         @mkdir("$tmp/pikkumies/hooks/guard/fileops-check", 0700, true);

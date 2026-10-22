@@ -4,11 +4,17 @@
  * only when several test files need it.
  */
 
-/** A throwaway directory under the system temp dir; remove it with testRmTree() in a finally. */
+/**
+ * A throwaway directory under the system temp dir; remove it with testRmTree() in a finally. The name is short and
+ * fixed-width ('p' and 8 hex digits) whatever $prefix says: hook messages quote paths in these trees and must fit
+ * HookUnits::APPROVE_SHOWN, and a long name (prefix, pid, random) under a testing account's TMPDIR in its home pushed
+ * some past it there while CI's /tmp kept them under. $prefix names the caller's purpose at the call site only.
+ */
 function testTempDir($prefix = 'pk-test')
 {
-    $dir = sys_get_temp_dir() . '/' . $prefix . '-' . getmypid() . '-' . mt_rand();
-    mkdir($dir, 0700, true);
+    do {
+        $dir = sys_get_temp_dir() . '/p' . bin2hex(random_bytes(4));
+    } while (!@mkdir($dir, 0700, true));
     return $dir;
 }
 
