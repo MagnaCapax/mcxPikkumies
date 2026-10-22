@@ -21,6 +21,9 @@ foreach (['SessionRewriteKeys', 'SessionRewriteLocate', 'SessionRewriteEngine', 
 // Test seam: a test may set this before including this file (the same pattern qbittorrent.php's
 // $qbitSecretDir uses), so a backup never lands in the real pikkumies/local/ during a test run.
 $sessionRewriteLocalDir = isset($sessionRewriteLocalDir) ? $sessionRewriteLocalDir : Config::localDir();
+// Test seam, same pattern: a fake /proc for the "client is running" refusal. Never read from the environment, so nothing
+// outside a test can point the refusal at an empty folder.
+$sessionRewriteProcRoot = isset($sessionRewriteProcRoot) ? $sessionRewriteProcRoot : '/proc';
 
 $usage = <<<'TXT'
 usage: php session-rewrite.php rewrite --client rtorrent|qbittorrent|transmission --from <prefix> --to <prefix> [--apply] [--human]
@@ -32,7 +35,7 @@ usage: php session-rewrite.php rewrite --client rtorrent|qbittorrent|transmissio
 TXT;
 
 Cli::run($argv, [
-    'rewrite' => function ($args, $opt) use ($sessionRewriteLocalDir) {
+    'rewrite' => function ($args, $opt) use ($sessionRewriteLocalDir, $sessionRewriteProcRoot) {
         if ($args) {
             throw new CliError('rewrite takes no positional arguments: nothing was changed',
                 'rewrite --client rtorrent|qbittorrent|transmission --from <prefix> --to <prefix> [--apply]');
@@ -60,10 +63,7 @@ Cli::run($argv, [
             throw new CliError('cannot find your home directory ($HOME is not set or not a directory)', 'run the tool as the seedbox user, from a login shell');
         }
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
-        // PIKKUMIES_FAKE_PROC exists for the tests (a fake /proc), the same seam the torrent-client units'
-        // restart proofs use (RtorrentRestart::$proc, QbitProc::$root); unset in production, so the real /proc is read.
-        $procRoot = getenv('PIKKUMIES_FAKE_PROC') ?: '/proc';
-        $running = OwnProcs::pids(Detect::KNOWN_APPS[$client], $uid, $procRoot);
+        $running = OwnProcs::pids(Detect::KNOWN_APPS[$client], $uid, $sessionRewriteProcRoot);
         if ($running) {
             throw new CliError("$client is running (pid " . implode(', ', $running) . '); nothing was changed',
                 "stop $client first (the panel, or the provider's own way; a client's own `restart` verb does not stop it), then run rewrite again");

@@ -2,7 +2,7 @@
 /**
  * tools/torrent-clients/session-rewrite: the `rewrite` CLI end to end (refusal while running, dry-run,
  * --apply with a backup, per-client directory resolution, the deluge refusal). Real files on disk, a fake
- * /proc (PIKKUMIES_FAKE_PROC) so the "client is running" refusal is tested without touching the real /proc,
+ * /proc (the tool's $sessionRewriteProcRoot seam) so the "client is running" refusal is tested without touching the real /proc,
  * and a fixture local/ dir (the tool's $sessionRewriteLocalDir seam) so a backup never lands in the real
  * pikkumies/local/ during this test run.
  */
@@ -34,12 +34,13 @@ function sreScript(array $fx)
     $run = "{$fx['dir']}/run.php";
     file_put_contents($run, '<?php
 $sessionRewriteLocalDir = ' . var_export($fx['local'], true) . ';
+$sessionRewriteProcRoot = ' . var_export($fx['proc'], true) . ';
 require ' . var_export($tool, true) . ';
 ');
     return $run;
 }
 
-/** Runs the tool with HOME and PIKKUMIES_FAKE_PROC set; returns [code, decoded lines, raw output]. */
+/** Runs the tool with HOME set (the fake /proc comes in through sreScript); returns [code, decoded lines, raw output]. */
 function sreRun(array $fx, array $args)
 {
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(sreScript($fx));
@@ -48,7 +49,6 @@ function sreRun(array $fx, array $args)
     }
     $env = getenv();
     $env['HOME'] = $fx['home'];
-    $env['PIKKUMIES_FAKE_PROC'] = $fx['proc'];
     $p = proc_open($cmd, [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, null, $env);
     $out = stream_get_contents($pipes[1]);
     fclose($pipes[1]);
