@@ -68,12 +68,18 @@ class MdRun
         }
     }
 
-    /** File contents under the root prefix, or null; a file only root can read (crypttab) is read with sudo -n cat. */
+    /**
+     * File contents under the root prefix, or null; a file only root can read (crypttab), or one in a directory only root
+     * can enter (the 0700 audit log directory, where file_exists() is false for the account), is read with sudo -n cat.
+     * Without the second case an append under sudo read null and replaced the whole log with its newest line.
+     */
     public static function read($p)
     {
         $full = self::path($p);
         $t = @file_get_contents($full);
-        if ($t === false && file_exists($full) && !is_readable($full) && self::access() === 'sudo') {
+        $dir = dirname($full);
+        $hidden = file_exists($full) ? !is_readable($full) : !(is_readable($dir) && is_executable($dir));
+        if ($t === false && $hidden && self::access() === 'sudo') {
             $r = self::run(['cat', $full]);
             return $r['code'] === 0 ? $r['out'] : null;
         }

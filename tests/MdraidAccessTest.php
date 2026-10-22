@@ -124,4 +124,39 @@ return [
             check(!preg_match('#\bas:? `?sudo php|\bsudo php [~</]#', $text) && strpos($text, 'never `sudo php`') !== false, basename($doc) . ' must say never sudo php, and never tell the agent to run it');
         }
     },
+    'mdraid access: under sudo an audit line is appended to a log the account cannot see, never replacing it' => function () {
+        $root = testTempDir('pk-mdlog');
+        $dir = "$root/var/lib/pikkumies-mdraid";
+        mkdir($dir, 0700, true);
+        file_put_contents("$dir/actions.log", "old line\n");
+        chmod($dir, 0600); // like root's 0700 directory seen from the account: no search permission, file_exists() is false
+        $copied = null;
+        MdRun::$access = 'sudo';
+        MdRun::$exec = function (array $argv) use (&$copied, $dir) {
+            $prog = $argv[0] === 'sudo' ? $argv[2] : $argv[0];
+            if ($prog === 'cat') { // sudo -n cat: root reads through the closed directory
+                chmod($dir, 0700);
+                $t = (string) @file_get_contents(end($argv));
+                chmod($dir, 0600);
+                return ['code' => 0, 'out' => $t];
+            }
+            if ($prog === 'cp') {
+                $copied = (string) file_get_contents($argv[count($argv) - 2]);
+                return ['code' => 0, 'out' => ''];
+            }
+            return ['code' => $prog === 'mkdir' ? 0 : 1, 'out' => ''];
+        };
+        try {
+            testWithEnv(['PIKKUMIES_MDRAID_ROOT' => $root], function () {
+                MdRun::audit('test step', 0);
+            });
+        } finally {
+            MdRun::$exec = null;
+            MdRun::$access = null;
+            chmod($dir, 0700);
+            testRmTree($root);
+        }
+        check(is_string($copied) && strpos($copied, "old line\n") === 0 && substr_count($copied, "\n") === 2 && strpos($copied, 'test step exit=0') !== false,
+            'the new line must be appended after the old one, not replace it: ' . json_encode($copied));
+    },
 ];
