@@ -49,28 +49,36 @@ class Eternal
         return false;
     }
 
+    /** Why the last ready() call said not-ready: no-key, no-credits, busy or start-check; '' otherwise. */
+    public static $why = '';
+
     public static function ready()
     {
+        self::$why = '';
         if (HermesInstall::bin() === '') {
             return 'waiting-for-setup';
         }
         $provider = Provider::resolve(Config::load());
         if (Launch::missingKeyMessage($provider) !== '') {
+            self::$why = 'no-key';
             return 'not-ready';
         }
         require_once __DIR__ . '/../tools/system/credits/CreditsLine.php';
         $credits = CreditsLine::cached($provider, CreditsLine::stateDir(), 600);
         if ($credits !== null && isset($credits['balance']) && $credits['balance'] <= 0) {
+            self::$why = 'no-credits';
             return 'not-ready';
         }
         $runtimeLock = HermesInstall::lock(false);
         if (!$runtimeLock) {
+            self::$why = 'busy';
             return 'not-ready';
         }
         fclose($runtimeLock);
         // The start check runs Hermes, so it needs Pikkumies' Hermes home and pinned layer like every other caller;
         // without them a never-started account fails it and Primary waits forever.
         if (HermesInstall::checkBeforeStart(array_merge(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], HermesConfig::envArgv()))) {
+            self::$why = 'start-check';
             return 'not-ready';
         }
         return '';

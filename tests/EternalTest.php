@@ -54,6 +54,21 @@ return [
             testRmTree($root);
         }
     },
+    'eternal: every not-ready path of ready() names its reason, and the listing carries it to the browser' => function () {
+        $fixture = json_decode(file_get_contents(__DIR__ . '/fixtures/eternals/listing.json'), true);
+        $src = file_get_contents(__DIR__ . '/../pikkumies/lib/Eternal.php');
+        check(preg_match('/public static function ready\(\)\s*\{(.*?)\n    \}/s', $src, $m) === 1, 'ready() not found');
+        $notReady = preg_split("/return 'not-ready';/", $m[1]);
+        array_pop($notReady);
+        check(count($notReady) >= 4, 'expected at least four not-ready paths');
+        foreach ($notReady as $before) {
+            check(preg_match("/self::\\\$why = '([a-z-]+)';\s*$/", $before, $w) === 1, 'a not-ready path in ready() sets no reason');
+            check(in_array($w[1], $fixture['why'], true), 'reason ' . $w[1] . ' outside the listing contract');
+        }
+        $cli = file_get_contents(__DIR__ . '/../pikkumies/lib/EternalCli.php');
+        check(strpos($cli, "\$state === 'not-ready' ? ['why' =>") !== false, 'listing does not report why for not-ready rows');
+        check(in_array('host', $fixture['why'], true) && in_array('unknown', $fixture['why'], true), 'contract lacks host/unknown');
+    },
     'eternal: tmux argv has only the explicit environment allowlist' => function () {
         $old = getenv('SECRET_FOR_TEST');
         putenv('SECRET_FOR_TEST=private');

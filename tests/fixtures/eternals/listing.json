@@ -1,1 +1,1 @@
-{"states":["running","starting","waiting-for-setup","not-ready","quit"],"paused":{"off":"quit","hold":"quit"}}
+{"states":["running","starting","waiting-for-setup","not-ready","quit"],"paused":{"off":"quit","hold":"quit"},"why":["no-key","no-credits","busy","start-check","host","unknown"]}
