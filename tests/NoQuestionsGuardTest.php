@@ -41,7 +41,8 @@ return [
     'guard-destructive: rm -rf is a reviewed delete, a whole home folder stays refused, and no refusal hands the command to the user' => function () {
         $d = nqGuard('terminal', ['command' => 'rm -rf ~/downloads/old']);
         check(is_array($d) && $d['action'] === 'approve' && $d['kind'] === 'delete', 'rm -rf of a folder must be asked as a delete: ' . json_encode($d));
-        foreach (['rm -rf /home/exampleuser', 'rm -rf /home/exampleuser/', 'rm -r -f /home/exampleuser/*'] as $cmd) {
+        foreach (['rm -rf /home/exampleuser', 'rm -rf /home/exampleuser/', 'rm -r -f /home/exampleuser/*', 'rm --recursive --force /home/exampleuser',
+            'rm -rf ~', 'rm --recursive ~/', 'rm -r "$HOME"', 'rm -rf ${HOME}'] as $cmd) {
             $d = nqGuard('terminal', ['command' => $cmd]);
             check(is_array($d) && $d['action'] === 'block' && strpos($d['message'], 'whole home folder') !== false, "$cmd must be refused: " . json_encode($d));
         }

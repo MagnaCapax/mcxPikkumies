@@ -158,8 +158,9 @@ if ($scheduleTool) {
 }
 
 $patterns = $secretPatterns + [
-    // Hermes' hardline list refuses rm -r of ~ and $HOME, not the same folder written as /home/<name> (tools/approval_detection.py).
-    '#(^|[\s;&|(`])rm\s+(-\S*\s+)*-[a-zA-Z]*[rR][a-zA-Z]*\s+(\S+\s+)*["\']?/home/[^/\s"\']+/?\*?["\']?(\s|$|[;&|)])#' => 'recursive delete of a whole home folder',
+    // Hermes' hardline list refuses rm -r of ~ and $HOME, not the same folder written as /home/<name> (tools/approval_detection.py),
+    // nor the long --recursive form; this covers all of them (review 2026-10-22).
+    '#(^|[\s;&|(`])rm\s+(-\S*\s+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\s+(\S+\s+)*["\']?(~|\$HOME|\$\{HOME\}|/home/[^/\s"\']+)/?\*?["\']?(\s|$|[;&|)])#' => 'recursive delete of a whole home folder',
     '/\bmkfs(\.|\s)/'                              => 'filesystem format',
     '/\bdd\s+[^|]*\bof=\/dev\//'                    => 'raw write to a device',
     '/\b(fdisk|parted|sgdisk|wipefs)\b/'            => 'partition or signature change',
