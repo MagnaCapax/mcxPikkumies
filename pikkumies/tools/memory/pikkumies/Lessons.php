@@ -14,11 +14,18 @@
  */
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 require_once dirname(__DIR__, 3) . '/lib/Services.php';
+require_once dirname(__DIR__, 3) . '/lib/Config.php';
+require_once dirname(__DIR__, 3) . '/lib/SessionCounters.php';
 
 class Lessons
 {
     const EXCERPT = 1500; // bytes of the best paragraph returned with a search hit
     const SOP_HEADINGS = ['When to use', 'Steps', 'Checks', 'What did not work']; // a --kind sop body needs each (ADR-0106)
+    // The bar for offering to share an SOP with Pulsed Media (ADR-0106, 2026-10-22). Operator, 2026-10-22: "it needs to be
+    // genuinely difficult, like 3+ outside sources minimum and 100+ turns, multiple failures, etc."
+    const SHARE_OUTSIDE = 3;   // distinct web addresses among the SOP's sources and text
+    const SHARE_REQUESTS = 100; // model requests of this run (SessionCounters reqs, delegated agents included)
+    const SHARE_FAILED = 2;    // list items under "## What did not work"
 
     public static function root()
     {
@@ -120,8 +127,49 @@ class Lessons
         if ($why !== '') {
             $status['no_related'] = $why;
         }
+        if ($kind === 'sop') {
+            $status['share'] = self::share($sources, $body, self::runRequests());
+        }
         return ['records' => [['path' => $path, 'links' => $links, 'related' => $related] + ($tools ? ['tools' => $tools] : [])
             + ($services ? ['service' => $services] : []) + ($categories ? ['categories' => $categories] : [])], 'status' => $status];
+    }
+
+    /**
+     * One line for an SOP's save result: whether the task met the bar for offering to share it with Pulsed Media
+     * (SHARE_*). Outside sources are the distinct web addresses in the sources and the text (a fragment and trailing
+     * punctuation dropped); failed approaches are the list items under "## What did not work"; $requests is this run's
+     * model request count, or null when it is not counted here. "met" needs all three; "unknown" when only the request
+     * count is missing and the other two hold; else "not met". Every count is the agent's own text except the requests:
+     * the line prompts a suggestion the user decides on, it grants nothing (ADR-0106).
+     */
+    public static function share(array $sources, $body, $requests)
+    {
+        preg_match_all('#https?://[^\s<>"\'`]+#i', implode("\n", $sources) . "\n" . $body, $m);
+        $urls = [];
+        foreach ($m[0] as $u) {
+            $u = rtrim(preg_replace('/#.*$/s', '', $u), '.,;:!?)]}*/');
+            $urls[strtolower($u)] = true;
+        }
+        $failed = 0;
+        if (preg_match('/^##[ \t]+What did not work[ \t]*$(.*?)(?=^##[ \t]|\z)/msi', $body, $s)) {
+            $failed = preg_match_all('/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\S/m', $s[1]);
+        }
+        $outside = count($urls);
+        $rest = $outside >= self::SHARE_OUTSIDE && $failed >= self::SHARE_FAILED;
+        $verdict = !$rest ? 'not met' : ($requests === null ? 'unknown' : ($requests >= self::SHARE_REQUESTS ? 'met' : 'not met'));
+        return "$verdict (outside sources $outside of " . self::SHARE_OUTSIDE . ', model requests '
+            . ($requests === null ? 'not counted here' : $requests) . ' of ' . self::SHARE_REQUESTS . ", failed approaches $failed of " . self::SHARE_FAILED . ')';
+    }
+
+    /** This run's model requests (PIKKUMIES_RUN's run file, ADR-0096), or null without a run or a readable count. */
+    private static function runRequests()
+    {
+        $run = (string) getenv('PIKKUMIES_RUN');
+        if (SessionCounters::runFile('', $run) === null) {
+            return null;
+        }
+        $c = SessionCounters::readRun(Config::localDir(), $run);
+        return $c !== null && isset($c['reqs']) && is_int($c['reqs']) ? $c['reqs'] : null;
     }
 
     /**

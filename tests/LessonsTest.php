@@ -130,6 +130,34 @@ return [
             lessonsCloseTree($tmp);
         }
     },
+    // ADR-0106 amendment 2026-10-22. Mutation-tested by hand: dropping the duplicate fold counts the repeated wiki
+    // page twice (met with two pages); counting every line under the heading takes the prose line as an approach;
+    // treating null requests as 0 turns "unknown" into "not met".
+    'lessons: share() is met only with 3 distinct outside addresses, 100 model requests and 2 listed failed approaches; unknown requests give "unknown", and an SOP save reports it' => function () {
+        $fail = "## What did not work\nTried things.\n- Restarting the client.\n2. Raising the limit.\n\n## Notes\n- not an approach\n";
+        $three = ['https://wiki.example.org/Page#Setup', 'man page'];
+        $body = "See https://wiki.example.org/Page. and [vendor](https://vendor.example.com/docs/) and <https://bugs.example.net/1>\n" . $fail;
+        check(strpos(Lessons::share($three, $body, 120), 'met (outside sources 3 of 3, model requests 120 of 100, failed approaches 2 of 2)') === 0, Lessons::share($three, $body, 120));
+        check(strpos(Lessons::share($three, $body, 99), 'not met ') === 0, 'requests under the bar: ' . Lessons::share($three, $body, 99));
+        check(strpos(Lessons::share($three, $body, null), 'unknown (outside sources 3 of 3, model requests not counted here') === 0, Lessons::share($three, $body, null));
+        $two = "https://wiki.example.org/Page and https://WIKI.example.org/Page/ and https://vendor.example.com/docs\n" . $fail;
+        check(strpos(Lessons::share([], $two, 500), 'not met (outside sources 2 of 3') === 0, 'one page twice: ' . Lessons::share([], $two, 500));
+        $prose = "https://a.example/1 https://b.example/2 https://c.example/3\n## What did not work\nRestarting, then raising the limit.\n";
+        check(strpos(Lessons::share([], $prose, null), 'not met (outside sources 3 of 3, model requests not counted here of 100, failed approaches 0 of 2)') === 0, 'prose: ' . Lessons::share([], $prose, null));
+        $tmp = lessonsFreshTree();
+        $run = getenv('PIKKUMIES_RUN');
+        putenv('PIKKUMIES_RUN');
+        try {
+            $r = Lessons::save(['topic' => 'rtorrent', 'title' => 'rtorrent behind a proxy', 'sources' => 'https://one.example/a; https://two.example/b', 'kind' => 'sop', 'no-related' => 'first one'],
+                "Also https://three.example/c\n\n## When to use\nx\n\n## Steps\n1. y\n\n## Checks\n1. z\n\n" . $fail);
+            check(isset($r['status']['share']) && strpos($r['status']['share'], 'unknown (outside sources 3 of 3') === 0, 'save status: ' . json_encode($r['status']));
+            $l = Lessons::save(['topic' => 'rtorrent', 'title' => 'plain lesson', 'sources' => 'x', 'no-related' => 'first one'], "Body.\n");
+            check(!isset($l['status']['share']), 'a lesson carries no share line');
+        } finally {
+            putenv($run === false ? 'PIKKUMIES_RUN' : "PIKKUMIES_RUN=$run");
+            lessonsCloseTree($tmp);
+        }
+    },
     'lessons: save() refuses a body with no markdown link to an existing memory file and no --no-related, and lists the nearest found-by-search paths in the hint' => function () {
         $tmp = lessonsFreshTree();
         try {
