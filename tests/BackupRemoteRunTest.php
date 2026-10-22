@@ -342,6 +342,9 @@ return [
                 return stLines($out);
             };
             $l = $status();
+            check(end($l)['state'] === 'unknown', 'the refresh never runs the remote check itself (ADR-0099 amendment 2026-10-22): ' . json_encode($l));
+            check(brRun($fx, ['check'])[0] === 0, 'backup remote check failed');
+            $l = $status();
             $m = array_values(array_filter($l, function ($r) {
                 return isset($r['record'], $r['kind']) && $r['record'] === 'method' && $r['kind'] === 'remote';
             }));
@@ -349,11 +352,14 @@ return [
             check(strpos(end($l)['custody'], 'backup passphrase not confirmed saved') === 0 && strpos(end($l)['table'], 'not confirmed saved') !== false,
                 'custody line in the status and the table: ' . json_encode(end($l)));
             $state = json_decode((string) file_get_contents($fx['secrets'] . '/state.json'), true);
-            $state['last_check']['verified_at'] -= 8 * 86400; // stale: the next refresh checks again
+            $state['last_check']['verified_at'] -= 8 * 86400; // stale: the refresh reads it as unchecked, `check` checks again
             file_put_contents($fx['secrets'] . '/state.json', json_encode($state));
             $arch = glob($fx['remote'] . '/pikkumies-backups/*/*.meta.tgz.gpg');
             $data = (string) file_get_contents($arch[0]);
             file_put_contents($arch[0], substr($data, 0, strpos($data, "\n") + 1) . 'garbage');
+            $l = $status();
+            check(end($l)['state'] === 'unknown' && strpos(json_encode($l), 'backup remote check') !== false, 'a stale check is unknown and names the command: ' . json_encode($l));
+            brRun($fx, ['check']);
             $l = $status();
             check(end($l)['state'] === 'broken', 'last_run ok but the archive does not read back: broken, not working: ' . json_encode($l));
         } finally {

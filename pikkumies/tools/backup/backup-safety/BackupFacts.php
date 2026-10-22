@@ -2,8 +2,8 @@
 /**
  * BackupFacts: the facts of each backup method of this account, for BackupStatus::judge() (ADR-0099): restic and borg
  * through their units' own classes (snapshots, sizes, a metadata `check` when the last one is over 7 days old), backup
- * remote through its local records, the receiver's listing and its own `check` (the newest archive decrypted and listed,
- * run again when the last is over 7 days old), and other tools from crontab lines and config files.
+ * remote through its local records, the receiver's listing and the record of its own `check` (the newest archive decrypted
+ * and listed; run on request, never by the refresh), and other tools from crontab lines and config files.
  * The system crontabs and config files under /etc count only when this account has root (Detect::rootAccess: direct as
  * uid 0, or passwordless sudo): on a shared server they are the provider's jobs, not this account's backups.
  * Nothing here prompts; a repository without a stored login is reported, never logged into.
@@ -30,7 +30,7 @@ class BackupFacts
                 $methods[] = $m;
             }
         }
-        $m = self::remote($localDir, $now, $verify);
+        $m = self::remote($localDir, $now);
         if ($m !== null) {
             $methods[] = $m;
         }
@@ -110,7 +110,7 @@ class BackupFacts
     }
 
     /** backup remote: null when no destination is set up. */
-    private static function remote($localDir, $now, $verify)
+    private static function remote($localDir, $now)
     {
         $dest = new RemoteDest($localDir);
         if (!is_file($dest->path('dest.json'))) {
@@ -144,15 +144,17 @@ class BackupFacts
             // Verified only by `check` (the archive decrypted and listed); a run's matching byte count says nothing about decrypting.
             $c = isset($s['last_check']) && is_array($s['last_check']) ? $s['last_check'] : null;
             $recent = $c !== null && !empty($c['checked']) && isset($c['verified_at']) && $now - (int) $c['verified_at'] <= BackupStatus::VERIFY;
-            if (!$recent && $verify && $rows) {
-                $c = RemoteOps::check($dest)['records'][0];
-            }
+            // `check` streams and decrypts the newest archive (up to 10 GiB): never inside the 120 s background refresh, where
+            // it was cut off and started again every day. It runs on request (`backup remote check`); its record is read here.
             if ($c !== null && !empty($c['checked']) && isset($c['verified_at'])) {
                 $m['verified_at'] = (int) $c['verified_at'];
                 $m['verify_ok'] = !empty($c['verify_ok']);
                 $m['check_note'] = isset($c['error']) ? (string) $c['error'] : null;
             } elseif ($c !== null && isset($c['why'])) {
                 $m['check_note'] = (string) $c['why']; // no archive small enough to check: unknown, not broken
+            }
+            if (!$recent && $rows) {
+                $m['check_note'] = 'not checked in the last 7 days; run `backup remote check` to check the newest archive';
             }
         } catch (CliError $e) {
             $m['error'] = $m['error'] !== null ? $m['error'] : $e->getMessage();

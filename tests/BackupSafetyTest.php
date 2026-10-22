@@ -398,4 +398,9 @@ return [
             testRmTree($t);
         }
     },
+    'backup-safety: the background refresh never runs the remote archive check (it streams up to 10 GiB past the 120 s limit)' => function () {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/tools/backup/backup-safety/BackupFacts.php');
+        check(strpos($src, 'RemoteOps::check(') === false, 'BackupFacts must only read the record of `backup remote check`, never run it');
+        check(strpos($src, 'run `backup remote check`') !== false, 'an unchecked remote must name the command that checks it');
+    },
 ];

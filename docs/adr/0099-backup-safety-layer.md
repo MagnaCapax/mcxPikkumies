@@ -43,3 +43,7 @@ What was found:
 ## References
 - [ADR-0020](0020-deletes-need-the-users-approval.md), [ADR-0025](0025-scheduled-jobs-per-minute-tick-under-no-new-privs.md), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md), [ADR-0049](0049-backup-remote-over-ssh.md), [ADR-0073](0073-no-questions-no-deferrals-one-reviewed-exception.md)
 - [backup-safety unit](../../pikkumies/tools/backup/backup-safety/README.md), [pre-edit-copy hook](../../pikkumies/hooks/guard/pre-edit-copy/README.md)
+
+## Amendment 2026-10-22: the refresh never runs the remote check
+
+The background refresh runs under `timeout 120`, and its second pass ran `backup remote check`, which streams and decrypts the newest archive (up to 10 GiB). A large archive was cut off before the result was saved, so the status stayed unknown and the archive was downloaded again the next day. The refresh now only reads the record of the last `check`; `backup remote check` runs on request. restic and borg keep their metadata check (it reads no archive). A remote without a check in the last 7 days stays unknown, with a note that names the command.
