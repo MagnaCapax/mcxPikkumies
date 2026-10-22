@@ -37,8 +37,13 @@ class HookRunCount
         if ($run === '') {
             return sha1((string) $sessionId);
         }
-        $hermes = $hermes === null ? self::hermes() : (string) $hermes;
-        return sha1('run:' . $run . ':' . (int) getenv('PIKKUMIES_DEPTH') . ($hermes === '' ? '' : ':' . $hermes));
+        return self::runHash($run, getenv('PIKKUMIES_DEPTH'), $hermes === null ? self::hermes() : (string) $hermes);
+    }
+
+    /** The spool hash of a launcher run: its key, the agent depth and the Hermes identity ('' when unknown). */
+    public static function runHash($run, $depth, $hermes)
+    {
+        return sha1('run:' . $run . ':' . (int) $depth . ($hermes === '' ? '' : ':' . $hermes));
     }
 
     /** The run key whose file counts for spool $hash. */
@@ -58,7 +63,7 @@ class HookRunCount
     }
 
     /** The fields of a /proc stat file after the command name (state first, so field n of proc(5) is [n - 3]), or null. */
-    private static function stat($file)
+    public static function stat($file)
     {
         $s = (string) @file_get_contents($file);
         $at = strrpos($s, ')');

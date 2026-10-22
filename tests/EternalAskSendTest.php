@@ -25,9 +25,13 @@ $pane = PANE_COMMAND;
 $args = array_slice($argv, 1);
 $verb = $args[0];
 if ($verb === 'display-message') { echo $pane . "|/dev/pts/42|0\n"; exit; }
-if ($verb === 'capture-pane') { echo "───\n❯\n───\n"; exit; }
+if ($verb === 'send-keys') { file_put_contents($root . '/keys', "Enter\n", FILE_APPEND); exit; }
+if ($verb === 'capture-pane') {
+    $held = is_file($root . '/hold') && is_file($root . '/armed') && count(file($root . '/keys', FILE_IGNORE_NEW_LINES) ?: []) < (int) file_get_contents($root . '/hold');
+    echo $held ? "───\n❯ hello\n───\n" : "───\n❯\n───\n"; exit;
+}
 if ($verb === 'load-buffer') { file_put_contents($root . '/buffer', stream_get_contents(STDIN)); }
-if ($verb === 'paste-buffer') { file_put_contents($root . '/pastes', implode(' ', $args) . "\n", FILE_APPEND); }
+if ($verb === 'paste-buffer') { file_put_contents($root . '/pastes', implode(' ', $args) . "\n", FILE_APPEND); touch($root . '/armed'); }
 exit(0);
 PHP;
         $fake = str_replace(['ROOT_PATH', 'PANE_COMMAND'], [var_export($root, true), var_export($pane, true)], $fake);
@@ -49,13 +53,24 @@ PHP;
         try {
             list($code, $out) = runPhp($runner, ['root']);
             check($code === 1 && strpos($out, 'not root') !== false && !is_file($root . '/pastes'), 'root reached tmux');
+            // The input drops the first Enter: ask presses it again while the pasted text is still held.
+            file_put_contents($root . '/hold', "2\n");
             list($code, $out) = runPhp($runner, ['nonce']);
             check($code === 0 && strpos($out, 'Sent') !== false, 'first send failed: ' . $out);
+            check(count(file($root . '/keys', FILE_IGNORE_NEW_LINES)) === 2, 'held text was not submitted again');
+            @unlink($root . '/hold');
+            @unlink($root . '/armed');
             $paste = (string) file_get_contents($root . '/pastes');
             check(preg_match('/paste-buffer -p -d -b pkask-[a-f0-9]{16} -t/', $paste) === 1, 'paste did not select its named buffer: ' . $paste);
             check(file_get_contents($root . '/buffer') === 'hello', 'question changed in buffer');
             list($code, $out) = runPhp($runner, ['nonce']);
             check($code === 0 && strpos($out, 'Already sent') !== false && file_get_contents($root . '/pastes') === $paste, 'nonce sent twice');
+            // Text that never leaves the input is reported as not sent, not as sent.
+            file_put_contents($root . '/hold', "99\n");
+            list($code, $out) = runPhp($runner, ['plain']);
+            check($code === 1 && strpos($out, 'Could not send') !== false, 'unsent text reported as sent: ' . $out);
+            @unlink($root . '/hold');
+            @unlink($root . '/armed');
             for ($n = 0; $n < 4; $n++) { list($code) = runPhp($runner, ['plain']); check($code === 0, 'send before cap failed'); }
             list($code, $out) = runPhp($runner, ['plain']);
             check($code === 4 && strpos($out, 'rate capped') !== false, 'sixth send bypassed cap');

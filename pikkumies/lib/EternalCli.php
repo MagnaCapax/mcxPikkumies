@@ -141,7 +141,12 @@ class EternalCli
             Eternal::tmux(['kill-window', '-t', '=pikkumies:' . $id]);
             return 0;
         }
-        echo "usage: pikkumies eternal new | quit pmN | on | off | hold --until TIMESTAMP | ensure | list --json\n";
+        if ($verb === 'activity' && (count($args) === 1 || (count($args) === 2 && $args[1] === '--json'))) {
+            list($code, $text) = EternalActivity::run(count($args) === 2, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());
+            echo $text . "\n";
+            return $code;
+        }
+        echo "usage: pikkumies eternal new | quit pmN | on | off | hold --until TIMESTAMP | ensure | list --json | activity [--json]\n";
         return 2;
     }
 

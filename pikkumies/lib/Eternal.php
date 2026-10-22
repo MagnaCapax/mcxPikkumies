@@ -406,9 +406,9 @@ class Eternal
         return EternalRecord::path($id) . '.quit';
     }
 
-    public static function capture($id, array $record, $tty)
+    public static function capture($id, array $record, $tty, $home = null)
     {
-        $pointer = self::pointer($tty, $record['lastStart']);
+        $pointer = self::pointer($tty, $record['lastStart'], $home);
         if (time() - $record['lastStart'] < 600) {
             return; // a newly created session must survive before it replaces a resume pointer
         }
@@ -427,7 +427,12 @@ class Eternal
         if (!is_file($path) || (int) @filemtime($path) < $lastStart) {
             return '';
         }
-        $pointer = trim((string) @file_get_contents($path));
+        $pointer = trim((string) @file_get_contents($path, false, null, 0, 4096));
+        if ($pointer !== '' && $pointer[0] === '{') {
+            // Hermes writes {"session_id": ..., "cwd": ..., "ts": ...}; older builds wrote the bare id.
+            $data = json_decode($pointer, true);
+            $pointer = is_array($data) && isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : '';
+        }
         return EternalRecord::validSession($pointer) ? $pointer : '';
     }
 

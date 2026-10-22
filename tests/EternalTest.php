@@ -179,11 +179,48 @@ return [
             check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === 'session_123', 'current breadcrumb lost');
             file_put_contents($path, "-unsafe;id\n");
             check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === '', 'unsafe pointer accepted');
+            // Hermes writes the breadcrumb as JSON; the bare-id form above stays readable.
+            file_put_contents($path, json_encode(['session_id' => 'local-35629f03f3', 'cwd' => '/home/fixtureuser', 'ts' => time()]) . "\n");
+            check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === 'local-35629f03f3', 'JSON breadcrumb not read');
+            file_put_contents($path, json_encode(['session_id' => '-bad;id', 'ts' => time()]));
+            check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === '', 'unsafe JSON session id accepted');
+            file_put_contents($path, json_encode(['cwd' => '/home/fixtureuser']));
+            check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === '', 'JSON without session_id accepted');
+            file_put_contents($path, '{"session_id": "abc"');
+            check(Eternal::pointer('/dev/pts/17', time() - 10, $home) === '', 'broken JSON accepted');
             check(Eternal::pointer('/dev/pts/../17', 0, $home) === '', 'unsafe tty accepted');
         } finally {
             @unlink($path);
             @rmdir($home . '/terminal-sessions');
             @rmdir($home);
+        }
+    },
+    'eternal: a JSON breadcrumb becomes the resume pointer after the new session has lived ten minutes' => function () {
+        $root = testTempDir('eternal-capture');
+        $home = $root . '/hermes';
+        @mkdir($home . '/terminal-sessions', 0700, true);
+        $path = $home . '/terminal-sessions/tty-dev-pts-21';
+        EternalRecord::$base = $root . '/records';
+        try {
+            file_put_contents($path, json_encode(['session_id' => 'local-new01', 'cwd' => '/home/fixtureuser', 'ts' => time()]) . "\n");
+            $young = ['sessionId' => 'local-old01', 'fails' => 0, 'lastStart' => time() - 60];
+            EternalRecord::write('pm1', $young);
+            Eternal::capture('pm1', $young, '/dev/pts/21', $home);
+            check(EternalRecord::read('pm1')['sessionId'] === 'local-old01', 'young session replaced the resume pointer');
+            $settled = ['sessionId' => 'local-old01', 'fails' => 0, 'lastStart' => time() - 700];
+            EternalRecord::write('pm1', $settled);
+            touch($path, time());
+            clearstatcache();
+            Eternal::capture('pm1', $settled, '/dev/pts/21', $home);
+            check(EternalRecord::read('pm1')['sessionId'] === 'local-new01', 'JSON breadcrumb not adopted for resume');
+        } finally {
+            EternalRecord::$base = null;
+            @unlink($path);
+            @unlink($root . '/records/pm1');
+            @rmdir($root . '/records');
+            @rmdir($home . '/terminal-sessions');
+            @rmdir($home);
+            @rmdir($root);
         }
     },
     'eternal: cgroup accepts only this uid user slice on v1 or v2' => function () {
@@ -229,6 +266,23 @@ return [
         check(!EternalAsk::idleAtInput("old ❯\nworking now"), 'old prompt accepted');
         check(!EternalAsk::idleAtInput("Working...\n"), 'running turn accepted');
         check(!EternalAsk::idleAtInput(''), 'unknown screen accepted');
+        // Hermes draws a status line under the widget and an italic, rotating placeholder in the empty prompt.
+        $rule = "\x1b[38;5;102m────────────\n";
+        $status = "\x1b[38;5;253m ☤ \x1b[1m\x1b[38;5;117mdefault\x1b[0m · ctx -- · 28s\n";
+        foreach (['Ask anything, or type / for commands…', 'Draft a reply to the last email in my inbox'] as $hint) {
+            $screen = "Welcome\n" . $rule . "\x1b[38;5;230m❯ \x1b[3m\x1b[38;5;136m" . $hint . "\n\x1b[0m" . $rule . $status;
+            check(EternalAsk::idleAtInput($screen), 'italic placeholder read as typed text: ' . $hint);
+            check(EternalAsk::screenStatus($screen) === 0, 'idle screen with placeholder not sendable: ' . $hint);
+        }
+        $typed = "Welcome\n" . $rule . "\x1b[38;5;230m❯ \x1b[0mcheck my disk\n" . $rule . $status;
+        check(EternalAsk::heldAtInput($typed), 'typed text with a status line below not held');
+        $mixed = "Welcome\n" . $rule . "\x1b[38;5;230m❯ \x1b[0mcheck \x1b[3mmy disk\n" . $rule . $status;
+        check(EternalAsk::heldAtInput($mixed), 'partly italic typed text read as placeholder');
+        check(EternalAsk::idleAtInput("Out\n" . $rule . "❯ \n" . $rule . $status), 'empty prompt with a status line below refused');
+        check(!EternalAsk::idleAtInput("Out\n" . $rule . "❯ \n" . $rule . "a\nb\nc\n"), 'prompt with output below it accepted');
+        $titled = "Answer\n──────────── QA test from the panel for\n\x1b[38;5;230m❯ \x1b[3mAsk anything\n\x1b[0m" . $rule . $status;
+        check(EternalAsk::idleAtInput($titled), 'top rule carrying the last turn title refused');
+        check(!EternalAsk::idleAtInput("Out\n── ⠇ Working… · 3s ──────\n☤ ❯ type to queue a message for after this turn\n" . $rule . $status), 'running turn read as idle');
     },
     'eternal: each UI instance has separate fork state and shares the private tmux socket' => function () {
         $root = sys_get_temp_dir() . '/eternal-ui-' . getmypid();

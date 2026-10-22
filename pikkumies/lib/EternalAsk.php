@@ -42,7 +42,7 @@ class EternalAsk
         if ($primary === null || Eternal::pointer($paneParts[1], $primary['lastStart']) === '') {
             return [5, 'Primary is starting. Try again shortly.'];
         }
-        list($code, $screen) = Eternal::tmux(['capture-pane', '-p', '-t', '=pikkumies:pm1', '-S', '-20']);
+        list($code, $screen) = self::screen();
         if ($code !== 0) {
             return [5, 'Primary is starting. Try again shortly.'];
         }
@@ -82,7 +82,7 @@ class EternalAsk
         fclose($pipes[2]);
         $loaded = proc_close($process) === 0;
         $pasted = $loaded && Eternal::tmux(['paste-buffer', '-p', '-d', '-b', $buffer, '-t', '=pikkumies:pm1'])[0] === 0;
-        if (!$loaded || !$pasted || Eternal::tmux(['send-keys', '-t', '=pikkumies:pm1', 'Enter'])[0] !== 0) {
+        if (!$loaded || !$pasted || !self::submit()) {
             if (!$pasted) {
                 Eternal::tmux(['delete-buffer', '-b', $buffer]);
             }
@@ -134,24 +134,97 @@ class EternalAsk
 
     public static function inputLine($screen)
     {
-        // The input widget sits between rule lines below the status bar. Only its normal,
-        // empty prompt is a positive signal; spinner/question/approval glyphs stay busy.
-        $lines = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $screen)), function ($line) {
-            return $line !== '';
-        }));
-        $tail = array_slice($lines, -3);
-        $count = count($tail);
-        for ($i = 0; $i < $count; $i++) {
-            if (preg_match('/^(?:❯|>)(?:\s*(\S.*))?$/u', $tail[$i], $match) !== 1) {
-                continue;
-            }
-            $above = $i > 0 && preg_match('/^─{3,}$/u', $tail[$i - 1]) === 1;
-            $below = $i + 1 < $count && preg_match('/^─{3,}$/u', $tail[$i + 1]) === 1;
-            if ($above && ($below || $i === $count - 1)) {
-                return isset($match[1]) && $match[1] !== '' ? 'held' : 'empty';
+        // The input widget is a prompt line between two rule lines; Hermes may draw a status line or two below it.
+        // Only its normal, empty prompt is a positive signal; spinner/question/approval glyphs stay busy. The screen
+        // comes with SGR escapes (capture-pane -e): text after the prompt that is all italic is Hermes' placeholder
+        // suggestion (it rotates, so the words are never compared), which still means an empty input.
+        $rows = [];
+        foreach (preg_split('/\r?\n/', (string) $screen) as $raw) {
+            $plain = trim(self::plain($raw));
+            if ($plain !== '') {
+                $rows[] = [$plain, $raw];
             }
         }
+        $tail = array_slice($rows, -5);
+        $count = count($tail);
+        for ($i = $count - 1; $i >= 1; $i--) {
+            if (preg_match('/^(?:❯|>)(?:\s*(\S.*))?$/u', $tail[$i][0], $match) !== 1) {
+                continue;
+            }
+            // A rule may carry a title (Hermes puts the last turn's summary in the top rule).
+            $above = preg_match('/^─{3,}/u', $tail[$i - 1][0]) === 1;
+            $below = $i + 1 < $count && preg_match('/^─{3,}/u', $tail[$i + 1][0]) === 1;
+            if (!$above || (!$below && $i !== $count - 1) || $count - $i > 4) {
+                continue;
+            }
+            if (!isset($match[1]) || $match[1] === '') {
+                return 'empty';
+            }
+            return self::placeholderOnly($tail[$i][1]) ? 'empty' : 'held';
+        }
         return 'unknown';
+    }
+
+    /** The line without SGR escape sequences. */
+    public static function plain($line)
+    {
+        return (string) preg_replace('/\x1b\[[0-9;]*m/', '', (string) $line);
+    }
+
+    /** True when every visible character after the prompt glyph is drawn in italic (a placeholder, not typed text). */
+    public static function placeholderOnly($raw)
+    {
+        $at = strpos((string) $raw, '❯');
+        $rest = $at === false ? '' : substr((string) $raw, $at + strlen('❯'));
+        $italic = false;
+        $seen = false;
+        foreach (preg_split('/(\x1b\[[0-9;]*m)/', $rest, -1, PREG_SPLIT_DELIM_CAPTURE) as $part) {
+            if (preg_match('/^\x1b\[([0-9;]*)m$/', $part, $sgr) === 1) {
+                foreach (explode(';', $sgr[1] === '' ? '0' : $sgr[1]) as $p) {
+                    if ($p === '3') {
+                        $italic = true;
+                    } elseif ($p === '0' || $p === '23') {
+                        $italic = false;
+                    }
+                }
+                continue;
+            }
+            if (trim($part) === '') {
+                continue;
+            }
+            if (!$italic) {
+                return false;
+            }
+            $seen = true;
+        }
+        return $seen;
+    }
+
+    /**
+     * Enter right after a bracketed paste is dropped by the input widget (VM 440, 2026-10-22): the text stayed
+     * unsent. Wait a moment, press Enter, and press it again (at most three times) only while the pasted text
+     * still sits in the input; once the turn starts the prompt is no longer held, so nothing is sent twice.
+     */
+    public static function submit($pause = 300000)
+    {
+        for ($try = 1; $try <= 3; $try++) {
+            usleep($pause * $try);
+            if (Eternal::tmux(['send-keys', '-t', '=pikkumies:pm1', 'Enter'])[0] !== 0) {
+                return false;
+            }
+            usleep($pause);
+            list($code, $screen) = self::screen();
+            if ($code !== 0 || self::inputLine($screen) !== 'held') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Primary's visible screen with its SGR escapes, the form inputLine() reads: [tmux exit code, text]. */
+    public static function screen()
+    {
+        return Eternal::tmux(['capture-pane', '-p', '-e', '-t', '=pikkumies:pm1', '-S', '-20']);
     }
 
     public static function cancelCopyMode($paneMode)
