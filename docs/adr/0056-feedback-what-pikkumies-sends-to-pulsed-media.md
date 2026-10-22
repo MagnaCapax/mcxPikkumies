@@ -113,3 +113,13 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - Tickets keep their bar: SOP/ask-vainamoinen-for-help decides them, now also naming problems that may reach beyond the account (other users on the server, a break-in, another account's files readable), and saying that what needs no staff action is feedback, never a ticket.
 
 **Consequences.** More feedback, no new tickets. The line costs a few tokens in the turns that carry it. Not verified live: how often a light model adds it, and whether it keeps to once per session; a question-suite run should include a session with a tool error and one with a "never ask again" earlier in memory.
+
+## Amendment 2026-10-22 (later): the 250-candidate review
+**Context.** The operator asked for each of 250 candidate moments to get its own adversarial review. The review (141 handled, 55 correctly silent, 36 gaps, 18 flood risks) found that a fault every account on a server sees could become one automatic ticket per account (the cap is per account; the global cap is the billing module's, ADR-0100), that the "went wrong" trigger counted only failures the user caught, that platform wishes and client-area account changes still read as ticket reasons, and that "or just say so" promised a yes a messaging gateway cannot check (ADR-0073).
+
+**Decision.**
+- The feedback line covers defects the agent checked, failures the agent can see itself (a loop, something broken that worked, a change nobody asked for) as well as the user's corrections, and wishes it could not meet; it appears only where a person reads the answer and can reply, and names `/feedback` only.
+- Before any ticket the SOP checks `ticket list` for one already sent and that the service is Pulsed Media's. A fault every account on the server sees is told to the user with a feedback offer, a ticket only if they ask. A break-in into this account or another account's files readable from here still needs Pulsed Media, judged from owners, permissions and logs, never by opening other people's files.
+- A change the user can make in the client area, or a wish for something new, is not a ticket. A no to a ticket ends agent tickets for the session; "never" turns `ticket.auto` off.
+
+**Consequences.** The earlier amendment's "other users on the server" ticket trigger is withdrawn. One line per rule, seven lines changed in total.

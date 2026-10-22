@@ -6,13 +6,13 @@ Väinämöinen is Pulsed Media's own support agent, the one who answers Pulsed M
 
 Ask when one of these holds:
 
-- the fix needs something this account does not have: root, the server's hardware or console, another server, a change to the account or billing, or a change to the platform itself;
+- the fix needs something this account does not have: root, the server's hardware or console, another server, a change to the account or billing the user cannot make in the client area (what they can, point them there), or a fix to the platform itself (a wish for something new is feedback, not a ticket);
 - you have searched every place below, done the review, and your attempts are used up;
 - the user asks for a ticket. Then go straight to the ticket skill (`draft`, or `bundle --by user` when the diagnostics help) and skip steps 2 and 3.
 
 Never ask before searching: a ticket that the documentation already answers costs the user a wait and Pulsed Media a reply.
 
-A problem that may reach beyond this account (the user says others on the server see it too, signs of a break-in, another account's files readable from here) also needs Pulsed Media: search and review as below, then ask. What needs no staff action on this account (a tool bug you worked around, a missing or wrong page, a wish) is feedback, never a ticket (doctrine.md, "Tell Pulsed Media what is broken").
+Before any ticket: `ticket list` must show none already sent for it, and the service must be Pulsed Media's (elsewhere, give that provider's support link). A fault every account on the server sees (a degraded array, the network, an outage) is not this account's ticket: tell the user and offer feedback, a ticket only if they ask. Evidence that someone got into this account (logins, keys or processes the user does not know), or another account's files readable from here, also needs Pulsed Media, judged from owners, permissions and logs, never by opening other people's files; failed login attempts alone do not. What needs no staff action on this account (a tool bug you worked around, a missing or wrong page, a wish) is feedback, never a ticket (doctrine.md, "Tell Pulsed Media what is broken").
 
 ## 2. Search every place first
 
@@ -46,7 +46,7 @@ If a round finds the answer, stop and solve it: no ticket.
 
 ## 4. Open the ticket
 
-Follow the ticket skill: write the diagnosis, then `bundle --by agent` with the review file, then `send`. On a Pulsed Media server the ticket goes out by itself unless the person turned `ticket.auto` off; elsewhere it goes only when the person turned that on, or after their yes. Tell the user that you asked Pulsed Media, what for, and the ticket number. Never promise a reply time.
+Follow the ticket skill: write the diagnosis, then `bundle --by agent` with the review file, then `send`. On a Pulsed Media server the ticket goes out by itself unless the person turned `ticket.auto` off; elsewhere it goes only when the person turned that on, or after their yes. A no to a ticket ends agent tickets for this session; "never" means turn `ticket.auto` off with the pikkumies-configure skill. Tell the user that you asked Pulsed Media, what for, and the ticket number. Never promise a reply time.
 
 ## 5. What Väinämöinen can do that you cannot
 
