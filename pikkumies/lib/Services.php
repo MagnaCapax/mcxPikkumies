@@ -27,7 +27,7 @@ class Services
     const TOKEN_RE = '/^[A-Za-z0-9._:\/@%+=,~-]{1,512}\z/';
     /**
      * A clients key shaped like a secret (password, passkey, api_key, rpc_token, cookie, basic_auth...), refused so it never sits
-     * in services.jsonl in plain text (ADR-0105); `auth` itself is allowed and must be secret:<handle>. A shape, not a list of
+     * in services.jsonl in plain text (ADR-0107); `auth` itself is allowed and must be secret:<handle>. A shape, not a list of
      * names: an innocent-looking key (login, pw) still cannot be told apart from a user name, so the README claims no more.
      */
     const SECRET_KEY_RE = '/pass|secret|token|key|cookie|auth/';
@@ -216,7 +216,7 @@ class Services
                 $out[$k] = $s[$k];
             }
         }
-        if (isset($s['account_auth']) && $s['account_auth'] !== '') { // Bytesized's read-only accounts API key (ADR-0105)
+        if (isset($s['account_auth']) && $s['account_auth'] !== '') { // Bytesized's read-only accounts API key (ADR-0107)
             $out['account_auth'] = self::secretRef($s['account_auth'], 'account_auth');
         }
         return $out;

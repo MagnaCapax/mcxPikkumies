@@ -394,7 +394,7 @@ return [
             check(svGuard($cmd) === null, "asked or blocked: $cmd");
         }
     },
-    'services list: clients auth is only secret:<handle>; a key shaped like a secret, a url with user:...@ or a query, and a bad user are refused without echoing the value (ADR-0105)' => function () {
+    'services list: clients auth is only secret:<handle>; a key shaped like a secret, a url with user:...@ or a query, and a bad user are refused without echoing the value (ADR-0107)' => function () {
         $base = ['nick' => 'feral1', 'host' => 'kepler.feralhosting.com', 'user' => 'xyzjohnny', 'transport' => 'tunnel'];
         $ok = Services::normalize($base + ['clients' => ['rtorrent' => ['url' => 'https://kepler.feralhosting.com/xyzjohnny/rtorrent/rpc', 'user' => 'rutorrent',
             'auth' => 'secret:feral1-rpc']], 'account_auth' => 'secret:bz1-api']);

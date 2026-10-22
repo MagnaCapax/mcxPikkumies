@@ -408,7 +408,7 @@ return [
             scDone($fx);
         }
     },
-    'secrets: set --host pins a secret to one normalised host or host and path prefix, list shows it, rotate keeps it or sets a new one with the value, nothing else changes it; a bad host stores nothing (ADR-0105)' => function () {
+    'secrets: set --host pins a secret to one normalised host or host and path prefix, list shows it, rotate keeps it or sets a new one with the value, nothing else changes it; a bad host stores nothing (ADR-0107)' => function () {
         $fx = scFixture();
         try {
             scSeed($fx, []);

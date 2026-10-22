@@ -49,7 +49,7 @@ class ServicesKeys
 
     /**
      * The authorized_keys line for $transport (comment pikkumies-<label>, which also names it for removal). $permitOpen: the
-     * "host:port" list from permitOpen(), each a permitopen= option on a tunnel key, so it forwards only there (ADR-0105).
+     * "host:port" list from permitOpen(), each a permitopen= option on a tunnel key, so it forwards only there (ADR-0107).
      */
     public static function keyLine($transport, $label, $allowDelete, $type, $b64, array $permitOpen = [])
     {
@@ -71,7 +71,7 @@ class ServicesKeys
      * The TCP endpoints a tunnel key may forward to, as permitopen takes them ("127.0.0.1:5000", "[::1]:5000"): each client's
      * `endpoint` written tcp://H:P or H:P, or its `port` alone (127.0.0.1:P). A unix socket, an https `url` or no endpoint adds
      * none. sshd applies permitopen to TCP forwards and, once any is set, refuses every unix-socket forward of that key too
-     * (OpenSSH channels.c, open_match and channel_permit_all; ADR-0105), so a service with ANY socket endpoint (a `socket` key,
+     * (OpenSSH channels.c, open_match and channel_permit_all; ADR-0107), so a service with ANY socket endpoint (a `socket` key,
      * or an `endpoint` that is a path) gets none: permitopen would silently take its socket forward away. A malformed TCP
      * endpoint refuses, never a silently unscoped key.
      */

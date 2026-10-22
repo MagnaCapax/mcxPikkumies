@@ -1,6 +1,6 @@
 <?php
 /**
- * tools/torrent-clients/rtorrent/HttpRpc.php (ADR-0105): rTorrent's XML-RPC over HTTPS with basic auth through an injected
+ * tools/torrent-clients/rtorrent/HttpRpc.php (ADR-0107): rTorrent's XML-RPC over HTTPS with basic auth through an injected
  * requester (tests/fixtures/rtorrent/httprpc.php), never the network. The oracle is the logged request and the CliError
  * text: the body is the codec's output, the header carries user:secret, every refusal comes before any request, and no
  * message holds the secret, the header or a URL's userinfo.

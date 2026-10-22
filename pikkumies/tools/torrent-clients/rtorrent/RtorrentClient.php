@@ -34,7 +34,7 @@ class RtorrentClient implements TorrentClient
     /**
      * $transport: null for the local client (its SCGI endpoint found on first use), or an object with the RtorrentScgi
      * shape (public $address, call($method, $params)) that every call goes through instead, with its own timeout
-     * (services remote reads a third-party box this way, ADR-0105). Local callers pass nothing and nothing changes.
+     * (services remote reads a third-party box this way, ADR-0107). Local callers pass nothing and nothing changes.
      */
     public function __construct($family, $home, $uid, $transport = null)
     {

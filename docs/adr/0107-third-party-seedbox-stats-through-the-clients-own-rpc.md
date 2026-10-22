@@ -1,4 +1,4 @@
-# ADR-0105: Third-party seedbox stats through the client's own RPC, never a Pikkumies serve
+# ADR-0107: Third-party seedbox stats through the client's own RPC, never a Pikkumies serve
 
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)

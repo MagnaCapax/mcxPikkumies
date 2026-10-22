@@ -1,7 +1,7 @@
 <?php
 /**
  * RtorrentHttpRpc: one XML-RPC call to an rTorrent whose RPC a third-party seedbox publishes over HTTPS with basic auth
- * (docs/adr/0105-third-party-seedbox-stats-through-the-clients-own-rpc.md). The same public shape as RtorrentScgi
+ * (docs/adr/0107-third-party-seedbox-stats-through-the-clients-own-rpc.md). The same public shape as RtorrentScgi
  * (`address`, `call`) and the same codec (RtorrentXmlRpc), so RtorrentClient builds the same records from it.
  * Refused before any request: a URL that is not https, that carries user:password@, whose port is not 443 or that holds
  * anything but a plain host and path; a host that is not the service's own host, or that the person's SSH lists refuse

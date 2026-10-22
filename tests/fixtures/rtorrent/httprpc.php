@@ -1,6 +1,6 @@
 <?php
 /**
- * Helpers for tests/RtorrentHttpRpcTest.php and tests/ServicesRemoteTunnelTest.php (ADR-0105): a temp secret store and
+ * Helpers for tests/RtorrentHttpRpcTest.php and tests/ServicesRemoteTunnelTest.php (ADR-0107): a temp secret store and
  * services list behind the seams (Secrets::$vaultFile, SecretsCache dirs, Services::$localDir/$configFile), and a fake
  * requester in place of Http::request that answers rTorrent XML-RPC from a method => value map and logs every request
  * to a file (so calls made in a forked fan-out worker are seen too). Nothing real is contacted.

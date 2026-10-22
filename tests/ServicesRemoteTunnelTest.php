@@ -1,6 +1,6 @@
 <?php
 /**
- * services remote for transport tunnel (ADR-0105): read verbs answered here from the box's own rTorrent RPC and Bytesized's
+ * services remote for transport tunnel (ADR-0107): read verbs answered here from the box's own rTorrent RPC and Bytesized's
  * accounts API through the fake requester (tests/fixtures/rtorrent/httprpc.php), change verbs refused before anything is
  * recorded or sent, per-service error records for what a tunnel does not answer, and a mixed --all where each service takes
  * its own path. ServicesRemote::run is called in-process; the oracle is its records, the request log and the files on disk.

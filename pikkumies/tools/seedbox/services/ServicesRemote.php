@@ -6,7 +6,7 @@
  * here and checked twice (here and by serve); there is no remote shell. A verb that changes something goes to one
  * service at a time and needs --intent with the user's own words, recorded in local/state/intents.jsonl.
  *
- * transport tunnel (a box without Pikkumies, ADR-0105): there is no serve, so the read verbs of torrent-clients/rtorrent
+ * transport tunnel (a box without Pikkumies, ADR-0107): there is no serve, so the read verbs of torrent-clients/rtorrent
  * (list, show, stats, traffic) run here, in this process, against that box's own rTorrent RPC over HTTPS (clients.rtorrent:
  * url, user, auth = secret:<handle>, through RtorrentHttpRpc), and system/system-status account reads Bytesized's read-only
  * accounts API (account_auth). The records are the local ones (RtorrentClient's), with `service`. A verb that changes
@@ -14,7 +14,7 @@
  */
 class ServicesRemote
 {
-    /** What a tunnel service answers here: unit => read verbs (ADR-0105). */
+    /** What a tunnel service answers here: unit => read verbs (ADR-0107). */
     const TUNNEL_READS = ['torrent-clients/rtorrent' => ['list', 'show', 'stats', 'traffic'], 'system/system-status' => ['account']];
     /** Options a tunnel read takes after `--` (the ones serve allows for these verbs; --files is refused with its reason). */
     const TUNNEL_OPTIONS = ['state', 'search', 'sort', 'reverse', 'limit', 'offset', 'fields', 'trackers', 'files'];
@@ -54,7 +54,7 @@ class ServicesRemote
             if ($svc['transport'] === 'tunnel') { // refused before the intent is recorded or anything is sent
                 throw new CliError("$verb on {$nicks[0]} is refused: it is transport tunnel, a box without Pikkumies, and there is no management API"
                     . ' there; the provider\'s own panel or the user\'s own SSH session does this; nothing was sent',
-                    'report it as not done, with this reason; never turn it into an ssh command of your own (ADR-0105)');
+                    'report it as not done, with this reason; never turn it into an ssh command of your own (ADR-0107)');
             }
             if ($svc['transport'] !== 'pikkumies') {
                 throw new CliError("service {$nicks[0]} is transport {$svc['transport']}: no Pikkumies serve there", 'remote needs Pikkumies on that box (transport pikkumies)');
@@ -111,7 +111,7 @@ class ServicesRemote
         $nick = $svc['nick'];
         if (!isset(self::TUNNEL_READS[$unit]) || !in_array($verb, self::TUNNEL_READS[$unit], true)) {
             throw new CliError("$unit $verb is not available for $nick (transport tunnel): a box without Pikkumies answers here only rtorrent list, show,"
-                . ' stats and traffic through its own RPC, and system-status account at Bytesized', 'qBittorrent and Deluge through their own APIs are a later step (ADR-0105)');
+                . ' stats and traffic through its own RPC, and system-status account at Bytesized', 'qBittorrent and Deluge through their own APIs are a later step (ADR-0107)');
         }
         Services::refuseListed($svc['host']);
         if ($unit === 'system/system-status') {

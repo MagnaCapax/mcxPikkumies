@@ -85,7 +85,7 @@ class ServicesList
             $svc['clients'] = $c;
         }
         if (isset($opt['account-auth'])) {
-            $svc['account_auth'] = (string) $opt['account-auth']; // secret:<handle> of Bytesized's API key (ADR-0105); '' clears it
+            $svc['account_auth'] = (string) $opt['account-auth']; // secret:<handle> of Bytesized's API key (ADR-0107); '' clears it
         }
         if (!empty($opt['allow-delete']) || !empty($opt['no-allow-delete'])) {
             $svc['allow_delete'] = empty($opt['no-allow-delete']); // records what the key line on that box allows

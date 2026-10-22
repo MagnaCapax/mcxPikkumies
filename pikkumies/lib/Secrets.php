@@ -7,7 +7,7 @@
  * the passphrase; the derived key is cached outside the home for a TTL (lib/SecretsCache.php), so a lost or copied
  * vault.enc is ciphertext only. Other tools read a value with Secrets::get($handle) (a services entry names it as
  * "secret:<handle>") and never print it; locked means the user unlocks in their own terminal. A secret may carry a pin
- * (host, optionally a path prefix) that limits where a tool may send it (ADR-0105).
+ * (host, optionally a path prefix) that limits where a tool may send it (ADR-0107).
  */
 require_once __DIR__ . '/SshLists.php';
 
@@ -81,7 +81,7 @@ class Secrets
 
     /**
      * The pin of one secret: ['host' => normalised host, 'path' => a path prefix ending in "/", or null for any path], or null
-     * when it has none. A tool that sends the secret over the network refuses a request pinAllows() does not allow (ADR-0105).
+     * when it has none. A tool that sends the secret over the network refuses a request pinAllows() does not allow (ADR-0107).
      * Only set and rotate write it, each together with a new value.
      */
     public static function pin($ref)

@@ -47,7 +47,7 @@ $change = function ($args, $mustExist) {
     }
     return [$h, $data, $key, $env, $checked];
 };
-// --host H or H/path/prefix/: where a tool may send this secret (ADR-0105), as Secrets::parsePin() reads it: ['host', 'path'],
+// --host H or H/path/prefix/: where a tool may send this secret (ADR-0107), as Secrets::parsePin() reads it: ['host', 'path'],
 // or null when not given. Read before the value, so a bad pin never consumes a typed or piped value.
 $pinOf = function (array $opt) {
     if (!isset($opt['host'])) {
