@@ -291,15 +291,21 @@ class Eternal
         return $command === $quoted || $command === $manual;
     }
 
-    public static function environment()
+    /** The caller's PATH with the account's own bin directories first, so `pikkumies` and its tools resolve. */
+    public static function searchPath($home)
     {
-        $home = (string) getenv('HOME');
         $path = (string) getenv('PATH');
         foreach ([$home . '/bin', $home . '/.local/bin'] as $bin) {
             if (is_dir($bin) && !in_array($bin, explode(':', $path), true)) {
                 $path = $bin . ':' . $path;
             }
         }
+        return $path;
+    }
+
+    public static function environment()
+    {
+        $path = self::searchPath((string) getenv('HOME'));
         $runtime = getenv('XDG_RUNTIME_DIR');
         if ($runtime === false || $runtime === '') {
             $runtime = '/run/user/' . (function_exists('posix_geteuid') ? posix_geteuid() : getmyuid());

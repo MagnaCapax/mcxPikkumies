@@ -83,7 +83,8 @@ class EternalUi
     public static function environment($home, $base, $instance)
     {
         return array_merge([
-            'HOME' => $home, 'AGENTBOARD_MODE' => 'pikkumies',
+            // The UI runs `pikkumies eternal ...`; the panel launcher's PATH has no account bin directory.
+            'HOME' => $home, 'PATH' => Eternal::searchPath($home), 'AGENTBOARD_MODE' => 'pikkumies',
             'AGENTBOARD_SOCKET' => $base . '/ui.sock', 'AGENTBOARD_TOKEN_DIR' => $base . '/tokens',
             'AGENTBOARD_DATA_DIR' => $instance, 'LOG_FILE' => $instance . '/agentboard.log',
             'AGENTBOARD_TMUX_PID_FILE' => $instance . '/tmux-server.pid',

@@ -228,7 +228,13 @@ return [
             }
             check($first['TMUX_TMPDIR'] === $second['TMUX_TMPDIR'] && $first['TMPDIR'] === $root . '/tmp', 'UI tmux environment drifted');
             check($first['AGENTBOARD_SOCKET'] === $second['AGENTBOARD_SOCKET'], 'UI socket contract drifted');
+            // The panel launcher starts the UI with the web server's PATH; the UI must still find `pikkumies` in ~/bin.
+            @mkdir($root . '/fixturehome/bin', 0700, true);
+            $ui = EternalUi::environment($root . '/fixturehome', $base, $base . '/ui-path');
+            check(strpos($ui['PATH'], $root . '/fixturehome/bin:') === 0, 'UI PATH lacks the account bin directory');
         } finally {
+            @rmdir($root . '/fixturehome/bin');
+            @rmdir($root . '/fixturehome');
             Eternal::$tmuxDirectory = null;
             @rmdir($root . '/tmux');
             @rmdir($root . '/tmp');
