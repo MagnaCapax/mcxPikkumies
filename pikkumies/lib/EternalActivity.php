@@ -6,7 +6,8 @@
  * has no session pointer since its start yet), else what the pane's input line shows (EternalAsk::screenStatus): idle,
  * held (unsent text at the input) or busy. line: the newest activity entry of Primary's spool (lib/HookSpool.php), a tool
  * call line or the start of an agent text as lib/GoalReviewWindow.php builds them, never a request the user typed; at
- * most LINE characters, control characters removed; at: that record's time. The spool is found from the pane's process
+ * most LINE characters, control characters removed; at: that record's time. said / said_at: the newest agent text alone
+ * (never a tool call line), cut and cleaned the same way, for a page that must not show commands. The spool is found from the pane's process
  * tree: the Hermes process carries the launcher's run key and depth (lib/HookRunCount.php), else the session pointer.
  * With every interval hook unit off there is no spool, so the line stays empty.
  */
@@ -37,10 +38,10 @@ class EternalActivity
         return [0, 'Primary: ' . $a['state'] . ($a['line'] !== '' ? '; latest: ' . $a['line'] : '')];
     }
 
-    /** ['state', 'line', 'at'] for Primary. */
+    /** ['state', 'line', 'at', 'said', 'said_at'] for Primary. */
     public static function read($localDir)
     {
-        $none = ['line' => '', 'at' => 0];
+        $none = ['line' => '', 'at' => 0, 'said' => '', 'said_at' => 0];
         if (is_file($localDir . '/eternals.off') || Eternal::sourceHeld($localDir . '/eternals.hold', time())) {
             return ['state' => 'off'] + $none;
         }
@@ -107,21 +108,33 @@ class EternalActivity
         return $best === null ? '' : $best[2];
     }
 
-    /** ['line', 'at'] of the newest activity entry among spool $records; never a user record. */
+    /**
+     * ['line', 'at'] of the newest activity entry among spool $records, and ['said', 'said_at'] of the newest agent text
+     * among them (a tool call line never); never a user record.
+     */
     public static function latest(array $records)
     {
         $activity = GoalReviewWindow::read($records)['activity'];
         if (!$activity) {
-            return ['line' => '', 'at' => 0];
+            return ['line' => '', 'at' => 0, 'said' => '', 'said_at' => 0];
         }
-        $last = end($activity);
-        $at = 0;
+        $at = [];
         foreach ($records as $r) {
-            if (is_array($r) && isset($r['seq'], $r['ts']) && $r['seq'] === $last['seq'] && is_string($r['ts'])) {
-                $at = (int) strtotime($r['ts']);
+            if (is_array($r) && isset($r['seq'], $r['ts']) && is_string($r['ts'])) {
+                $at[$r['seq']] = (int) strtotime($r['ts']);
             }
         }
-        return ['line' => GoalReviewWindow::line(EternalAsk::clean($last['text']), self::LINE), 'at' => $at];
+        $last = end($activity);
+        $said = null;
+        foreach (array_reverse($activity) as $a) {
+            if ($a['kind'] === 'A') {
+                $said = $a;
+                break;
+            }
+        }
+        return ['line' => GoalReviewWindow::line(EternalAsk::clean($last['text']), self::LINE), 'at' => $at[$last['seq']] ?? 0,
+            'said' => $said === null ? '' : GoalReviewWindow::line(EternalAsk::clean($said['text']), self::LINE),
+            'said_at' => $said === null ? 0 : ($at[$said['seq']] ?? 0)];
     }
 
     /** NAME => value of a /proc environ file; [] when it cannot be read. */

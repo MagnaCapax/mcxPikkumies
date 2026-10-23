@@ -29,18 +29,29 @@ function eaSpool($local, $hash, array $records)
 return [
     'eternal activity: the newest tool line or agent text start, never the user\'s request, cut and without control characters' => function () {
         $none = EternalActivity::latest([eaRec(1, 'user', ['text' => 'my private request'])]);
-        check($none === ['line' => '', 'at' => 0], 'user text only: ' . json_encode($none));
+        check($none === ['line' => '', 'at' => 0, 'said' => '', 'said_at' => 0], 'user text only: ' . json_encode($none));
         $tools = EternalActivity::latest([eaRec(1, 'user', ['text' => 'please check the disk']), eaRec(2, 'tool', ['tool' => 'terminal', 'args' => '{"command":"ls -la"}', 'status' => 'ok']),
             eaRec(3, 'tool', ['tool' => 'terminal', 'args' => '{"command":"df -h"}', 'status' => 'ok'])]);
-        check($tools === ['line' => 'terminal: df -h', 'at' => 1760000003], 'newest tool line: ' . json_encode($tools));
+        check($tools === ['line' => 'terminal: df -h', 'at' => 1760000003, 'said' => '', 'said_at' => 0], 'newest tool line: ' . json_encode($tools));
         $text = EternalActivity::latest([eaRec(1, 'user', ['text' => 'hi']), eaRec(2, 'assistant', ['text' => "Checking the disk now.\nThen the logs."])]);
-        check($text === ['line' => 'Checking the disk now. Then the logs.', 'at' => 1760000002], 'agent text start: ' . json_encode($text));
+        check($text === ['line' => 'Checking the disk now. Then the logs.', 'at' => 1760000002, 'said' => 'Checking the disk now. Then the logs.', 'said_at' => 1760000002], 'agent text start: ' . json_encode($text));
         $after = EternalActivity::latest([eaRec(1, 'tool', ['tool' => 'read_file', 'args' => '{"path":"/x/y"}']), eaRec(2, 'user', ['text' => 'SECRET-REQUEST'])]);
         check($after['line'] === 'read_file: /x/y' && strpos(json_encode($after), 'SECRET') === false, 'a later user record was printed: ' . json_encode($after));
         $long = EternalActivity::latest([eaRec(1, 'assistant', ['text' => str_repeat('ä', 500)])]);
         check(preg_match_all('/./us', $long['line']) === 200, 'not cut to 200 characters: ' . preg_match_all('/./us', $long['line']));
         $ctl = EternalActivity::latest([eaRec(1, 'reply', ['text' => "ok\x1b[31m red\x07\xC2\x9Bdone\x00"])]);
         check(preg_match('/[\x00-\x1F\x7F]|\xC2[\x80-\x9F]/', $ctl['line']) === 0 && strpos($ctl['line'], 'red') !== false && strpos($ctl['line'], 'done') !== false, 'control characters kept: ' . json_encode($ctl));
+    },
+    'eternal activity: said is the newest agent text only, so a page can show progress without any command' => function () {
+        $mixed = EternalActivity::latest([eaRec(1, 'user', ['text' => 'is my disk full?']), eaRec(2, 'assistant', ['text' => 'Looking at your disk use.']),
+            eaRec(3, 'tool', ['tool' => 'terminal', 'args' => '{"command":"du -sh ~/data"}', 'status' => 'ok'])]);
+        check($mixed['line'] === 'terminal: du -sh ~/data' && $mixed['said'] === 'Looking at your disk use.' && $mixed['said_at'] === 1760000002,
+            'said must be the newest agent text, never the tool line: ' . json_encode($mixed));
+        $toolsOnly = EternalActivity::latest([eaRec(1, 'tool', ['tool' => 'terminal', 'args' => '{"command":"cat /etc/passwd"}', 'status' => 'ok'])]);
+        check($toolsOnly['said'] === '' && $toolsOnly['said_at'] === 0, 'tool-only spool must leave said empty: ' . json_encode($toolsOnly));
+        $result = EternalActivity::latest([eaRec(1, 'assistant', ['text' => "Result: All fine, no ticket needed.\nYour disk is 41% full."]),
+            eaRec(2, 'tool', ['tool' => 'read_file', 'args' => '{"path":"/x"}'])]);
+        check(strpos($result['said'], 'Result: All fine, no ticket needed.') === 0, 'the answer start must come through said: ' . json_encode($result));
     },
     'eternal activity: the spool of the shallowest agent under the pane, found by its run key, depth, pid and start time' => function () {
         $root = testTempDir('eternal-activity-spool');
@@ -87,7 +98,7 @@ return [
             list($code, $out) = runPhp($runner, ['root']);
             check($code === 1 && strpos($out, 'not root') !== false && !is_file($root . '/calls'), 'root was not refused: ' . $out);
             list($code, $out) = runPhp($runner, ['activity', '--json']);
-            check($code === 0 && json_decode($out, true) === ['state' => 'absent', 'line' => '', 'at' => 0], 'no Primary: ' . $out);
+            check($code === 0 && json_decode($out, true) === ['state' => 'absent', 'line' => '', 'at' => 0, 'said' => '', 'said_at' => 0], 'no Primary: ' . $out);
             @mkdir($root . '/local/tmux', 0700);
             @mkdir($root . '/local/tmp', 0700);
             EternalRecord::$base = $root . '/local/eternals';
@@ -100,12 +111,12 @@ return [
             eaSpool($root . '/local', HookRunCount::runHash($run, 1, '501:11'), [eaRec(1, 'user', ['text' => 'SECRET-USER-REQUEST']),
                 eaRec(2, 'tool', ['tool' => 'terminal', 'args' => '{"command":"df -h /home"}', 'status' => 'ok'])]);
             list($code, $out) = runPhp($runner, ['activity', '--json']);
-            check($code === 0 && json_decode($out, true) === ['state' => 'busy', 'line' => 'terminal: df -h /home', 'at' => 1760000002], 'busy Primary: ' . $out);
+            check($code === 0 && json_decode($out, true) === ['state' => 'busy', 'line' => 'terminal: df -h /home', 'at' => 1760000002, 'said' => '', 'said_at' => 0], 'busy Primary: ' . $out);
             list($code, $out) = runPhp($runner, ['activity']);
             check($code === 0 && trim($out) === 'Primary: busy; latest: terminal: df -h /home' && strpos($out, 'SECRET') === false, 'plain: ' . $out);
             file_put_contents($root . '/local/eternals.off', "off\n");
             list($code, $out) = runPhp($runner, ['activity', '--json']);
-            check($code === 0 && json_decode($out, true) === ['state' => 'off', 'line' => '', 'at' => 0], 'off: ' . $out);
+            check($code === 0 && json_decode($out, true) === ['state' => 'off', 'line' => '', 'at' => 0, 'said' => '', 'said_at' => 0], 'off: ' . $out);
             unlink($root . '/enabled');
             list($code, $out) = runPhp($runner, ['activity', '--json']);
             check($code === 1 && strpos($out, 'not enabled') !== false, 'markerless host answered: ' . $out);
