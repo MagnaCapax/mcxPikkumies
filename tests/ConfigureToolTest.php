@@ -53,9 +53,12 @@ return [
         }
         // #35 guards intentional strictness: only acceptTerms()'s literal boolean true counts, so a
         // hand-edited truthy-but-not-true value (a string, here) must still warn.
+        // Off a Pulsed Media server: there the terms are not asked (ADR-0032 amendment 2026-10-24), so nothing warns.
         $config = Config::defaults();
         $config['terms']['accepted'] = 'true';
+        ConfigureTiers::$pmssOverride = false;
         $rows = array_column(ConfigureSettings::review($config), null, 'key');
+        ConfigureTiers::$pmssOverride = null;
         check(isset($rows['terms.accepted']['warning']), 'a string "true" must still warn (only the literal boolean counts)');
         // #36 independent oracle: filesize() of a file the test itself created, not a re-derivation.
         $dir = testTempDir('pk-configure-statedb');

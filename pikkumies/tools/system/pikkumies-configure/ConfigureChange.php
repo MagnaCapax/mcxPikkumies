@@ -17,7 +17,7 @@ class ConfigureChange
 {
     /** What the person's own change does and where they make it: a key, else a key prefix; the first match wins. */
     const HOW = [
-        'terms.' => 'only the person accepts the terms: they are asked at the first interactive start, or install with `pikkumies install --accept-terms`',
+        'terms.' => 'only the person accepts the terms: they are asked at the first interactive start (never on a Pulsed Media server, where signing up accepted them), or install with `pikkumies install --accept-terms`',
         'provider.' => 'the AI provider and its key file are the person\'s: they set them in ~/pikkumies/local/config.php or in the key file',
         'host.' => 'host.* overrides what detection found; the person sets it by hand in ~/pikkumies/local/config.php',
         'root.disabled' => 'turning root\'s tools back on lets the agent act as root; the person sets root.disabled to false by hand in ~/pikkumies/local/config.php',

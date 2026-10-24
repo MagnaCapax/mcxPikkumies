@@ -26,7 +26,7 @@ class EternalAsk
         if ($nonce !== '' && preg_match('/^[A-Za-z0-9_-]{8,64}$/D', $nonce) !== 1) {
             return [1, 'Ask nonce is invalid.'];
         }
-        if (empty(Config::load()['terms']['accepted']) || Eternal::ready() !== '') {
+        if (!Config::termsAccepted(Config::load()) || Eternal::ready() !== '') {
             return [2, 'Setup is not finished. Open Primary to accept the terms.'];
         }
         $lock = Eternal::lock();

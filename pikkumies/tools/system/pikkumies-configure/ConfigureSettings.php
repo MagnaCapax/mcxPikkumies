@@ -128,7 +128,7 @@ class ConfigureSettings
             $size = $stateDb !== null && is_file($stateDb) ? ' (now ' . round(filesize($stateDb) / 1048576, 1) . ' MB)' : '';
             return 'sessions are kept forever, so Hermes\' session store ~/pikkumies/local/hermes/state.db' . $size . ' keeps growing and counts against the disk quota; a number of days lets Hermes prune old ended sessions';
         }
-        if ($key === 'terms.accepted' && $v !== true) {
+        if ($key === 'terms.accepted' && $v !== true && !ConfigureTiers::onPmss()) {
             return 'not accepted yet; the next interactive session asks the person';
         }
         return '';

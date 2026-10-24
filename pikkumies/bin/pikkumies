@@ -573,7 +573,7 @@ switch ($cmd) {
         if (Launch::isTty() && Launch::isSession($passArgs)) {
             try {
                 $firstConfig = Config::load();
-                if (empty($firstConfig['terms']['accepted'])) {
+                if (!Config::termsAccepted($firstConfig)) {
                     promptWrite(Launch::settingsNote($firstConfig));
                     if (!Launch::askTerms('promptRead', 'promptWrite')) {
                         out('Not starting: the terms of service and privacy policy have to be accepted first. Run `pikkumies` again when you are ready.');

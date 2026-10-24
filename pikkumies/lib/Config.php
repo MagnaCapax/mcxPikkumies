@@ -243,6 +243,20 @@ class Config
         return self::write('web.search', (bool) $on, $file);
     }
 
+    /**
+     * Whether a session starts without the terms question: the person accepted them here, or this is a Pulsed Media (PMSS)
+     * server, whose customers accepted these same terms (Launch::TERMS_URL) when they signed up. Operator 2026-10-24:
+     * no "accepting terms before action in our own service".
+     */
+    public static function termsAccepted(array $config)
+    {
+        if (!empty($config['terms']['accepted'])) {
+            return true;
+        }
+        require_once __DIR__ . '/ConfigureTiers.php';
+        return ConfigureTiers::onPmss();
+    }
+
     /** The person accepted the terms of service and privacy policy: only the TTY prompt and install --accept-terms call this. */
     public static function acceptTerms($file = null)
     {

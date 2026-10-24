@@ -14,7 +14,8 @@
  * `pikkumies configure` reviews the settings, with the agent on a terminal (ADR-0052). `pikkumies configure undo`, the
  * person's own, sets the last settings change back, asking y/N first only for a change in the asked tier (ADR-0059).
  *
- * First start (ADR-0032): an interactive `run` on a terminal asks the person to accept the terms and privacy policy;
+ * First start (ADR-0032): an interactive `run` on a terminal asks the person to accept the terms and privacy policy,
+ * except on a Pulsed Media server, whose customers accepted them at signup (Config::termsAccepted, ADR-0032 amendment 2026-10-24);
  * nothing else is asked, the agent's name included (it is Pikkumies until renamed in chat or with configure). Without a
  * terminal nothing is asked and nothing is blocked; install flags answer every question.
  */
