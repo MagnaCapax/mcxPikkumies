@@ -46,8 +46,9 @@ PHP;
         putenv('PIKKUMIES_KEY=fixture-key');
         putenv('TMUX=/ordinary/socket,1,0');
         // The cap counts sends per wall-clock minute (EternalAsk::send); near a minute boundary the counted sends
-        // would straddle it and the sixth one pass (CI, 2026-10-20). Start in a fresh minute instead.
-        if (time() % 60 > 50) {
+        // would straddle it and the sixth one pass (CI, 2026-10-20). Start in a fresh minute instead. The sends took
+        // 10.3 s on a CI runner started at second 50 (2026-10-24), so leave half a minute.
+        if (time() % 60 > 30) {
             sleep(61 - time() % 60);
         }
         try {
