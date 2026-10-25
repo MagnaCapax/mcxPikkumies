@@ -69,9 +69,13 @@ class HermesConfig
     public static function write(array $config, array $profile)
     {
         $home = self::home();
-        @mkdir($home . '/skills', 0700, true);
         $prov = Provider::resolve($config);
-        $prov['model'] = Provider::model($prov, $ids);
+        $prov['model'] = Provider::model($prov, $ids, $http);
+        if ($prov['model'] === '') {
+            // Leave both config layers and the light-model decision intact; never start on an empty default.
+            throw new Exception(Provider::modelFailure($http));
+        }
+        @mkdir($home . '/skills', 0700, true);
         // The light model for hooks (local/llm.json), reusing the /models answer when there was one;
         // also goes under auxiliary.goal_judge below, since /goal already uses an auxiliary judge (ADR-0047).
         $light = Provider::writeLight($prov, $config, $ids);
@@ -189,6 +193,9 @@ class HermesConfig
      */
     public static function renderYaml(array $prov, array $skillDirs, array $hooks, $lazyInstalls = false, $goalJudgeModel = '', $pinsOnly = false, $webSearch = false)
     {
+        if ($prov['model'] === '') {
+            throw new Exception(Provider::modelFailure());
+        }
         $y = $pinsOnly ? self::managedHeader() : self::seedHeader();
         // A named provider: Hermes reads key_env for entries under providers: (hermes_cli/providers.py);
         // a bare `provider: custom` ignored model.key_env when this was first verified (ADR-0005).

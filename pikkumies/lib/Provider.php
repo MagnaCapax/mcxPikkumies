@@ -92,15 +92,33 @@ class Provider
     /**
      * The model to use: the configured one, else the first model the endpoint lists.
      * Hermes needs an explicit model; an OpenAI-compatible endpoint names its models in /models.
-     * $ids receives the listed ids when /models was asked, so a caller can reuse that one request.
+     * $ids and $http receive the /models result so a caller can reuse that one request and explain a failure.
      */
-    public static function model(array $prov, &$ids = null)
+    public static function model(array $prov, &$ids = null, &$http = null)
     {
+        $http = null;
         if ($prov['model'] !== '') {
             return $prov['model'];
         }
-        list(, $ids) = self::models($prov);
+        list($http, $ids) = self::models($prov);
         return $ids ? $ids[0] : '';
+    }
+
+    /** Why no default model is available; only our words and the status, never a key or response body. */
+    public static function modelFailure($http = null)
+    {
+        if ($http === 401 || $http === 403) {
+            $why = 'the model key was rejected (HTTP ' . $http . ')';
+        } elseif ($http === 0) {
+            $why = 'the model endpoint is unreachable (connection failed or timed out)';
+        } elseif ($http >= 200 && $http < 300) {
+            $why = 'the model endpoint lists no models';
+        } elseif ($http !== null) {
+            $why = 'the model endpoint could not list models (HTTP ' . $http . ')';
+        } else {
+            $why = 'no default model is available';
+        }
+        return $why . '. Run `pikkumies doctor`.';
     }
 
     /**

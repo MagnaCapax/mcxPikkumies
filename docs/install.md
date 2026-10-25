@@ -26,6 +26,11 @@ key=your-key
 
 Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
+Without a configured model, Pikkumies uses the endpoint's first listed model. If the
+key is rejected, the endpoint cannot be reached or it lists no models, startup stops
+with that reason and points to `pikkumies doctor`. Existing Hermes defaults stay intact;
+an empty default is never written ([ADR-0110](adr/0110-refuse-start-without-a-default-model.md)).
+
 On a Pulsed Media seedbox with at least 1000 MiB RAM, Pikkumies comes preinstalled on new accounts. The platform runs the installer with `PIKKUMIES_SKIP_HERMES=1`, which skips the agent runtime build. The runtime then builds at the account's daily update time, or the first time you run `pikkumies`: that run starts the build (or finds it running), shows its progress on one line while it waits, usually a few minutes, and then starts the session (ADR-0033).
 
 When OpenClaw is installed in the account, Pikkumies writes `<state dir>/skills/pikkumies/SKILL.md` at every start and update: the state directory is the non-empty `OPENCLAW_STATE_DIR` in Pikkumies' environment, otherwise `~/.openclaw`. Turn the skill off with OpenClaw setting `skills.entries.pikkumies.enabled false`; deleting the file only lasts until the next start. After removing Pikkumies, the folder `~/.openclaw/skills/pikkumies` (or its equivalent in your chosen state directory) can be deleted ([ADR-0105](adr/0105-openclaw-skill.md)).

@@ -273,7 +273,11 @@ switch ($cmd) {
     case 'doctor':
         $config = Config::load();
         $prov = Provider::resolve($config);
-        list($ok, $http) = Provider::check($prov);
+        $model = Provider::model($prov, $ids, $http);
+        if ($http === null) { // An explicitly configured model needs no discovery; doctor still checks the key.
+            list(, $http) = Provider::check($prov);
+        }
+        $ok = $http >= 200 && $http < 300;
         if (Config::overlayPath() !== '') {
             out('overlay:  ' . Config::overlayPath() . ' (PIKKUMIES_CONFIG, merged over ' . Config::shown(Config::localDir() . '/config.php') . ')');
         } elseif ((string) getenv('PIKKUMIES_CONFIG') !== '') {
@@ -287,7 +291,10 @@ switch ($cmd) {
         if ($credits !== null) {
             out('credits:  ' . number_format($credits, 0, '.', ' ') . ' left on this key');
         }
-        out('model:    ' . (Provider::model($prov) ?: '(none: set provider.model in ' . Config::shown(Config::localDir() . '/config.php') . ')'));
+        out('model:    ' . ($model !== '' ? $model : '(none)'));
+        if ($model === '') {
+            out('Not starting: ' . Provider::modelFailure($http));
+        }
         out('pikkumies: ' . UpdateChannel::describe($config['update']['channel'])); // read from the checkout, never fetched (ADR-0057)
         if (HermesInstall::isComplete()) {
             $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());
@@ -602,7 +609,7 @@ switch ($cmd) {
         try {
             generate(profile());
         } catch (Exception $x) {
-            out('not starting: ' . $x->getMessage());
+            out('Not starting: ' . $x->getMessage());
             if ($eternalId !== '') {
                 Eternal::afterExit($eternalId, 1, $eternalStarted, $eternalSignalled);
             }
