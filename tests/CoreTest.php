@@ -250,9 +250,9 @@ echo json_encode(["data" => []]);
 ');
         try {
             list($code, $ids) = Provider::models(['endpoint' => '', 'key' => 'k', 'model' => '']);
-            check($code === 0 && $ids === [] && !is_file("$dir/calls"), 'a blank endpoint must make no request: ' . json_encode([$code, $ids]));
+            check($code < 0 && $ids === [] && !is_file("$dir/calls"), 'a blank endpoint must make no request: ' . json_encode([$code, $ids]));
             list($code, $ids) = Provider::models(['endpoint' => $base, 'key' => '', 'model' => '']);
-            check($code === 0 && $ids === [] && !is_file("$dir/calls"), 'a blank key must make no request: ' . json_encode([$code, $ids]));
+            check($code < 0 && $ids === [] && !is_file("$dir/calls"), 'a blank key must make no request: ' . json_encode([$code, $ids]));
             list($code, $ids) = Provider::models(['endpoint' => $base, 'key' => 'k', 'model' => '']);
             check($code === 200 && is_file("$dir/calls"), 'a real endpoint+key must actually call /models: ' . json_encode([$code, $ids]));
         } finally {

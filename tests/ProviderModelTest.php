@@ -27,9 +27,9 @@ echo "{\"data\": []}";
             check(Provider::model($prov, $ids, $http) === 'fixture' && $http === null, 'configured model changed');
             check(count(file("$dir/calls")) === 4, 'configured models must not need discovery');
             $prov['model'] = '';
-            $prov['endpoint'] = ''; // No reachable endpoint, like a connection failure or timeout: status 0.
-            check(Provider::model($prov, $ids, $http) === '' && $http === 0, 'no endpoint must yield no model');
-            check(strpos(Provider::modelFailure($http), 'unreachable') !== false, 'unreachable endpoint needs its own reason');
+            $prov['endpoint'] = ''; // No request can be sent; this is distinct from a connection failure.
+            check(Provider::model($prov, $ids, $http) === '' && $http < 0, 'no endpoint must yield an unsent result');
+            check(strpos(Provider::modelFailure($http), 'no endpoint= line') !== false, 'missing endpoint needs its own reason');
         } finally {
             coProviderServerDone($proc, $dir);
         }
