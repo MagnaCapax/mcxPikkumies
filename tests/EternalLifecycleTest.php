@@ -44,6 +44,9 @@ return [
         }
         @mkdir($root . '/include', 0700);
         @mkdir($root . '/home', 0700);
+        @mkdir($root . '/local', 0700);
+        // A configured model needs no discovery (ADR-0110), so the resident starts without a provider.
+        file_put_contents($root . '/local/config.php', '<?php return ' . var_export(['provider' => ['model' => 'fixture']], true) . ';');
         @mkdir($root . '/hermes/.hermes/bin', 0700, true);
         file_put_contents($root . '/enabled', "1\n");
         file_put_contents($root . '/include/.hermes-ready', "ready\n");
