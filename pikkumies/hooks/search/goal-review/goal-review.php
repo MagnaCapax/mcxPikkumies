@@ -23,7 +23,7 @@ require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 require_once dirname(__DIR__, 3) . '/tools/system/credits/CreditsLine.php';
 
 const GOAL_REVIEW_DAILY = 24;       // model calls a day per account unless hooks.dailyCalls.goal-review says otherwise
-const GOAL_REVIEW_MAX_TOKENS = 500; // 13 short lines; some light models spend output on reasoning first
+const GOAL_REVIEW_MAX_TOKENS = 300; // 13 short lines; HookLlm adds the reasoning allowance on top
 const GOAL_REVIEW_LOG_DAYS = 7;
 const GOAL_REVIEW_GATES = ['firstAfter' => 300, 'firstTokens' => 75000, 'thenEvery' => 1800, 'thenTokens' => 600000];
 const GOAL_REVIEW_RETRY = 600;      // seconds after a call that gave no usable answer, doubling up to RETRY_MAX

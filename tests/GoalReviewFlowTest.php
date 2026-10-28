@@ -104,7 +104,7 @@ return [
             list($d, $raw) = grRun($tree, grWindow());
             $req = hookSearchRequests("$tree/fake");
             $user = $req[0]['body']['messages'][1]['content'];
-            check(count($req) === 1 && $req[0]['body']['max_tokens'] === 500 && $req[0]['body']['messages'][0]['content'] === GoalReview::SYSTEM, 'request: ' . json_encode($req));
+            check(count($req) === 1 && $req[0]['body']['max_tokens'] === 300 + HookLlm::REASONING_ALLOWANCE && $req[0]['body']['messages'][0]['content'] === GoalReview::SYSTEM, 'request: ' . json_encode($req));
             check(preg_match('/^Marker: ([0-9a-f]{8})\n<<<DATA-\1\n/', $user) === 1 && strpos($user, "R1: Please move my torrents to the new disk\n") !== false
                 && strpos($user, 'R2: Did it move all of them? Check the free space too') !== false && strpos($user, 'T: terminal: df -h') !== false
                 && strpos($user, 'T1: diskmove') !== false && strpos($user, 'D1: Moving torrents to a new disk') !== false, 'data: ' . $user);

@@ -11,7 +11,7 @@ require_once __DIR__ . '/GatewayAccess.php';
 
 class AskReview
 {
-    const TIMEOUT = 8;          // seconds for the one model call; part of the pre_tool_call hook entry's timeout
+    const TIMEOUT = 20;         // seconds for the one model call (a reasoning light model takes about 6 s); part of the pre_tool_call hook entry's timeout
     const MAX_TOKENS = 40;
     const USER_MESSAGES = 3;    // the user's most recent messages kept as evidence
     const ENTRY_MAX = 2000;     // characters per evidence entry

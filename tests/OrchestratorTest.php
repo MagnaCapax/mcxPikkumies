@@ -190,8 +190,9 @@ return [
             's/ctx' => ['pre_llm_call', false, 3, 'exit(0);'],
         ]);
         $e = HermesConfig::hookEntries("$tree/pikkumies/hooks");
+        $t = 10 + 7 + 2 + AskReview::TIMEOUT; // the units, plus 2, plus the ask review (ADR-0073)
         check(array_keys($e) === ['pre_llm_call', 'pre_tool_call'], 'entries: ' . json_encode($e));
-        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call 27", 'failClosed' => true, 'timeout' => 27], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call'])); // 10 + 7 + 2, plus AskReview::TIMEOUT (8) for the ask review (ADR-0073)
+        check($e['pre_tool_call'] === ['command' => PHP_BINARY . " -d display_errors=stdout -d error_reporting=4437 $tree/pikkumies/hooks/orchestrator.php pre_tool_call $t", 'failClosed' => true, 'timeout' => $t], 'pre_tool_call entry: ' . json_encode($e['pre_tool_call'])); // 10 + 7 + 2, plus AskReview::TIMEOUT for the ask review (ADR-0073)
         check($e['pre_llm_call']['failClosed'] === false && $e['pre_llm_call']['timeout'] === 5, 'pre_llm_call entry: ' . json_encode($e['pre_llm_call']));
         $y = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a'], $e);
         check(substr_count($y, '    - command: ') === 2 && substr_count($y, 'fail_closed: true') === 1 && strpos($y, "hooks_auto_accept: true\n") !== false, 'yaml: ' . $y);

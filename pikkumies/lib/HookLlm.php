@@ -12,6 +12,12 @@ require_once __DIR__ . '/Provider.php';
 
 class HookLlm
 {
+    /**
+     * Tokens a light model may spend reasoning before its answer, added to every caller's answer size (ADR-0073 amendment
+     * 2026-10-28): a caller sizes $maxTokens for its answer, and a capped reasoning model otherwise returns no answer at all.
+     */
+    const REASONING_ALLOWANCE = 400;
+
     /** One chat completion: the reply text, or '' on any failure. $model: a caller's own pick (goal review), '' for model(). */
     public static function chat(array $messages, $timeout = 6, $maxTokens = 60, $model = '')
     {
@@ -24,12 +30,18 @@ class HookLlm
         if ($prov['endpoint'] === '' || $prov['key'] === '' || $model === '') {
             return '';
         }
-        $body = json_encode(['model' => $model, 'messages' => $messages, 'max_tokens' => $maxTokens, 'temperature' => 0], JSON_INVALID_UTF8_SUBSTITUTE); // L3: a caller's byte-cut text can land mid-character; substitute rather than fail the whole encode
+        $body = json_encode(self::body($model, $messages, $maxTokens), JSON_INVALID_UTF8_SUBSTITUTE); // L3: a caller's byte-cut text can land mid-character; substitute rather than fail the whole encode
         // Same rule as Provider::models: the endpoint may be a local service of root or a service account.
         $r = Http::request('POST', $prov['endpoint'] . '/chat/completions', ['timeout' => $timeout, 'max' => 65536, 'owners' => 'system',
             'headers' => ['Authorization: Bearer ' . $prov['key'], 'Content-Type: application/json'], 'body' => $body]);
         $d = $r['code'] >= 200 && $r['code'] < 300 ? json_decode($r['body'], true) : null;
         return isset($d['choices'][0]['message']['content']) && is_string($d['choices'][0]['message']['content']) ? $d['choices'][0]['message']['content'] : '';
+    }
+
+    /** The request body: the caller's answer size plus the reasoning allowance. */
+    public static function body($model, array $messages, $maxTokens)
+    {
+        return ['model' => $model, 'messages' => $messages, 'max_tokens' => (int) $maxTokens + self::REASONING_ALLOWANCE, 'temperature' => 0];
     }
 
     /**

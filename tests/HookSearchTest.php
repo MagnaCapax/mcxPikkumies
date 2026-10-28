@@ -169,7 +169,7 @@ return [
             $req = hookSearchRequests($fake);
             check(count($req) === 1 && $req[0]['uri'] === '/v1/chat/completions' && $req[0]['auth'] === 'Bearer test-key-123', 'one request with the agent key expected');
             $b = $req[0]['body'];
-            check($b['model'] === 'acme/model-9-mini' && $b['max_tokens'] === 60 && $b['temperature'] === 0, 'model or limits wrong: ' . json_encode($b));
+            check($b['model'] === 'acme/model-9-mini' && $b['max_tokens'] === 60 + HookLlm::REASONING_ALLOWANCE && $b['temperature'] === 0, 'model or limits wrong: ' . json_encode($b));
             check(count($b['messages']) === 2 && $b['messages'][1] === ['role' => 'user', 'content' => $question], 'something besides the user message was sent');
             $first = hookSearchRun($tree, hookSearchTurn('s7', $question, true));
             check(strpos($first, 'pikkumies.php search') !== false && strpos($first, 'searched as: disk quota') !== false, 'first-turn reword missing: ' . $first);

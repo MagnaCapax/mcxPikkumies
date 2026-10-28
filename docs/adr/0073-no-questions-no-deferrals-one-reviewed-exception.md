@@ -97,3 +97,24 @@ What was found (Hermes v0.22.2):
 - `NestedAgent::approvalsOff()` stays as a reader of the flag; no unit treats it as a reason to hand work back.
 
 **Consequences.** Hermes shows the session as yolo, which matches what it does. There is no setting to turn it off: the approvals bypass is the pinned `approvals.mode`, and the flag adds nothing a person could switch back on. Tests: `tests/LaunchRoutingTest.php` (the launcher contract), and the feedback, ticket and bundle send tests.
+
+## Amendment 2026-10-28: room for the light model's reasoning
+
+The review asked for its three answer lines with `max_tokens` 40 and 8 s. The
+platform's light model reasons before it answers: over seven days it spent 67
+reasoning tokens a request on average and took about 6 s to its whole answer,
+and 386 of 404 calls capped at 40 tokens spent all 40 on reasoning. Those calls
+returned no answer, so the review had nothing to read and every `/ticket` and
+`/feedback` send was refused with the unchecked reason.
+
+Every hook model call now gets `HookLlm::REASONING_ALLOWANCE` (400 tokens) on
+top of the answer size its caller asks for, in `HookLlm` itself, so no caller
+sizes for reasoning on its own (the goal review's 500 goes back to its answer
+size, 300). The review's model call has 20 s (`AskReview::TIMEOUT`), and the
+`pre_tool_call` hook entry grows with it. A review that still gives no answer,
+a missing key or no evidence is refused as before: the unchecked refusal of
+ADR-0101 is unchanged. The allowance is a ceiling only; a model that answers
+directly spends no more than before. A reasoning model now finishes its answer
+instead of stopping inside its reasoning, so a hook call costs a few dozen
+tokens more on the user's own key; the review, the halt judge and the search
+terms still have no daily bound (only the goal review has one).
