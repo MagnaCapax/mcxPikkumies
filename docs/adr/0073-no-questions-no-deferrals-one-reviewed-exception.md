@@ -126,7 +126,7 @@ to send one sentence as feedback. The review answered, and refused it: the send
 named the conversation transcript and system information, and R3 read them as
 reaching further than the user asked. They are what these sends carry by design
 (ADR-0056: "/feedback and that sends us crucial information + transcript"; a
-ticket bundle's system information, logs, diagnosis and transcript, ADR-0100),
+ticket bundle's system information, logs, diagnosis and transcript, [ADR-0100](0100-ticket-bundle-diagnostics-and-automatic-tickets-on-pulsed-media-servers.md)),
 and ADR-0101 decided that the user's own request for the send clears it.
 
 For the two Pikkumies send units (`guard/feedback-send`, `guard/ticket-send`,
