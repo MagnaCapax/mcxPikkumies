@@ -23,6 +23,11 @@ require_once __DIR__ . '/LocalNotes.php';
 require_once __DIR__ . '/HookInterval.php';
 require_once __DIR__ . '/PathName.php';
 
+/** Only install and post-update may finish without a model; write failures must still stop them. */
+class ModelUnavailable extends Exception
+{
+}
+
 class HermesConfig
 {
     public static function home()
@@ -69,11 +74,11 @@ class HermesConfig
     public static function write(array $config, array $profile)
     {
         $home = self::home();
-        $prov = Provider::resolve($config);
+        $prov = Provider::resolve($config, $keyFile);
         $prov['model'] = Provider::model($prov, $ids, $http);
         if ($prov['model'] === '') {
             // Leave both config layers and the light-model decision intact; never start on an empty default.
-            throw new Exception(Provider::modelFailure($http));
+            throw new ModelUnavailable(Provider::modelFailure($http, $keyFile));
         }
         @mkdir($home . '/skills', 0700, true);
         // The light model for hooks (local/llm.json), reusing the /models answer when there was one;

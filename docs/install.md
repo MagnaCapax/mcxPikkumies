@@ -13,7 +13,7 @@ The installer needs no root and returns in seconds. It:
 - on a fresh clone, moves it to the newest release (a tag named by its date, `YYYY-MM-DD`, or `YYYY-MM-DD.N` for a second release that day) unless you install with `--channel=git/<branch>`; with no release published yet it stays on `main` ([ADR-0057](adr/0057-release-channel.md));
 - links `~/pikkumies` to the runtime;
 - detects the machine (OS, which seedbox host it is, root access, running apps, resources);
-- generates one Hermes skill per tool unit and an index of all tools, writes the agent's configuration, and tells the agent what this machine allows;
+- generates one Hermes skill per tool unit and an index of all tools; when a model resolves, writes the agent's configuration and tells the agent what this machine allows;
 - installs Hermes Agent in the background: an unmodified checkout of its newest release in `pikkumies/hermes`, set up by Hermes' own package manager (its pinned, checksum-verified uv and Python) in your own account, with no root and without Hermes' installer scripts, which would edit your shell files ([ADR-0033](adr/0033-vanilla-hermes-git-checkout-updated-separately.md));
 - puts `pikkumies` on your `PATH`: a symlink in `~/.local/bin` or `~/bin` when either is already on `PATH`, otherwise one marked block added to `~/.bashrc` and `~/.profile` (never duplicated on a re-run; [ADR-0022](adr/0022-pikkumies-is-the-one-command-prompt-routing-and-path-install.md)). Open a new shell (or `hash -r`) afterwards.
 
@@ -26,10 +26,20 @@ key=your-key
 
 Check everything with `pikkumies doctor`, then just type `pikkumies`.
 
-Without a configured model, Pikkumies uses the endpoint's first listed model. If the
-key is rejected, the endpoint cannot be reached or it lists no models, startup stops
-with that reason and points to `pikkumies doctor`. Existing Hermes defaults stay intact;
-an empty default is never written ([ADR-0110](adr/0110-refuse-start-without-a-default-model.md)).
+Without a configured model, Pikkumies uses the endpoint's first listed model. Install
+and update finish successfully even if no model resolves, including before the key
+arrives. They report `model: unavailable` with the reason and `pikkumies doctor`, and
+still generate skills and the tool index, arrange both schedules, set up the runtime
+and start the documentation fill. Both Hermes config layers and `local/llm.json`
+stay untouched until a model resolves.
+
+A session or gateway still refuses to start without a model, and explicit
+`pikkumies generate` still fails. A missing or unusable key gets the no-key message;
+a key file without an endpoint names that file and its missing `endpoint=` line.
+Only an attempted connection that fails or times out is called unreachable. A
+rejected key, an empty model list or another HTTP failure keeps its own reason.
+Existing Hermes defaults stay intact; an empty default is never written
+([ADR-0110](adr/0110-refuse-start-without-a-default-model.md)).
 
 On a Pulsed Media seedbox with at least 1000 MiB RAM, Pikkumies comes preinstalled on new accounts. The platform runs the installer with `PIKKUMIES_SKIP_HERMES=1`, which skips the agent runtime build. The runtime then builds at the account's daily update time, or the first time you run `pikkumies`: that run starts the build (or finds it running), shows its progress on one line while it waits, usually a few minutes, and then starts the session (ADR-0033).
 

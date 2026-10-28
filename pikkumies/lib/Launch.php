@@ -31,6 +31,8 @@ class Launch
     const PRIVACY_URL = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Privacy_Policy';
     /** The first start's last line: what the agent does, as a statement. */
     const READY = "Ready. Pikkumies works from plain words: it checks disk space, fixes stuck apps, adds torrents, looks after containers and backups, researches and explains, and changes its own settings, its name too, when told to.\n";
+    const MISSING_KEY_MESSAGE = 'no model key yet. A platform key arrives in ~/.virsilipasKey (on Pulsed Media it is also shown in the client area);'
+        . ' for your own provider put endpoint= and key= lines in ~/.pikkumiesKey. Then run `pikkumies doctor`.';
     /** install flag => the setting it writes (Config::SETTABLE); --accept-terms is separate. */
     const INSTALL_FLAGS = ['name' => 'agent.name', 'telemetry' => 'privacy.telemetry', 'perf-logging' => 'privacy.perfLogging', 'retention-days' => 'sessions.retentionDays', 'channel' => 'update.channel'];
 
@@ -268,8 +270,7 @@ class Launch
         if ($prov['key'] !== '') {
             return '';
         }
-        return 'Not starting: no model key yet. A platform key arrives in ~/.virsilipasKey (on Pulsed Media it is also shown in the client area);'
-            . ' for your own provider put endpoint= and key= lines in ~/.pikkumiesKey. Then run `pikkumies doctor`.';
+        return 'Not starting: ' . self::MISSING_KEY_MESSAGE;
     }
 
     /**

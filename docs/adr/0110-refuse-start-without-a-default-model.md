@@ -36,3 +36,26 @@ startup does not require model discovery to succeed.
 - [ADR-0005](0005-hermes-wiring-verified-against-source.md)
 - [ADR-0062](0062-hermes-config-seeded-once-pins-in-hermes-managed-scope.md)
 - `tests/ProviderModelTest.php`, `tests/ModelStartTest.php`
+
+## Amendment 2026-10-28: provision before the model key arrives
+
+Install can run before the platform delivers a key. A missing key or endpoint sends
+no discovery request, so calling either case an unreachable endpoint was incorrect.
+
+- Discovery carries separate no-key and no-endpoint results, distinct from HTTP 0.
+  `Provider::modelFailure` remains the one classifier: no key reuses the launcher's
+  message naming `~/.virsilipasKey`; no endpoint names the key file and its missing
+  `endpoint=` line. Connection failures and timeouts keep the unreachable reason;
+  HTTP rejection, empty model lists and other HTTP failures keep their reasons.
+- Install and update's post-update step catch only the missing-model refusal, for
+  any discovery failure. They exit 0, report `model: unavailable` with the reason
+  and `pikkumies doctor`, and finish skills, the tool index, both schedules, runtime
+  setup and background documentation fill. Other generation/write errors still fail.
+- Both Hermes config layers and `local/llm.json` remain untouched when no model
+  resolves. `generate()` and `HermesConfig::write` still refuse the empty model;
+  explicit `pikkumies generate` still exits 1. Sessions and gateways still refuse
+  to start, including when old defaults remain on disk.
+- Doctor reports that no request was sent for missing credentials, with the same
+  reason, rather than claiming an HTTP 0 network failure.
+- Regression coverage: `tests/ModelInstallTest.php`, `tests/ModelStartTest.php`,
+  `tests/ProviderModelTest.php`, `tests/CoreTest.php`.

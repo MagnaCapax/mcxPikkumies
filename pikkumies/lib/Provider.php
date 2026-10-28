@@ -8,15 +8,22 @@
  */
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Http.php';
+require_once __DIR__ . '/Launch.php';
 
 class Provider
 {
-    public static function resolve(array $config)
+    // Discovery did not send a request; zero remains a failed connection or timeout.
+    const MODEL_NO_KEY = -1;
+    const MODEL_NO_ENDPOINT = -2;
+
+    /** $keyFile receives the source path for diagnostics, without changing the resolved provider's shape. */
+    public static function resolve(array $config, &$keyFile = null)
     {
         $p = $config['provider'];
         $file = self::keyFile($p);
         $endpoint = getenv('PIKKUMIES_ENDPOINT') ?: ($p['endpoint'] !== '' ? $p['endpoint'] : $file['endpoint']);
         $key = getenv('PIKKUMIES_KEY') ?: $file['key'];
+        $keyFile = getenv('PIKKUMIES_KEY') ? '' : $file['path'];
         return ['endpoint' => rtrim((string) $endpoint, '/'), 'key' => (string) $key, 'model' => (string) $p['model']];
     }
 
@@ -105,9 +112,13 @@ class Provider
     }
 
     /** Why no default model is available; only our words and the status, never a key or response body. */
-    public static function modelFailure($http = null)
+    public static function modelFailure($http = null, $keyFile = '')
     {
-        if ($http === 401 || $http === 403) {
+        if ($http === self::MODEL_NO_KEY) {
+            return Launch::MISSING_KEY_MESSAGE;
+        } elseif ($http === self::MODEL_NO_ENDPOINT) {
+            $why = 'the model key file ' . ($keyFile !== '' ? $keyFile : '(~/.pikkumiesKey or ~/.virsilipasKey)') . ' has no endpoint= line';
+        } elseif ($http === 401 || $http === 403) {
             $why = 'the model key was rejected (HTTP ' . $http . ')';
         } elseif ($http === 0) {
             $why = 'the model endpoint is unreachable (connection failed or timed out)';
@@ -154,11 +165,14 @@ class Provider
         return Http::request('GET', $prov['endpoint'] . $route, ['timeout' => (int) $timeout, 'owners' => 'system', 'max' => (int) $max, 'headers' => ['Authorization: Bearer ' . $prov['key']]]);
     }
 
-    /** GET {endpoint}/models. Returns [httpCode, model ids]. */
+    /** GET {endpoint}/models. Returns [httpCode or MODEL_NO_*, model ids]. Missing credentials send nothing. */
     public static function models(array $prov)
     {
-        if ($prov['endpoint'] === '' || $prov['key'] === '') {
-            return [0, []];
+        if ($prov['key'] === '') {
+            return [self::MODEL_NO_KEY, []];
+        }
+        if ($prov['endpoint'] === '') {
+            return [self::MODEL_NO_ENDPOINT, []];
         }
         // The provider endpoint may be a local service run by another account (root or a service account, never another customer).
         $r = Http::request('GET', $prov['endpoint'] . '/models', ['timeout' => 10, 'owners' => 'system', 'headers' => ['Authorization: Bearer ' . $prov['key']]]);

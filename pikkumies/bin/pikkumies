@@ -46,8 +46,9 @@ function profile($refresh = false)
  * Skills and tools/INDEX.md from the tool units, then the Hermes config (ADR-0015) and OpenClaw's
  * skills/pikkumies/SKILL.md (ADR-0105). Throws when a Pikkumies file cannot be written, so `run`
  * never starts Hermes on a half-written config; an OpenClaw sync error is only reported.
+ * $result retains the generated skills count even when HermesConfig refuses a missing model.
  */
-function generate(array $profile)
+function generate(array $profile, &$result = null)
 {
     $config = Config::load();
     $result = Generate::run(Generate::disabledCategories($config), null, null, null, (array) $config['skills']['disabled']);
@@ -198,8 +199,12 @@ switch ($cmd) {
             exit(1);
         }
         $profile = profile();
+        $modelState = 'ready';
         try {
-            $generated = generate($profile);
+            generate($profile, $generated);
+        } catch (ModelUnavailable $x) {
+            // Provisioning precedes the platform key; keep the remaining setup independent of discovery.
+            $modelState = 'unavailable; ' . $x->getMessage();
         } catch (Exception $x) {
             out('install stopped: ' . $x->getMessage());
             exit(1);
@@ -208,6 +213,7 @@ switch ($cmd) {
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
+        out('  model: ' . $modelState);
         out('  hermes: ' . HermesInstall::ensure(false, !empty($profile['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
         out('  version: ' . UpdateChannel::describe(Config::load()['update']['channel']));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
@@ -235,13 +241,17 @@ switch ($cmd) {
 
     case 'post-update': // internal: the second half of `update`, run by the updated code
         $profile = profile();
+        $modelState = 'ready';
         try {
-            $r = generate($profile);
+            generate($profile, $r);
+        } catch (ModelUnavailable $x) {
+            $modelState = 'unavailable; ' . $x->getMessage();
         } catch (Exception $x) {
             out('generate failed: ' . $x->getMessage());
             exit(1);
         }
         out('generated ' . $r['skills'] . ' skills and tools/INDEX.md');
+        out('model: ' . $modelState);
         $config = Config::load();
         out('auto-update: ' . Update::schedule($config, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
         out('cron-tick: ' . Update::scheduleCronTick($config, !empty($profile['root']['available'])));
@@ -272,7 +282,7 @@ switch ($cmd) {
 
     case 'doctor':
         $config = Config::load();
-        $prov = Provider::resolve($config);
+        $prov = Provider::resolve($config, $keyFile);
         $model = Provider::model($prov, $ids, $http);
         if ($http === null) { // An explicitly configured model needs no discovery; doctor still checks the key.
             list(, $http) = Provider::check($prov);
@@ -284,16 +294,16 @@ switch ($cmd) {
             out('overlay:  ' . getenv('PIKKUMIES_CONFIG') . ' NOT USED: missing, unreadable, not yours, or writable by others');
         }
         out('endpoint: ' .($prov['endpoint'] ? preg_replace('#^([a-z][a-z0-9+.-]*://)[^/@]*@#i', '$1', $prov['endpoint']) : '(not set)')); // never a user:password@ part
-        $keyFrom = getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : Provider::keyFile($config['provider'])['path'];
+        $keyFrom = getenv('PIKKUMIES_KEY') ? 'PIKKUMIES_KEY' : $keyFile;
         out('key:      ' . Provider::mask($prov['key']) . ($prov['key'] !== '' && $keyFrom !== '' ? ' (from ' . $keyFrom . ')' : ''));
-        out('provider: ' . ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')'));
+        out('provider: ' . ($http < 0 ? 'not checked (no request sent)' : ($ok ? 'reachable' : 'not reachable (HTTP ' . $http . ')')));
         $credits = $ok ? Provider::balance($prov) : null;
         if ($credits !== null) {
             out('credits:  ' . number_format($credits, 0, '.', ' ') . ' left on this key');
         }
         out('model:    ' . ($model !== '' ? $model : '(none)'));
-        if ($model === '') {
-            out('Not starting: ' . Provider::modelFailure($http));
+        if ($model === '' || $http < 0) {
+            out('Not starting: ' . Provider::modelFailure($http, $keyFile));
         }
         out('pikkumies: ' . UpdateChannel::describe($config['update']['channel'])); // read from the checkout, never fetched (ADR-0057)
         if (HermesInstall::isComplete()) {
