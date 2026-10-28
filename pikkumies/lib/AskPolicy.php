@@ -27,6 +27,8 @@ class AskPolicy
     const DISCLOSE = ['send', 'mail', 'exposure'];            // cannot be taken back: R2 is yes without asking the model
     const UNCHECKED_BLOCK = ['delete', 'exposure', 'send', 'mail']; // still refused when the check cannot run
     const CONFIRM_UNITS = ['guard/feedback-send', 'guard/ticket-send']; // data leaves for Pulsed Media: reviewed as a send (ADR-0056, ADR-0089)
+    /** Pikkumies' own note to the review of a /feedback or /ticket send (ADR-0073 amendment 2026-10-28): what these sends carry is their design. */
+    const SEND_SCOPE = 'The action is Pikkumies\' own feedback or support ticket send. The conversation transcript, system information and diagnostic files it names are what such a send carries by design, so a user who asked to send the feedback or ticket asked for them too: for R1 judge whether the user asked for this send, and for R3 do not count them as reaching further.';
 
     /** The one refusal (ADR-0101): %s is WHY_UNCOVERED or WHY_UNCHECKED. It never asks and never hands the step over. */
     const BLOCK_REFUSED = 'Pikkumies safety: not run. This could destroy or send something that has no copy, and %s.'
@@ -123,12 +125,16 @@ class AskPolicy
     {
         $questions = [];
         $disclose = false;
+        $note = '';
         foreach ($review as $r) {
             $questions[] = isset($r['message']) ? (string) $r['message'] : 'a Pikkumies hook asks about this call';
+            if (empty($r['local']) && in_array(isset($r['unit']) ? (string) $r['unit'] : '', self::CONFIRM_UNITS, true)) {
+                $note = self::SEND_SCOPE;
+            }
             $disclose = $disclose || self::route($r) === 'confirm' || in_array(self::kind($r), self::DISCLOSE, true);
         }
-        $answers = self::$reviewer !== null ? call_user_func(self::$reviewer, (string) $tool, $questions, $evidence, $timeout)
-            : AskReview::ask((string) $tool, $questions, $evidence, $timeout);
+        $answers = self::$reviewer !== null ? call_user_func(self::$reviewer, (string) $tool, $questions, $evidence, $timeout, $note)
+            : AskReview::ask((string) $tool, $questions, $evidence, $timeout, $note);
         return is_array($answers) && $answers ? AskReview::keep($answers, $disclose) : null;
     }
 

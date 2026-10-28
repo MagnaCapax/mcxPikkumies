@@ -118,3 +118,24 @@ directly spends no more than before. A reasoning model now finishes its answer
 instead of stopping inside its reasoning, so a hook call costs a few dozen
 tokens more on the user's own key; the review, the halt judge and the search
 terms still have no daily bound (only the goal review has one).
+
+## Amendment 2026-10-28: the review knows what a /feedback or /ticket send carries
+
+The first acceptance run after the reasoning allowance had a user ask Pikkumies
+to send one sentence as feedback. The review answered, and refused it: the send
+named the conversation transcript and system information, and R3 read them as
+reaching further than the user asked. They are what these sends carry by design
+(ADR-0056: "/feedback and that sends us crucial information + transcript"; a
+ticket bundle's system information, logs, diagnosis and transcript, ADR-0100),
+and ADR-0101 decided that the user's own request for the send clears it.
+
+For the two Pikkumies send units (`guard/feedback-send`, `guard/ticket-send`,
+not a local unit), `AskPolicy` now gives the review a fixed note,
+`AskPolicy::SEND_SCOPE`, placed after the data markers and before the
+questions: the transcript and system information belong to the send, so for R1
+the review judges whether the user asked for this send, and for R3 it does not
+count them (or the diagnostic files a ticket bundle names) as reaching further.
+Other files are still judged by R3. The note comes from Pikkumies' own code, never
+from the action or the user. Nothing else changes: R1 must still be yes, R2 is
+still yes without asking the model, and a send the user did not ask for (for
+example one a file told the agent to make) is still refused.

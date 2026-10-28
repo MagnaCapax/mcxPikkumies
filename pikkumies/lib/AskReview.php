@@ -95,8 +95,11 @@ class AskReview
         return preg_match('/^.{0,' . self::ENTRY_MAX . '}/su', $text, $m) ? $m[0] : substr($text, 0, self::ENTRY_MAX);
     }
 
-    /** The two chat messages for the model: a fixed instruction, then the delimited data and the questions. */
-    public static function prompt($tool, array $questions, array $evidence)
+    /**
+     * The two chat messages for the model: a fixed instruction, then the delimited data and the questions. $note: a
+     * fixed sentence from Pikkumies' own code (never from the action or the user), placed outside the data markers.
+     */
+    public static function prompt($tool, array $questions, array $evidence, $note = '')
     {
         $said = '';
         foreach ($evidence as $e) {
@@ -110,7 +113,7 @@ class AskReview
         $system = 'You review one action an AI agent is about to take in a user\'s server account. ' . self::DATA_NOTICE
             . ' Reply with exactly three lines, "R1: yes", "R1: no" or "R1: unsure" and the same for R2 and R3, and nothing else.';
         $user = '===ACTION (tool: ' . $tool . ")===\n" . implode("\n", $questions) . "\n===END ACTION===\n\n"
-            . "===WHAT THE USER WROTE OR SAW===\n" . ($said !== '' ? $said : "(nothing available)\n") . "===END===\n\nQuestions:\n" . implode("\n", $lines);
+            . "===WHAT THE USER WROTE OR SAW===\n" . ($said !== '' ? $said : "(nothing available)\n") . "===END===\n\n" . ($note !== '' ? 'Note from Pikkumies: ' . $note . "\n\n" : '') . "Questions:\n" . implode("\n", $lines);
         return [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $user]];
     }
 
@@ -141,8 +144,8 @@ class AskReview
     }
 
     /** One model call; '' (no endpoint, disabled, timeout, error) parses to nothing, which AskPolicy treats as no review. */
-    public static function ask($tool, array $questions, array $evidence, $timeout)
+    public static function ask($tool, array $questions, array $evidence, $timeout, $note = '')
     {
-        return self::parse(HookLlm::chat(self::prompt($tool, $questions, $evidence), $timeout, self::MAX_TOKENS));
+        return self::parse(HookLlm::chat(self::prompt($tool, $questions, $evidence, $note), $timeout, self::MAX_TOKENS));
     }
 }
