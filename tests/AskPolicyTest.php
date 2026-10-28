@@ -98,4 +98,25 @@ return [
         $p = AskReview::prompt('terminal', ['Pikkumies: deletes ~/a'], $ev);
         check(strpos($p[0]['content'], AskReview::DATA_NOTICE) !== false && strpos($p[1]['content'], '[agent replied, and the user answered it next] Delete ~/a too?') !== false, 'prompt');
     },
+    'AskPolicy: a /feedback or /ticket send tells the review, outside the action data, that its transcript and system information are part of the send; other calls and local units do not (ADR-0073 amendment 2026-10-28)' => function () use ($cleared) {
+        $notes = [];
+        AskPolicy::$reviewer = function ($tool, $questions, $ev, $timeout, $note = '') use ($cleared, &$notes) {
+            $notes[] = $note;
+            return $cleared;
+        };
+        try {
+            foreach ([['guard/feedback-send', false, true], ['guard/ticket-send', false, true], ['guard/feedback-send', true, false], ['guard/guard-destructive', false, false]] as $c) {
+                $notes = [];
+                AskPolicy::apply([askApprove('send', ['unit' => $c[0]] + ($c[1] ? ['local' => true] : []))], 'terminal', [['role' => 'user', 'text' => 'send feedback: it works']], 8);
+                check($notes === [$c[2] ? AskPolicy::SEND_SCOPE : ''], json_encode($c) . ': ' . json_encode($notes));
+            }
+        } finally {
+            AskPolicy::$reviewer = null;
+        }
+        $p = AskReview::prompt('terminal', ['Pikkumies: sends feedback'], [['role' => 'user', 'text' => 'send feedback']], AskPolicy::SEND_SCOPE);
+        $end = strpos($p[1]['content'], '===END===');
+        $at = strpos($p[1]['content'], 'Note from Pikkumies: ' . AskPolicy::SEND_SCOPE);
+        check($end !== false && $at !== false && $at > $end && strpos($p[1]['content'], 'Questions:') > $at, 'the note must sit after the data markers and before the questions');
+        check(strpos(AskReview::prompt('terminal', ['x'], [])[1]['content'], 'Note from Pikkumies') === false, 'no note, no note line');
+    },
 ];
