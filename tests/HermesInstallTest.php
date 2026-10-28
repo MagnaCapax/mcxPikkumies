@@ -572,7 +572,9 @@ return [
         check(strpos($bin, 'Hermes is pinned by Pikkumies') === false, 'the run update refusal is still there');
         check(strpos($bin, 'HermesInstall::lock($isUpdate)') !== false && strpos($bin, 'CronTick::wrap(array_merge([hermesBin()], $passArgs)') !== false
             && strpos($bin, 'HermesInstall::originOfficial(') !== false && strpos($bin, 'HermesInstall::checkBeforeStart()') !== false, 'run update: lock, setpriv, origin, start check');
-        $post = substr($bin, strpos($bin, "case 'post-update':"), 900);
+        $postStart = strpos($bin, "case 'post-update':");
+        $postEnd = strpos($bin, "\n    case '", $postStart + 1); // the post-update branch only, whatever its length
+        $post = substr($bin, $postStart, $postEnd === false ? strlen($bin) : $postEnd - $postStart);
         check(strpos($post, 'HermesInstall::ensure(true,') !== false, 'post-update only builds a missing tree (unattended)');
         $skill = (string) file_get_contents("$root/pikkumies/tools/system/pikkumies-update/skill.md");
         check(strpos($skill, 'Never run `hermes update`, the `/update` command') === false && strpos($skill, '`pikkumies run update`') !== false && strpos($skill, 'installer script') !== false,
