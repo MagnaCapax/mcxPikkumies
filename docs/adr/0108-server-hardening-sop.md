@@ -31,6 +31,16 @@ Sources for the values: Pulsed Media's billing web host configuration (Apache ev
 - The values are starting points that change with Pulsed Media's own configuration; the SOP says so, and the agent checks each one on the machine.
 - Two wiki pages contradict the standard (the APF page's fail2ban suggestion; the OpenSSH page's generic checklist); fixing them is a separate wiki change.
 
+## Amendment 2026-10-29: services the server does not need
+The operator's request of 2026-10-29, verbatim: "probably generalized server hardening (but let's forget the fail2ban bullshit, let's keep root ssh login etc. we can be opinionated here, this is for sysadmins and ease of life, peopel can change the shit if they want -- so more improtant is checking there is no stupid services for a linux server running like CUPS and unnnecessary daermons and shit like that)".
+
+The SOP had no step for what runs on the server. Test installs on 2026-10-29 found the gap in practice: an open-source seedbox installer on Debian 12 left packagekit (a desktop package helper) running on a headless server.
+- Add section 7, "Services: run only what the server is for": list running, enabled and listening units; sort each into workload, OS-essential or not needed here, with common examples to recognise rather than a list to delete; check reverse dependencies and the user's own words before stopping; `disable --now` plus `mask`, sockets and timers too; verify from a new session with `free -m` before and after. Never the VM guest agent, the time service, or what the panel or hypervisor needs.
+- A local mail server is left alone: cron and alerts often send through it, and stopping it fails silently.
+- No package purge as part of hardening (it also deletes configuration and cannot be undone like a mask); a purge needs the user's own words, as the safety check in doctrine/safety.md requires for anything that cannot be taken back. Otherwise the answer lists the candidates. An unidentifiable unit stays running and is named in the answer, since the agent does not ask the user for permission (doctrine/safety.md).
+- "Patch, then verify" becomes section 8. The SSH rules (root password login kept, no fail2ban) are unchanged.
+- The server-admin skill's pointer names the new scope.
+
 ## References
 - `pikkumies/doctrine/SOP/harden-a-linux-server.md`, `pikkumies/tools/server-admin/server-admin/skill.md`, `pikkumies/doctrine/safety.md`, [ADR-0098](0098-host-upgrade-and-kernel-reboot-sop.md).
 - https://wiki.pulsedmedia.com/wiki/Fail2ban, https://wiki.pulsedmedia.com/wiki/Installing_Advanced_Policy_Firewall_and_Brute_Force_Detection

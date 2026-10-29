@@ -57,7 +57,23 @@ Write settings to `/etc/sysctl.d/99-local.conf` and load them with `sysctl --sys
 
 Cap every log so a flood of failed logins cannot fill the disk: `maxsize` in logrotate (the wiki page uses 50M, Pulsed Media's seedbox servers use 500M for syslog) and a `SystemMaxUse` for journald. Check with `logrotate -d`.
 
-## 7. Patch, then verify
+## 7. Services: run only what the server is for
+
+A server runs its workload and what the OS needs to boot, log in, log, keep time and be reached; nothing else. Desktop and laptop daemons that an installer or a provider image left running cost memory, listen on sockets and add packages to patch, for nothing. Removing them matters more than any login-blocking tool.
+
+1. List what runs, what starts and what listens: `systemctl list-units --type=service --state=running`, `systemctl list-unit-files --state=enabled` (services, sockets and timers), `ss -tulpn`.
+2. Put each unit in one group and name the group in your answer:
+   - **Workload:** what the user runs the server for (web server, database, torrent client, panel, mail).
+   - **OS-essential:** sshd, getty, logind, journald or rsyslog, cron, udev, dbus, network configuration, the time service, and the guest agent on a VM.
+   - **Not needed here:** everything else. Typical finds: printing (cups, cups-browsed), service discovery (avahi-daemon), modems and Bluetooth (ModemManager, bluetooth), Wi-Fi on a wired server (wpa_supplicant), desktop helpers (packagekit, accounts-daemon, colord, udisks2, power-profiles-daemon), snapd with no snap installed. A local mail server is not on this list: cron and alerts often send through it. These are examples to recognise, not a list to delete: decide each unit by what it does on this machine.
+3. Before stopping one, check what needs it (`systemctl list-dependencies --reverse <unit>`, `apt-cache rdepends --installed <package>` or `rpm -q --whatrequires <package>`) and whether the user named it. Anything the workload depends on is workload.
+4. Stop it and keep it off: `systemctl disable --now <unit>`, then `systemctl mask <unit>` so an update or socket activation does not start it again. Do its `.socket` and `.timer` units the same way.
+5. Do not purge packages as part of hardening: a mask can be undone, a purge also deletes the configuration. Purge only when the user's own words ask for removal; otherwise list what could be purged, and how much it would free, in your answer.
+6. Check: `systemctl --failed` is empty, `ss -tulpn` shows only what you meant to keep, SSH and the workload answer from a new session; put `free -m` from before and after in your answer.
+
+Never stop the guest agent on a VM (the provider's console and backups use it), the time service, or anything the panel or hypervisor needs. When unsure what a unit does, read its unit file and package description; if the machine cannot tell you, leave it running and name it in your answer.
+
+## 8. Patch, then verify
 
 1. Apply security updates (`apt update && apt upgrade`, or the distribution's equivalent) and turn on automatic security updates if the user agrees.
 2. From a new session and from outside the server: SSH logs in, every site and service answers, `apf --status` shows the rules, and the services are active.
