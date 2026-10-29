@@ -47,7 +47,7 @@ usage: php ticket.php draft --subject S (--text T | --text-file F) [--email E] [
      | send <id> | list
   draft   save the ticket (common password and key forms removed) as a draft and show what would be sent; nothing
           leaves this machine. --email is needed once and remembered; files: at most 3 the user named, each at most
-          1 MiB, txt, log, png, jpg, jpeg or pdf
+          8 MiB, txt, log, png, jpg, jpeg or pdf
   bundle  save a ticket with the diagnostics attached: system facts, process list and logs; the diagnosis, review and
           searches; the transcript. --by agent (the default) needs the searches and a ten-round review
   send    open the ticket <id> at Pulsed Media with the Pulsed Media AI key, when you asked for a ticket, or for an

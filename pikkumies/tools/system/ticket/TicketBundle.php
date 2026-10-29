@@ -3,7 +3,7 @@
  * TicketBundle (ADR-0100, on /ticket ADR-0089): the message and the three attachments of a ticket the agent bundles when
  * it is stuck. 01 is machine-collected (TicketCollect: system facts, process list, logs); 02 is the agent's diagnosis
  * and ten-round review, framed as untrusted text, then the machine-collected search log (TicketSearches); 03 is the
- * conversation with its tool calls. Each stays under 1 MiB with room for redaction; long lines are cut so one huge line
+ * conversation with its tool calls. Each stays under FILE_MAX (7 MiB) with room for redaction; long lines are cut so one huge line
  * cannot stop the draft. Redaction itself is TicketDraft::attachment's (lib/Redact.php), the one pass every text file
  * of a ticket goes through; a ticket nobody reads before it goes also gets scrubTokens() on 01 and 03.
  */
@@ -13,7 +13,7 @@ require_once __DIR__ . '/TicketCollect.php';
 class TicketBundle
 {
     const NAMES = ['01-system-processes-logs.txt', '02-diagnosis-and-searches.txt', '03-transcript-and-tool-calls.txt'];
-    const FILE_MAX = 1048576;     // the endpoint takes 1 MiB per attachment (TicketDraft::FILE_MAX)
+    const FILE_MAX = 7340032;     // 7 MiB: three of them, base64 in JSON, stay under TicketDraft::REQUEST_MAX (32 MiB)
     const ROOM = 65536;           // left under FILE_MAX for what redaction adds ("token=a" becomes "token=REDACTED")
     const LINE_MAX = 8192;
     const MESSAGE_MAX = 8000;
@@ -69,7 +69,7 @@ class TicketBundle
             }
             $f .= $part;
         }
-        return $f . ($left ? "\nLeft out to stay under 1 MiB: " . self::cutLines(implode(', ', $left)) . "\n" : '');
+        return $f . ($left ? "\nLeft out to stay under " . (self::FILE_MAX >> 20) . " MiB: " . self::cutLines(implode(', ', $left)) . "\n" : '');
     }
 
     /** Attachment 02: the agent's own diagnosis and review, framed as untrusted, then the machine-collected search log. */
@@ -79,7 +79,7 @@ class TicketBundle
             . "\n\n## Review before asking\n\n" . ($review !== null ? trim($review) : '(The user asked for this ticket, so no review was required.)') . "\n\n---\n\n"
             . sprintf(self::UNTRUSTED, gmdate('Y-m-d H:i', $now) . 'Z') . "\n\n" . $searches);
         if (strlen($f) > self::FILE_MAX - self::ROOM) {
-            throw new CliError('the diagnosis, review and search log together are over 1 MiB', 'shorten the diagnosis or the review');
+            throw new CliError('the diagnosis, review and search log together are over ' . (self::FILE_MAX >> 20) . ' MiB', 'shorten the diagnosis or the review');
         }
         return $f;
     }
@@ -97,7 +97,7 @@ class TicketBundle
             // The end of a session is where the problem is: keep the newest part, from a line start, valid UTF-8.
             $md = (string) json_decode(json_encode(TicketCollect::fromLineStart(substr($md, -$room), true), JSON_INVALID_UTF8_IGNORE));
         }
-        return [$head . ($older ? "(The older part of the conversation was left out to stay under 1 MiB; this is its newest part.)\n\n" : '') . self::cutLines($md), $older];
+        return [$head . ($older ? '(The older part of the conversation was left out to stay under ' . (self::FILE_MAX >> 20) . " MiB; this is its newest part.)\n\n" : '') . self::cutLines($md), $older];
     }
 
     /** "Pikkumies: <one line>", control characters folded to spaces (TicketDraft redacts and checks the length). */

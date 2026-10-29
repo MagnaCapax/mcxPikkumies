@@ -12,9 +12,9 @@ class TicketDraft
 {
     const SUBJECT_MAX = 200;      // characters (the endpoint's limits, docs/SUPPORT-TICKETS.md of the credit service)
     const MESSAGE_MAX = 20000;    // characters
-    const FILES_MAX = 3;
-    const FILE_MAX = 1048576;     // bytes, each file as sent
-    const REQUEST_MAX = 4718592;  // bytes, the whole request (4.5 MiB)
+    const FILES_MAX = 32;
+    const FILE_MAX = 8388608;     // bytes, each file as sent (8 MiB)
+    const REQUEST_MAX = 33554432; // bytes, the whole request (32 MiB)
     const PRIORITIES = ['Low', 'Medium', 'High'];
     /** Extension => the bytes the file must start with ('' for text: no NUL byte, secrets removed). */
     const TYPES = ['txt' => '', 'log' => '', 'png' => "\x89PNG\r\n\x1a\n", 'jpg' => "\xFF\xD8\xFF", 'jpeg' => "\xFF\xD8\xFF", 'pdf' => '%PDF-'];
@@ -70,7 +70,7 @@ class TicketDraft
         }
         $json = json_encode($p, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if (!is_string($json) || strlen(self::body($p)) > self::REQUEST_MAX) {
-            throw new CliError('the ticket is larger than the 4.5 MiB Pulsed Media takes', 'attach fewer or smaller files');
+            throw new CliError('the ticket is larger than the 32 MiB Pulsed Media takes', 'attach fewer or smaller files');
         }
         list($id, $path) = DraftStore::save(self::dir($stateDir), $json);
         self::rememberEmail($email, $stateDir);
@@ -159,7 +159,7 @@ class TicketDraft
             throw new CliError("$path is not a $ext file inside", 'attach the file as what it is');
         }
         if ($data === false || strlen($data) > self::FILE_MAX) {
-            throw new CliError("$path is larger than 1 MiB or could not be read", 'attach a smaller part of it, such as the end of a log');
+            throw new CliError("$path is larger than 8 MiB or could not be read", 'attach a smaller part of it, such as the end of a log');
         }
         return ['name' => $name, 'data' => base64_encode($data)];
     }

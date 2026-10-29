@@ -86,3 +86,7 @@ Facts this rests on: the endpoint takes at most 3 attachments of at most 1 MiB, 
   - Sudo reads with `timeout 10 sudo -n dd iflag=nofollow,skip_bytes,nonblock`.
 - **A crash cannot reset the cap.** Inside the lock, the attempt is written (`status -2`) before posting, and the send is refused when that line cannot be written. An attempt counts by its attempt id; one whose last line is -2 counts.
 - **Files under the bundle's names are checked as a bundle.** A plain draft whose three files carry the bundle's names is refused. The approve question collapses the file list only for a real bundle.
+
+## Amendment 2026-10-29: larger tickets
+
+Tickets were meant to carry the logs a problem needs, and 3 files of 1 MiB was too little for that. Pulsed Media's endpoint now takes any number of attachments, 8 MiB each, 32 MiB per request, a name starting with a letter or digit, and stores a `.log` as `<name>.log.txt` because its billing system drops `.log` attachments without an error. So `/ticket`: at most 32 files (`TicketDraft::FILES_MAX`), 8 MiB each (`FILE_MAX`), 32 MiB in all (`REQUEST_MAX`); a bundle file at most 7 MiB (`TicketBundle::FILE_MAX`), so three of them still fit. The facts above that name 3 attachments, 1 MiB and 4.5 MiB describe the endpoint before this date.

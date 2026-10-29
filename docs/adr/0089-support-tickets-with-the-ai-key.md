@@ -45,3 +45,7 @@ Facts this rests on:
 - ADR-0015, [ADR-0020](0020-deletes-need-the-users-approval.md), [ADR-0030](0030-hooks-as-units-run-by-one-orchestrator.md), ADR-0032, ADR-0054, ADR-0056, ADR-0073
 - Code: `pikkumies/tools/system/ticket/`, `pikkumies/hooks/guard/ticket-send/`, `pikkumies/lib/DraftStore.php`, `pikkumies/lib/SendGuard.php`, `pikkumies/lib/Provider.php`, `pikkumies/lib/AskPolicy.php`
 - Tests: `tests/TicketTest.php`, `tests/GuardUsageContractTest.php`, `tests/OrchestratorTest.php`, `tests/FeedbackTest.php`
+
+## Amendment 2026-10-29: larger tickets
+
+Tickets were meant to carry the logs a problem needs, and 3 files of 1 MiB was too little for that. Pulsed Media's endpoint now takes any number of attachments, 8 MiB each, 32 MiB per request, a name starting with a letter or digit, and stores a `.log` as `<name>.log.txt` because its billing system drops `.log` attachments without an error. So `/ticket`: at most 32 files (`TicketDraft::FILES_MAX`), 8 MiB each (`FILE_MAX`), 32 MiB in all (`REQUEST_MAX`); a bundle file at most 7 MiB (`TicketBundle::FILE_MAX`), so three of them still fit. The facts above that name 3 attachments, 1 MiB and 4.5 MiB describe the endpoint before this date.

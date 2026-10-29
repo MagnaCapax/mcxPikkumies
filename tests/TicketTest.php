@@ -136,7 +136,7 @@ return [
         }
         testRmTree($dir);
     },
-    'ticket: files are at most 3, each at most 1 MiB, of the allowed types and starting as one, this account\'s, never a symlink' => function () {
+    'ticket: files are at most FILES_MAX (32), each at most FILE_MAX (8 MiB), of the allowed types and starting as one, this account\'s, never a symlink' => function () {
         $dir = testTempDir('pk-tkfiles');
         $make = function ($name, $data) use ($dir) {
             file_put_contents("$dir/$name", $data);
@@ -147,7 +147,7 @@ return [
         $rec = TicketDraft::create('x', 'y', 'jane@example.com', 'Medium', '', [$ok, $png], 1, $dir . '/state');
         check(count($rec['attachments']) === 2 && $rec['attachments'][1]['name'] === 'shot.PNG', json_encode($rec['attachments']));
         $refused = [
-            'four files' => [$ok, $ok, $ok, $ok],
+            'one file over FILES_MAX' => array_fill(0, TicketDraft::FILES_MAX + 1, $ok),
             'too big' => [$make('big.log', str_repeat('x', TicketDraft::FILE_MAX + 1))],
             'a type not allowed' => [$make('notes.md', 'x')],
             'no extension' => [$make('README', 'x')],

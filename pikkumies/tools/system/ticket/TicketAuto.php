@@ -65,7 +65,7 @@ class TicketAuto
 
     /**
      * A bundle draft must hold what `ticket bundle` makes, whoever wrote the file (the agent can write local/state):
-     * a bundle record, exactly the three attachments, each within 1 MiB, every text already redacted (redacting again
+     * a bundle record, exactly the three attachments, each within TicketBundle::FILE_MAX, every text already redacted (redacting again
      * changes nothing), and, on the automatic path ($auto) or when the bundle says it was scrubbed, all three files
      * already through the automatic-ticket pass. Refuses with "was not made by bundle".
      */

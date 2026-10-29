@@ -134,14 +134,14 @@ return [
             testRmTree($dir);
         }
     },
-    'ticket bundle: each attachment stays under 1 MiB: logs that do not fit are named, the transcript keeps its newest part, ps at most 300 rows' => function () {
+    'ticket bundle: each attachment stays under FILE_MAX: logs that do not fit are named, the transcript keeps its newest part, ps at most 300 rows' => function () {
         $logs = [];
         for ($i = 0; $i < 40; $i++) {
-            $logs[] = ["log$i", str_repeat("line $i of a long log\n", 3000)];
+            $logs[] = ["log$i", str_repeat("line $i of a long log\n", 20000)];
         }
         $f = TicketBundle::systemFile(['Hostname' => 'h'], ['all users', 'ps', 1], $logs, 1792300000);
-        check(strlen($f) <= TicketBundle::FILE_MAX && strpos($f, 'Left out to stay under 1 MiB') !== false && strpos($f, 'log39') !== false, 'system file: ' . strlen($f));
-        list($t, $older) = TicketBundle::transcriptFile(str_repeat("old turn\n", 400000) . "the newest turn\n", '', 1792300000);
+        check(strlen($f) <= TicketBundle::FILE_MAX && strpos($f, 'Left out to stay under ' . (TicketBundle::FILE_MAX >> 20) . ' MiB') !== false && strpos($f, 'log39') !== false, 'system file: ' . strlen($f));
+        list($t, $older) = TicketBundle::transcriptFile(str_repeat("old turn\n", 1000000) . "the newest turn\n", '', 1792300000);
         check($older === true && strlen($t) <= TicketBundle::FILE_MAX && substr($t, -16) === "the newest turn\n" && strpos($t, 'older part') !== false, 'transcript: ' . strlen($t));
         list($t, $older) = TicketBundle::transcriptFile(null, 'Hermes is not installed here', 1792300000);
         check($older === false && strpos($t, 'No transcript: Hermes is not installed here') !== false, $t);
