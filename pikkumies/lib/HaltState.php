@@ -24,12 +24,12 @@ class HaltState
 
     /**
      * A fresh snapshot for a new turn: $continues, $wrapup_sent and $last_judged_turn always start over. $asked: what the
-     * user wrote or saw (AskReview::evidence), the only evidence the ask review reads (ADR-0073).
+     * user wrote or saw (AskReview::evidence), the only evidence the ask review reads (ADR-0073); $askStats: its counts for the hook log.
      */
-    public static function writeSnapshot($sessionId, $userMessage, $tail, array $asked = [])
+    public static function writeSnapshot($sessionId, $userMessage, $tail, array $asked = [], array $askStats = [])
     {
         $new = !is_file(self::file($sessionId));
-        self::put($sessionId, ['user_message' => (string) $userMessage, 'tail' => (string) $tail, 'asked' => array_values($asked), 'turn_started' => time(),
+        self::put($sessionId, ['user_message' => (string) $userMessage, 'tail' => (string) $tail, 'asked' => array_values($asked), 'ask_stats' => $askStats, 'turn_started' => time(),
             'continues' => 0, 'wrapup_sent' => false, 'last_judged_turn' => 0]);
         if ($new) {
             self::prune();

@@ -40,6 +40,14 @@ class AskPolicy
     /** Test seam: a callable($tool, $questions, $evidence, $timeout) returning parsed R answers, instead of the model. */
     public static $reviewer = null;
 
+    /** What the last apply() did, as codes for the hook log row (numbers and fixed words only, never text): R1-R3 answers and why. */
+    private static $audit = [];
+
+    public static function audit()
+    {
+        return self::$audit;
+    }
+
     /** The fixed refusal text: the review found the step not covered, or ($unchecked) it could not run. */
     public static function refused($unchecked = false)
     {
@@ -55,6 +63,7 @@ class AskPolicy
     public static function apply(array $results, $tool, array $evidence, $seconds)
     {
         $counts = ['blocked' => 0, 'dropped' => 0, 'cleared' => 0, 'ran' => 0, 'unchecked' => 0];
+        self::$audit = [];
         $original = $results;
         try {
             foreach ($results as $r) {
@@ -78,8 +87,13 @@ class AskPolicy
                 return [array_values($results), $counts];
             }
             $keep = $evidence && $seconds >= 2 ? self::keepAfterReview($review, $tool, $evidence, min(AskReview::TIMEOUT, $seconds)) : null;
+            self::$audit['why'] = $keep === false ? 'cleared' : ($keep === true ? 'uncovered' : ($keep === 'partial' ? 'partial' : (!$evidence ? 'no-evidence' : ($seconds < 2 ? 'no-time' : 'no-answer'))));
             foreach ($review as $i => $r) {
-                if ($keep === false) {
+                if ($keep === 'partial') { // the model's answer was incomplete: every reviewed kind is refused, as before, with the "could not run" reason
+                    $results[$i] = ['action' => 'block', 'message' => self::refused(true)];
+                    $counts['blocked']++;
+                    $counts['unchecked']++;
+                } elseif ($keep === false) {
                     unset($results[$i]);
                     $counts['cleared']++;
                 } elseif ($keep === true) {
@@ -120,7 +134,7 @@ class AskPolicy
         return isset($approve['kind']) ? (string) $approve['kind'] : '';
     }
 
-    /** One review for all reviewed questions of this call: true refuses them all, false clears them, null: no answer. */
+    /** One review for all reviewed questions of this call: true refuses them all, false clears them, 'partial' refuses them all because the answer was incomplete, null: no answer. */
     private static function keepAfterReview(array $review, $tool, array $evidence, $timeout)
     {
         $questions = [];
@@ -135,7 +149,20 @@ class AskPolicy
         }
         $answers = self::$reviewer !== null ? call_user_func(self::$reviewer, (string) $tool, $questions, $evidence, $timeout, $note)
             : AskReview::ask((string) $tool, $questions, $evidence, $timeout, $note);
-        return is_array($answers) && $answers ? AskReview::keep($answers, $disclose) : null;
+        if (!is_array($answers) || !$answers) {
+            return null;
+        }
+        foreach (['R1', 'R2', 'R3'] as $n) {
+            self::$audit[strtolower($n)] = isset($answers[$n]) ? $answers[$n] : '-';
+        }
+        return AskReview::partial($answers, $disclose) ? 'partial' : AskReview::keep($answers, $disclose);
+    }
+
+    /** The counts AskReview::evidence stored with the snapshot (rows seen, dropped, unwrapped, entry lengths), or []. */
+    public static function statsFor($sessionId)
+    {
+        $state = is_string($sessionId) && preg_match('/^[A-Za-z0-9._-]{1,128}$/', $sessionId) ? HaltState::load($sessionId) : null;
+        return is_array($state) && isset($state['ask_stats']) && is_array($state['ask_stats']) ? $state['ask_stats'] : [];
     }
 
     /**

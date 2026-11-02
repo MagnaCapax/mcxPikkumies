@@ -31,9 +31,10 @@ $tail = HaltJudge::tail($messages, $userMessage);
 // sender on the gateway's explicit allowlist; in a scheduled run, what the person asked when the job was made.
 $platform = isset($extra['platform']) && is_string($extra['platform']) ? $extra['platform'] : '';
 $sender = isset($extra['sender_id']) && is_scalar($extra['sender_id']) ? (string) $extra['sender_id'] : '';
-$asked = AskReview::evidence($messages, $userMessage, $platform, $sender);
+$askStats = [];
+$asked = AskReview::evidence($messages, $userMessage, $platform, $sender, null, $askStats);
 if (!$asked && $platform === 'cron') {
     $asked = CronAuth::lookup(HaltJudge::text($userMessage));
     HookLog::add('pre_llm_call', 'cron-auth', 0, $asked ? 'hit' : 'miss'); // a reason code only, never the words
 }
-HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail, $asked);
+HaltState::writeSnapshot((string) $payload['session_id'], HaltJudge::text($userMessage), $tail, $asked, $askStats);

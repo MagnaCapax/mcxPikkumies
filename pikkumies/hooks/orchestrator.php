@@ -191,7 +191,8 @@ if ($hookEvent === 'pre_llm_call') {
         list($all, $asked) = AskPolicy::apply($all, isset($payload['tool_name']) ? (string) $payload['tool_name'] : '',
             AskPolicy::evidenceFor($session), (int) floor($budget - ($askStart - $started) - 1));
         if (array_sum($asked) > 0) {
-            HookLog::add($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked));
+            // Counts, R answer codes, the reason code and the evidence counts: numbers and fixed words, never the person's words, the draft or the command.
+            HookLog::add($hookEvent, 'ask-policy', (int) round((microtime(true) - $askStart) * 1000), json_encode($asked + AskPolicy::audit() + ['ev' => AskPolicy::statsFor($session)]));
         }
     }
     $answer = $hookEvent === 'pre_tool_call' ? HookAnswers::mergePreToolCall($all) : ($hookEvent === 'pre_verify' ? HookAnswers::mergePreVerify($all) : null);

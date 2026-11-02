@@ -139,3 +139,53 @@ Other files are still judged by R3. The note comes from Pikkumies' own code, nev
 from the action or the user. Nothing else changes: R1 must still be yes, R2 is
 still yes without asking the model, and a send the user did not ask for (for
 example one a file told the agent to make) is still refused.
+
+## Amendment 2026-11-02: the review judges the person's own words, whole
+
+On a customer's account almost every `/feedback` send was refused as "not covered
+by what the user asked" although the user had asked for it. The review read the
+wrong evidence. A slash command reaches Hermes as one role `user` row of about 6 KB:
+the skill's own text, then the person's words in its last line. The review kept the
+first 2000 characters of each row, so the person's words were cut off and the skill
+text was judged instead. Hermes also writes role `user` rows itself (a background-process
+notice that embeds the command's output, a context-compaction summary of tens of KB,
+nudges), and the review counted them as "what the user wrote", against the rule above
+that R1 is never judged from tool output.
+
+`AskReview::evidence` now decides row by row what is the person's words
+(`personWords()`), reusing `HookRecords::skillTurn` as the spool does
+([ADR-0096](0096-goal-review-v2-drift-check-by-time-and-tokens.md)):
+
+- plain text counts as it is;
+- a skill invocation counts as the instruction typed with it (`/name` when bare), never as the skill's text;
+- an out-of-band wrapper counts as the text inside, only when its header is the first byte of the row and its closer the last;
+- every other row that begins with a bracketed machine tag is dropped: a tag with a space, colon or dash in it, or one not closed in its first line. A person's `[URGENT] fix it` stays;
+- a row Hermes flagged synthetic (`HookRecords::synthetic`) is dropped.
+
+This drops tagged machine rows; it is not an allowlist of plain text. A machine row with
+no tag and no flag (a plain-sentence nudge) cannot be told from the person's typing,
+and stays a residual risk. The census of every place Hermes v0.22.2 adds a `user` row
+is in `tests/AskReviewEvidenceTest.php`.
+
+Rows are passed whole. The per-row cut (2000 characters), which had no stated basis, is gone. The
+window is unchanged: the person's last three rows (`AskReview::USER_MESSAGES`), which the
+classifier now fills with the person's words only, and the reply the current message answers.
+One guard remains, `AskReview::ROW_MAX` (120000 bytes): a single pathological row (megabytes of
+pasted log) is cut there, at a whole character, so the prompt cannot pass the light model's
+context window. Its basis is an assumption (about 30k tokens), not a measurement: the model's
+window is not recorded in the configuration. A gateway turn keeps its narrow rule (the current
+message and the reply it answers), which is about whose words they are. The review's timeout,
+answer size and reasoning allowance are unchanged.
+
+A partial model answer (R1 or R3 missing, R2 not "no") refuses exactly the calls it
+refused before, every kind, but now says the check could not run
+(`AskPolicy::WHY_UNCHECKED`, [ADR-0101](0101-refuse-and-report-never-ask.md)) instead of "does not
+cover it", because that is what happened. The block set does not shrink, and nothing
+else in ADR-0101 changes. The `/feedback` and `/ticket` send scope is as in the amendment
+above ([ADR-0056](0056-feedback-what-pikkumies-sends-to-pulsed-media.md),
+[ADR-0100](0100-ticket-bundle-diagnostics-and-automatic-tickets-on-pulsed-media-servers.md)).
+
+The one `ask-policy` hook-log row of a review now also holds the R1-R3 answers, the
+reason code (`cleared`, `uncovered`, `partial`, `no-evidence`, `no-time`, `no-answer`) and
+counts of rows seen, dropped, unwrapped and each evidence entry's length. Never any
+text from the person, the draft, the evidence, the model or the command.

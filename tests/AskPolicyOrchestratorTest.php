@@ -32,10 +32,10 @@ if (!function_exists('askOrchTree')) {
     }
 
     /** The halt snapshot the review reads its evidence from, as halt-snapshot writes it. */
-    function askOrchSnapshot($tree, $session, array $asked)
+    function askOrchSnapshot($tree, $session, array $asked, array $stats = [])
     {
         @mkdir("$tree/pikkumies/local/state/halt", 0700, true);
-        file_put_contents("$tree/pikkumies/local/state/halt/" . sha1($session) . '.json', json_encode(['user_message' => 'm', 'tail' => 't', 'asked' => $asked,
+        file_put_contents("$tree/pikkumies/local/state/halt/" . sha1($session) . '.json', json_encode(['user_message' => 'm', 'tail' => 't', 'asked' => $asked, 'ask_stats' => $stats,
             'turn_started' => time(), 'continues' => 0, 'wrapup_sent' => false, 'last_judged_turn' => 0]));
     }
 }
@@ -56,7 +56,7 @@ return [
             check($d === null, 'a clear review must let the call run: ' . $raw);
             $req = hookSearchRequests($dir);
             check(count($req) === 1 && $req[0]['body']['model'] === 'acme/light' && strpos($req[0]['body']['messages'][1]['content'], '[user wrote] delete the old folder in my home') !== false, 'one review with the light model: ' . json_encode($req));
-            check(in_array('ask-policy={"blocked":0,"dropped":0,"cleared":1,"ran":0,"unchecked":0}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
+            check(in_array('ask-policy={"blocked":0,"dropped":0,"cleared":1,"ran":0,"unchecked":0,"r1":"yes","r2":"yes","r3":"no","why":"cleared","ev":[]}', hookFailOutcomes($tree), true), 'the clearing must be logged: ' . json_encode(hookFailOutcomes($tree)));
             file_put_contents("$dir/reply", "R1: unsure\nR2: yes\nR3: no");
             list($d) = orchestratorRun($tree, 'pre_tool_call', $call);
             check($d === ['action' => 'block', 'message' => AskPolicy::refused()], 'a doubtful review must block until the user says yes');
@@ -94,6 +94,34 @@ return [
             proc_terminate($proc);
             testRmTree($loadTree);
             testRmTree($sendTree);
+            testRmTree($dir);
+        }
+    },
+    'orchestrator ask policy: one hook-log row per review holds the R codes, the reason code and the evidence counts, and none of the words of the person, the draft or the command; a partial answer is refused as "could not run"' => function () {
+        $dir = testTempDir('pk-askorch');
+        list($proc, $port) = hookSearchFakeProvider($dir);
+        $send = ['action' => 'approve', 'message' => 'Pikkumies: send this feedback? DRAFTWORD', 'rule_key' => 'pikkumies-feedback:3', 'kind' => 'send'];
+        $tree = askOrchTree(['guard/feedback-send' => $send], $port);
+        $call = ['tool_name' => 'terminal', 'tool_input' => ['command' => 'feedback-send COMMANDWORD'], 'session_id' => 'sess-3'];
+        try {
+            askOrchSnapshot($tree, 'sess-3', [['role' => 'user', 'text' => 'PERSONWORD send my feedback']], ['seen' => 4, 'dropped' => 2, 'unwrapped' => 1, 'len' => [27]]);
+            file_put_contents("$dir/reply", "R2: yes");
+            list($d, $raw) = orchestratorRun($tree, 'pre_tool_call', $call);
+            check($d === ['action' => 'block', 'message' => AskPolicy::refused(true)] && strpos($d['message'], AskPolicy::WHY_UNCHECKED) !== false, 'a partial answer must be refused with the could-not-run reason: ' . $raw);
+            $rows = array_values(array_filter(explode("\n", (string) file_get_contents("$tree/pikkumies/local/logs/hooks/" . gmdate('Ymd') . '.jsonl')), function ($l) {
+                return strpos($l, '"ask-policy"') !== false;
+            }));
+            check(count($rows) === 1, 'one ask-policy row per review: ' . json_encode($rows));
+            $row = json_decode($rows[0], true);
+            $out = json_decode(substr($row['outcome'], 0), true);
+            check($out['r1'] === '-' && $out['r2'] === 'yes' && $out['r3'] === '-' && $out['why'] === 'partial' && $out['blocked'] === 1 && $out['unchecked'] === 1
+                && $out['ev'] === ['seen' => 4, 'dropped' => 2, 'unwrapped' => 1, 'len' => [27]], 'the row: ' . $rows[0]);
+            foreach (['PERSONWORD', 'DRAFTWORD', 'COMMANDWORD'] as $w) {
+                check(strpos($rows[0], $w) === false, "the log row must never hold '$w'");
+            }
+        } finally {
+            proc_terminate($proc);
+            testRmTree($tree);
             testRmTree($dir);
         }
     },
