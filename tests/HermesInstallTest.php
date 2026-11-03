@@ -166,6 +166,8 @@ return [
         check(HermesInstall::latestTag($out) === 'v0.22.2', 'got ' . HermesInstall::latestTag($out));
         check(HermesInstall::latestTag("$sha\trefs/tags/v0.9.0\r\n$sha\trefs/tags/v0.10.0\r\n") === 'v0.10.0', 'version order, not string order');
         check(HermesInstall::latestTag('') === '' && HermesInstall::latestTag("fatal: unable to access\n") === '', 'no tags must give no tag');
+        // v0.22.6 dropped browser.restrict_evaluate (the browse guard), so a newer tag is never installed until it is checked.
+        check(HermesInstall::latestTag("$sha\trefs/tags/v0.22.5\n$sha\trefs/tags/v0.22.6\n$sha\trefs/tags/v0.23.0\n") === 'v0.22.5', 'a release newer than NEWEST_CHECKED must not be installed');
     },
     'hermes bootstrap: the machine target and the uv/python pins are read from pm/lock.json like setup-hermes.sh' => function () {
         check(HermesInstall::target('Linux', 'x86_64') === 'linux-x64' && HermesInstall::target('Linux', 'aarch64') === 'linux-arm64'

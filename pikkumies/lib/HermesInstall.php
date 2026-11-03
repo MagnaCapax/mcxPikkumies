@@ -205,13 +205,20 @@ class HermesInstall
         return is_array($lock) ? $lock : [];
     }
 
-    /** The newest stable release tag in `git ls-remote --tags` output, '' when there is none. */
+    // The newest Hermes release this Pikkumies has checked its settings against. v0.22.6 (2026-11-02) removed the built-in
+    // browser tools and with them browser.restrict_evaluate (hermes_cli/config_defaults.py REMOVAL NOTE), which the browse
+    // guard of ADR-0077 sets, so CONFIG_FACTS refuses to start it; installs stay on v0.22.5 until that guard is moved to the
+    // new browser (ADR-0033 amendment 2026-11-03).
+    const NEWEST_CHECKED = '0.22.5';
+
+    /** The newest stable release tag in `git ls-remote --tags` output, no newer than NEWEST_CHECKED; '' when there is none. */
     public static function latestTag($lsRemote)
     {
         $best = '';
         foreach (preg_split('/\r?\n/', (string) $lsRemote) as $line) {
             // Peeled lines (v1.2.3^{}) never match: the tag name may not contain "^".
             if (preg_match('#^[0-9a-f]{40,64}\s+refs/tags/(v[^\s^]+)$#', trim($line), $m) && preg_match(self::STABLE_TAG_RE, $m[1])
+                && version_compare(substr($m[1], 1), self::NEWEST_CHECKED, '<=')
                 && ($best === '' || version_compare(substr($m[1], 1), substr($best, 1), '>'))) {
                 $best = $m[1];
             }

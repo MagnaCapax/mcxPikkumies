@@ -107,3 +107,17 @@ The first addendum above had a session with no runtime start the build and exit,
 
 ## Addendum 2026-10-21: a build-only verb for the platform launcher
 The PMSS Power user launcher starts the dashboard with `--skip-build` and waits about ten seconds for it, so on a fresh account the first start found no page and failed (live QA on a throwaway seedbox, 2026-10-21: Hermes printed "--skip-build was passed but no web dist found"). `pikkumies ui web-build` runs the same build as the dashboard start above, through the same function in `bin/pikkumies` (`buildWebUi`), and starts no server. The launcher runs it detached when the page is missing and shows its setting-up page until the page exists. It prints `Web page ready.` and exits 0 when the page is there, or names why not and exits 1.
+
+## Amendment 2026-11-03: install no newer than the newest checked release
+
+Hermes v0.22.6 (tag of 2026-11-02, commit f0d94882) removed its built-in browser tools, and with them
+`browser.restrict_evaluate`, which the browse guard of ADR-0077 sets (`hermes_cli/config_defaults.py`, its
+"REMOVAL NOTE"). `HermesInstall::CONFIG_FACTS` therefore refuses to start that checkout, and every new install
+since that tag got a Hermes that Pikkumies will not start (seen on a fresh QA account, released and candidate
+builds alike). Install now takes the newest stable tag no newer than `HermesInstall::NEWEST_CHECKED` (0.22.5).
+Raising it is a reviewed change: move the browse guard to the new browser first. `hermes update` by the person
+is unchanged; a checkout it moves past the checked facts is still refused at start, with the reason.
+Follow-up for lifting the bound: in v0.22.6 the core browser is the `browser_exec` tool (the same REMOVAL NOTE:
+"browser_exec is the only core browser"), so the browse guard has to be expressed against it before
+`NEWEST_CHECKED` moves. An install made between the v0.22.6 tag and this change holds a v0.22.6 checkout that
+Pikkumies refuses to start; this change does not move it (the checkout is the person's, ADR-0033).
