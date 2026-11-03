@@ -211,61 +211,6 @@ class HermesInstall
     // new browser (ADR-0033 amendment 2026-11-03).
     const NEWEST_CHECKED = '0.22.5';
 
-    /**
-     * The release tag of a checkout Pikkumies installed and can never start, '' for any other tree: an unmodified checkout of the
-     * official repository at a stable tag newer than NEWEST_CHECKED, missing a key of CONFIG_FACTS, that never passed verify()
-     * (no hermes-verified.json). A tree with the person's own changes, another origin or a verified start is left alone.
-     */
-    public static function refusedNewerRelease()
-    {
-        if (file_exists(self::localDir() . '/hermes-verified.json') || !self::missingConfigKeys(self::treeDir())) {
-            return '';
-        }
-        // Files first, so a complete install that is not this case runs no git (a session start reads this).
-        $tag = self::packedTagAtHead(self::treeDir() . '/.git');
-        if ($tag === '' || !preg_match(self::STABLE_TAG_RE, $tag) || version_compare(substr($tag, 1), self::NEWEST_CHECKED, '<=')) {
-            return '';
-        }
-        $s = self::status();
-        return $s['clean'] && $s['official'] && $s['rev'] === $tag ? $tag : '';
-    }
-
-    /** [entries, bytes] under $dir (directories count, as in the file quota), symlinks not followed. */
-    public static function treeSize($dir)
-    {
-        $files = 0;
-        $bytes = 0;
-        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST, RecursiveIteratorIterator::CATCH_GET_CHILD);
-        foreach ($it as $entry) {
-            $files++;
-            $bytes += $entry->isLink() ? 0 : $entry->getSize();
-        }
-        return [$files, $bytes];
-    }
-
-    /** The tag in packed-refs that names the detached HEAD commit (a release clone), '' when there is none. Reads files only. */
-    public static function packedTagAtHead($gitDir)
-    {
-        $head = trim((string) @file_get_contents($gitDir . '/HEAD'));
-        if (!preg_match('/^[0-9a-f]{40,64}$/', $head)) {
-            return '';
-        }
-        $last = '';
-        foreach (preg_split('/\r?\n/', (string) @file_get_contents($gitDir . '/packed-refs')) as $line) {
-            if (preg_match('#^([0-9a-f]{40,64}) refs/tags/(\S+)$#', $line, $m)) {
-                if ($m[1] === $head) {
-                    return $m[2];
-                }
-                $last = $m[2];
-            } elseif ($last !== '' && $line === '^' . $head) {
-                return $last; // the peeled commit of an annotated tag
-            } else {
-                $last = '';
-            }
-        }
-        return '';
-    }
-
     /** The newest stable release tag in `git ls-remote --tags` output, no newer than NEWEST_CHECKED; '' when there is none. */
     public static function latestTag($lsRemote)
     {
@@ -488,21 +433,19 @@ class HermesInstall
      * is tried). A build that runs out of files or space stops half way with EDQUOT and leaves a broken tree, so the
      * account's file quota and free space are checked first. $files: Quota::files(); $freeBytes: quota_free_bytes.
      * $unattended (a build nobody started, e.g. a preinstalled account's daily update) also keeps UNATTENDED_RESERVE of
-     * both quotas free, so it never fills a customer's account; $limitBytes: quota_limit_bytes. $need: [files, bytes] the build
-     * adds, default a fresh build; ensure() sizes the rebuild of a refused release from that tree (refusedNewerRelease).
+     * both quotas free, so it never fills a customer's account; $limitBytes: quota_limit_bytes.
      */
-    public static function roomProblem($files, $freeBytes, $limitBytes = null, $unattended = false, ?array $need = null)
+    public static function roomProblem($files, $freeBytes, $limitBytes = null, $unattended = false)
     {
-        list($needFiles, $needBytes) = $need !== null ? $need : [self::BUILD_FILES, self::BUILD_BYTES];
         $reserve = $unattended ? self::UNATTENDED_RESERVE : 0.0;
-        if (is_array($files) && $files['soft'] > 0 && $files['used'] + $needFiles > $files['soft'] * (1 - $reserve)) {
+        if (is_array($files) && $files['soft'] > 0 && $files['used'] + self::BUILD_FILES > $files['soft'] * (1 - $reserve)) {
             return sprintf('Hermes needs about %s files and your account allows %s, with %s in use%s. The file quota grows with the disk quota; a larger plan has room.',
-                number_format($needFiles), number_format($files['soft']), number_format($files['used']),
+                number_format(self::BUILD_FILES), number_format($files['soft']), number_format($files['used']),
                 $unattended ? '; an automatic build keeps 10% of it free, run `pikkumies` to build anyway' : '');
         }
-        $room = $needBytes + ($unattended && $limitBytes > 0 ? $limitBytes * $reserve : 0);
-        if ($freeBytes !== null && $freeBytes < $room) {
-            return sprintf('Hermes needs about %.1f GB and your quota has %.1f GB free%s.', $needBytes / 1073741824, $freeBytes / 1073741824,
+        $need = self::BUILD_BYTES + ($unattended && $limitBytes > 0 ? $limitBytes * $reserve : 0);
+        if ($freeBytes !== null && $freeBytes < $need) {
+            return sprintf('Hermes needs about %.1f GB and your quota has %.1f GB free%s.', self::BUILD_BYTES / 1073741824, $freeBytes / 1073741824,
                 $unattended ? '; an automatic build keeps 10% of the quota free, run `pikkumies` to build anyway' : '');
         }
         return '';
@@ -510,10 +453,7 @@ class HermesInstall
 
     public static function ensure($unattended = false, $rootAvailable = false, $optionalTools = false)
     {
-        // A complete checkout Pikkumies refuses to start because it is a release newer than the checked one is rebuilt at the
-        // checked release, the old tree moved aside (ADR-0033 amendment 2026-11-03).
-        $refused = self::isComplete() ? self::refusedNewerRelease() : '';
-        if (self::isComplete() && $refused === '') {
+        if (self::isComplete()) {
             return 'installed (pikkumies/hermes; updates: `pikkumies run update`)';
         }
         if (getenv('PIKKUMIES_SKIP_HERMES') === '1') {
@@ -524,7 +464,7 @@ class HermesInstall
         }
         $tree = self::treeDir();
         $exists = file_exists($tree) || is_link($tree);
-        if ($exists && $unattended && $refused === '') {
+        if ($exists && $unattended) {
             return 'not complete: pikkumies/hermes is left from a build that failed or stopped (see ' . Config::shown(self::localDir() . '/install.log') . '); run `pikkumies install` to move it aside and build again';
         }
         if (self::target() === '') {
@@ -534,14 +474,7 @@ class HermesInstall
             return 'not installed: root is available and setpriv is missing, so no unattended build (ADR-0025); run `pikkumies install`';
         }
         $q = Quota::fields((string) getenv('HOME'));
-        // A refused release is rebuilt over its HERMES_HOME, which stays and grows: on a QA account (2026-11-03) the v0.22.5
-        // rebuild beside a 23,360-entry, 367 MB v0.22.6 tree added 35,547 files and about 715 MB (new tree plus environment),
-        // so it needs twice the refused tree's entries and two and a half times its bytes.
-        if ($refused !== '') {
-            list($treeFiles, $treeBytes) = self::treeSize($tree);
-        }
-        $room = self::roomProblem(Quota::files((string) getenv('HOME')), $q['quota_free_bytes'], $q['quota_limit_bytes'], $unattended,
-            $refused !== '' ? [2 * $treeFiles, (int) (2.5 * $treeBytes)] : null);
+        $room = self::roomProblem(Quota::files((string) getenv('HOME')), $q['quota_free_bytes'], $q['quota_limit_bytes'], $unattended);
         if ($room !== '') {
             return 'not installed: ' . $room;
         }
@@ -557,17 +490,13 @@ class HermesInstall
                 return 'not complete, and a Hermes process still runs from pikkumies/hermes; close it and run `pikkumies install` again';
             }
             // Never deleted: the tree can hold the user's own stashed changes.
-            $aside = $tree . ($refused !== '' ? '.refused-' . $refused . '-' : '.broken-') . gmdate('Ymd\THis\Z');
+            $aside = $tree . '.broken-' . gmdate('Ymd\THis\Z');
             $moved = @rename($tree, $aside);
             fclose($lock);
             if (!$moved) {
                 return 'not complete, and could not move pikkumies/hermes aside; move or remove it, then run `pikkumies install`';
             }
-            $note = 'moved the ' . ($refused !== '' ? $refused . ' tree Pikkumies cannot start' : 'incomplete tree') . ' to ' . PathName::base($aside) . ' (remove it when it is not needed); ';
-            if ($refused !== '') {
-                @unlink(self::markerFile());
-                @file_put_contents(self::localDir() . '/hermes-heal.log', gmdate('c') . ' moved ' . $refused . ' (newer than ' . self::NEWEST_CHECKED . ', missing ' . implode(', ', self::missingConfigKeys($aside)) . ') to ' . PathName::base($aside) . ', building ' . $tag . "\n", FILE_APPEND);
-            }
+            $note = 'moved the incomplete tree to ' . PathName::base($aside) . ' (remove it when it is not needed); ';
         }
         @mkdir(self::includeDir(), 0700, true);
         @mkdir(self::localDir(), 0700, true);
