@@ -314,7 +314,8 @@ switch ($cmd) {
             out('hermes:   ' . $hs['rev'] . ' (' . $hs['sha'] . '), ' . ($hs['clean'] ? 'vanilla' : 'local changes in pikkumies/hermes')
                 . ', origin ' . ($hs['official'] ? 'official' : 'NOT the official repository: ' . $hs['origin'] . ' (`pikkumies run update` refuses it)') . '; ' . $py);
             $missingKeys = HermesInstall::missingConfigKeys();
-            out('hermes config keys: ' . ($missingKeys ? 'missing: ' . implode(', ', $missingKeys) . ' (Pikkumies will not start this Hermes)' : 'ok'));
+            $fix = $missingKeys ? HermesInstall::refusedFix() : '';
+            out('hermes config keys: ' . ($missingKeys ? 'missing: ' . implode(', ', $missingKeys) . ' (Pikkumies will not start this Hermes)' . ($fix !== '' ? '. ' . $fix : '') : 'ok'));
             $leaks = HermesInstall::pathLaunchers((string) getenv('HOME'));
             out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no launchers in ~/.local/bin (cli.expose_on_path: false)'));
         } else {
@@ -653,7 +654,8 @@ switch ($cmd) {
         // A checkout that moved since it was last checked (/update in a session, a hand edit) is checked first.
         $problems = HermesInstall::checkBeforeStart();
         if ($problems) {
-            out('not starting: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) . '. Run `pikkumies doctor`.');
+            $fix = HermesInstall::refusedFix();
+            out('not starting: pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) . '. ' . ($fix !== '' ? $fix : 'Run `pikkumies doctor`.'));
             exit($eternalId !== '' ? 75 : 1);
         }
         // The credits line once, before Hermes starts (ADR-0040): a library call, silent when credits cannot be read.
