@@ -111,7 +111,7 @@ The PMSS Power user launcher starts the dashboard with `--skip-build` and waits 
 ## Amendment 2026-11-03: install no newer than the newest checked release
 
 Hermes v0.22.6 (tag of 2026-11-02, commit f0d94882) removed its built-in browser tools, and with them
-`browser.restrict_evaluate`, which the browse guard of ADR-0077 sets (`hermes_cli/config_defaults.py`, its
+`browser.restrict_evaluate`, which the browse guard of [ADR-0077](0077-isolated-browser-in-a-private-network-namespace.md) sets (`hermes_cli/config_defaults.py`, its
 "REMOVAL NOTE"). `HermesInstall::CONFIG_FACTS` therefore refuses to start that checkout, and every new install
 since that tag got a Hermes that Pikkumies will not start (seen on a fresh QA account, released and candidate
 builds alike). Install now takes the newest stable tag no newer than `HermesInstall::NEWEST_CHECKED` (0.22.5).
