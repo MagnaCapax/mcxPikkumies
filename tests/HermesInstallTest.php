@@ -158,6 +158,35 @@ function hermesTFakeComplete(array $w)
     return $tree;
 }
 
+/**
+ * A complete install cloned from the world's remote at a new release $tag (committed and tagged in the work tree first): with
+ * $drop, that release lacks the browse guard's config text, like Hermes v0.22.6 (ADR-0033 amendment 2026-11-03).
+ */
+function hermesTCompleteAt(array $w, $tag, $drop)
+{
+    $g = 'git -C ' . escapeshellarg($w['work']) . ' -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false ';
+    $fact = HermesInstall::CONFIG_FACTS['browser.restrict_evaluate'];
+    $policy = $w['work'] . '/' . $fact[0];
+    file_put_contents($policy, $drop ? "# removed upstream\n" : $fact[1] . "\n");
+    // Eternals add one key on hosts that enable them (HermesInstall::configFacts); a release that keeps every key keeps it too.
+    file_put_contents($w['work'] . '/hermes_cli/config_defaults.py', '"terminal_continue":' . "\n", FILE_APPEND);
+    hermesTSh($g . 'add -A');
+    hermesTSh($g . 'commit -q -m ' . escapeshellarg($tag));
+    hermesTSh($g . 'tag ' . escapeshellarg($tag));
+    hermesTSh($g . 'push -q ' . escapeshellarg($w['t'] . '/remote.git') . ' ' . escapeshellarg($tag));
+    $tree = $w['root'] . '/hermes';
+    hermesTSh('git clone -q --depth 1 --branch ' . escapeshellarg($tag) . ' ' . escapeshellarg($w['repo']) . ' ' . escapeshellarg($tree));
+    mkdir("$tree/.hermes/bin", 0700, true);
+    copy($w['bin'] . '/fake-hermes', "$tree/.hermes/bin/hermes");
+    chmod("$tree/.hermes/bin/hermes", 0755);
+    @mkdir($w['root'] . '/include', 0700, true);
+    touch($w['root'] . '/include/.hermes-ready');
+    // The person's own Hermes data (sessions, memories) lives in HERMES_HOME, which a move aside never touches.
+    @mkdir($w['root'] . '/local/hermes/sessions', 0700, true);
+    file_put_contents($w['root'] . '/local/hermes/sessions/one.json', "{\"mine\":1}\n");
+    return $tree;
+}
+
 return [
     'hermes release: the newest stable vX.Y.Z tag, never a date tag, a canary or a peeled line' => function () {
         $sha = str_repeat('a', 40);
@@ -368,6 +397,94 @@ return [
             });
         } finally {
             testRmTree($w['t']);
+        }
+    },
+    'hermes ensure: a complete, unmodified, never-verified release newer than NEWEST_CHECKED that lacks a checked key is moved aside and rebuilt at the checked release, by install and by the daily update' => function () {
+        foreach ([false, true] as $unattended) {
+            $w = hermesTWorld();
+            try {
+                $tree = hermesTCompleteAt($w, 'v0.23.0', true);
+                hermesTIn($w, function () use ($w, $tree, $unattended) {
+                    check(HermesInstall::isComplete() && HermesInstall::refusedNewerRelease() === 'v0.23.0', 'the refused release must be recognised');
+                    $msg = HermesInstall::ensure($unattended);
+                    $aside = glob($w['root'] . '/hermes.refused-v0.23.0-*');
+                    check(count($aside) === 1 && preg_match('/^hermes\.refused-v0\.23\.0-\d{8}T\d{6}Z$/', basename($aside[0])) === 1, 'aside: ' . json_encode($aside));
+                    check(is_dir($aside[0] . '/.git'), 'the moved tree must be kept whole');
+                    check(strpos($msg, 'moved the v0.23.0 tree Pikkumies cannot start to ' . basename($aside[0]) . ' (remove it when it is not needed); building v0.10.0 in the background') === 0, 'ensure: ' . $msg);
+                    $log = file($w['root'] . '/local/hermes-heal.log', FILE_IGNORE_NEW_LINES);
+                    check(count($log) === 1 && strpos($log[0], 'moved v0.23.0 (newer than ' . HermesInstall::NEWEST_CHECKED . ', missing browser.restrict_evaluate) to ' . basename($aside[0]) . ', building v0.10.0') !== false, 'heal log: ' . json_encode($log));
+                    hermesTWaitReady($w);
+                    check(HermesInstall::isComplete() && HermesInstall::status()['rev'] === 'v0.10.0', 'rebuilt at: ' . json_encode(HermesInstall::status()));
+                    check(file_get_contents($w['root'] . '/local/hermes/sessions/one.json') === "{\"mine\":1}\n", 'HERMES_HOME data must not be touched');
+                    check(strpos(HermesInstall::ensure($unattended), 'installed') === 0 && count(glob($w['root'] . '/hermes.refused-*')) === 1, 'a healed install is left alone afterwards');
+                });
+            } finally {
+                testRmTree($w['t']);
+            }
+        }
+    },
+    'hermes room: the rebuild of a refused release is sized from that tree, not a fresh build, so the daily update can heal a full-size install' => function () {
+        // QA account on 2026-11-03: 150,000 soft files, 75,437 in use (a v0.22.6 tree of 23,360 files plus its HERMES_HOME).
+        $files = ['soft' => 150000, 'used' => 75437];
+        check(strpos(HermesInstall::roomProblem($files, null, null, true), 'Hermes needs about 65,000 files') === 0, 'a fresh build must still keep the reserve');
+        check(HermesInstall::roomProblem($files, null, null, true, [2 * 23360, 917 * 1048576]) === '', 'the measured rebuild (2 x 23,360 entries) fits');
+        check(strpos(HermesInstall::roomProblem(['soft' => 30000, 'used' => 20000], null, null, true, [23360, 0]), 'Hermes needs about 23,360 files') === 0, 'a rebuild that does not fit names its own size');
+        check(strpos(HermesInstall::roomProblem(null, 100 * 1048576, null, false, [100, 400 * 1048576]), 'Hermes needs about 0.4 GB') === 0, 'bytes too');
+        $d = testTempDir('pk-hermes-size');
+        try {
+            mkdir("$d/a/b", 0700, true);
+            file_put_contents("$d/a/one", '12345');
+            file_put_contents("$d/a/b/two", '123');
+            symlink("$d/a/one", "$d/link");
+            check(HermesInstall::treeSize($d) === [5, 8 + filesize("$d/a") + filesize("$d/a/b")], 'treeSize: ' . json_encode(HermesInstall::treeSize($d)));
+        } finally {
+            testRmTree($d);
+        }
+    },
+    'hermes refused release: the tag of a release clone is read from packed-refs, annotated (peeled line) or not, without git' => function () {
+        $d = testTempDir('pk-hermes-refs');
+        try {
+            $head = str_repeat('f', 40);
+            file_put_contents("$d/HEAD", "$head\n");
+            file_put_contents("$d/packed-refs", "# pack-refs with: peeled fully-peeled sorted\n" . str_repeat('4', 40) . " refs/tags/v0.22.6\n^$head\n");
+            check(HermesInstall::packedTagAtHead($d) === 'v0.22.6', 'annotated tag');
+            file_put_contents("$d/packed-refs", str_repeat('4', 40) . " refs/tags/v0.22.5\n^" . str_repeat('5', 40) . "\n$head refs/tags/v0.23.0\n");
+            check(HermesInstall::packedTagAtHead($d) === 'v0.23.0', 'lightweight tag after another tag');
+            file_put_contents("$d/packed-refs", str_repeat('4', 40) . " refs/tags/v0.22.6\n^" . str_repeat('5', 40) . "\n");
+            check(HermesInstall::packedTagAtHead($d) === '', 'no tag at HEAD');
+            file_put_contents("$d/HEAD", "ref: refs/heads/main\n");
+            check(HermesInstall::packedTagAtHead($d) === '' && HermesInstall::packedTagAtHead("$d/missing") === '', 'a branch or no HEAD has no release tag');
+        } finally {
+            testRmTree($d);
+        }
+    },
+    'hermes ensure: a refused release is left alone when it has the person\'s changes, passed verify, is not newer than NEWEST_CHECKED, keeps every checked key, or has another origin' => function () {
+        $cases = [
+            'modified' => ['v0.23.0', true, function ($w, $tree) { file_put_contents("$tree/mine.patch", "user work\n"); }],
+            'verified' => ['v0.23.0', true, function ($w, $tree) { file_put_contents($w['root'] . '/local/hermes-verified.json', "{}\n"); }],
+            'not newer' => ['v0.22.4', true, null],
+            'keys kept' => ['v0.23.1', false, null],
+            'other origin' => ['v0.23.0', true, function ($w, $tree) { hermesTSh('git -C ' . escapeshellarg($tree) . ' remote set-url origin https://example.invalid/fork.git'); }],
+        ];
+        foreach ($cases as $name => list($tag, $drop, $change)) {
+            $w = hermesTWorld();
+            try {
+                $tree = hermesTCompleteAt($w, $tag, $drop);
+                if ($change) {
+                    $change($w, $tree);
+                }
+                hermesTIn($w, function () use ($w, $tree, $name) {
+                    check(HermesInstall::refusedNewerRelease() === '', "$name: must not count as refused");
+                    foreach ([false, true] as $unattended) {
+                        $msg = HermesInstall::ensure($unattended);
+                        check(strpos($msg, 'installed (pikkumies/hermes') === 0, "$name: ensure: $msg");
+                    }
+                    check(is_dir("$tree/.git") && !glob($w['root'] . '/hermes.refused-*') && !glob($w['root'] . '/hermes.broken-*')
+                        && !file_exists($w['root'] . '/local/hermes-heal.log'), "$name: the tree must stay where it is");
+                });
+            } finally {
+                testRmTree($w['t']);
+            }
         }
     },
     'hermes ensure: a build already running is left alone, nothing else is started' => function () {

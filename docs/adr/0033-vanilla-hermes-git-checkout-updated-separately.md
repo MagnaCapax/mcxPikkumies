@@ -121,3 +121,19 @@ Follow-up for lifting the bound: in v0.22.6 the core browser is the `browser_exe
 "browser_exec is the only core browser"), so the browse guard has to be expressed against it before
 `NEWEST_CHECKED` moves. An install made between the v0.22.6 tag and this change holds a v0.22.6 checkout that
 Pikkumies refuses to start; this change does not move it (the checkout is the person's, ADR-0033).
+
+## Amendment 2026-11-03 (second): rebuild a refused newer release
+
+An install made between the v0.22.6 tag and the bound kept a checkout Pikkumies refuses, and nothing moved it back:
+`ensure()` left any complete tree alone. It now treats one kind of complete tree as not installed: an unmodified
+checkout of the official repository at a stable tag newer than `NEWEST_CHECKED`, missing a `CONFIG_FACTS` key, that
+never passed `verify()` (no `local/hermes-verified.json`). Pikkumies installed that tree and can never start it.
+`pikkumies install` and the daily update (`post-update`) move it aside to `pikkumies/hermes.refused-<tag>-<UTC time>`
+(never deleted), write one line to `local/hermes-heal.log`, and build the checked release. A tree with the person's
+own changes, another origin, or a recorded verified start stays where it is, and HERMES_HOME (`local/hermes`, the
+person's sessions and memories) is not touched.
+The rebuild's room check is sized from the refused tree, not from a fresh build's 65,000 files: with that number a
+full-size QA account (75,437 of 150,000 files in use) never healed on the daily update. Measured on that account
+(2026-11-03): the move costs nothing, and the v0.22.5 rebuild beside a 23,360-entry, 367 MB v0.22.6 tree added 35,547
+files and about 715 MB (the new tree, plus about 18,000 files the environment in HERMES_HOME gained). The check asks for
+twice the tree's entries and two and a half times its bytes, with the usual reserve for an automatic build.
