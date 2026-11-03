@@ -89,7 +89,7 @@ class GoalReviewWindow
     /** [D-id => [title, path]] and [T-id => [name, script]]: free candidates for the requests, none the session already used. */
     public static function candidates(array $w, array $config, $toolsDir = null)
     {
-        $query = self::cut(implode(' ', array_column($w['requests'], 'text')), 1000);
+        $query = self::candidateQuery($w);
         $docs = [];
         list($hits) = DocSources::search($query, self::CANDIDATES, true, 0.3); // free text: pages sharing a third of its words
         foreach ($hits as $h) {
@@ -120,6 +120,17 @@ class GoalReviewWindow
             $tools['T' . ($i + 1)] = [$s[1], $s[2]];
         }
         return [$docs, $tools];
+    }
+
+    /**
+     * The free-text query for the page and tool candidates: the newest requests first, so what the user asks now is never the part that
+     * is cut. The length bound is not a guess about cost: TextSearch::rank needs a third of the query's weighted words in a page, so a
+     * query that grows with the whole session matches fewer and fewer pages (ADR-0096 lets the review see every request; the search
+     * keeps to the recent ones).
+     */
+    public static function candidateQuery(array $w)
+    {
+        return self::cut(implode(' ', array_reverse(array_column($w['requests'], 'text'))), 1000);
     }
 
     /** One line, at most $max characters. */
