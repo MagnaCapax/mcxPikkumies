@@ -8,7 +8,7 @@ function cliFixtureTool()
     $tool = "$dir/fixture.php";
     file_put_contents($tool, '<?php
 require ' . var_export("$lib/Cli.php", true) . ';
-require ' . var_export("$lib/CliHuman.php", true) . ';
+require_once ' . var_export("$lib/CliHuman.php", true) . ';
 Cli::run($argv, [
     "list" => function ($args, $opt) {
         $out = [];
@@ -109,6 +109,19 @@ return [
         check(strpos($out, 'ok, 3 shown') !== false, 'no human status line');
         list(, $out) = runPhp(cliFixtureTool(), ['nasty', '--human']);
         check(strpos($out, "\x1b") === false, 'escape reached the terminal');
+    },
+    'cli: --human works in a tool that loads only Cli.php' => function () {
+        $dir = sys_get_temp_dir() . '/pk-cli-only-' . getmypid();
+        @mkdir($dir, 0700, true);
+        $tool = "$dir/only.php";
+        file_put_contents($tool, '<?php
+require ' . var_export(dirname(__DIR__) . '/pikkumies/lib/Cli.php', true) . ';
+Cli::run($argv, ["list" => function ($args, $opt) { return [["name" => "a", "size" => 2048]]; }], "usage: only.php list [--human]");
+');
+        list($code, $out) = runPhp($tool, ['list', '--human']);
+        check($code === 0 && strpos($out, '2.0 KiB') !== false && strpos($out, 'ok, 1 shown') !== false, "--human failed when the tool loads only Cli.php: $out");
+        list($code, $out) = runPhp($tool, ['list']);
+        check($code === 0 && strpos($out, '"ok":true') !== false, 'JSON output changed');
     },
     'cli: secret-like fields and secrets inside URLs never print' => function () {
         list($code, $out) = runPhp(cliFixtureTool(), ['leak']);

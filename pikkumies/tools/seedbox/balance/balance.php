@@ -8,7 +8,7 @@
  * php balance.php plan [--tag seedbox] [--goal free|upload] [--max-moves N] [--human]
  */
 require dirname(__DIR__, 3) . '/lib/Cli.php';
-require dirname(__DIR__, 3) . '/lib/CliHuman.php';
+require_once dirname(__DIR__, 3) . '/lib/CliHuman.php';
 require_once dirname(__DIR__, 3) . '/lib/ToolProc.php';
 require_once __DIR__ . '/BalanceGather.php';
 require_once __DIR__ . '/BalancePlan.php';

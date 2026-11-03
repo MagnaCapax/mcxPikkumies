@@ -16,7 +16,7 @@ if (!function_exists('cctFixtureTool')) {
         $tool = "$dir/fixture.php";
         file_put_contents($tool, '<?php
 require ' . var_export("$lib/Cli.php", true) . ';
-require ' . var_export("$lib/CliHuman.php", true) . ';
+require_once ' . var_export("$lib/CliHuman.php", true) . ';
 Cli::run($argv, [
     "statusonly" => function ($args, $opt) { return ["status" => ["ok" => true, "verified" => true]]; },
     "err" => function ($args, $opt) { throw new CliError("tracker refused us", "see https://t.example/a.php?passkey=0123456789abcdef9z"); },

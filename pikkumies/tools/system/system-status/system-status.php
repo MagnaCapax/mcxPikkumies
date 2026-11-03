@@ -12,7 +12,7 @@ require dirname(__DIR__, 3) . '/lib/Detect.php';
 require_once dirname(__DIR__, 3) . '/lib/Cgroup.php'; // Detect.php already require_once's this; once here too, so a direct `php system-status.php` still finds the class
 require_once dirname(__DIR__, 3) . '/lib/Config.php'; // Detect.php already require_once's this; once here too, for the same reason
 require dirname(__DIR__, 3) . '/lib/Cli.php';
-require dirname(__DIR__, 3) . '/lib/CliHuman.php';
+require_once dirname(__DIR__, 3) . '/lib/CliHuman.php';
 require_once __DIR__ . '/StatusAccount.php';
 require_once __DIR__ . '/StatusHealth.php';
 require_once dirname(__DIR__) . '/telemetry/TelemetryLog.php'; // local-only history of this verb's own record (docs/adr/0084-...)

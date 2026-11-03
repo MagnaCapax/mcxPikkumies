@@ -10,6 +10,8 @@
  * It throws CliError for a failure the user can act on. Output: one JSON object per line and a
  * final {"ok":...} line; --human prints the same records for people. Exit 0 ok, 1 error, 2 usage.
  */
+require_once __DIR__ . '/CliHuman.php'; // --human belongs to every tool that loads Cli; a tool must not have to know to load it too
+
 class CliError extends Exception
 {
     public $hint;
