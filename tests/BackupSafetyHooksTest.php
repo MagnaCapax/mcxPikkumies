@@ -218,6 +218,27 @@ return [
             testRmTree($t);
         }
     },
+    'pre-edit copy: sessions are kept however old; only a folder over its budget loses whole sessions, oldest first, never the current one' => function () {
+        $t = testTempDir('pk-pec');
+        $uid = posix_geteuid();
+        try {
+            mkdir("$t/base", 0700);
+            $now = 1792483200;
+            foreach (['old' => $now - 400 * 86400, 'mid' => $now - 40 * 86400, 'new' => $now - 86400, 'cur' => $now] as $s => $mtime) {
+                mkdir("$t/base/$s", 0700);
+                file_put_contents("$t/base/$s/f", str_repeat('x', 100));
+                touch("$t/base/$s", $mtime);
+            }
+            preEditPrune("$t/base", $uid, $now, 1000, "$t/base/cur");
+            check(is_dir("$t/base/old") && is_dir("$t/base/mid") && is_dir("$t/base/new") && is_dir("$t/base/cur"), 'a year-old session must stay while the folder fits its budget');
+            preEditPrune("$t/base", $uid, $now, 250, "$t/base/cur");
+            check(!is_dir("$t/base/old") && !is_dir("$t/base/mid") && is_dir("$t/base/new") && is_dir("$t/base/cur"), 'over budget: the oldest go first, only as many as needed');
+            preEditPrune("$t/base", $uid, $now, 0, "$t/base/cur");
+            check(!is_dir("$t/base/new") && is_file("$t/base/cur/f"), 'the session that just copied survives even a zero budget');
+        } finally {
+            testRmTree($t);
+        }
+    },
     'pre-edit copy: the copy is of the file that was checked (same inode), whole, and named only once complete' => function () {
         $t = testTempDir('pk-pec');
         try {

@@ -47,3 +47,7 @@ What was found:
 ## Amendment 2026-10-22: the refresh never runs the remote check
 
 The background refresh runs under `timeout 120`, and its second pass ran `backup remote check`, which streams and decrypts the newest archive (up to 10 GiB). A large archive was cut off before the result was saved, so the status stayed unknown and the archive was downloaded again the next day. The refresh now only reads the record of the last `check`; `backup remote check` runs on request. restic and borg keep their metadata check (it reads no archive). A remote without a check in the last 7 days stays unknown, with a note that names the command.
+
+## Amendment 2026-11-03: pre-edit copies are kept until the folder outgrows a budget, not for 7 days
+
+"Session folders older than 7 days removed" had no measurement or ruling behind it (the Decision above states it without a reason), and it deleted the very copy a user needs when they notice a bad edit on day 8. A time limit with no basis is a guess; the real limit here is the account's disk. The hook now removes nothing by age. When the copies of all sessions together pass min(2 GiB, half of the free space plus what the copies already use) -- the same basis as the `snap` cap -- it removes whole session folders, oldest first, until they fit, and never the session that just copied. The per-file (1 MiB) and per-session (50 MB) caps stay: they bound a single runaway edit, and their numbers are the ones this ADR already states.

@@ -23,7 +23,7 @@ require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 const PRE_EDIT_FILE_MAX = 1048576;
 const PRE_EDIT_SESSION_MAX = 52428800;
-const PRE_EDIT_KEEP = 604800;
+const PRE_EDIT_TOTAL_MAX = 2147483648; // all sessions together; the same 2 GiB ceiling as `backup-safety snap` (ADR-0099)
 const PRE_EDIT_SESSION_RE = '/^[A-Za-z0-9._-]{1,128}$/';
 
 /** The files a call is about to rewrite, as written (relative ones are resolved by the caller): [['path', 'sudo' => run through sudo]]. */
@@ -105,15 +105,60 @@ function preEditDir($localDir, $uid, $session)
     return LocalTmp::dir($localDir, "pre-edit/$session", $uid);
 }
 
-/** Removes session folders older than PRE_EDIT_KEEP under $base: only this account's own files and folders, never a link's target. */
-function preEditPrune($base, $uid, $now)
+/** Bytes of regular files under $p, this account's own only, links never followed. */
+function preEditSize($p, $uid)
 {
+    $st = @lstat($p);
+    if ($st === false || (int) $st['uid'] !== (int) $uid) {
+        return 0;
+    }
+    if (($st['mode'] & 0170000) === 0100000) {
+        return (int) $st['size'];
+    }
+    $n = 0;
+    if (($st['mode'] & 0170000) === 0040000) {
+        foreach ((array) @scandir($p) as $name) {
+            if ($name !== '.' && $name !== '..') {
+                $n += preEditSize("$p/$name", $uid);
+            }
+        }
+    }
+    return $n;
+}
+
+/**
+ * Keeps the copies until the folder outgrows its budget, then removes whole session folders, oldest first, until it fits:
+ * only this account's own files and folders, never a link's target. $budget (test seam) defaults to
+ * min(PRE_EDIT_TOTAL_MAX, half of what the disk has free plus what the copies already use), the same basis as the 'snap' cap (ADR-0099).
+ */
+function preEditPrune($base, $uid, $now, $budget = null, $except = null)
+{
+    $folders = [];
+    $total = 0;
     foreach ((array) @scandir($base) as $name) {
         $p = "$base/$name";
         $st = $name === '.' || $name === '..' ? false : @lstat($p);
-        if ($st !== false && ($st['mode'] & 0170000) === 0040000 && (int) $st['uid'] === (int) $uid && $st['mtime'] < $now - PRE_EDIT_KEEP) {
-            preEditRemove($p, $uid);
+        if ($st !== false && ($st['mode'] & 0170000) === 0040000 && (int) $st['uid'] === (int) $uid) {
+            $size = preEditSize($p, $uid);
+            if ($p !== $except) { // the session that just copied is never the one to go
+                $folders[] = [$st['mtime'], $p, $size];
+            }
+            $total += $size;
         }
+    }
+    if ($budget === null) {
+        $free = @disk_free_space($base);
+        $budget = $free === false ? PRE_EDIT_TOTAL_MAX : min(PRE_EDIT_TOTAL_MAX, intdiv((int) $free + $total, 2));
+    }
+    usort($folders, function ($a, $b) {
+        return $a[0] - $b[0];
+    });
+    foreach ($folders as $f) {
+        if ($total <= $budget) {
+            break;
+        }
+        preEditRemove($f[1], $uid);
+        $total -= $f[2];
     }
 }
 
@@ -200,9 +245,9 @@ function preEditCopyFiles(array $payload, $localDir, $uid, $now, $run)
         }
     }
     if ($made && $dir !== null && !is_file("$dir/.noticed") && @touch("$dir/.noticed")) {
-        preEditPrune(dirname($dir), $uid, $now);
+        preEditPrune(dirname($dir), $uid, $now, null, $dir);
         HookNotes::add($localDir, $session, 'pre-edit-copy', 'Before an edit of a small existing file, Pikkumies keeps a copy of it as it was in '
-            . $dir . ' (only this account can open it; folders older than 7 days are removed). If the user wants an edit undone, the copy is there.', false);
+            . $dir . ' (only this account can open it; the oldest sessions go only when the copies together pass half the free space, at most 2 GiB). If the user wants an edit undone, the copy is there.', false);
     }
     return $made;
 }
