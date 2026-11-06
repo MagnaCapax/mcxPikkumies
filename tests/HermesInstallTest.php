@@ -377,6 +377,7 @@ return [
                 check(file_get_contents("$tree/mine.patch") === "second\n" && count(glob($w['root'] . '/hermes.broken-*')) === 1, 'an earlier aside means no second automatic rebuild');
             });
             rename($tree, $w['t'] . '/gone');
+            @unlink($w['root'] . '/local/install.log'); // the first rebuild's log; the next part checks that nothing starts
             hermesTIn($w, function () use ($w) {
                 CronTick::$setprivPresentOverride = false;
                 $msg = HermesInstall::ensure(true, true);
