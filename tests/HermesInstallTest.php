@@ -352,7 +352,7 @@ return [
             testRmTree($w['t']);
         }
     },
-    'hermes ensure: unattended never touches an incomplete tree, and refuses an unattended build on root without setpriv' => function () {
+    'hermes ensure: unattended moves an incomplete tree aside and builds again once, leaves it when an earlier aside exists, and refuses on root without setpriv' => function () {
         $w = hermesTWorld();
         try {
             $tree = $w['root'] . '/hermes';
@@ -360,8 +360,20 @@ return [
             file_put_contents("$tree/mine.patch", "user work\n");
             hermesTIn($w, function () use ($w, $tree) {
                 $msg = HermesInstall::ensure(true);
-                check(strpos($msg, 'not complete: pikkumies/hermes is left from a build that failed or stopped') === 0 && strpos($msg, 'run `pikkumies install`') !== false, 'ensure: ' . $msg);
-                check(file_get_contents("$tree/mine.patch") === "user work\n" && !glob($w['root'] . '/hermes.broken-*'), 'unattended must not move or delete the tree');
+                $aside = glob($w['root'] . '/hermes.broken-*');
+                check(count($aside) === 1 && strpos($msg, 'moved the incomplete tree to ' . basename($aside[0])) === 0, 'ensure: ' . $msg);
+                check(file_get_contents($aside[0] . '/mine.patch') === "user work\n", 'the moved tree lost the user file');
+                check(strpos((string) @file_get_contents($w['root'] . '/local/hermes-heal.log'), 'moved an incomplete tree to ' . basename($aside[0])) !== false, 'no heal log line');
+                hermesTWaitReady($w);
+                check(HermesInstall::isComplete(), 'the daily rebuild must finish the tree');
+            });
+            testRmTree($tree);
+            mkdir("$tree/.git", 0700, true);
+            file_put_contents("$tree/mine.patch", "second\n");
+            hermesTIn($w, function () use ($w, $tree) {
+                $msg = HermesInstall::ensure(true);
+                check(strpos($msg, 'not complete: pikkumies/hermes is left from a build that failed or stopped') === 0 && strpos($msg, 'run `pikkumies install`') !== false, 'second: ' . $msg);
+                check(file_get_contents("$tree/mine.patch") === "second\n" && count(glob($w['root'] . '/hermes.broken-*')) === 1, 'an earlier aside means no second automatic rebuild');
             });
             rename($tree, $w['t'] . '/gone');
             hermesTIn($w, function () use ($w) {
