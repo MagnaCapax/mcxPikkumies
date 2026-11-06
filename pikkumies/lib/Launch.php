@@ -98,6 +98,11 @@ class Launch
         if (Eternal::enabled() && $argv[1] === 'ui' && in_array($rest, [['start'], ['web-build']], true)) {
             return ['ui', $rest];
         }
+        // ensure and list are maintenance calls (PMSS userTransfer, scripts) that EternalCli answers on a disabled host
+        // too; as prompts they would start a session on the account's credits (ADR-0075 amendment 2026-11-06).
+        if ($argv[1] === 'eternal' && in_array($rest, [['ensure'], ['list'], ['list', '--json']], true)) {
+            return ['eternal', $rest];
+        }
         if (Eternal::enabled() && $argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new'], ['activity'], ['activity', '--json']], true)
             || (count($rest) === 2 && $rest[0] === 'quit' && preg_match('/^pm[1-9]$/D', $rest[1]) === 1)
             || (count($rest) === 3 && $rest[0] === 'hold' && $rest[1] === '--until' && ctype_digit($rest[2])))) {
