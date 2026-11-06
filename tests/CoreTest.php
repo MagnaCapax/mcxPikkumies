@@ -59,12 +59,14 @@ return [
     },
     'tools: tools.disabled leaves categories out; root.disabled hides server-admin' => function () {
         Generate::$dockerPresentOverride = true; // the docker CLI gate has its own test (GenerateTest)
+        Generate::$catalogEnabledOverride = true; // and so has the catalog host marker
         try {
             check(Generate::disabledCategories(Config::defaults()) === [], 'defaults must load every category');
             check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']], 'root' => ['disabled' => false]]) === ['seedbox'], 'tools.disabled ignored');
             check(in_array('server-admin', Generate::disabledCategories(['root' => ['disabled' => true]]), true), 'root.disabled must hide the server-admin category');
         } finally {
             Generate::$dockerPresentOverride = null;
+            Generate::$catalogEnabledOverride = null;
         }
     },
     'soul fits under the Hermes context-file cut and keeps its load-bearing rules' => function () {

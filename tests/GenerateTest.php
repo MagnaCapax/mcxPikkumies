@@ -99,6 +99,7 @@ return [
     },
     'generate: containers is left out when no docker CLI is on PATH or in ~/bin, recomputed each call, whatever the daemon does (ADR-0034)' => function () {
         $dir = testTempDir('pk-gen-docker');
+        Generate::$catalogEnabledOverride = true;
         try {
             mkdir("$dir/bin");
             mkdir("$dir/home/bin", 0700, true);
@@ -120,7 +121,26 @@ return [
             check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']]]) === ['seedbox'], 'with docker present only the user\'s list counts');
         } finally {
             Generate::$dockerPresentOverride = null;
+            Generate::$catalogEnabledOverride = null;
             testRmTree($dir);
+        }
+    },
+
+    'generate: seedbox/plans (the plan catalog) is left out unless the host opted in with its marker (ADR-0111)' => function () {
+        Generate::$dockerPresentOverride = true;
+        try {
+            Generate::$catalogEnabledOverride = false;
+            check(Generate::disabledCategories([]) === ['seedbox/plans'], 'no marker: the catalog is off');
+            check(Units::isDisabled('seedbox/plans', Generate::disabledCategories([])), 'the catalog category is the one left out');
+            check(!Units::isDisabled('seedbox', Generate::disabledCategories([])), 'the rest of seedbox stays');
+            Generate::$catalogEnabledOverride = true;
+            check(Generate::disabledCategories([]) === [], 'marker present: the catalog is on');
+            Generate::$catalogEnabledOverride = null;
+            check(Generate::CATALOG_MARKER === '/etc/seedbox/config/pikkumiesCatalog.enabled', 'the marker sits with the other host opt-ins');
+            check(in_array('seedbox/plans', Generate::disabledCategories([]), true) === !is_file(Generate::CATALOG_MARKER), 'the real marker decides when no seam is set');
+        } finally {
+            Generate::$dockerPresentOverride = null;
+            Generate::$catalogEnabledOverride = null;
         }
     },
 ];
