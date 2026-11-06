@@ -48,6 +48,11 @@ return [
             foreach ([['ask'], ['ask', '--nonce=abcdefgh'], ['ui', 'start'], ['ui', 'web-build'], ['eternal', 'new'], ['eternal', '--bad']] as $words) {
                 check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'markerless word claimed: ' . json_encode($words));
             }
+            // The maintenance verbs EternalCli answers on a disabled host are never prompts: PMSS userTransfer runs
+            // `eternal ensure` after every move, and as a prompt it would start a session on the account's credits.
+            foreach ([['eternal', 'ensure'], ['eternal', 'list'], ['eternal', 'list', '--json']] as $words) {
+                check(Launch::route(array_merge(['pikkumies'], $words)) === ['eternal', array_slice($words, 1)], 'markerless maintenance verb became a prompt: ' . json_encode($words));
+            }
             check(Eternal::insidePrivateTmux($root . '/tmux/tmux-1000/default,1,0'), 'private socket missed');
             check(!Eternal::insidePrivateTmux('/ordinary/socket,1,0'), 'foreign socket claimed');
             $privatePlan = Launch::tmuxPlan('1', ['pm1'], Eternal::insidePrivateTmux($root . '/tmux/tmux-1000/default,1,0'), 'cmd');
