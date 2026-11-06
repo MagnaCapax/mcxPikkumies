@@ -434,7 +434,13 @@ class HermesInstall
         $cmd = ($cwd !== null ? 'cd ' . escapeshellarg($cwd) . ' && ' : '') . $cmd . ' ' . implode(' ', array_map('escapeshellarg', $argv));
         if (func_num_args() >= 4) {
             $lines = [];
-            exec($cmd . ' 2>/dev/null', $lines, $code);
+            // The value is stdout; stderr goes to the install log, so a failed step says why.
+            $err = (string) tempnam(sys_get_temp_dir(), 'pk-run-');
+            exec($cmd . ($err !== '' ? ' 2>' . escapeshellarg($err) : ' 2>/dev/null'), $lines, $code);
+            if ($err !== '') {
+                echo (string) @file_get_contents($err);
+                @unlink($err);
+            }
             $out = trim(implode("\n", $lines));
             return $code;
         }
@@ -524,10 +530,12 @@ class HermesInstall
                 return $fail($problem);
             }
         }
-        if (self::run([$entry . '/uv', 'python', 'install', '--no-bin', '--no-registry', $py], $env) !== 0) {
+        // Both uv steps run in HERMES_HOME: `uv python find` looks for a .venv in its working directory and fails on one
+        // the account cannot read (a build started through runuser from root's directory) after `uv python install` worked.
+        if (self::run([$entry . '/uv', 'python', 'install', '--no-bin', '--no-registry', $py], $env, $env['HERMES_HOME']) !== 0) {
             return $fail("uv could not install the bootstrap Python $py");
         }
-        if (self::run([$entry . '/uv', 'python', 'find', '--managed-python', $py], $env, null, $boot) !== 0 || !is_executable($boot)) {
+        if (self::run([$entry . '/uv', 'python', 'find', '--managed-python', $py], $env, $env['HERMES_HOME'], $boot) !== 0 || !is_executable($boot)) {
             return $fail("uv found no bootstrap Python $py");
         }
         $pm = [$boot, '-m', 'pm.cli', 'install'];

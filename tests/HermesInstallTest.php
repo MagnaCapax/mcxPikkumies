@@ -73,7 +73,7 @@ chmod(getcwd() . "/.hermes/bin/hermes", 0755);
     hermesTFake("$t/uvsrc/uv-x86_64-unknown-linux-gnu/uv", sprintf($logLine, '"uv " . implode(" ", array_slice($argv, 1)) . " | PYDIR=" . getenv("UV_PYTHON_INSTALL_DIR") . " | CACHE=" . getenv("UV_CACHE_DIR") . " | NOCONFIG=" . getenv("UV_NO_CONFIG")') . '
 $py = getenv("UV_PYTHON_INSTALL_DIR") . "/cpython-" . end($argv) . "/bin/python3";
 if (array_slice($argv, 1, 2) === ["python", "install"]) { @mkdir(dirname($py), 0700, true); copy(' . var_export("$bin/boot-python", true) . ', $py); chmod($py, 0755); exit(0); }
-if (array_slice($argv, 1, 2) === ["python", "find"]) { if (!is_file($py)) { exit(2); } echo $py, "\n"; exit(0); }
+if (array_slice($argv, 1, 2) === ["python", "find"]) { if (!is_readable(getcwd())) { fwrite(STDERR, "error: failed to query metadata of symlink .venv: Permission denied\n"); exit(2); } if (getenv("PK_FAKE_FIND_FAIL")) { fwrite(STDERR, "error: fake find failure\n"); exit(2); } if (!is_file($py)) { exit(2); } echo $py, "\n"; exit(0); }
 exit(0);
 ');
     hermesTSh('tar -czf ' . escapeshellarg("$t/uv.tar.gz") . ' -C ' . escapeshellarg("$t/uvsrc") . ' uv-x86_64-unknown-linux-gnu');
@@ -217,6 +217,45 @@ return [
         $env = HermesInstall::bootstrapEnv();
         $home = Config::root() . '/local/hermes';
         check($env === ['HERMES_HOME' => $home, 'UV_NO_CONFIG' => '1', 'UV_PYTHON_INSTALL_DIR' => "$home/bootstrap-python", 'UV_CACHE_DIR' => "$home/cache/uv"], 'everything the bootstrap writes stays under HERMES_HOME: ' . json_encode($env));
+    },
+    'hermes build: the uv steps run in HERMES_HOME, so a build started from a directory the account cannot read finishes, and a failed uv step leaves its error in the install log' => function () {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            skip('root reads every directory; checked as an ordinary account');
+        }
+        $here = getcwd();
+        $locked = testTempDir('pk-locked-cwd');
+        $w = hermesTWorld();
+        $f = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w, $locked, $here) {
+                chdir($locked);
+                chmod($locked, 0);
+                try {
+                    HermesInstall::ensure();
+                    hermesTWaitReady($w);
+                } finally {
+                    chmod($locked, 0700);
+                    chdir($here);
+                }
+                check(HermesInstall::isComplete(), 'a build started from an unreadable directory must finish: ' . @file_get_contents($w['root'] . '/local/install.log'));
+            });
+            hermesTIn($f, function () use ($f) {
+                HermesInstall::ensure();
+                $log = '';
+                for ($i = 0; $i < 300 && strpos($log, 'failed:') === false; $i++) {
+                    usleep(100000);
+                    $log = (string) @file_get_contents($f['root'] . '/local/install.log');
+                }
+                check(strpos($log, "error: fake find failure\n") !== false && strpos($log, 'failed: uv found no bootstrap Python 3.14') !== false,
+                    'a failed uv python find must leave its own error in the install log: ' . $log);
+            }, ['PK_FAKE_FIND_FAIL' => '1']);
+        } finally {
+            chdir($here);
+            @chmod($locked, 0700);
+            testRmTree($locked);
+            testRmTree($w['t']);
+            testRmTree($f['t']);
+        }
     },
     'hermes install: an unmodified checkout of the newest release, bootstrapped by pinned uv + pm.cli install, nothing outside pikkumies/' => function () {
         $w = hermesTWorld();
