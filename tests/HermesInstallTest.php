@@ -371,6 +371,7 @@ return [
             mkdir("$tree/.git", 0700, true);
             file_put_contents("$tree/mine.patch", "second\n");
             hermesTIn($w, function () use ($w, $tree) {
+                @unlink(HermesInstall::markerFile());
                 $msg = HermesInstall::ensure(true);
                 check(strpos($msg, 'not complete: pikkumies/hermes is left from a build that failed or stopped') === 0 && strpos($msg, 'run `pikkumies install`') !== false, 'second: ' . $msg);
                 check(file_get_contents("$tree/mine.patch") === "second\n" && count(glob($w['root'] . '/hermes.broken-*')) === 1, 'an earlier aside means no second automatic rebuild');
