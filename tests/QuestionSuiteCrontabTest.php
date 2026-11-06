@@ -111,4 +111,16 @@ return [
             $box->remove();
         }
     },
+    'questions: the sandbox checkout opts in to the plan catalog, which ships off, and reuse() restores the opt-in (ADR-0111)' => function () {
+        $box = questionsSandboxOrSkip(dirname(__DIR__));
+        try {
+            $optIn = $box->root . '/checkout/pikkumies/local/catalog.enabled';
+            check(is_file($optIn), 'create() must opt the sandbox checkout in to the catalog');
+            unlink($optIn);
+            Sandbox::reuse($box->root);
+            check(is_file($optIn), 'reuse() must restore a missing opt-in');
+        } finally {
+            $box->remove();
+        }
+    },
 ];

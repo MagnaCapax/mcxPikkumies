@@ -59,7 +59,7 @@ return [
     },
     'tools: tools.disabled leaves categories out; root.disabled hides server-admin' => function () {
         Generate::$dockerPresentOverride = true; // the docker CLI gate has its own test (GenerateTest)
-        Generate::$catalogEnabledOverride = true; // and so has the catalog host marker
+        Generate::$catalogEnabledOverride = true; // and so has the catalog opt-in
         try {
             check(Generate::disabledCategories(Config::defaults()) === [], 'defaults must load every category');
             check(Generate::disabledCategories(['tools' => ['disabled' => ['seedbox']], 'root' => ['disabled' => false]]) === ['seedbox'], 'tools.disabled ignored');

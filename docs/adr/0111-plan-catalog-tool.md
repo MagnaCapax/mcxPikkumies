@@ -23,7 +23,7 @@ Users ask their agent what a plan costs and whether it is on sale. Pikkumies had
 - Most plans have no specs block. Those show their own description; no filter on figures exists, so none can drop them.
 - It orders nothing. A question to buy gets the plan's order link.
 - The skill forbids comparing with the user's own service: their price can be an older one they keep.
-- The tool is its own category, `seedbox/plans`, and is on only where the host opted in with `/etc/seedbox/config/pikkumiesCatalog.enabled`, like the Eternals marker (ADR-0075). Without it `Generate::unavailableCategories` leaves the category out of the skills, the tool index and SOUL.md. Every account follows main while no release is tagged, so this tool ships off and is switched on per host after its end-use tests pass. The storage skill's "never state a price" is unchanged, because accounts without the catalog keep that rule.
+- The tool is its own category, `seedbox/plans`, and is on only in an install that opted in with the file `local/catalog.enabled`. Without it `Generate::unavailableCategories` leaves the category out of the skills, the tool index and SOUL.md. Every account follows main while no release is tagged, so this tool ships off until its end-use tests pass. The opt-in is per install, not per host: the weekly QA asks its questions on a production server, and a host-wide switch there would turn the tool on for every account of that server. The question suite's sandbox creates the file for its own copy. The storage skill's "never state a price" is unchanged, because accounts without the catalog keep that rule.
 
 ## Consequences
 

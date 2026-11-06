@@ -126,18 +126,16 @@ return [
         }
     },
 
-    'generate: seedbox/plans (the plan catalog) is left out unless the host opted in with its marker (ADR-0111)' => function () {
+    'generate: seedbox/plans (the plan catalog) is left out unless the install opted in with local/catalog.enabled (ADR-0111)' => function () {
         Generate::$dockerPresentOverride = true;
         try {
             Generate::$catalogEnabledOverride = false;
-            check(Generate::disabledCategories([]) === ['seedbox/plans'], 'no marker: the catalog is off');
+            check(Generate::disabledCategories([]) === ['seedbox/plans'], 'no opt-in: the catalog is off');
             check(Units::isDisabled('seedbox/plans', Generate::disabledCategories([])), 'the catalog category is the one left out');
             check(!Units::isDisabled('seedbox', Generate::disabledCategories([])), 'the rest of seedbox stays');
             Generate::$catalogEnabledOverride = true;
-            check(Generate::disabledCategories([]) === [], 'marker present: the catalog is on');
-            Generate::$catalogEnabledOverride = null;
-            check(Generate::CATALOG_MARKER === '/etc/seedbox/config/pikkumiesCatalog.enabled', 'the marker sits with the other host opt-ins');
-            check(in_array('seedbox/plans', Generate::disabledCategories([]), true) === !is_file(Generate::CATALOG_MARKER), 'the real marker decides when no seam is set');
+            check(Generate::disabledCategories([]) === [], 'opted in: the catalog is on');
+            check(Generate::CATALOG_OPT_IN === 'catalog.enabled', 'the opt-in file the question sandbox creates');
         } finally {
             Generate::$dockerPresentOverride = null;
             Generate::$catalogEnabledOverride = null;

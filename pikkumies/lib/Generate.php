@@ -23,9 +23,9 @@ class Generate
 {
     /** Test seam: a docker CLI presence other than this machine's real PATH and ~/bin. */
     public static $dockerPresentOverride = null;
-    /** The host's opt-in for the plan catalog (ADR-0111); without it seedbox/plans is left out. */
-    const CATALOG_MARKER = '/etc/seedbox/config/pikkumiesCatalog.enabled';
-    /** Test seam: the catalog opt-in other than this host's real marker. */
+    /** The install's opt-in for the plan catalog, a file in local/ (ADR-0111); without it seedbox/plans is left out. */
+    const CATALOG_OPT_IN = 'catalog.enabled';
+    /** Test seam: the catalog opt-in other than this install's real file. */
     public static $catalogEnabledOverride = null;
 
     /**
@@ -45,13 +45,13 @@ class Generate
     /**
      * Categories whose program is missing here, recomputed on every run, never written to the config:
      * containers when no `docker` CLI is on PATH or in ~/bin (ADR-0034). Only the CLI decides, never the
-     * daemon's health: a daemon that is down is when the containers tools are needed. seedbox/plans when the host
-     * has not opted in with CATALOG_MARKER (ADR-0111).
+     * daemon's health: a daemon that is down is when the containers tools are needed. seedbox/plans when the install
+     * has not opted in with local/CATALOG_OPT_IN (ADR-0111).
      */
     public static function unavailableCategories()
     {
         $docker = self::$dockerPresentOverride !== null ? (bool) self::$dockerPresentOverride : Host::markerPresent('docker');
-        $catalog = self::$catalogEnabledOverride !== null ? (bool) self::$catalogEnabledOverride : Host::markerPresent(self::CATALOG_MARKER);
+        $catalog = self::$catalogEnabledOverride !== null ? (bool) self::$catalogEnabledOverride : is_file(Config::localDir() . '/' . self::CATALOG_OPT_IN);
         $off = $docker ? [] : ['containers'];
         if (!$catalog) {
             $off[] = 'seedbox/plans';

@@ -51,6 +51,7 @@ class Sandbox
             . "if [ \"\$1\" = -r ]; then rm -f $tab; exit 0; fi\ncat \"\${1:--}\" > $tab\n");
         chmod("$root/home/.qa-bin/crontab", 0700);
         self::ensureBashProfile($root);
+        self::ensureOptIns($root);
         return new self($root);
     }
 
@@ -65,6 +66,7 @@ class Sandbox
             throw new Exception("--install $dir is not a private sandbox this runner made under " . $tmp);
         }
         self::ensureBashProfile($real);
+        self::ensureOptIns($real);
         return new self($real);
     }
 
@@ -74,6 +76,15 @@ class Sandbox
      * set up; this file is sourced after ~/.profile and restores it. Pikkumies only manages .bashrc and .profile
      * (PathInstall.php), so this file never collides with anything it writes.
      */
+    /** The sandbox checkout opts in to tools that ship off (the plan catalog, ADR-0111), so their questions ask them. */
+    private static function ensureOptIns($root)
+    {
+        @mkdir("$root/checkout/pikkumies/local", 0700, true);
+        if (!is_file("$root/checkout/pikkumies/local/catalog.enabled") && file_put_contents("$root/checkout/pikkumies/local/catalog.enabled", "question suite\n") === false) {
+            throw new Exception("could not opt $root in to the catalog");
+        }
+    }
+
     private static function ensureBashProfile($root)
     {
         $path = "$root/home/.bash_profile";
