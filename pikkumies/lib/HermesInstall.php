@@ -666,7 +666,9 @@ class HermesInstall
         if ($room !== '') {
             return 'not installed: ' . $room;
         }
-        list(, $tags) = self::git(['ls-remote', '--tags', '--', self::repo()]);
+        // From /, never the caller's directory: git refuses to list a remote's tags from a directory the account cannot read
+        // (runuser from root's directory), which read as "network?" and started no build.
+        list(, $tags) = self::git(['ls-remote', '--tags', '--', self::repo()], '/');
         $tag = self::latestTag($tags);
         if ($tag === '') {
             return 'not installed: could not read the Hermes releases from ' . self::repo() . ' (network?)';
