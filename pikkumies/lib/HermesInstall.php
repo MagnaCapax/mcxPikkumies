@@ -624,7 +624,11 @@ class HermesInstall
         }
         $tree = self::treeDir();
         $exists = file_exists($tree) || is_link($tree);
-        if ($exists && $unattended && $refused === '') {
+        // An incomplete tree (a build that failed or stopped) is moved aside and built again by the daily update once; when
+        // an earlier aside is still there, a rebuild already ran or the user kept one, so it waits for `pikkumies install`
+        // (ADR-0033 amendment 2026-11-06).
+        $retried = $exists && $refused === '' && (glob($tree . '.broken-*') ?: []) !== [];
+        if ($exists && $unattended && $refused === '' && $retried) {
             return 'not complete: pikkumies/hermes is left from a build that failed or stopped (see ' . Config::shown(self::localDir() . '/install.log') . '); run `pikkumies install` to move it aside and build again';
         }
         if (self::target() === '') {
@@ -682,6 +686,8 @@ class HermesInstall
                 @unlink(self::markerFile());
                 @file_put_contents(self::localDir() . '/hermes-heal.log', gmdate('c') . ' ' . ($delete ? 'deleted' : 'moved') . ' ' . $refused . ' (newer than ' . self::NEWEST_CHECKED . ', missing ' . $missing . ')'
                     . ($delete ? ', an unchanged copy of the public tag, no room to keep it aside' . ($gone ? '' : '; left: ' . PathName::base($aside)) : ' to ' . PathName::base($aside)) . ', building ' . $tag . "\n", FILE_APPEND);
+            } elseif ($unattended) {
+                @file_put_contents(self::localDir() . '/hermes-heal.log', gmdate('c') . ' moved an incomplete tree to ' . PathName::base($aside) . ', building ' . $tag . "\n", FILE_APPEND);
             }
         }
         @mkdir(self::includeDir(), 0700, true);

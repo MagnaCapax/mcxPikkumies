@@ -146,3 +146,13 @@ next build makes again, so the upstream tag is its copy. That room check asks fo
 one and a half times its bytes. The deletion is one line in `local/hermes-heal.log`; HERMES_HOME and `~/.hermes` are
 never touched. This exception to "never deleted" is the decision of the orchestrating agent (2026-11-03), not an
 operator ruling: an account at 85% of its file quota otherwise stays refused.
+
+## Amendment 2026-11-06: the daily update rebuilds an incomplete tree once
+An incomplete tree, a build that failed or stopped, used to wait for `pikkumies install`, which few people run, so it
+stayed broken: a read-only count on 2026-11-03 found 62 incomplete trees of 762, while every daily update printed the
+hint. The daily update now does what `pikkumies install` does, once: it moves the tree aside to
+`pikkumies/hermes.broken-<UTC time>`, writes one line to `local/hermes-heal.log` and builds again, under the same room
+check and low priority as any unattended build. Nothing is deleted, so a person's own changes in the tree stay in the
+aside. When any `hermes.broken-*` aside already exists, a rebuild has run or the person kept one, and the tree waits
+for `pikkumies install` as before, so a failure that repeats does not rebuild every day. This is the decision of the
+orchestrating agent (2026-11-06), not an operator ruling.
