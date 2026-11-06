@@ -230,13 +230,15 @@ return [
             hermesTIn($w, function () use ($w, $locked, $here) {
                 chdir($locked);
                 chmod($locked, 0);
+                $msg = '';
                 try {
-                    HermesInstall::ensure();
-                    hermesTWaitReady($w);
+                    $msg = HermesInstall::ensure();
                 } finally {
                     chmod($locked, 0700);
                     chdir($here);
                 }
+                check(strpos($msg, 'building ') === 0, 'ensure from an unreadable directory must start a build: ' . $msg);
+                hermesTWaitReady($w);
                 check(HermesInstall::isComplete(), 'a build started from an unreadable directory must finish: ' . @file_get_contents($w['root'] . '/local/install.log'));
             });
             hermesTIn($f, function () use ($f) {
