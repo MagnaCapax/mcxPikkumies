@@ -708,7 +708,9 @@ class HermesInstall
         $build = self::buildProcess($tag, $optionalTools);
         $argv = array_merge(['flock', '-n', $lock], CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], $unattended ? CronTick::lowPriority($build) : $build);
         // flock -n: if a build already runs, this one exits at once and leaves it alone.
-        exec('nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
+        // The build starts in local/, never in the caller's directory: one the account cannot read (runuser from root's
+        // directory) breaks `uv python find` and slows other steps.
+        exec('cd ' . escapeshellarg(self::localDir()) . ' && nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
         return $note . 'building ' . $tag . ' in the background (log: ' . Config::shown(self::localDir() . '/install.log') . ')';
     }
 
