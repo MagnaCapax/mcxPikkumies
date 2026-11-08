@@ -1,6 +1,6 @@
 # mcxPikkumies
 
-A small helper agent that lives on the server it looks after. Ask it in plain words to check disk space, fix a stuck app, add a torrent, look after containers or backups, or explain what is going on, and it does the work with tools built for that, asking before it deletes anything. Its first home is the PMSS seedbox platform; it runs on other Linux servers with your own model provider.
+A small helper agent that lives on the Linux machine it looks after — a server, or a desktop. Ask it in plain words to check disk space, fix a stuck app, add a torrent, look after containers or backups, or explain what is going on, and it does the work with tools built for that, asking before it deletes anything. Its first home is the PMSS seedbox platform; it runs on other Linux machines with your own model provider.
 
 ## Install
 
@@ -48,6 +48,7 @@ The agent runtime (Hermes) is updated separately, when you choose: `/update` ins
 - Rootless Docker containers: [containers](pikkumies/tools/containers/README.md)
 - Backups with restic and borg, and encrypted archives to another machine over ssh: [backup](pikkumies/tools/backup/README.md)
 - Performance and network checks: [performance](pikkumies/tools/system/performance/README.md)
+- On a Linux desktop: which session is running, what is on the screens, and where name resolution goes: [desktop status](pikkumies/tools/system/desktop-status/README.md)
 - Know-how for the apps on a PMSS seedbox, with the wiki pages to read: [seedbox apps](pikkumies/tools/seedbox/seedbox-apps/README.md)
 - Server administration when it has root: [server admin](pikkumies/tools/server-admin/server-admin/README.md)
 - The provider's wiki and knowledge base, searched on your machine: [wiki](pikkumies/tools/documentation/wiki/README.md), [knowledge base](pikkumies/tools/documentation/kb/README.md)

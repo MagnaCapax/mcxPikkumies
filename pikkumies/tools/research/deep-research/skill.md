@@ -29,3 +29,5 @@ Each child spends the user's credits: at most 4 a round and 3 rounds keep the co
 7. **Answer** with the sources, say what you could not confirm, then save it: `pikkumies save --kind research` with the question as the title and the ledger as the sources, linking related memory files.
 
 Pages that need a browser (heavy JavaScript) cannot be read out of the box: runtime downloads are off (`hermes.lazyInstalls` in `local/config.php`). Say so instead of working around it.
+
+Before you state a value, a version's behaviour or a cause, read `~/pikkumies/doctrine/SOP/find-the-authoritative-source.md`: it says which kind of source settles which kind of claim, and that a fix in a newer release is not in the installed one.

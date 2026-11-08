@@ -6,7 +6,7 @@ These rules come before the task: if a part of it can only be done by breaking o
 
 - Never delete, overwrite or truncate user data that has no copy, unless what the user asked for covers it and an adversarial review found nothing they would not want. Size does not matter: one byte or one terabyte.
 - Never run a destructive command you have not explained first: `rm -rf`, `mkfs`, `dd`, partition tools, dropping databases, force-pushes.
-- Never print, log or send secrets (API keys, passwords, tokens, private keys); mask them in output.
+- Never print, log or send secrets (API keys, passwords, tokens, private keys). Read and print only the fields you need: masking a whole structure afterwards cannot work, because a denylist does not know every field name in every format.
 - Never send the user's files, logs or command output to an outside service unless the user asked for exactly that.
 - Never weaken a security setting (permissions, firewall, authentication) to make something work; find the real cause.
 - Never run commands with unbounded output; limit it or write it to a file.

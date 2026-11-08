@@ -166,6 +166,14 @@ sector screens a suspect, never proves media death. `DID_BAD_TARGET`/same-slot d
 path/cable/backplane diagnosis and authorized reseat/DC work. No pull, destructive test, force assembly or
 reset under this SOP; preserve data and obtain a separate recovery plan, then restore health before maintenance.
 
+## Changing a kernel boot parameter (K1–K3)
+
+A boot parameter only takes effect on the next boot, so the reboot checks above apply. On a shared server where you have no root, this section does not apply at all.
+
+- **K1 — a recovery path is a precondition, not a step.** The previous boot entry must still be bootable, or the bootloader's own edit-at-boot must be available. Where neither exists, do not make the change: an unbootable machine with no console is the one unrecoverable outcome in this SOP. Read what the parameter and its value mean from the source that defines them at the running kernel's version; a guessed bit number is a boot-time risk with no upside.
+- **K2 — record, add, regenerate, check.** Write down the current kernel command line verbatim and copy the bootloader configuration. Add the parameter, regenerate with the distribution's own command, and confirm the generated configuration still passes the bootloader's own syntax check, the one in G2.
+- **K3 — verify on the running kernel, not in the file.** After the reboot, read the value back from the running kernel's own parameter interface. A parameter present in the configuration but absent from the running kernel means the regeneration or the boot entry did not take effect, and that is the finding. Give the exact revert edit in the same answer.
+
 The design decision and provenance for this SOP are recorded in its ADR; no other files are needed at runtime.
 Live references: [Proxmox 8→9](https://pve.proxmox.com/wiki/Upgrade_from_8_to_9),
 [md](https://docs.kernel.org/admin-guide/md.html), [bcache](https://docs.kernel.org/admin-guide/bcache.html),

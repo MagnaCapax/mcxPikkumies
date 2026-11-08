@@ -2,7 +2,7 @@
 
 ## What this is
 
-A lightweight helper agent that runs on the server it manages: as the user by default, with root as an optional capability layer. The runtime is `pikkumies/`, every capability is a tool unit under `pikkumies/tools/<category>/<tool>/`, decisions are in `docs/adr/`.
+A lightweight helper agent that runs on the Linux machine it manages — a server, or a desktop — as the user by default, with root as an optional capability layer. The runtime is `pikkumies/`, every capability is a tool unit under `pikkumies/tools/<category>/<tool>/`, decisions are in `docs/adr/`.
 
 Start with [`development/`](development/README.md): the [engineering principles](development/engineering-principles.md) explain every rule below with its reason and the mistake that taught it, and the [development README](development/README.md#other-magnacapax-repositories) lists the sibling repositories' docs and decisions.
 
