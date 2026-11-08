@@ -306,6 +306,23 @@ switch ($cmd) {
             out('Not starting: ' . Provider::modelFailure($http, $keyFile));
         }
         out('pikkumies: ' . UpdateChannel::describe($config['update']['channel'])); // read from the checkout, never fetched (ADR-0057)
+        // Whether the per-minute tick is actually firing (ADR-0025). Nothing else reads local/cron-tick.last,
+        // so without this a scheduler dead for days is indistinguishable from an idle one.
+        $tick = Update::cronTickStatus($config, !empty(profile()['root']['available']));
+        $tickLine = [
+            'ok' => 'running, last tick ' . $tick['age'] . 's ago',
+            'off' => 'off (cron.disabled)',
+            'refused' => 'not installed (root available, no setpriv; see ' . Config::shown(Config::localDir() . '/update.log') . ')',
+            'missing-line' => 'NOT INSTALLED: the crontab has no tick line; `pikkumies` (a session) puts it back',
+            'never' => 'NEVER RAN: the line is installed but has not fired once',
+            'stale' => 'NOT RUNNING: last tick ' . intdiv((int) $tick['age'], 60) . ' min ago',
+        ][$tick['state']];
+        out('scheduler: ' . $tickLine);
+        if ($tick['state'] === 'never' || $tick['state'] === 'stale') {
+            // Not proof of a fault: cron refuses an expired account outright and a user cannot read its own
+            // expiry. Say what is known and what settles it, rather than calling it broken.
+            out('           if this account is expired, cron is blocked on purpose; only your provider can tell which');
+        }
         if (HermesInstall::isComplete()) {
             $pyPin = HermesInstall::pythonPin(HermesInstall::lockData());
             $py = 'python ' . ($pyPin !== '' ? $pyPin : '?') . ' managed by Hermes (pm/lock.json)';

@@ -118,11 +118,17 @@ class Update
         return strpbrk($line, "%\n\r") === false ? $line : ''; // same guard as cronLine(): a % or line break would break the line
     }
 
+    /** Test seam: a tick-log path other than this host's real one (null = the real one, as in Detect/CronTick). */
+    public static $cronTickLogOverride = null;
+
     /** Where the tick line's output goes: in local/ itself, beside update.log, because a missing redirect folder would stop the tick. */
     public static function cronTickLog()
     {
-        return Config::localDir() . '/cron-tick.last';
+        return self::$cronTickLogOverride !== null ? self::$cronTickLogOverride : Config::localDir() . '/cron-tick.last';
     }
+
+    /** Test seam: crontab text other than this host's real one (null = read it). Same pattern as CronTick's overrides. */
+    public static $crontabTextOverride = null;
 
     /**
      * Put the per-minute cron-tick line in the user's crontab, or take it out when
@@ -222,9 +228,48 @@ class Update
         return self::$keptDir !== null ? self::$keptDir : Config::localDir() . '/secrets/cron';
     }
 
+    /**
+     * Is the per-minute tick actually running, in terms this account can see (ADR-0025).
+     *
+     * The crontab line rewrites local/cron-tick.last every 60 seconds, so its mtime is a liveness signal that
+     * otherwise nothing reads: a tick dead for days looks exactly like an idle one. The states are kept apart
+     * because they need different answers — a missing line is repairable by a session, a stale tick is not.
+     *
+     * One state this account CANNOT settle: cron's PAM account module blocks the job outright for an expired
+     * account (`pam_unix(cron:account): account <name> has expired`), and a user cannot read its own shadow
+     * expiry. So 'never'/'stale' report the fact and say so, rather than guessing "broken".
+     *
+     * @return array{state:string, age:?int} state one of ok|off|refused|missing-line|never|stale
+     */
+    public static function cronTickStatus(array $config, $rootAvailable): array
+    {
+        if (!empty($config['cron']['disabled'])) {
+            return ['state' => 'off', 'age' => null];
+        }
+        if (CronTick::refuses($rootAvailable)) {
+            return ['state' => 'refused', 'age' => null];
+        }
+        $crontab = self::readCrontab();
+        if ($crontab !== null && strpos($crontab, self::CRON_TICK_TAG) === false) {
+            return ['state' => 'missing-line', 'age' => null];
+        }
+        $mtime = @filemtime(self::cronTickLog());
+        if ($mtime === false) {
+            return ['state' => 'never', 'age' => null];
+        }
+        $age = max(0, time() - $mtime);
+        return ['state' => $age > self::CRON_TICK_STALE_SECONDS ? 'stale' : 'ok', 'age' => $age];
+    }
+
+    /** Five missed ticks before it counts as not running: one slow minute or a suspended host is not a fault. */
+    const CRON_TICK_STALE_SECONDS = 300;
+
     /** The current crontab text, '' when there is none yet, null when `crontab -l` failed otherwise. */
     private static function readCrontab()
     {
+        if (self::$crontabTextOverride !== null) {
+            return self::$crontabTextOverride;
+        }
         list($code, $current, $err) = self::exec([self::$crontab, '-l']);
         if ($code === 0) {
             return $current;
