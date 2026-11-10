@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-04
-- Status: Accepted. The "local skill with the same name" override is superseded by [ADR-0007](0007-customising-shipped-skills.md); where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md); `packs/` in the layout by [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units under `pikkumies/tools/<category>/<tool>/`); "Release tags and channels come later" by [ADR-0057](0057-release-channel.md) (update and a first install follow the newest release by default, a git branch when asked).
+- Status: Accepted. The "local skill with the same name" override is superseded by [ADR-0007](0007-customising-shipped-skills.md); where Hermes is installed (`pikkumies/hermes`, not `include/hermes/`) by [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md); `packs/` in the layout by [ADR-0015](0015-tool-units-one-skill-per-tool.md) (tool units under `pikkumies/tools/<category>/<tool>/`); "Release tags and channels come later" by [ADR-0057](0057-release-channel.md) (update and a first install follow the newest release by default, a git branch when asked). Amended 2026-11-10: the removal command in Consequences is withdrawn, see the amendment at the end.
 
 ## Context
 Pikkumies runs on the machine it manages, as the user. It must be quick to install and easy to update from git. Updates must never overwrite what the user or the agent changed locally. The repository also holds developer material (docs, tests, CI) that the runtime does not need.
@@ -27,7 +27,12 @@ Pikkumies runs on the machine it manages, as the user. It must be quick to insta
 ## Consequences
 - An update cannot destroy local work: it either fast-forwards cleanly or changes nothing and says why.
 - Users override a shipped skill by creating a local skill with the same name (Hermes precedence, [ADR-0003](0003-hermes-integration.md)), not by editing tracked files.
-- `~/pikkumies` is a symlink. To remove Pikkumies, run `rm -rf ~/.mcxPikkumies ~/pikkumies`.
+- `~/pikkumies` is a symlink to the runtime directory.
 
 ## References
 - [ADR-0002](0002-packs.md) (packs), ADR-0003 (Hermes integration), [ADR-0004](0004-provider-key-and-root-detection.md) (provider key and detection)
+
+## Amendment 2026-11-10: no removal instructions
+**Context.** Consequences carried a command that removes Pikkumies. Pulsed Media runs Pikkumies as part of its platform, and the operator ruled on 2026-11-07 that no agent describes or suggests a way to remove it, in any channel. The line was added by an agent when this ADR was written.
+
+**Decision.** The removal command is withdrawn. Consequences now says only that `~/pikkumies` is a symlink to the runtime directory. The layout, install and update model are unchanged.
