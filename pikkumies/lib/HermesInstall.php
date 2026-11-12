@@ -820,10 +820,13 @@ class HermesInstall
         }
         $argv = array_merge($prefix, [$bin, 'hooks', 'test', 'pre_tool_call', '--for-tool', 'terminal', '--payload-file', $payload]);
         $out = [];
+        $since = gmdate('Y-m-d\TH:i:s\Z');
         exec(implode(' ', array_map('escapeshellarg', $argv)) . ' 2>&1', $out, $code);
         @unlink($payload);
         $text = implode("\n", $out);
-        if (strpos($text, '"action": "block"') === false || strpos($text, self::GUARD_BLOCK) === false) {
+        // The answer is the first block of the units (HookAnswers::mergePreToolCall), so on a slow machine a unit that
+        // failed closed before the guard answered names itself instead. Then the guard's own row in the hook log says it blocked.
+        if (strpos($text, '"action": "block"') === false || (strpos($text, self::GUARD_BLOCK) === false && !self::guardLoggedBlock($since))) {
             $problems[] = 'the delete guard did not block mkfs in `hermes hooks test` (exit ' . $code . ')';
         }
         // The pins are applied: Hermes refuses to change one. A user config.yaml that does not parse is the user's
@@ -835,6 +838,23 @@ class HermesInstall
             $problems[] = 'Hermes did not refuse a change to a setting Pikkumies pins (`hermes config set approvals.mode`, exit ' . $code . '), so the pinned settings are not applied';
         }
         return $problems;
+    }
+
+    /** Whether the hook log (HookLog, UTC) has the delete guard blocking a pre_tool_call at or after $since (whole seconds, so
+     * another session's guard block in that window counts too: it is still this install's guard blocking; ADR-0033 addendum). */
+    private static function guardLoggedBlock($since)
+    {
+        $day = substr(str_replace('-', '', $since), 0, 8);
+        foreach (array_unique([$day, gmdate('Ymd')]) as $d) {
+            foreach (@file(self::localDir() . "/logs/hooks/$d.jsonl", FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+                $row = json_decode($line, true);
+                if (is_array($row) && isset($row['ts']) && is_string($row['ts']) && strcmp($row['ts'], $since) >= 0
+                    && ($row['event'] ?? '') === 'pre_tool_call' && ($row['unit'] ?? '') === 'guard/guard-destructive' && ($row['outcome'] ?? '') === 'block') {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

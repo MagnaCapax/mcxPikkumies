@@ -156,3 +156,7 @@ check and low priority as any unattended build. Nothing is deleted, so a person'
 aside. When any `hermes.broken-*` aside already exists, a rebuild has run or the person kept one, and the tree waits
 for `pikkumies install` as before, so a failure that repeats does not rebuild every day. This is the decision of the
 orchestrating agent (2026-11-06), not an operator ruling.
+
+## Addendum 2026-11-12: the delete guard's own log row counts as its block
+
+The start check needs a block answer from `hermes hooks test`, and evidence that the delete guard made it. Until now the evidence was the guard's text in the answer. But the answer is the first block of the units (`HookAnswers::mergePreToolCall`, ADR-0030). On a busy machine, a unit that runs before the guard can fail closed on its short timeout, and then the answer carries that unit's message. mkfs was still refused, and the guard had blocked it, but the check refused every start: three in a row on one busy shared host. The check now also accepts the guard's own row in the hook log (`local/logs/hooks/`, `guard/guard-destructive`, outcome `block`) written during that test. A block answer is still required. Rejected: preferring the guard's message in the merge (ADR-0030 merges as Hermes does), and retrying the test (on a busy machine a retry fails the same way). This is the decision of the orchestrating agent (2026-11-12), not an operator ruling.

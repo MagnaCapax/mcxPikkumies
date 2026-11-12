@@ -51,6 +51,12 @@ if (isset($argv[2]) && $argv[1] === "hooks" && $argv[2] === "test") {
     $o = getenv("PK_FAKE_HOOK_OUT");
     // PK_FAKE_REQUIRE_MANAGED: like the real one, no Pikkumies hooks without the managed layer in the environment.
     if (getenv("PK_FAKE_REQUIRE_MANAGED") && (string) getenv("HERMES_MANAGED_DIR") === "") { $o = "      parsed: <none>\n"; }
+    // PK_FAKE_HOOKLOG_DIR + PK_FAKE_HOOKLOG_ROW (unit:outcome): the hook log row the orchestrator writes during the test.
+    if ((string) getenv("PK_FAKE_HOOKLOG_DIR") !== "") {
+        list($u, $oc) = explode(":", (string) getenv("PK_FAKE_HOOKLOG_ROW"), 2);
+        @mkdir(getenv("PK_FAKE_HOOKLOG_DIR"), 0700, true);
+        file_put_contents(getenv("PK_FAKE_HOOKLOG_DIR") . "/" . gmdate("Ymd") . ".jsonl", json_encode(["ts" => gmdate("Y-m-d\\TH:i:s\\Z"), "event" => "pre_tool_call", "unit" => $u, "ms" => 1, "outcome" => $oc]) . "\n", FILE_APPEND);
+    }
     echo $o !== false && $o !== "" ? $o : "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies safety: filesystem format. Refused outright, not asked.\"}\n";
 }
 // `config set` of a pinned key: what Hermes prints when it refuses one, or the text in PK_FAKE_SET_OUT (exit 0).
@@ -731,6 +737,34 @@ return [
                 check(HermesInstall::checkBeforeStart() === ['Hermes no longer has the config key sessions.auto_prune'], 'a missing key must refuse the start');
                 file_put_contents($f, str_replace('"prune":', '"auto_prune":', file_get_contents($f)));
                 check(HermesInstall::checkBeforeStart() === [] && HermesInstall::verifiedCommit() === $moved, 'a fixed checkout is accepted and recorded');
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
+    'hermes start check: another unit failing closed first still passes when the guard itself logged its block in that run' => function () {
+        $w = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w) {
+                HermesInstall::ensure();
+                hermesTWaitReady($w);
+                $logDir = HermesInstall::localDir() . '/logs/hooks';
+                $other = "      parsed (Hermes wire shape): {\"action\": \"block\", \"message\": \"Pikkumies hook guard/feedback-send failed closed: timed out after 3s. Not run; tell the user this safety check is failing.\"}\n";
+                // Only the guard problem is asserted: the key checks are covered by their own tests.
+                $fails = true;
+                $run = function (array $env) {
+                    return in_array('the delete guard did not block mkfs in `hermes hooks test` (exit 0)', testWithEnv($env, function () {
+                        return HermesInstall::verify();
+                    }), true);
+                };
+                check($run(['PK_FAKE_HOOK_OUT' => $other]) === $fails, 'no guard row: the other unit\'s block is not the guard');
+                check($run(['PK_FAKE_HOOK_OUT' => $other, 'PK_FAKE_HOOKLOG_DIR' => $logDir, 'PK_FAKE_HOOKLOG_ROW' => 'guard/guard-destructive:failed-closed']) === $fails, 'a guard that failed closed did not block');
+                check($run(['PK_FAKE_HOOK_OUT' => $other, 'PK_FAKE_HOOKLOG_DIR' => $logDir, 'PK_FAKE_HOOKLOG_ROW' => 'guard/litter-check:block']) === $fails, 'another unit\'s block row is not the guard');
+                check($run(['PK_FAKE_HOOK_OUT' => "      parsed: <none>\n", 'PK_FAKE_HOOKLOG_DIR' => $logDir, 'PK_FAKE_HOOKLOG_ROW' => 'guard/guard-destructive:block']) === $fails, 'a guard row without a block answer is not enough');
+                check($run(['PK_FAKE_HOOK_OUT' => $other, 'PK_FAKE_HOOKLOG_DIR' => $logDir, 'PK_FAKE_HOOKLOG_ROW' => 'guard/guard-destructive:block']) === false, 'block answer + the guard\'s own block row in that run passes');
+                // A guard row from before the test started does not count.
+                file_put_contents("$logDir/" . gmdate('Ymd') . '.jsonl', json_encode(['ts' => '2000-01-01T00:00:00Z', 'event' => 'pre_tool_call', 'unit' => 'guard/guard-destructive', 'ms' => 1, 'outcome' => 'block']) . "\n");
+                check($run(['PK_FAKE_HOOK_OUT' => $other]) === $fails, 'an earlier guard row must not count');
             });
         } finally {
             testRmTree($w['t']);
