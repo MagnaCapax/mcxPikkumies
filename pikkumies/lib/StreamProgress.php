@@ -69,6 +69,9 @@ class StreamProgress
     private $lines = [];
     private $newStep = false;
     private $answered = false;
+    private $held = '';
+    private $toolsBase = 0;
+    private $tokensBase = 0;
     private $stats = ['runs' => 0, 'tools' => 0, 'failed' => 0, 'model' => '', 'session' => '',
         'tokens' => ['input' => 0, 'output' => 0, 'cache_read' => 0, 'cache_write' => 0, 'total' => 0]];
 
@@ -115,24 +118,54 @@ class StreamProgress
     /**
      * One Hermes run has ended (its stdout closed): the answer text ('' when it printed none). An error the run
      * reported, or an end without a result event, is said on stderr. The next run starts clean.
+     * $hold, when given, is asked about a reported error with (error, tokens this run spent, tool calls this run made):
+     * true keeps the error back, for the caller that is about to run the same command again (GatewayWait), and counts
+     * the run as not made. Said or not, the error is never lost: heldError() has it, releaseError() says it (ADR-0109:
+     * errors always print).
      */
-    public function finishRun($exitCode)
+    public function finishRun($exitCode, callable $hold = null)
     {
         if ($this->buf !== '' && !$this->skipping) {
             $this->line($this->buf);
         }
         $this->buf = '';
         $this->skipping = false;
+        $tools = $this->stats['tools'] - $this->toolsBase;
+        $tokens = array_sum($this->stats['tokens']) - $this->tokensBase;
+        $this->toolsBase = $this->stats['tools'];
+        $this->tokensBase = array_sum($this->stats['tokens']);
+        $this->held = '';
         if ($this->runText === null) {
             $this->sayAlways($this->mark() . 'Hermes ended without finishing (exit ' . (int) $exitCode . ')');
         } elseif ($this->runError !== '') {
-            $this->sayAlways($this->mark() . 'Hermes: ' . $this->runError);
+            if ($hold !== null && call_user_func($hold, $this->runError, $tokens, $tools)) {
+                $this->held = $this->runError;
+                $this->stats['runs']--; // a run that did nothing and is run again is one run in the figures
+            } else {
+                $this->sayAlways($this->mark() . 'Hermes: ' . $this->runError);
+            }
         }
         $answer = $this->runText !== null && $this->runText !== '' ? $this->runText : $this->text;
         $this->runText = null;
         $this->runError = '';
         $this->text = '';
         return $answer;
+    }
+
+    /** The error finishRun() kept back for the last run, '' when none. */
+    public function heldError()
+    {
+        return $this->held;
+    }
+
+    /** Says the held error on stderr, as finishRun() would have, and forgets it. */
+    public function releaseError()
+    {
+        if ($this->held !== '') {
+            $this->sayAlways($this->mark() . 'Hermes: ' . $this->held);
+            $this->stats['runs']++;
+            $this->held = '';
+        }
     }
 
     /** What goes before an answer on stdout: nothing for the first, a blank line before each later one. */

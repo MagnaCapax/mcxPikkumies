@@ -263,11 +263,13 @@ return [
         $n = count(file(dirname(__DIR__) . '/pikkumies/lib/Cli.php'));
         check($n <= 216 + 80, "Cli.php has grown to $n lines, past the 216+80 soft ceiling measured this session");
     },
-    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php, rtorrent/Scgi.php, email/lib/MailTransport.php and browse/CdpSocket.php' => function () {
+    'architecture: network egress (curl_init/fsockopen/stream_socket_client) appears only in lib/Http.php, rtorrent/Scgi.php, email/lib/MailTransport.php and browse/CdpSocket.php and lib/GatewayWait.php' => function () {
         // MailTransport is the one mail connection (ADR-0053): imaps, pop3s and smtp(s) over TLS, which Http (http/https only) does not speak.
         // CdpSocket is the web guard's one WebSocket to the browser's DevTools port on loopback, which Http does not speak either.
+        // GatewayWait is the one connection to the local gateway's control socket (a unix:// path in the account's own Hermes home, ADR-0113): no network.
         $allowed = [dirname(__DIR__) . '/pikkumies/lib/Http.php', dirname(__DIR__) . '/pikkumies/tools/torrent-clients/rtorrent/Scgi.php',
-            dirname(__DIR__) . '/pikkumies/tools/email/lib/MailTransport.php', dirname(__DIR__) . '/pikkumies/tools/system/browse/CdpSocket.php'];
+            dirname(__DIR__) . '/pikkumies/tools/email/lib/MailTransport.php', dirname(__DIR__) . '/pikkumies/tools/system/browse/CdpSocket.php',
+            dirname(__DIR__) . '/pikkumies/lib/GatewayWait.php'];
         foreach (actTrackedPhp() as $f) {
             if (in_array($f, $allowed, true)) {
                 continue;

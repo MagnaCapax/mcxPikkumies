@@ -22,6 +22,7 @@ require_once __DIR__ . '/HaltJudge.php';
 require_once __DIR__ . '/HookAsync.php';
 require_once __DIR__ . '/Antipatterns.php';
 require_once __DIR__ . '/StreamProgress.php';
+require_once __DIR__ . '/GatewayWait.php';
 
 class HaltRun
 {
@@ -137,6 +138,40 @@ class HaltRun
     }
 
     /**
+     * execOnce(), run again while Hermes ends it with "Gateway starting: deadline" having done nothing (GH #12, ADR-0113):
+     * its client gives a cold gateway a fixed 60 s, and a re-run attaches to the gateway already starting. Between runs
+     * GatewayWait waits for that gateway to answer; when it is gone instead, the held error is said and the run ends as
+     * it did before. Only the stream-json render path sees the error (the plain path is unchanged), and a question read
+     * from stdin (`--query-file -`) is not run twice: the first run took the stdin.
+     */
+    private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
+    {
+        $home = (string) getenv('HERMES_HOME');
+        $hold = $render !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
+        while (true) {
+            $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold);
+            if ($hold === null || $render->heldError() === '') {
+                return $result;
+            }
+            $say = function ($line) use ($render) {
+                $render->say($line);
+            };
+            if (GatewayWait::run($home, $say) !== 'ready') {
+                $render->releaseError();
+                return $result;
+            }
+        }
+    }
+
+    /** Whether the question is read from stdin: `--query-file=-` or `--query-file -` (Hermes reads it itself). */
+    private static function readsStdin(array $argv)
+    {
+        $i = array_search('--query-file=-', $argv, true);
+        $j = array_search('--query-file', $argv, true);
+        return $i !== false || ($j !== false && isset($argv[$j + 1]) && $argv[$j + 1] === '-');
+    }
+
+    /**
      * One Hermes run: streams stdout to the user as it arrives (unchanged from today) while also
      * keeping the last CAPTURE_MAX bytes of it. The arguments go to Hermes unchanged: Hermes'
      * --usage-file is a top-level, one-shot-only flag, and after `chat` it is an unrecognised argument
@@ -146,7 +181,7 @@ class HaltRun
      * stream goes to it instead of stdout; the run's answer text is printed (to stderr for a wrap-up turn, $aside) and
      * returned as the captured output, and the session id comes from the renderer.
      */
-    private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
+    private static function execOnce($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false, callable $hold = null)
     {
         $cmd = 'exec ' . escapeshellarg($hermesBin);
         foreach ($argv as $a) {
@@ -188,7 +223,7 @@ class HaltRun
             return [$code, '', $render !== null ? $render->sessionId() : ''];
         }
         if ($render !== null) {
-            $answer = $render->finishRun($code);
+            $answer = $render->finishRun($code, $hold);
             if ($answer !== '') {
                 // Model-written text reaching a terminal is cleaned of control characters, line breaks kept (ADR-0109): the
                 // wrap-up always goes to stderr, the answer when stdout is a terminal; a pipe or file gets the answer as written.
