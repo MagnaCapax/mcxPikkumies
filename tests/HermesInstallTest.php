@@ -399,6 +399,37 @@ return [
             testRmTree($w['t']);
         }
     },
+    'hermes ensure: once the tree is complete, unchanged trees set aside earlier are removed; one with the person\'s changes or no checkout stays' => function () {
+        $w = hermesTWorld();
+        try {
+            $tree = hermesTCompleteAt($w, 'v0.22.4', true);
+            $r = $w['root'];
+            foreach (['hermes.broken-20261110T000000Z', 'hermes.refused-v0.23.0-20261111T000000Z', 'hermes.broken-20261111T000000Z'] as $n) {
+                hermesTSh('cp -a ' . escapeshellarg($tree) . ' ' . escapeshellarg("$r/$n"));
+            }
+            file_put_contents("$r/hermes.broken-20261111T000000Z/mine.patch", "user work\n");
+            mkdir("$r/hermes.broken-20261112T000000Z");
+            file_put_contents("$r/hermes.broken-20261112T000000Z/partial", "x\n");
+            mkdir("$r/hermes.broken-20261109T000000Z.deleting/sub", 0700, true);
+            symlink($tree, "$r/hermes.broken-20261113T000000Z");
+            hermesTIn($w, function () use ($w, $r) {
+                $msg = HermesInstall::ensure(true);
+                check(strpos($msg, 'installed (pikkumies/hermes; updates: `pikkumies run update`); removed ') === 0
+                    && strpos($msg, 'hermes.broken-20261110T000000Z') !== false && strpos($msg, 'hermes.refused-v0.23.0-20261111T000000Z') !== false
+                    && strpos($msg, 'hermes.broken-20261109T000000Z') !== false && strpos($msg, '(unchanged copies of the public release)') !== false, 'ensure: ' . $msg);
+                check(!file_exists("$r/hermes.broken-20261110T000000Z") && !file_exists("$r/hermes.refused-v0.23.0-20261111T000000Z")
+                    && !file_exists("$r/hermes.broken-20261109T000000Z.deleting") && !glob("$r/*.deleting"), 'unchanged asides must be gone');
+                check(file_get_contents("$r/hermes.broken-20261111T000000Z/mine.patch") === "user work\n" && is_file("$r/hermes.broken-20261112T000000Z/partial")
+                    && is_link("$r/hermes.broken-20261113T000000Z"), 'an aside with the person\'s changes, without a checkout, or a symlink must stay');
+                $log = file($r . '/local/hermes-heal.log', FILE_IGNORE_NEW_LINES);
+                check(count($log) === 3 && strpos($log[0], ' removed hermes.') !== false && strpos($log[0], 'an unchanged copy of the public release; the tree is complete') !== false, 'log: ' . json_encode($log));
+                check(HermesInstall::isComplete() && HermesInstall::status()['rev'] === 'v0.22.4', 'the tree must stay');
+                check(HermesInstall::ensure(true) === 'installed (pikkumies/hermes; updates: `pikkumies run update`)', 'nothing left to remove');
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
     'hermes ensure: unattended moves an incomplete tree aside and builds again once, leaves it when an earlier aside exists, and refuses on root without setpriv' => function () {
         $w = hermesTWorld();
         try {
@@ -477,7 +508,11 @@ return [
                     hermesTWaitReady($w);
                     check(HermesInstall::isComplete() && HermesInstall::status()['rev'] === 'v0.10.0', 'rebuilt at: ' . json_encode(HermesInstall::status()));
                     check(file_get_contents($w['root'] . '/local/hermes/sessions/one.json') === "{\"mine\":1}\n", 'HERMES_HOME data must not be touched');
-                    check(strpos(HermesInstall::ensure($unattended), 'installed') === 0 && count(glob($w['root'] . '/hermes.refused-*')) === 1, 'a healed install is left alone afterwards');
+                    // The refused tree is an unchanged copy of its public release, so once the rebuild is complete it is removed (amendment 2026-11-13).
+                    $again = HermesInstall::ensure($unattended);
+                    check($again === 'installed (pikkumies/hermes; updates: `pikkumies run update`); removed ' . basename($aside[0]) . ' (unchanged copies of the public release)'
+                        && !glob($w['root'] . '/hermes.refused-*') && count(file($w['root'] . '/local/hermes-heal.log')) === 2, 'a healed install removes the refused copy: ' . $again);
+                    check(HermesInstall::ensure($unattended) === 'installed (pikkumies/hermes; updates: `pikkumies run update`)', 'a healed install is left alone afterwards');
                 });
             } finally {
                 testRmTree($w['t']);

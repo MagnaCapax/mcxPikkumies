@@ -54,7 +54,7 @@ Facts this rests on, read in upstream source (shallow checkout at `e5eb6b36fe`, 
 - On a host without the system library libatomic1 (needed by upstream's Node), pm's attempt to install it with sudo is refused by `setpriv --no-new-privs` and the build stops with pm's error in `local/install.log` (not tested live); the server's administrator installs the package.
 - A Hermes release that drops or renames a key we rely on, or breaks the delete guard, cannot start under Pikkumies until Pikkumies is changed; the user sees the reason. The key check is a text check: it catches removals and renames, not changed meanings; the hook test checks the guard's behaviour.
 - `pikkumies run update` waits for nothing: it refuses while another session runs, and the user closes it.
-- A moved-aside `hermes.broken-*` tree stays until the user removes it; `pikkumies install` names it.
+- A moved-aside `hermes.broken-*` tree stays until the user removes it; `pikkumies install` names it. Once the tree is complete, an aside that is an unchanged copy of its public release is removed (amendment 2026-11-13).
 - When a check fails after `/update` inside a session, the next start refuses; the user can still see the reason with `pikkumies doctor`.
 - `/update` inside a session runs Hermes' updater without setpriv (the session itself is not wrapped). On a terminal its libatomic step asks for the sudo password, which the user can decline; `pikkumies run update` is the path that can never escalate.
 
@@ -160,3 +160,17 @@ orchestrating agent (2026-11-06), not an operator ruling.
 ## Addendum 2026-11-12: the delete guard's own log row counts as its block
 
 The start check needs a block answer from `hermes hooks test`, and evidence that the delete guard made it. Until now the evidence was the guard's text in the answer. But the answer is the first block of the units (`HookAnswers::mergePreToolCall`, ADR-0030). On a busy machine, a unit that runs before the guard can fail closed on its short timeout, and then the answer carries that unit's message. mkfs was still refused, and the guard had blocked it, but the check refused every start: three in a row on one busy shared host. The check now also accepts the guard's own row in the hook log (`local/logs/hooks/`, `guard/guard-destructive`, outcome `block`) written during that test. A block answer is still required. Rejected: preferring the guard's message in the merge (ADR-0030 merges as Hermes does), and retrying the test (on a busy machine a retry fails the same way). This is the decision of the orchestrating agent (2026-11-12), not an operator ruling.
+
+## Amendment 2026-11-13: trees set aside are removed once the tree is complete
+A build that failed was moved aside to `pikkumies/hermes.broken-<UTC time>` and kept, with no end: an account that needed
+three attempts kept three asides of about 370 MB and 22,000 files each, about 1.1 GB and 66,000 files of its quota, after
+the fourth build had succeeded. The broken aside has two jobs: it keeps anything of the person's that was in the tree, and
+while the tree is incomplete it tells the daily update that a rebuild already ran. Once the tree is complete it does
+neither for an aside with nothing of the person's in it. `ensure()` now removes, when the tree is complete and not refused,
+each `hermes.broken-*` and `hermes.refused-*` aside that passes the same test as the 2026-11-03 deletion
+(`onlyReleaseAndBuildOutput` at the aside's own tag: official origin, clean, only build output ignored), so the public tag is
+its copy. It is renamed to `<name>.deleting` first, so a removal that stops part-way is finished on the next run; each one
+is a line in `local/hermes-heal.log` and is named in ensure()'s line. An aside with the person's changes, one without a
+checkout, and a symlink stay. If the tree breaks again later, the daily update rebuilds it once more, since no aside is
+left. HERMES_HOME and `~/.hermes` are not touched. This is the decision of the orchestrating agent (2026-11-13), not an
+operator ruling.

@@ -622,7 +622,7 @@ class HermesInstall
         // checked release, the old tree moved aside (ADR-0033 amendment 2026-11-03).
         $refused = self::isComplete() ? self::refusedNewerRelease() : '';
         if (self::isComplete() && $refused === '') {
-            return 'installed (pikkumies/hermes; updates: `pikkumies run update`)';
+            return 'installed (pikkumies/hermes; updates: `pikkumies run update`)' . self::clearAsides();
         }
         if (getenv('PIKKUMIES_SKIP_HERMES') === '1') {
             return 'skipped (PIKKUMIES_SKIP_HERMES=1)';
@@ -714,6 +714,36 @@ class HermesInstall
         // directory) breaks `uv python find` and slows other steps.
         exec('cd ' . escapeshellarg(self::localDir()) . ' && nohup ' . implode(' ', array_map('escapeshellarg', $argv)) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
         return $note . 'building ' . $tag . ' in the background (log: ' . Config::shown(self::localDir() . '/install.log') . ')';
+    }
+
+    /**
+     * Once the tree is complete, the trees set aside before it (hermes.broken-*, hermes.refused-*) only take room: the daily
+     * update looks for a broken aside only while the tree is incomplete. One that is an unchanged copy of its public release
+     * (onlyReleaseAndBuildOutput) is removed, one line each in local/hermes-heal.log; one with anything of the person's in it
+     * stays (ADR-0033 amendment 2026-11-13). '' or '; removed ...' for ensure()'s line.
+     */
+    public static function clearAsides()
+    {
+        $removed = [];
+        foreach (array_merge(glob(self::treeDir() . '.broken-*') ?: [], glob(self::treeDir() . '.refused-*') ?: []) as $aside) {
+            if (is_link($aside) || !is_dir($aside)) {
+                continue;
+            }
+            // Only an aside that passed the check gets this name, so one a removal left part-way is finished.
+            if (substr($aside, -9) !== '.deleting') {
+                $tag = file_exists($aside . '/.git') ? self::git(['describe', '--tags', '--exact-match', 'HEAD'], $aside)[1] : '';
+                if (!self::onlyReleaseAndBuildOutput($aside, $tag) || !@rename($aside, $aside . '.deleting')) {
+                    continue;
+                }
+                $aside .= '.deleting';
+            }
+            $gone = self::removeTree($aside);
+            $name = PathName::base(substr($aside, 0, -9));
+            @file_put_contents(self::localDir() . '/hermes-heal.log', gmdate('c') . ' removed ' . $name . ', an unchanged copy of the public release; the tree is complete'
+                . ($gone ? '' : '; left: ' . PathName::base($aside)) . "\n", FILE_APPEND);
+            $removed[] = $name;
+        }
+        return $removed ? '; removed ' . implode(', ', $removed) . ' (unchanged copies of the public release)' : '';
     }
 
     /**
