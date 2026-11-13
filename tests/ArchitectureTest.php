@@ -121,6 +121,17 @@ return [
         $root = dirname(__DIR__);
         $pages = [];
         exec('cd ' . escapeshellarg($root) . ' && git ls-files "*.md" 2>/dev/null', $pages, $code);
+        // A copy shipped without .git (the dev sandbox) holds exactly the tracked and the untracked, not ignored files, so a
+        // walk lists the same pages; without it the sandbox skipped this check and red pushes reached main.
+        if ($code !== 0 && !file_exists("$root/.git")) {
+            $pages = [];
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $p) {
+                if ($p->isFile() && substr($p->getFilename(), -3) === '.md') {
+                    $pages[] = substr($p->getPathname(), strlen($root) + 1);
+                }
+            }
+            $code = $pages ? 0 : 1;
+        }
         if ($code !== 0) {
             skip('git cannot list the tracked markdown here (no git, or not a checkout); CI runs this check');
         }
