@@ -894,7 +894,7 @@ return [
         $postStart = strpos($bin, "case 'post-update':");
         $postEnd = strpos($bin, "\n    case '", $postStart + 1); // the post-update branch only, whatever its length
         $post = substr($bin, $postStart, $postEnd === false ? strlen($bin) : $postEnd - $postStart);
-        check(strpos($post, 'HermesInstall::ensure(true,') !== false, 'post-update only builds a missing tree (unattended)');
+        check(strpos($post, 'HermesInstall::ensure(!Update::attended(),') !== false, 'post-update only builds a missing tree (unattended unless a person started it, ADR-0013 addendum 2026-11-14)');
         $skill = (string) file_get_contents("$root/pikkumies/tools/system/pikkumies-update/skill.md");
         check(strpos($skill, 'Never run `hermes update`, the `/update` command') === false && strpos($skill, '`pikkumies run update`') !== false && strpos($skill, 'installer script') !== false,
             'update skill: allow the Hermes update through pikkumies run update, keep the installer ban');

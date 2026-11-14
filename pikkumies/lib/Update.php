@@ -37,6 +37,16 @@ class Update
     }
 
     /**
+     * True when a person started this update: a caller that runs `pikkumies update` for someone watching (the PMSS
+     * installer, the panel's setup button) sets PIKKUMIES_ATTENDED=1. The cron line sets nothing, so an unset or any
+     * other value means unattended: the daily run keeps its file reserve and idle priority (ADR-0013 addendum 2026-11-14).
+     */
+    public static function attended()
+    {
+        return getenv('PIKKUMIES_ATTENDED') === '1';
+    }
+
+    /**
      * The daily update line. Minute and hour come from the uid, so the users of one machine do
      * not all fetch at the same moment. It runs bin/pikkumies by its `env php` line, not a versioned PHP
      * binary that a distribution upgrade may remove. The log keeps only the last run. '' when a path has a % or a

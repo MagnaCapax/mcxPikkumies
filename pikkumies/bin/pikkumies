@@ -256,7 +256,8 @@ switch ($cmd) {
         out('auto-update: ' . Update::schedule($config, function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
         out('cron-tick: ' . Update::scheduleCronTick($config, !empty($profile['root']['available'])));
         // Hermes updates on its own path (`pikkumies run update`, ADR-0033): this only builds it where none exists.
-        out('hermes: ' . HermesInstall::ensure(true, !empty($profile['root']['available']), !empty($config['hermes']['lazyInstalls'])));
+        // Unattended (reserve, idle priority) unless a person started the update (ADR-0013 addendum 2026-11-14).
+        out('hermes: ' . HermesInstall::ensure(!Update::attended(), !empty($profile['root']['available']), !empty($config['hermes']['lazyInstalls'])));
         out('docs: ' . startDocsFill());
         break;
 

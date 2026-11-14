@@ -27,3 +27,21 @@ The request of 2026-10-08: "should insert auto-update cron job for the user too 
 
 ## References
 - ADR-0001 (layout, install and update), ADR-0009 (pinned Hermes builds)
+
+## Addendum 2026-11-14: post-update builds unattended only when nobody started it
+
+`pikkumies update` runs `post-update`, which builds Hermes where none exists. It always built in the unattended mode of
+[ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md) (a 10% file and disk reserve, idle CPU and I/O
+priority), because it cannot tell the daily cron line from a person. Two callers are people: the PMSS installer runs
+`pikkumies update` and then `pikkumies install`, and the PMSS panel's setup button runs `post-update`. ADR-0033 says a
+build the user starts keeps the plain room check and normal priority. The installer instead printed "not installed
+... run `pikkumies` to build anyway" from its update step and then "building" from `install`, and on a plan with room
+its update step started the build at idle priority. The panel refused below about 156 GiB on a fresh account and
+showed its setup page again.
+
+Decision: a caller that runs the update for a person sets `PIKKUMIES_ATTENDED=1` (`Update::attended()`), and
+`post-update` then builds attended. Unset or any other value stays unattended, so the cron line (unchanged) and every
+existing caller keep today's behaviour, and an older Pikkumies ignores the variable. A cron-line marker was rejected:
+the first run after a release comes from the old, unmarked line and would build attended on every account. TTY
+detection was rejected: the panel has no terminal. The variable gives an account nothing it could not get by running
+`pikkumies install`. `PIKKUMIES_SKIP_HERMES=1` is checked first, so automated PMSS installer runs stay skipped.
