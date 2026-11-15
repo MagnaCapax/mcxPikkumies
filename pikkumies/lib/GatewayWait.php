@@ -7,7 +7,7 @@
  *
  * The wait ends on what Hermes' files and socket say, never on a timer of ours. It is over ("ready") when the gateway's
  * control socket (gateway.sock, or the path in gateway.sock.path, gateway/control_socket.py) answers `identify` with a
- * state other than "starting", which is how Hermes' own client reads it, or ("gone") when nothing is starting any more.
+ * result state other than "starting" (any other state is for Hermes' own client to act on when the command runs again), or ("gone") when nothing is starting any more.
  * Something is starting while gateway.lock is held by another process (the flock Hermes takes for the gateway's whole
  * life, gateway/status.py _try_acquire_file_lock), or while this account has a `gateway run` process for this HERMES_HOME
  * that has not taken the lock yet (the client spawns the gateway, and it imports before it locks). A wedged boot ends by
@@ -102,7 +102,10 @@ class GatewayWait
         $line = fgets($s, 524289);
         fclose($s);
         $answer = is_string($line) ? json_decode($line, true) : null;
-        return is_array($answer) && isset($answer['state']) && is_string($answer['state']) ? $answer['state'] : '';
+        // The answer is {"ok":true,"protocol":1,"id":1,"result":{...,"state":...}}: the state is inside result (hermes_cli/
+        // gateway_runtime_discovery.py _identify_response, gateway/run_bootstrap.py _identify_runtime). A top-level state is no answer.
+        $result = is_array($answer) && isset($answer['ok'], $answer['result']) && $answer['ok'] === true && is_array($answer['result']) ? $answer['result'] : [];
+        return isset($result['state']) && is_string($result['state']) ? $result['state'] : '';
     }
 
     /** Whether this account has a `gateway run` process whose HERMES_HOME is $home (found in /proc; own processes only). */

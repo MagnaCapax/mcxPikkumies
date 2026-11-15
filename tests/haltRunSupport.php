@@ -141,7 +141,7 @@ if (!function_exists('haltRunFakeGateway')) {
     function haltRunFakeGateway($home, $starting)
     {
         file_put_contents("$home/gateway-server.php", '<?php $s = stream_socket_server("unix://" . $argv[1], $e, $m); echo "up\n"; $n = 0; '
-            . 'while ($c = stream_socket_accept($s, 60)) { fgets($c); fwrite($c, json_encode(["state" => $n++ < (int) $argv[2] ? "starting" : "ready"]) . "\n"); fclose($c); }');
+            . 'while ($c = stream_socket_accept($s, 60)) { fgets($c); fwrite($c, json_encode(["ok" => true, "protocol" => 1, "id" => 1, "result" => ["state" => $n++ < (int) $argv[2] ? "starting" : "ready"]]) . "\n"); fclose($c); }');
         $p = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$home/gateway-server.php") . ' ' . escapeshellarg("$home/gateway.sock") . ' ' . (int) $starting, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         check(fgets($pipes[1]) === "up\n", 'the fake gateway is listening');
         return $p;

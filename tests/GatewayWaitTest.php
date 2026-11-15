@@ -98,14 +98,25 @@ return [
         try {
             check(GatewayWait::state($dir) === '', 'no socket');
             $sock = "$dir/gateway.sock";
+            // Hermes' answer: {"ok":true,"protocol":1,"id":1,"result":{...}} (hermes_cli/gateway_runtime_discovery.py _identify_response),
+            // its state inside result (gateway/run_bootstrap.py _identify_runtime). One answer per connection, in this order.
+            $real = function ($state) {
+                return ['ok' => true, 'protocol' => 1, 'id' => 1, 'result' => ['instance_id' => 'i1', 'runtime_protocol' => 1, 'authority_epoch' => 1,
+                    'state' => $state, 'served_profiles' => [], 'capabilities' => ['session-authority-v1'], 'supervisor' => 'none']];
+            };
+            file_put_contents("$dir/answers.json", json_encode([$real('starting'), $real('starting'), $real('ready'),
+                ['state' => 'ready', 'protocol' => 1], ['ok' => false, 'protocol' => 1, 'id' => 1, 'error' => 'denied']]));
             file_put_contents("$dir/server.php", '<?php $s = stream_socket_server("unix://" . $argv[1], $e, $m); echo "up\n"; '
-                . 'foreach ([$argv[2], $argv[2]] as $state) { $c = stream_socket_accept($s, 30); if ($c) { fgets($c); fwrite($c, json_encode(["state" => $state, "protocol" => 1]) . "\n"); fclose($c); } }');
-            $proc = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$dir/server.php") . ' ' . escapeshellarg($sock) . ' starting', [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+                . 'foreach (json_decode(file_get_contents($argv[2]), true) as $a) { $c = stream_socket_accept($s, 30); if ($c) { fgets($c); fwrite($c, json_encode($a) . "\n"); fclose($c); } }');
+            $proc = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$dir/server.php") . ' ' . escapeshellarg($sock) . ' ' . escapeshellarg("$dir/answers.json"), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             check(fgets($pipes[1]) === "up\n", 'the fake gateway is listening');
             check(GatewayWait::state($dir) === 'starting', 'direct socket, state starting');
             mkdir("$dir/home2");
             file_put_contents("$dir/home2/gateway.sock.path", "$sock\n");
             check(GatewayWait::state("$dir/home2") === 'starting', 'through gateway.sock.path');
+            check(GatewayWait::state($dir) === 'ready', 'a ready gateway\'s full answer');
+            check(GatewayWait::state($dir) === '', 'a state outside result is not Hermes\' answer');
+            check(GatewayWait::state($dir) === '', 'a refused identify is no state');
             check(GatewayWait::state("$dir/home3") === '', 'a home with neither');
             file_put_contents("$dir/home2/gateway.sock.path", "relative.sock\n");
             check(GatewayWait::state("$dir/home2") === '', 'a pointer that is not an absolute path');
