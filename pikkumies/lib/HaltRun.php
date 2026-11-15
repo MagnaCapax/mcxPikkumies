@@ -141,7 +141,10 @@ class HaltRun
      * execOnce(), run again while Hermes ends it with "Gateway starting: deadline" having done nothing (GH #12, ADR-0113):
      * its client gives a cold gateway a fixed 60 s, and a re-run attaches to the gateway already starting. Between runs
      * GatewayWait waits for that gateway to answer; when it is gone instead, the held error is said and the run ends as
-     * it did before. Only the stream-json render path sees the error (the plain path is unchanged). A question read
+     * it did before. The stream-json render path sees the error, and so does a caller's own `--format stream-json` with
+     * no renderer (`run chat`, the support job's form): there a parse-only StreamProgress reads the stream, stdout is held
+     * only while every line is a `system` or `result` event, and a held run's stream is dropped for the re-run, or
+     * written unchanged with one stderr line when it is said. A plain-text passthrough is unchanged. A question read
      * from stdin (`--query-file -`, how a support job asks) is first kept in a private file (keepStdin), so the re-run
      * hands Hermes the same question; the file is removed when the run ends. "Gateway connection failed; no local fallback"
      * with nothing done (GH #12 finding 4) is run again once, whether or not a gateway answers: every re-run seen of it was a
@@ -150,40 +153,56 @@ class HaltRun
     private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
     {
         $home = (string) getenv('HERMES_HOME');
+        // A caller's own `--format stream-json` (`run chat`, how a support job asks) has no renderer: a parse-only one reads
+        // the stream, and its stdout is held only while the run has said nothing yet (execOnce, quietStart).
+        $raw = $render === null && $home !== '' && self::formatArgs($argv) === ['--format=stream-json'];
+        $probe = $raw ? new StreamProgress(false, false, null, fopen('php://memory', 'w+')) : $render;
+        $say = function ($line) use ($render) {
+            if ($render !== null) {
+                $render->say($line);
+            } else {
+                fwrite(STDERR, 'Pikkumies: ' . $line . "\n");
+            }
+        };
         $kept = null;
-        if ($render !== null && $home !== '' && self::readsStdin($argv)) {
+        if ($probe !== null && $home !== '' && self::readsStdin($argv)) {
             $kept = self::keepStdin($argv);
             if ($kept === false) {
-                $render->say('Could not keep the question in ' . Config::shown(Config::localDir() . '/state/oneshot') . ' (is the disk full?)');
+                $say('Could not keep the question in ' . Config::shown(Config::localDir() . '/state/oneshot') . ' (is the disk full?)');
                 return [1, '', ''];
             }
             if ($kept !== null) {
                 $argv = $kept[0];
             }
         }
-        $hold = $render !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
+        $hold = $probe !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
         $connectRerun = false;
         try {
             while (true) {
-                $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold);
-                if ($hold === null || $render->heldError() === '') {
+                $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold, $raw ? $probe : null);
+                if ($hold === null || $probe->heldError() === '') {
                     return $result;
                 }
-                $connect = trim($render->heldError()) === GatewayWait::CONNECT;
-                if ($connect && $connectRerun) {
-                    $render->releaseError('the agent gateway did not take the connection twice in a row, so the question did not run');
-                    return $result;
-                }
-                $say = function ($line) use ($render) {
-                    $render->say($line);
+                $release = function ($why) use ($render, $probe, $result) {
+                    if ($render !== null) {
+                        $render->releaseError($why);
+                        return;
+                    }
+                    fwrite(STDOUT, $result[3]); // the held run's own stream, unchanged: the caller reads its result event as before
+                    fwrite(STDERR, 'Pikkumies: Hermes: ' . $probe->heldError() . ' (' . $why . ")\n");
                 };
+                $connect = trim($probe->heldError()) === GatewayWait::CONNECT;
+                if ($connect && $connectRerun) {
+                    $release('the agent gateway did not take the connection twice in a row, so the question did not run');
+                    return $result;
+                }
                 if (GatewayWait::run($home, $say) !== 'ready' && !$connect) {
-                    $render->releaseError('the agent gateway stopped before it finished starting, so the question did not run');
+                    $release('the agent gateway stopped before it finished starting, so the question did not run');
                     return $result;
                 }
                 if ($connect) {
                     $connectRerun = true;
-                    $render->say('The agent gateway did not take the connection; asking again');
+                    $say('The agent gateway did not take the connection; asking again');
                 }
             }
         } finally {
@@ -263,7 +282,7 @@ class HaltRun
      * stream goes to it instead of stdout; the run's answer text is printed (to stderr for a wrap-up turn, $aside) and
      * returned as the captured output, and the session id comes from the renderer.
      */
-    private static function execOnce($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false, callable $hold = null)
+    private static function execOnce($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false, callable $hold = null, ?StreamProgress $probe = null)
     {
         $cmd = 'exec ' . escapeshellarg($hermesBin);
         foreach ($argv as $a) {
@@ -275,6 +294,8 @@ class HaltRun
         $output = '';
         $raw = 0;
         $code = 1;
+        $pending = ''; // with $probe: stdout held back while the run has said nothing yet
+        $live = $probe === null;
         $started = is_resource($p);
         if ($started) {
             while (!feof($pipes[1])) {
@@ -289,6 +310,16 @@ class HaltRun
                 if ($render !== null) {
                     $render->feed($chunk);
                     continue;
+                }
+                if (!$live) {
+                    $probe->feed($chunk);
+                    $pending .= $chunk;
+                    if (strlen($pending) <= self::CAPTURE_MAX && self::quietStart($pending)) {
+                        continue;
+                    }
+                    $chunk = $pending; // the run started working: out with what was held, then live as before
+                    $pending = '';
+                    $live = true;
                 }
                 fwrite(STDOUT, $chunk);
                 $output .= $chunk;
@@ -315,8 +346,36 @@ class HaltRun
             }
             return [$code, strlen($answer) > self::CAPTURE_MAX ? substr($answer, -self::CAPTURE_MAX) : $answer, $render->sessionId()];
         }
+        if ($probe !== null) {
+            // Only a run whose stdout was all held can be held as a whole: anything already written is with the caller.
+            $probe->finishRun($code, $live ? null : $hold);
+            if (!$live && $probe->heldError() !== '') {
+                $held = strlen($pending) > self::CAPTURE_MAX ? substr($pending, -self::CAPTURE_MAX) : $pending;
+                return [$code, $held, self::streamSessionId($held), $pending];
+            }
+            fwrite(STDOUT, $pending);
+            $output .= $pending;
+        }
         $output = strlen($output) > self::CAPTURE_MAX ? substr($output, -self::CAPTURE_MAX) : $output;
         return [$code, $output, self::streamSessionId($output)];
+    }
+
+    /** Whether every complete line so far is a `system` event or the `result` event: the run has not started any work. */
+    private static function quietStart($pending)
+    {
+        $lines = explode("\n", (string) $pending);
+        array_pop($lines); // the line still being written
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $e = json_decode($line, true);
+            if (!is_array($e) || !isset($e['type']) || !in_array($e['type'], ['system', 'result'], true)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** `hermes chat` options that take the next word as their value (Hermes v0.22.2 hermes_cli/_parser.py): that word is never read as an option. */

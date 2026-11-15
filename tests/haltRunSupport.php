@@ -135,3 +135,31 @@ if (!function_exists('haltRunReplies')) {
         return ["Q1: no\nQ2: yes\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no", "Q1: no\nQ2: yes\nQ3: yes\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no", "Q1: yes\nQ2: no\nQ3: no\nQ4: no\nQ5: no\nQ6: no\nQ7: no\nQ8: no\nQ9: no"];
     }
 }
+
+if (!function_exists('haltRunFakeGateway')) {
+    /** A fake gateway: listens on $home/gateway.sock and answers "starting" to the first $starting identify requests, then "ready". */
+    function haltRunFakeGateway($home, $starting)
+    {
+        file_put_contents("$home/gateway-server.php", '<?php $s = stream_socket_server("unix://" . $argv[1], $e, $m); echo "up\n"; $n = 0; '
+            . 'while ($c = stream_socket_accept($s, 60)) { fgets($c); fwrite($c, json_encode(["state" => $n++ < (int) $argv[2] ? "starting" : "ready"]) . "\n"); fclose($c); }');
+        $p = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$home/gateway-server.php") . ' ' . escapeshellarg("$home/gateway.sock") . ' ' . (int) $starting, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        check(fgets($pipes[1]) === "up\n", 'the fake gateway is listening');
+        return $p;
+    }
+
+    /** The events of a run Hermes ended at once with $error: no step, no text, tokens as given. */
+    function haltRunRenderFailed($error, $tokens = 0, $sessionId = 'fakesess')
+    {
+        return [['type' => 'system', 'subtype' => 'init', 'model' => 'm', 'session_id' => $sessionId],
+            ['type' => 'result', 'session_id' => $sessionId, 'exit_code' => 1, 'text' => '', 'error' => $error, 'tokens' => ['input' => $tokens, 'output' => 0, 'total' => $tokens]]];
+    }
+
+    function haltRunRenderEvents($answer, $sessionId = 'fakesess')
+    {
+        return [['type' => 'system', 'subtype' => 'init', 'model' => 'm', 'session_id' => $sessionId],
+            ['type' => 'tool_use', 'name' => 'terminal', 'input' => ['command' => 'df -h']],
+            ['type' => 'tool_result', 'name' => 'terminal', 'is_error' => false],
+            ['type' => 'text', 'text' => $answer],
+            ['type' => 'result', 'session_id' => $sessionId, 'exit_code' => 0, 'text' => $answer, 'tokens' => ['input' => 1, 'output' => 1, 'total' => 2]]];
+    }
+}
