@@ -203,10 +203,11 @@ return [
             list($code, $out, $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query=disk?', '--format=stream-json']);
             check($code === 1 && $out === '' && substr_count($err, 'Hermes: Gateway starting: deadline') === 1, 'gone: the error is printed once: ' . json_encode([$code, $out, $err]));
             check(haltRunCalls($tree) === 1, 'gone: no second run: ' . haltRunCalls($tree));
+            check(strpos($err, 'the agent gateway stopped before it finished starting, so the question did not run') !== false, 'gone: the error names what stopped: ' . $err);
             @unlink("$tree/calls.jsonl");
             file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed('Gateway starting: deadline', 5), 'code' => 1]]));
             list(, , $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query=disk?', '--format=stream-json']);
-            check(substr_count($err, 'Hermes: Gateway starting: deadline') === 1 && strpos($err, 'Waiting for') === false && haltRunCalls($tree) === 1, 'tokens spent: not the cold-start failure: ' . $err);
+            check(substr_count($err, 'Hermes: Gateway starting: deadline') === 1 && strpos($err, 'Waiting for') === false && strpos($err, 'did not run') === false && haltRunCalls($tree) === 1, 'tokens spent: not the cold-start failure: ' . $err);
             $reads = new ReflectionMethod('HaltRun', 'readsStdin');
             $reads->setAccessible(true);
             check($reads->invoke(null, ['chat', '--query-file=-']) && $reads->invoke(null, ['chat', '--query-file', '-']), 'stdin forms are seen');

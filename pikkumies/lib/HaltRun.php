@@ -170,7 +170,7 @@ class HaltRun
                     $render->say($line);
                 };
                 if (GatewayWait::run($home, $say) !== 'ready') {
-                    $render->releaseError();
+                    $render->releaseError('the agent gateway stopped before it finished starting, so the question did not run');
                     return $result;
                 }
             }

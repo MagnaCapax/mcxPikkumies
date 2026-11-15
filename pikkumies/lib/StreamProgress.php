@@ -158,11 +158,11 @@ class StreamProgress
         return $this->held;
     }
 
-    /** Says the held error on stderr, as finishRun() would have, and forgets it. */
-    public function releaseError()
+    /** Says the held error on stderr, as finishRun() would have, with $why after it when given, and forgets it. */
+    public function releaseError($why = '')
     {
         if ($this->held !== '') {
-            $this->sayAlways($this->mark() . 'Hermes: ' . $this->held);
+            $this->sayAlways($this->mark() . 'Hermes: ' . $this->held . ($why !== '' ? ' (' . $why . ')' : ''));
             $this->stats['runs']++;
             $this->held = '';
         }
