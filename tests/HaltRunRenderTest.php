@@ -3,8 +3,8 @@
 require_once __DIR__ . '/haltRunSupport.php';
 
 if (!function_exists('haltRunRenderDrive')) {
-    /** Like haltRunDrive, with a renderer and stderr kept: [code, stdout, stderr]. */
-    function haltRunRenderDrive($tree, $hermesBin, $sessionId, $alreadyJudged, array $passArgs)
+    /** Like haltRunDrive, with a renderer and stderr kept, $stdin piped in: [code, stdout, stderr]. */
+    function haltRunRenderDrive($tree, $hermesBin, $sessionId, $alreadyJudged, array $passArgs, $stdin = '')
     {
         $script = "$tree/rdriver-" . mt_rand() . '.php';
         $body = "<?php\nrequire " . var_export("$tree/pikkumies/lib/HaltState.php", true) . ";\nrequire " . var_export("$tree/pikkumies/lib/HaltRun.php", true) . ";\n"
@@ -17,6 +17,7 @@ if (!function_exists('haltRunRenderDrive')) {
             . 'exit(HaltRun::run(' . var_export($hermesBin, true) . ', ' . var_export($passArgs, true) . ", \$r));\n";
         file_put_contents($script, $body);
         $p = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        fwrite($pipes[0], $stdin);
         fclose($pipes[0]);
         $out = stream_get_contents($pipes[1]);
         $err = stream_get_contents($pipes[2]);
@@ -190,7 +191,7 @@ return [
             testRmTree($home);
         }
     },
-    'HaltRun render: the deadline error is still printed, once and without a second run, when the gateway is gone, when the run spent tokens, or when the question comes from stdin' => function () {
+    'HaltRun render: the deadline error is still printed, once and without a second run, when the gateway is gone, or when the run spent tokens' => function () {
         $fakeModel = testTempDir('pk-haltrun-model');
         list($proc, $port) = haltRunFakeModel($fakeModel);
         $tree = haltRunTree($port);
@@ -215,6 +216,59 @@ return [
             putenv('HERMES_HOME');
             proc_terminate($proc, 9);
             proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
+            testRmTree($home);
+        }
+    },
+    'HaltRun render: a question read from stdin is kept in a 0600 file, so the run after the gateway wait gets the same question; the file is gone afterwards (GH #12)' => function () {
+        $fakeModel = testTempDir('pk-haltrun-model');
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltRunTree($port);
+        $home = testTempDir('pk-gwhome');
+        $gateway = null;
+        $lock = null;
+        try {
+            $lock = fopen("$home/gateway.lock", 'c');
+            check(flock($lock, LOCK_EX | LOCK_NB), 'the test holds the gateway lock');
+            $gateway = haltRunFakeGateway($home, 1);
+            putenv('PK_FAKE_HERMES_DIR=' . $tree);
+            putenv('HERMES_HOME=' . $home);
+            file_put_contents("$tree/plan.json", json_encode([
+                ['events' => haltRunRenderFailed('Gateway starting: deadline'), 'code' => 1],
+                ['events' => haltRunRenderEvents('41 GB free'), 'code' => 0],
+            ]));
+            list($code, $out, $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query-file', '-', '--format=stream-json'], "how much disk is free?\n");
+            check($code === 0 && $out === "41 GB free\n", 'one answer: ' . json_encode([$code, $out, $err]));
+            check(strpos($err, 'Waiting for the agent gateway to finish starting') !== false && strpos($err, 'deadline') === false, 'waited, no deadline error: ' . $err);
+            $calls = array_map(function ($l) { return json_decode($l, true); }, array_filter(explode("\n", (string) file_get_contents("$tree/calls.jsonl")), 'strlen'));
+            check(count($calls) === 2, 'two runs: ' . count($calls));
+            check($calls[0]['query_file_text'] === "how much disk is free?\n" && $calls[1]['query_file_text'] === "how much disk is free?\n", 'both runs got the question: ' . json_encode($calls));
+            check($calls[0]['argv'] === $calls[1]['argv'] && !in_array('-', $calls[0]['argv'], true), 'the same kept file both times, not stdin: ' . json_encode($calls[0]['argv']));
+            $dir = "$tree/pikkumies/local/state/oneshot";
+            check(is_dir($dir) && (fileperms($dir) & 0777) === 0700, 'the directory is 0700');
+            check(glob("$dir/question-*") === [], 'the kept question is removed after the run');
+            @unlink("$tree/calls.jsonl");
+            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderEvents('ok'), 'code' => 0]]));
+            list($code) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query-file=-', '--format=stream-json'], '');
+            check($code === 2, 'an empty stdin question still stops with Hermes\' own exit 2: ' . $code);
+            $old = "$dir/question-left";
+            file_put_contents($old, 'x');
+            touch($old, time() - 2 * 86400);
+            haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query-file=-', '--format=stream-json'], "again\n");
+            check(!file_exists($old), 'a file left by a killed run is removed after a day');
+        } finally {
+            putenv('PK_FAKE_HERMES_DIR');
+            putenv('HERMES_HOME');
+            if (is_resource($lock)) {
+                fclose($lock);
+            }
+            foreach ([$gateway, $proc] as $p) {
+                if (is_resource($p)) {
+                    proc_terminate($p, 9);
+                    proc_close($p);
+                }
+            }
             testRmTree($tree);
             testRmTree($fakeModel);
             testRmTree($home);

@@ -141,26 +141,96 @@ class HaltRun
      * execOnce(), run again while Hermes ends it with "Gateway starting: deadline" having done nothing (GH #12, ADR-0113):
      * its client gives a cold gateway a fixed 60 s, and a re-run attaches to the gateway already starting. Between runs
      * GatewayWait waits for that gateway to answer; when it is gone instead, the held error is said and the run ends as
-     * it did before. Only the stream-json render path sees the error (the plain path is unchanged), and a question read
-     * from stdin (`--query-file -`) is not run twice: the first run took the stdin.
+     * it did before. Only the stream-json render path sees the error (the plain path is unchanged). A question read
+     * from stdin (`--query-file -`, how a support job asks) is first kept in a private file (keepStdin), so the re-run
+     * hands Hermes the same question; the file is removed when the run ends.
      */
     private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
     {
         $home = (string) getenv('HERMES_HOME');
-        $hold = $render !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
-        while (true) {
-            $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold);
-            if ($hold === null || $render->heldError() === '') {
-                return $result;
+        $kept = null;
+        if ($render !== null && $home !== '' && self::readsStdin($argv)) {
+            $kept = self::keepStdin($argv);
+            if ($kept === false) {
+                $render->say('Could not keep the question in ' . Config::shown(Config::localDir() . '/state/oneshot') . ' (is the disk full?)');
+                return [1, '', ''];
             }
-            $say = function ($line) use ($render) {
-                $render->say($line);
-            };
-            if (GatewayWait::run($home, $say) !== 'ready') {
-                $render->releaseError();
-                return $result;
+            if ($kept !== null) {
+                $argv = $kept[0];
             }
         }
+        $hold = $render !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
+        try {
+            while (true) {
+                $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold);
+                if ($hold === null || $render->heldError() === '') {
+                    return $result;
+                }
+                $say = function ($line) use ($render) {
+                    $render->say($line);
+                };
+                if (GatewayWait::run($home, $say) !== 'ready') {
+                    $render->releaseError();
+                    return $result;
+                }
+            }
+        } finally {
+            if (is_array($kept)) {
+                @unlink($kept[1]);
+            }
+        }
+    }
+
+    /**
+     * Copies the stdin question into a new 0600 file in local/state/oneshot (dir 0700) and returns [$argv with the stdin
+     * form replaced by --query-file=<that file>, the file]. Null when stdin is empty (Hermes then reports the empty
+     * question itself, as before) or the directory cannot be made (stdin is untouched and read by Hermes as before);
+     * false when stdin was read but could not be written in full. Files left by a killed run are removed after a day.
+     */
+    private static function keepStdin(array $argv)
+    {
+        $dir = Config::localDir() . '/state/oneshot';
+        if ((!is_dir($dir) && !@mkdir($dir, 0700, true)) || is_link($dir)) {
+            return null;
+        }
+        foreach ((array) glob($dir . '/question-*') as $old) {
+            if (is_file($old) && !is_link($old) && @filemtime($old) < time() - 86400) {
+                @unlink($old);
+            }
+        }
+        $old = umask(0077);
+        $file = @tempnam($dir, 'question-');
+        umask($old);
+        if ($file === false || dirname($file) !== $dir) {
+            if (is_string($file)) {
+                @unlink($file);
+            }
+            return null;
+        }
+        $fh = @fopen($file, 'wb');
+        $copied = is_resource($fh) ? stream_copy_to_stream(STDIN, $fh) : false;
+        $closed = is_resource($fh) && fclose($fh);
+        clearstatcache(true, $file);
+        if ($copied === false || !$closed || filesize($file) !== $copied) {
+            @unlink($file);
+            return false;
+        }
+        if ($copied === 0) {
+            @unlink($file);
+            return null;
+        }
+        $out = [];
+        for ($i = 0, $n = count($argv); $i < $n; $i++) {
+            if ($argv[$i] === '--query-file=-') {
+                $out[] = '--query-file=' . $file;
+            } elseif ($argv[$i] === '--query-file' && ($argv[$i + 1] ?? null) === '-') {
+                $out[] = '--query-file=' . $file;
+                $i++;
+            } else {
+                $out[] = $argv[$i];
+            }
+        }
+        return [$out, $file];
     }
 
     /** Whether the question is read from stdin: `--query-file=-` or `--query-file -` (Hermes reads it itself). */
