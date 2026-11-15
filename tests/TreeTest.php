@@ -210,7 +210,7 @@ return [
             $locked[] = $t;
             check(treeIds(Units::all($t)) === ['/tools'] && Units::all($t)[0]['errors'] === [Tree::UNREADABLE], 'an unreadable root is one broken unit');
         } finally {
-            foreach ($locked as $d) {
+            foreach (array_reverse($locked) as $d) { // parent first: a child under a locked parent cannot be unlocked
                 @chmod($d, 0700);
             }
             testRmTree($dir);
