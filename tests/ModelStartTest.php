@@ -107,4 +107,34 @@ http_response_code(404); echo "{}";
             testRmTree($dir);
         }
     },
+    'start notices: a piped one-shot says "backups: none" on stderr, never in the answer on stdout (ADR-0099)' => function () {
+        if (!function_exists('curl_init')) {
+            skip('curl is required for model discovery');
+        }
+        list($proc, $base, $serverDir) = coProviderStart('
+if (substr($_SERVER["REQUEST_URI"], -7) === "/models") { echo "{\"data\": [{\"id\": \"fixture\"}]}"; return; }
+http_response_code(404); echo "{}";
+');
+        $dir = modelStartWorld();
+        try {
+            check(BackupStatus::write("$dir/local", ['state' => 'none', 'checked_at' => time()]), 'the backup status cache was written');
+            testWithEnv(['HOME' => $dir, 'PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null, 'PIKKUMIES_ENDPOINT' => $base,
+                'PIKKUMIES_KEY' => 'fixture-key'], function () use ($dir) {
+                $p = proc_open(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$dir/bin/pikkumies") . ' run chat --query=hi --format stream-json',
+                    [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+                fclose($pipes[0]);
+                $out = stream_get_contents($pipes[1]);
+                $err = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                proc_close($p);
+                // The fixture's Hermes stops the start later (it is not a checkout); the backups block runs before that.
+                check(strpos($out, 'backups:') === false, 'nothing but the answer on stdout: ' . json_encode($out));
+                check(substr_count($err, 'backups: none (') === 1, 'the notice is said once on stderr: ' . json_encode($err));
+            });
+        } finally {
+            coProviderServerDone($proc, $serverDir);
+            testRmTree($dir);
+        }
+    },
 ];

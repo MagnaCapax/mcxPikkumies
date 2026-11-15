@@ -25,6 +25,13 @@ function out($line)
     fwrite(STDOUT, $line . "\n");
 }
 
+/** A start notice: on stdout for a person at a terminal, on stderr when stdout is a pipe, so a one-shot's answer or
+ * stream on stdout is only the answer (ADR-0099). */
+function notice($line)
+{
+    fwrite(Launch::isTty(STDOUT) ? STDOUT : STDERR, $line . "\n");
+}
+
 function profile($refresh = false)
 {
     $profile = Detect::cached($refresh);
@@ -529,7 +536,7 @@ switch ($cmd) {
         // A moved account arrives without its crontab and nothing else restores the two lines (Update::ensureScheduled).
         if (Launch::isSession($passArgs)) {
             foreach (Update::ensureScheduled(Config::load(), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(), !empty(profile()['root']['available'])) as $msg) {
-                out('restored in your crontab: ' . $msg);
+                notice('restored in your crontab: ' . $msg);
             }
         }
         // A session without a model key would only fail on its first request: say where the key comes from instead.
@@ -545,10 +552,10 @@ switch ($cmd) {
                 BackupStatus::refreshInBackground(Config::localDir(), Config::root() . '/tools/backup/backup-safety/backup-safety.php');
             }
             if (is_array($backups) && $backups['state'] !== 'working') {
-                out('backups: ' . $backups['state'] . ' (' . Config::shown(Config::root() . '/tools/backup/backup-safety/backup-safety.php') . ' status shows why)');
+                notice('backups: ' . $backups['state'] . ' (' . Config::shown(Config::root() . '/tools/backup/backup-safety/backup-safety.php') . ' status shows why)');
             }
             if (($custody = BackupStatus::custody($backups)) !== '') {
-                out($custody);
+                notice($custody);
             }
         }
         // Hermes' own updater (ADR-0033): alone on the tree, never as more than the account, official origin only.
