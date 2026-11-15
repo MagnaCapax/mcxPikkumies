@@ -20,6 +20,8 @@ class GatewayWait
 {
     /** The error text of the failure this handles, as Hermes reports it (hermes_cli/gateway_client.py). */
     const ERROR = 'Gateway starting: deadline';
+    /** The second failure shape (GH #12 finding 4): the client's WebSocket open timed out after ensure said the gateway could be attached. */
+    const CONNECT = 'Gateway connection failed; no local fallback';
     /** Seconds between checks. */
     const POLL = 2;
     /** Seconds between progress lines. */
@@ -27,10 +29,10 @@ class GatewayWait
     /** Seconds one identify probe may take to connect and answer: the 2 s Hermes' own discovery allows it (discover_gateway_endpoint). */
     const PROBE = 2;
 
-    /** Whether a finished run is the fixed-deadline failure with nothing done: no tokens spent and no tool called. */
+    /** Whether a finished run is one of the two gateway failures with nothing done: no tokens spent and no tool called. */
     public static function triggered($error, $tokens, $tools)
     {
-        return trim((string) $error) === self::ERROR && (int) $tokens === 0 && (int) $tools === 0;
+        return in_array(trim((string) $error), [self::ERROR, self::CONNECT], true) && (int) $tokens === 0 && (int) $tools === 0;
     }
 
     /**

@@ -47,6 +47,8 @@ return [
         check(!GatewayWait::triggered('Gateway inaccessible: authorization', 0, 0), 'another gateway failure');
         check(!GatewayWait::triggered('Gateway starting: not_ready', 0, 0), 'another reason');
         check(!GatewayWait::triggered('', 0, 0) && !GatewayWait::triggered('The model failed. Gateway starting: deadline', 0, 0), 'no error, or the text only inside another');
+        check(GatewayWait::triggered('Gateway connection failed; no local fallback', 0, 0), 'the connection failure with nothing done (finding 4)');
+        check(!GatewayWait::triggered('Gateway connection failed; no local fallback', 3, 0) && !GatewayWait::triggered('Gateway connection failed; no local fallback', 0, 2), 'the connection failure after the run did something');
     },
     'gateway wait: waits while the lock is held and the gateway says it is starting, then is ready on any other state' => function () {
         list($r, $lines, $sleeps) = gatewayWaitRun(['', '', 'starting', 'starting', 'ready'], [true], [false]);

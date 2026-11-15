@@ -222,6 +222,41 @@ return [
             testRmTree($home);
         }
     },
+    'HaltRun render: "Gateway connection failed" with nothing done runs once more and prints the answer; failing twice says the cause once; with tokens spent it is printed as before (GH #12 finding 4)' => function () {
+        $fakeModel = testTempDir('pk-haltrun-model');
+        list($proc, $port) = haltRunFakeModel($fakeModel);
+        $tree = haltRunTree($port);
+        $home = testTempDir('pk-gwhome');
+        $failed = 'Gateway connection failed; no local fallback';
+        $args = ['chat', '--query=disk?', '--format=stream-json'];
+        try {
+            putenv('PK_FAKE_HERMES_DIR=' . $tree);
+            putenv('HERMES_HOME=' . $home);
+            // No gateway answers and none is starting: the connection failure is still run once more.
+            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed($failed), 'code' => 1], ['events' => haltRunRenderEvents('41 GB free'), 'code' => 0]]));
+            list($code, $out, $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, $args);
+            check($code === 0 && $out === "41 GB free\n", 'one answer after the second run: ' . json_encode([$code, $out, $err]));
+            check(strpos($err, 'The agent gateway did not take the connection; asking again') !== false && strpos($err, 'Hermes:') === false, 'the re-run is said, the error is not: ' . $err);
+            check(haltRunCalls($tree) === 2, 'two runs: ' . haltRunCalls($tree));
+            @unlink("$tree/calls.jsonl");
+            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed($failed), 'code' => 1]]));
+            list($code, $out, $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, $args);
+            check($code === 1 && $out === '' && haltRunCalls($tree) === 2, 'twice: one re-run, then it stops: ' . json_encode([$code, $out, haltRunCalls($tree)]));
+            check(substr_count($err, 'Hermes: ' . $failed . ' (the agent gateway did not take the connection twice in a row, so the question did not run)') === 1, 'twice: the error once, with its cause: ' . $err);
+            @unlink("$tree/calls.jsonl");
+            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed($failed, 7), 'code' => 1]]));
+            list(, , $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, $args);
+            check(substr_count($err, 'Hermes: ' . $failed) === 1 && strpos($err, 'asking again') === false && haltRunCalls($tree) === 1, 'tokens spent: printed once, no re-run: ' . $err);
+        } finally {
+            putenv('PK_FAKE_HERMES_DIR');
+            putenv('HERMES_HOME');
+            proc_terminate($proc, 9);
+            proc_close($proc);
+            testRmTree($tree);
+            testRmTree($fakeModel);
+            testRmTree($home);
+        }
+    },
     'HaltRun render: a question read from stdin is kept in a 0600 file, so the run after the gateway wait gets the same question; the file is gone afterwards (GH #12)' => function () {
         $fakeModel = testTempDir('pk-haltrun-model');
         list($proc, $port) = haltRunFakeModel($fakeModel);

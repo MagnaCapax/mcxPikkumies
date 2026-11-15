@@ -143,7 +143,9 @@ class HaltRun
      * GatewayWait waits for that gateway to answer; when it is gone instead, the held error is said and the run ends as
      * it did before. Only the stream-json render path sees the error (the plain path is unchanged). A question read
      * from stdin (`--query-file -`, how a support job asks) is first kept in a private file (keepStdin), so the re-run
-     * hands Hermes the same question; the file is removed when the run ends.
+     * hands Hermes the same question; the file is removed when the run ends. "Gateway connection failed; no local fallback"
+     * with nothing done (GH #12 finding 4) is run again once, whether or not a gateway answers: every re-run seen of it was a
+     * single one, so a second failure in a row is said with its cause instead of repeating on a loaded host.
      */
     private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
     {
@@ -160,18 +162,28 @@ class HaltRun
             }
         }
         $hold = $render !== null && $home !== '' && !self::readsStdin($argv) ? ['GatewayWait', 'triggered'] : null;
+        $connectRerun = false;
         try {
             while (true) {
                 $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold);
                 if ($hold === null || $render->heldError() === '') {
                     return $result;
                 }
+                $connect = trim($render->heldError()) === GatewayWait::CONNECT;
+                if ($connect && $connectRerun) {
+                    $render->releaseError('the agent gateway did not take the connection twice in a row, so the question did not run');
+                    return $result;
+                }
                 $say = function ($line) use ($render) {
                     $render->say($line);
                 };
-                if (GatewayWait::run($home, $say) !== 'ready') {
+                if (GatewayWait::run($home, $say) !== 'ready' && !$connect) {
                     $render->releaseError('the agent gateway stopped before it finished starting, so the question did not run');
                     return $result;
+                }
+                if ($connect) {
+                    $connectRerun = true;
+                    $render->say('The agent gateway did not take the connection; asking again');
                 }
             }
         } finally {
