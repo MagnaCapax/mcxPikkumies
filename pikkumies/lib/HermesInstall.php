@@ -579,7 +579,8 @@ class HermesInstall
     }
 
     /**
-     * Start a build when there is no complete install; never touches a complete one (no git, no pm).
+     * Start a build when there is no complete install; never updates or rebuilds a complete one (no git, no pm install; the
+     * daily update runs upstream's gc on it, ADR-0114).
      * $unattended (post-update, from the daily cron) builds only where no tree exists at all, and not on
      * a root-capable host without setpriv (ADR-0025). $optionalTools: hermes.lazyInstalls (ADR-0021).
      * Returns a status line.
@@ -622,7 +623,11 @@ class HermesInstall
         // checked release, the old tree moved aside (ADR-0033 amendment 2026-11-03).
         $refused = self::isComplete() ? self::refusedNewerRelease() : '';
         if (self::isComplete() && $refused === '') {
-            return 'installed (pikkumies/hermes; updates: `pikkumies run update`)' . self::clearAsides();
+            $line = 'installed (pikkumies/hermes; updates: `pikkumies run update`)' . self::clearAsides();
+            if ($unattended) {
+                self::collectGenerations();
+            }
+            return $line;
         }
         if (getenv('PIKKUMIES_SKIP_HERMES') === '1') {
             return 'skipped (PIKKUMIES_SKIP_HERMES=1)';
@@ -744,6 +749,30 @@ class HermesInstall
             $removed[] = $name;
         }
         return $removed ? '; removed ' . implode(', ', $removed) . ' (unchanged copies of the public release)' : '';
+    }
+
+    /**
+     * The daily update runs upstream's own cleanup (ADR-0114): `hermes pm gc` removes dependency generations that are not
+     * selected, are at least a day old and are leased by no running Hermes (hermes_cli/runtime_state.py collect_generations),
+     * and store entries nothing references. Hermes' own update sync does the same, but Pikkumies never runs that updater by
+     * itself (ADR-0033), so the generation a build's second install call supersedes (ADR-0082) would stay. Not while a build
+     * runs or an update holds the Hermes lock; idle priority; output to the install log. Nothing here deletes a file itself.
+     */
+    private static function collectGenerations()
+    {
+        $bin = self::bin();
+        if ($bin === '' || self::building()) {
+            return;
+        }
+        $lock = self::lock(false);
+        if ($lock === null) {
+            return;
+        }
+        ob_start();
+        echo gmdate('c'), " daily update: hermes pm gc\n";
+        self::run(CronTick::lowPriority([$bin, 'pm', 'gc']), self::bootstrapEnv(), self::treeDir());
+        @file_put_contents(self::localDir() . '/install.log', ob_get_clean(), FILE_APPEND);
+        fclose($lock);
     }
 
     /**

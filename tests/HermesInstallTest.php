@@ -385,7 +385,7 @@ return [
             testRmTree($w['t']);
         }
     },
-    'hermes ensure: a complete install is left alone, no git, no uv, no pm' => function () {
+    'hermes ensure: a complete install is left alone, no git, no uv, no pm install; the daily update runs only upstream gc (ADR-0114)' => function () {
         $w = hermesTWorld();
         try {
             hermesTFake($w['bin'] . '/git', 'file_put_contents(getenv("PK_FAKE_LOG"), "git called\n", FILE_APPEND); exit(1);');
@@ -393,7 +393,7 @@ return [
             hermesTIn($w, function () use ($w) {
                 $msg = HermesInstall::ensure(true);
                 check($msg === 'installed (pikkumies/hermes; updates: `pikkumies run update`)', 'ensure: ' . $msg);
-                check(!is_file($w['log']), 'a complete install must run nothing: ' . @file_get_contents($w['log']));
+                check(@file_get_contents($w['log']) === "hermes pm gc\n", 'a complete install must run nothing but upstream gc: ' . @file_get_contents($w['log']));
             });
         } finally {
             testRmTree($w['t']);
