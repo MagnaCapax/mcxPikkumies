@@ -18,7 +18,7 @@ Facts:
 - **Remove the old generation ourselves.** Rejected: which generation is selected, leased or still being published is upstream state; a deletion of our own would have to copy upstream's rules and would break when they change.
 - **One install call instead of two.** Rejected: pm refuses `--without` with `--extra`, and `--extra` alone skips the default package closure (`pm/cli.py`), so the build would not be the default install.
 - **Drop the build-time extra.** Rejected: it reverses ADR-0082's "`on` works at once", and later extras supersede generations anyway.
-- **Run `pm gc` once per build, with a stamp file.** Rejected: it misses the generations later extras supersede, and it saves a daily run whose cost is small (measured below).
+- **Run `pm gc` once per build, with a stamp file.** Rejected: it misses the generations later extras supersede, and it saves a daily run whose cost is small: on a test account the daily post-update took 1.4 to 2.8 s with the gc and 0.6 s without it.
 - **Ask upstream for a shorter window.** Rejected: the day is upstream's guard for readers of an old generation.
 - **The daily update runs upstream's `hermes pm gc`.** Chosen.
 
@@ -29,8 +29,8 @@ Facts:
 - Nothing in Pikkumies deletes a file here: what goes is what upstream's collector decides.
 
 ## Consequences
-- A build's superseded generation is removed by the first daily update after it is a day old; until then the account carries both.
-- One extra process a day on each account with a complete install, at idle priority. Its run time and what it removed are in the install log.
+- A build's superseded generation is removed by the first daily update after it is a day old; until then the account carries both. On two fresh 150 GiB test accounts (2026-11-16, markers backdated) that update freed 8,582 and 8,571 files of the 75,000-file quota (71,320 to 62,738 and 71,322 to 62,751) and the post-update took 4.9 s and 3.7 s.
+- One extra process a day on each account with a complete install, at idle priority. Its run time and what it removed are in the install log. While a Hermes process holds upstream's install lock, upstream waits 10 s for it twice and removes no generation; that day's post-update took 22.7 s.
 - The store sweep is upstream's: if upstream's idea of a referenced store entry changes, the daily run follows it. The acceptance run checked that a gc leaves the install starting and later extras installing.
 - Tests: `tests/HermesInstallGcTest.php` (the daily update runs one gc with the bootstrap environment from the tree at idle priority and logs it; a person-started ensure runs none; none while an update holds the lock; a failing gc leaves the status line; none without a complete install).
 
