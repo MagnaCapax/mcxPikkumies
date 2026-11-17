@@ -19,10 +19,11 @@ class RemoteRun
     const EXCLUDE = ['.cache', './.bin', '.*_history', '.lesshst', './.pikkumiesKey', './.virsilipasKey'];
     /** Also left out of meta mode: application caches inside ~/.config. */
     const META_EXCLUDE = ['cache', 'Cache', 'CachedData', 'GPUCache', 'Code Cache'];
-    /** Also left out of meta mode, inside the pikkumies local directory: the agent runtime an install rebuilds (pm's package
-     *  store and uv's Python, HermesInstall::bootstrapEnv). 1.1 GiB of a fresh account's 1.7 GiB local on 2026-11-17; the
-     *  runtime's state (state.db, memories, skills, config.yaml) stays in. */
-    const META_LOCAL_EXCLUDE = ['hermes/tools', 'hermes/bootstrap-python'];
+    /** Also left out of meta mode, inside the pikkumies local directory: the agent runtime an install rebuilds: pm's package
+     *  store and uv's Python (HermesInstall::bootstrapEnv), and pm's venv generations and prepared runtime per checkout
+     *  (pm/environments.py installs_root, pm/packages.py, pm/runtime.py). 1.6 GiB of a fresh account's 1.7 GiB local on
+     *  2026-11-17; the runtime's state (state.db, memories, skills, config.yaml, the install's facts and declined packages) stays in. */
+    const META_LOCAL_EXCLUDE = ['hermes/tools', 'hermes/bootstrap-python', 'hermes/installs/*/environments', 'hermes/installs/*/pm-runtime'];
     const FULL_MAX_KIB = 104857600; // 100 GiB: a daily full above this needs --allow-large (1 TB takes about 2.5 h at 1 Gbit/s)
     const LIST_NAME = 'pikkumies-file-list.tsv.gz';
 
