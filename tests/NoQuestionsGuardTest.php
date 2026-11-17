@@ -111,6 +111,8 @@ return [
         }
         check(strpos($p, 'approval for something destructive or paid') === false && strpos($p, '(a password, a choice between options') === false && strpos($p, 'or asked the user about') === false, 'the old waiting list must be gone, and a question to the user is no longer a reason to wait (ADR-0101)');
         check(strpos(HaltJudge::WRAPUP, 'not a question that waits for an answer') !== false, 'wrap-up');
+        // A recorded answer gave an idea and then a light topic with a wrong claim in it (2026-11-17): one or the other.
+        check(strpos(HaltJudge::WRAPUP, 'never both') !== false, 'wrap-up must say idea or light topic, never both');
         check(strpos(HaltJudge::CONTINUE_RULE, 'what the user asked for') !== false && strpos(HaltJudge::CONTINUE_RULE, 'beyond that request') !== false && strpos(HaltJudge::CONTINUE_RULE, 'never work around a refusal') !== false, 'the request bounds every continue, and no continue works around a refusal');
     },
 ];
