@@ -230,6 +230,10 @@ return [
             $right = $typed(implode(' ', str_split(brPhrase($fx), 4)));
             clearstatcache();
             check(brRun($fx, ['stats'])[1][0]['passphrase_saved_by_user'] === true, 'confirm-saved with the right copy not recorded: ' . $right);
+            // An answer built from stats once said the passphrase "lives only with you": stats names the file on this server.
+            $pf = (string) brRun($fx, ['stats'])[1][0]['passphrase_file'];
+            check(strpos($pf, 'secrets/backup-remote/pass') !== false && strpos($pf, 'on this server') !== false && strpos($pf, brPhrase($fx)) === false,
+                'stats must name the passphrase file on this server, never its contents: ' . $pf);
             // No echo check here: piped typeahead reaches the pty before `stty -echo`, so the terminal itself echoes it in this harness.
         } finally {
             stDone($fx);

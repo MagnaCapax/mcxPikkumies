@@ -59,3 +59,6 @@ The same day it was widened to pm's venv generations and prepared runtime (`herm
 
 ## Amendment 2026-11-17: the scrub note says when the password reached the model
 Setup cannot tell whether the agent ran it with a password from the chat or the user ran it in their own terminal with the password read hidden, so its `next` note now says that a password given in a chat has reached the model provider and this session's history, and one typed in the user's own terminal did not. The honest scrub scope above is unchanged: changing the remote password is still what really scrubs it. The services setup of [ADR-0084](0084-services-list-and-moving-torrents-between-boxes.md) says the same.
+
+## Amendment 2026-11-17: stats names where the passphrase file is
+Two recorded answers built from `stats` and USAGE.md told the user the passphrase "lives only with you". The account's command log showed it reading USAGE.md and `stats`; that log records shell commands, not Hermes skill loads, so whether skill.md reached it is not known. `stats` now carries `passphrase_file`: the file's path on this server (never its contents) with "on this server, for the nightly runs", and USAGE.md says the same, so the fact is in what the agent reads before it answers.

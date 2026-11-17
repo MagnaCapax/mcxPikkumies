@@ -80,7 +80,11 @@ class RemoteOps
         return strpos((string) $gpgErr, '[GNUPG:] DECRYPTION_OKAY') !== false;
     }
 
-    /** Local facts only: the destination, the last run, the schedule, whether the user saved the passphrase. */
+    /**
+     * Local facts only: the destination, the last run, the schedule, where the passphrase file is and whether the user saved
+     * a copy. passphrase_file is there because an answer built from stats said the passphrase "lives only with you" (2026-11-17):
+     * the file stays on this server for the nightly runs, whatever the user saved.
+     */
     public static function stats(RemoteDest $dest, $keptDir)
     {
         $d = $dest->load();
@@ -90,6 +94,7 @@ class RemoteOps
         return [['host' => $d['host'], 'user' => $d['user'], 'port' => (int) $d['port'], 'label' => $d['label'],
             'keep_days' => (int) $d['keep_days'], 'host_key' => isset($d['host_key']) ? $d['host_key'] : null,
             'schedule' => $line !== '' ? $line : null, 'last_run' => isset($s['last_run']) ? $s['last_run'] : null,
+            'passphrase_file' => Config::shown($dest->passFile(false)) . ' (on this server, for the nightly runs)',
             'passphrase_saved_by_user' => $dest->passphraseConfirmed(), 'last_check' => isset($s['last_check']) ? $s['last_check'] : null]];
     }
 
