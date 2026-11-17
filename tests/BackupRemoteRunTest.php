@@ -18,14 +18,16 @@ function brHome(array $state = [])
     stClearLog($fx);
     $h = $fx['home'];
     foreach (['session', '.config/qBittorrent', '.config/app/cache', '.config/app/Cache', '.cache/x', '.bin', 'data', '.lighttpd',
-        'pikkumies/local/logs', '.local/share/qBittorrent/BT_backup', '.ssh'] as $d) {
+        'pikkumies/local/logs', '.local/share/qBittorrent/BT_backup', '.ssh', 'pikkumies/local/hermes/memories',
+        'pikkumies/local/hermes/tools/pkg', 'pikkumies/local/hermes/bootstrap-python/py'] as $d) {
         @mkdir("$h/$d", 0700, true);
     }
     foreach (['.rtorrent.rc' => 'rc', 'session/a.torrent' => 't', '.config/qBittorrent/q.conf' => 'q', '.config/app/settings.json' => 's',
         '.config/app/cache/c' => 'c', '.config/app/Cache/c' => 'c', '.cache/x/y' => 'y', '.bin/tool' => 'b', 'data/movie.mkv' => 'big',
         '.bashrc' => 'b', '.bash_history' => 'a typed line', '.pikkumiesKey' => 'k', '.lighttpd/l.conf' => 'l',
         'pikkumies/local/config.php' => '<?php return [];', 'pikkumies/local/logs/l.jsonl' => 'l', '.local/share/qBittorrent/BT_backup/h.fastresume' => 'r',
-        '.ssh/config' => 'Host x'] as $f => $c) {
+        '.ssh/config' => 'Host x', 'pikkumies/local/hermes/state.db' => 's', 'pikkumies/local/hermes/memories/m.md' => 'm',
+        'pikkumies/local/hermes/tools/pkg/lib.so' => 'runtime', 'pikkumies/local/hermes/bootstrap-python/py/python' => 'runtime'] as $f => $c) {
         file_put_contents("$h/$f", $c);
     }
     return $fx;
@@ -62,11 +64,13 @@ return [
             check($code === 0 && end($r)['verified'] === true, 'restore: ' . $out);
             $t = $fx['home'] . '/restored';
             foreach (['.rtorrent.rc', 'session/a.torrent', '.config/qBittorrent/q.conf', '.config/app/settings.json', '.bashrc', '.lighttpd/l.conf',
-                'pikkumies/local/config.php', '.local/share/qBittorrent/BT_backup/h.fastresume', BR_LIST] as $f) {
+                'pikkumies/local/config.php', '.local/share/qBittorrent/BT_backup/h.fastresume', BR_LIST,
+                'pikkumies/local/hermes/state.db', 'pikkumies/local/hermes/memories/m.md'] as $f) {
                 check(is_file("$t/$f"), "meta lacks $f");
             }
             foreach (['.config/app/cache', '.config/app/Cache', '.cache', '.bin', 'data', '.bash_history', '.pikkumiesKey',
-                'pikkumies/local/secrets', 'pikkumies/local/logs', '.ssh'] as $f) {
+                'pikkumies/local/secrets', 'pikkumies/local/logs', '.ssh', 'pikkumies/local/hermes/tools',
+                'pikkumies/local/hermes/bootstrap-python'] as $f) {
                 check(!file_exists("$t/$f"), "meta holds $f");
             }
             $files = substr((string) file_get_contents("$t/" . BR_LIST), 9); // the fake pigz header
