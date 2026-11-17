@@ -69,29 +69,29 @@ class HaltRun
                     $render->say('Not finished, continuing (' . (self::MAX_CONTINUES - $continuesLeft) . ' of ' . self::MAX_CONTINUES . ')');
                 }
                 // after the wrap-up turn, a further continue is still wrap-up talk, not an answer: stderr (ADR-0109)
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $render, $wrappedUp);
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($verdict['message'])], $resumeTail), $render, $wrappedUp);
                 continue;
             }
             if ($verdict['verdict'] === 'done-wrapup' && !$wrappedUp) {
                 $wrappedUp = true;
-                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $sessionId)) {
+                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($verdict['message'])], $resumeTail), $sessionId)) {
                     return $code; // unattended: the answer is out; the wrap-up runs on its own (ADR-0103)
                 }
                 if ($render !== null) {
                     $render->say('Wrapping up');
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $verdict['message']], $resumeTail), $render, true);
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($verdict['message'])], $resumeTail), $render, true);
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
             }
             if ($applied['resume'] !== null && !$wrappedUp) {
                 $wrappedUp = true;
-                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail), $sessionId)) {
+                if (self::detachWrapUp($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($applied['resume'])], $resumeTail), $sessionId)) {
                     return $code;
                 }
                 if ($render !== null) {
                     $render->say('Wrapping up');
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . $applied['resume']], $resumeTail), $render, true);
+                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($applied['resume'])], $resumeTail), $render, true);
                 continue; // same single wrap-up slot as done-wrapup above: ADR-0047's bound stays 3 continues + 1 final resume
             }
             return $code;

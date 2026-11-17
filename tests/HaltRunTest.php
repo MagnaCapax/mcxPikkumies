@@ -132,7 +132,7 @@ return [
                 return null;
             };
             check(strpos($resumeQuery($calls[1]['argv']), HaltJudge::CONTINUE_SENTENCES[3]) !== false, 'first resume must carry the Q3 fixed sentence: ' . $resumeQuery($calls[1]['argv']));
-            check($resumeQuery($calls[3]['argv']) === HaltJudge::WRAPUP, 'the fourth call must be the one wrap-up resume: ' . $resumeQuery($calls[3]['argv']));
+            check($resumeQuery($calls[3]['argv']) === HaltJudge::note(HaltJudge::WRAPUP), 'the fourth call must be the one wrap-up resume: ' . $resumeQuery($calls[3]['argv']));
             check($calls[0]['argv'][0] === 'chat' && strpos(implode(' ', $calls[0]['argv']), '--resume=') === false, 'the first call must be the seeded prompt, not a resume: ' . json_encode($calls[0]['argv']));
             foreach ([1, 2, 3] as $i) {
                 check(in_array('--resume=fakesess', $calls[$i]['argv'], true), "call $i must resume the same session: " . json_encode($calls[$i]['argv']));
@@ -172,7 +172,7 @@ return [
                 }
                 return null;
             };
-            check($resumeQuery($calls[1]['argv']) === Antipatterns::resumeMessage(['load-is-not-cpu']), 'the resume query must be exactly resumeMessage(): ' . $resumeQuery($calls[1]['argv']));
+            check($resumeQuery($calls[1]['argv']) === HaltJudge::note(Antipatterns::resumeMessage(['load-is-not-cpu'])), 'the resume query must be exactly resumeMessage(): ' . $resumeQuery($calls[1]['argv']));
         } finally {
             putenv('PK_FAKE_HERMES_DIR');
             proc_terminate($proc, 9);
@@ -230,7 +230,7 @@ return [
                 }
                 return null;
             };
-            $expect = HaltJudge::WRAPUP . "\n" . Antipatterns::lines(['load-is-not-cpu']);
+            $expect = HaltJudge::note(HaltJudge::WRAPUP . "\n" . Antipatterns::lines(['load-is-not-cpu']));
             check($resumeQuery($calls[1]['argv']) === $expect, 'the one resume must carry the wrap-up text plus the lines, not a second resume: ' . $resumeQuery($calls[1]['argv']));
         } finally {
             putenv('PK_FAKE_HERMES_DIR');

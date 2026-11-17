@@ -53,12 +53,12 @@ $verdict['message'] = $applied['message'];
 HaltState::logDecision($sessionId, 'hook', $attempt, $verdict, (int) $config['sessions']['retentionDays'], $attempt >= HALT_GUARD_MAX_ATTEMPT - 1); // the last continue it may send (ADR-0102)
 if ($verdict['verdict'] === 'continue') {
     HaltState::bumpContinues($sessionId);
-    echo json_encode(['action' => 'continue', 'message' => $verdict['message']], JSON_UNESCAPED_SLASHES) . "\n";
+    echo json_encode(['action' => 'continue', 'message' => HaltJudge::note($verdict['message'])], JSON_UNESCAPED_SLASHES) . "\n";
 } elseif ($verdict['verdict'] === 'done-wrapup') {
     HaltState::markWrapupSent($sessionId);
-    echo json_encode(['action' => 'continue', 'message' => $verdict['message']], JSON_UNESCAPED_SLASHES) . "\n";
+    echo json_encode(['action' => 'continue', 'message' => HaltJudge::note($verdict['message'])], JSON_UNESCAPED_SLASHES) . "\n";
 } elseif ($applied['resume'] !== null) {
     // The attempt >= 3 / wrapup_sent check at the top of this file already stands guard: this never fires twice for one turn.
     HaltState::markWrapupSent($sessionId);
-    echo json_encode(['action' => 'continue', 'message' => $applied['resume']], JSON_UNESCAPED_SLASHES) . "\n";
+    echo json_encode(['action' => 'continue', 'message' => HaltJudge::note($applied['resume'])], JSON_UNESCAPED_SLASHES) . "\n";
 }

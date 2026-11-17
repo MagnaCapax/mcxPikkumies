@@ -77,6 +77,16 @@ class HaltJudge
         return $out;
     }
 
+    /** Put in front of every message the halt layer sends into the conversation (continue, wrap-up, resume): Hermes adds
+     *  it as a user message and prints whatever the model writes next, so a reply to the check reached the user as part
+     *  of the answer (2026-11-17: a "Correcting: ..." second answer, and "Does not apply. ..." after a finished one). */
+    const NOTE = '[Note from Pikkumies\' own completion check, not from the user. Whatever you write next is shown to the user after your answer, so write only what the user should read: never reply to this note, quote it or mention the check.] ';
+
+    public static function note($message)
+    {
+        return self::NOTE . $message;
+    }
+
     const WRAPUP = 'Before you finish: if this task taught you something worth keeping, save it as a lesson in memory. '
         . 'Then end with one short idea that could help the user with their setup, as a plain suggestion, not a question that waits for an answer; if nothing useful comes to mind, name one light, fun topic. Keep both brief. '
         . 'If this task continues, checkpoint it with the scratchpad tool.';

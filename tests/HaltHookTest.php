@@ -195,6 +195,8 @@ return [
             $seeded = haltSeed($tree, 'sess-cont', []);
             list($d, $raw) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-cont', 'extra' => ['attempt' => 0, 'final_response' => 'partial answer']]);
             check(is_array($d) && $d['action'] === 'continue' && strpos($d['message'], HaltJudge::CONTINUE_SENTENCES[3]) !== false, 'continue answer: ' . $raw);
+            // The model's next text is printed to the user: the message must say it comes from the check, not the user.
+            check(strpos($d['message'], HaltJudge::NOTE) === 0, 'a continue must open with the note that the reply is shown to the user: ' . $raw);
             $state = json_decode(file_get_contents(haltStateFile($tree, 'sess-cont')), true);
             check($state['continues'] === 1, 'continues must be bumped: ' . json_encode($state));
             check($state['last_judged_turn'] === $seeded['turn_started'], 'last_judged_turn must be stamped: ' . json_encode($state));
@@ -214,7 +216,7 @@ return [
             file_put_contents("$fake/reply", $doneReply);
             haltSeed($tree, 'sess-done', []);
             list($d1, $raw1) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-done', 'extra' => ['attempt' => 0, 'final_response' => 'all done']]);
-            check(is_array($d1) && $d1['action'] === 'continue' && $d1['message'] === HaltJudge::WRAPUP, 'first wrap-up answer: ' . $raw1);
+            check(is_array($d1) && $d1['action'] === 'continue' && $d1['message'] === HaltJudge::note(HaltJudge::WRAPUP), 'first wrap-up answer: ' . $raw1);
             $afterFirst = json_decode(file_get_contents(haltStateFile($tree, 'sess-done')), true);
             check($afterFirst['wrapup_sent'] === true, 'wrapup_sent must be set after the one wrap-up');
             list($d2, $raw2) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-done', 'extra' => ['attempt' => 1, 'final_response' => 'still done']]);
@@ -314,7 +316,7 @@ return [
             file_put_contents("$fakeModel/replies.json", json_encode([$chatReply, 'load-is-not-cpu | pegging every one of the four cpu cores']));
             haltSeed($tree, 'sess-ap-chat', []);
             list($d, $raw) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-ap-chat', 'extra' => ['attempt' => 0, 'final_response' => $flagged]]);
-            check(is_array($d) && $d['action'] === 'continue' && $d['message'] === Antipatterns::resumeMessage(['load-is-not-cpu']), 'answer: ' . $raw);
+            check(is_array($d) && $d['action'] === 'continue' && $d['message'] === HaltJudge::note(Antipatterns::resumeMessage(['load-is-not-cpu'])), 'answer: ' . $raw);
             $state = json_decode(file_get_contents(haltStateFile($tree, 'sess-ap-chat')), true);
             check($state['wrapup_sent'] === true, 'the one-shot resume must mark wrapup_sent, reusing the wrap-up slot: ' . json_encode($state));
             list($d2, $raw2) = haltHookRun($tree, 'halt-guard', ['hook_event_name' => 'pre_verify', 'session_id' => 'sess-ap-chat', 'extra' => ['attempt' => 1, 'final_response' => $flagged]]);
