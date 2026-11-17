@@ -20,7 +20,7 @@ function brHome(array $state = [])
     foreach (['session', '.config/qBittorrent', '.config/app/cache', '.config/app/Cache', '.cache/x', '.bin', 'data', '.lighttpd',
         'pikkumies/local/logs', '.local/share/qBittorrent/BT_backup', '.ssh', 'pikkumies/local/hermes/memories',
         'pikkumies/local/hermes/tools/pkg', 'pikkumies/local/hermes/bootstrap-python/py', 'pikkumies/local/hermes/installs/k1/environments/g1',
-        'pikkumies/local/hermes/installs/k1/pm-runtime'] as $d) {
+        'pikkumies/local/hermes/installs/k1/pm-runtime', 'pikkumies/local/hermes-managed'] as $d) {
         @mkdir("$h/$d", 0700, true);
     }
     foreach (['.rtorrent.rc' => 'rc', 'session/a.torrent' => 't', '.config/qBittorrent/q.conf' => 'q', '.config/app/settings.json' => 's',
@@ -29,7 +29,7 @@ function brHome(array $state = [])
         'pikkumies/local/config.php' => '<?php return [];', 'pikkumies/local/logs/l.jsonl' => 'l', '.local/share/qBittorrent/BT_backup/h.fastresume' => 'r',
         '.ssh/config' => 'Host x', 'pikkumies/local/hermes/state.db' => 's', 'pikkumies/local/hermes/memories/m.md' => 'm',
         'pikkumies/local/hermes/tools/pkg/lib.so' => 'runtime', 'pikkumies/local/hermes/bootstrap-python/py/python' => 'runtime', 'pikkumies/local/hermes/installs/k1/environments/g1/lib.so' => 'venv',
-        'pikkumies/local/hermes/installs/k1/pm-runtime/r' => 'pm', 'pikkumies/local/hermes/installs/k1/declined-packages.json' => '{}'] as $f => $c) {
+        'pikkumies/local/hermes/installs/k1/pm-runtime/r' => 'pm', 'pikkumies/local/hermes-managed/.env' => 'PIKKUMIES_API_KEY=k', 'pikkumies/local/hermes/.env' => 'OTHER_KEY=k', 'pikkumies/local/hermes-managed/config.yaml' => 'c', 'pikkumies/local/hermes/installs/k1/declined-packages.json' => '{}'] as $f => $c) {
         file_put_contents("$h/$f", $c);
     }
     return $fx;
@@ -67,11 +67,11 @@ return [
             $t = $fx['home'] . '/restored';
             foreach (['.rtorrent.rc', 'session/a.torrent', '.config/qBittorrent/q.conf', '.config/app/settings.json', '.bashrc', '.lighttpd/l.conf',
                 'pikkumies/local/config.php', '.local/share/qBittorrent/BT_backup/h.fastresume', BR_LIST,
-                'pikkumies/local/hermes/state.db', 'pikkumies/local/hermes/memories/m.md', 'pikkumies/local/hermes/installs/k1/declined-packages.json'] as $f) {
+                'pikkumies/local/hermes/state.db', 'pikkumies/local/hermes/memories/m.md', 'pikkumies/local/hermes-managed/config.yaml', 'pikkumies/local/hermes/installs/k1/declined-packages.json'] as $f) {
                 check(is_file("$t/$f"), "meta lacks $f");
             }
             foreach (['.config/app/cache', '.config/app/Cache', '.cache', '.bin', 'data', '.bash_history', '.pikkumiesKey',
-                'pikkumies/local/secrets', 'pikkumies/local/logs', '.ssh', 'pikkumies/local/hermes/tools',
+                'pikkumies/local/secrets', 'pikkumies/local/logs', '.ssh', 'pikkumies/local/hermes/tools', 'pikkumies/local/hermes-managed/.env', 'pikkumies/local/hermes/.env',
                 'pikkumies/local/hermes/bootstrap-python', 'pikkumies/local/hermes/installs/k1/environments', 'pikkumies/local/hermes/installs/k1/pm-runtime'] as $f) {
                 check(!file_exists("$t/$f"), "meta holds $f");
             }

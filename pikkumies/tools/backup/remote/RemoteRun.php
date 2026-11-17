@@ -140,7 +140,9 @@ class RemoteRun
         $runtime = $local !== null && $mode === 'meta' ? array_map(function ($p) use ($local) {
             return "$local/$p";
         }, self::META_LOCAL_EXCLUDE) : [];
-        return array_merge(self::EXCLUDE, $local !== null ? ["$local/secrets", "$local/logs"] : [], $mode === 'meta' ? self::META_EXCLUDE : [], $runtime);
+        // The Hermes .env files are AI key files (GuardKeyFiles): hermes-managed/.env holds the provider key, rebuilt at every
+        // start (HermesConfig.php), and hermes/.env is where Hermes keeps keys; both are left out like ~/.pikkumiesKey.
+        return array_merge(self::EXCLUDE, $local !== null ? ["$local/secrets", "$local/logs", "$local/hermes-managed/.env", "$local/hermes/.env"] : [], $mode === 'meta' ? self::META_EXCLUDE : [], $runtime);
     }
 
     /** KiB the paths hold (du, at most 2 minutes), or null when du did not finish. */
