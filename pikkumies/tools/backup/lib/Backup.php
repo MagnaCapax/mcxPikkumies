@@ -5,7 +5,7 @@
  * and "one backup job at a time" live here once, so restic and borg behave the same.
  */
 $backupLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath'] as $backupClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'BackupStatus'] as $backupClass) {
     require_once "$backupLib/$backupClass.php";
 }
 foreach (['ToolText', 'ToolList'] as $toolLib) {
@@ -17,7 +17,7 @@ require_once __DIR__ . '/BackupRules.php';
 
 class Backup
 {
-    /** $ctx: store (BackupStore), make (fn() => BackupTool), script, mountinfo, procRoot, uid. */
+    /** $ctx: store (BackupStore), make (fn() => BackupTool), script, mountinfo, procRoot, uid, localDir (the backup-safety cache's). */
     public static function run(array $argv, array $ctx, $usage)
     {
         $made = null;
@@ -50,12 +50,14 @@ class Backup
             'stats' => function ($args, $opt) use ($t) {
                 return [$t()->stats()];
             },
-            'check' => function ($args, $opt) use ($t) {
+            'check' => function ($args, $opt) use ($t, $ctx) {
                 $subset = isset($opt['read-data-subset']) ? (string) $opt['read-data-subset'] : null;
                 if ($subset !== null && !preg_match('#^(\d+/\d+|\d+(\.\d+)?%)$#', $subset)) {
                     throw new CliError('--read-data-subset is n/m or a percentage, e.g. 5%', 'or --read-data for everything');
                 }
-                return [$t()->check(!empty($opt['read-data']), $subset)];
+                $r = $t()->check(!empty($opt['read-data']), $subset);
+                BackupStatus::refreshAfterBackup(isset($ctx['localDir']) ? $ctx['localDir'] : Config::localDir());
+                return [$r];
             },
             'backup' => function ($args, $opt) use ($t, $ctx) {
                 if (!$args) {
@@ -66,7 +68,9 @@ class Backup
                     return HomePath::existing($p, $home);
                 }, $args);
                 BackupRules::idle($ctx);
-                return [$t()->backup(array_values(array_unique($paths)))];
+                $r = $t()->backup(array_values(array_unique($paths)));
+                BackupStatus::refreshAfterBackup(isset($ctx['localDir']) ? $ctx['localDir'] : Config::localDir());
+                return [$r];
             },
             'restore' => function ($args, $opt) use ($t, $ctx) {
                 return self::restore($t(), $args, $opt, $ctx);

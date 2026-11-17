@@ -328,6 +328,24 @@ return [
             testRmTree($t);
         }
     },
+    'backup safety: a backup or a check refreshes an existing status cache in the background, and only an existing one' => function () {
+        $spawned = [];
+        BackupStatus::$spawn = function ($line) use (&$spawned) {
+            $spawned[] = $line;
+        };
+        $t = testTempDir('pk-bsafe-after');
+        try {
+            check(BackupStatus::refreshAfterBackup($t) === false && $spawned === [], 'no cache yet: nothing may start');
+            @mkdir("$t/state", 0700, true);
+            file_put_contents(BackupStatus::file($t), '{}');
+            check(BackupStatus::refreshAfterBackup($t) === true && count($spawned) === 1, 'an existing cache must be refreshed');
+            check(strpos($spawned[0], 'backup-safety.php') !== false && strpos($spawned[0], 'status --refresh') !== false
+                && strpos($spawned[0], 'flock -n') !== false, 'the refresh line: ' . $spawned[0]);
+        } finally {
+            BackupStatus::$spawn = null;
+            testRmTree($t);
+        }
+    },
     'backup safety: no cron line Pikkumies generates sends output to /dev/null, and each keeps a log' => function () {
         $spawned = [];
         BackupStatus::$spawn = function ($line) use (&$spawned) {

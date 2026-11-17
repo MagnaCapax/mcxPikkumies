@@ -34,6 +34,7 @@ $resticStore = new BackupStore('restic', $backupSecretDir, $backupLocalDir);
 Backup::run($argv, [
     'store' => $resticStore,
     'script' => __FILE__,
+    'localDir' => $backupLocalDir,
     'mountinfo' => $backupMountinfo,
     'procRoot' => $backupProcRoot,
     'uid' => function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(),

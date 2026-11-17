@@ -9,7 +9,8 @@
  * - stale: a method whose latest backup is older than fresh; unknown: found but not checkable (another tool, or not
  *   verified in 7 days), and also when there is no cache yet; none: no method at all.
  * The cache is local/state/backup-status.json (0600). A session start refreshes it in the background when it is older
- * than a day (refreshInBackground, one at a time, 120 s at most, its output kept in local/logs/backup-status/last.log).
+ * than a day (refreshInBackground, one at a time, 120 s at most, its output kept in local/logs/backup-status/last.log),
+ * and so does a backup or a check that just finished (refreshAfterBackup), when a cache already exists.
  */
 class BackupStatus
 {
@@ -242,6 +243,13 @@ class BackupStatus
             exec($line);
         }
         return true;
+    }
+
+    /** After a backup or a check finished: refresh an existing cache in the background, so status and the hooks do not
+     *  report the state from before it (ADR-0099, amendment 2026-11-17). No cache yet: false; the next session start builds it. */
+    public static function refreshAfterBackup($localDir)
+    {
+        return is_file(self::file($localDir)) && self::refreshInBackground($localDir, dirname(__DIR__) . '/tools/backup/backup-safety/backup-safety.php');
     }
 
     /** ['storage_box' => url|null, 'e2e_guide' => url|null] from the documentation sources, by name, on any host. */

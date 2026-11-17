@@ -4,7 +4,7 @@
  * tar | pigz | gpg --symmetric | ssh to a receiver that a restricted key can reach and nothing else.
  */
 $remoteLib = dirname(__DIR__, 3) . '/lib';
-foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update', 'SshLists', 'LocalTmp'] as $remoteClass) {
+foreach (['Cli', 'CliHuman', 'Config', 'ToolProc', 'HomePath', 'SecretFile', 'CronTick', 'Update', 'SshLists', 'LocalTmp', 'BackupStatus'] as $remoteClass) {
     require_once "$remoteLib/$remoteClass.php";
 }
 require_once dirname(__DIR__, 2) . '/storage/lib/ToolText.php';
@@ -39,13 +39,17 @@ Cli::run($argv, [
         return RemoteSetup::run($remoteDest, $args, $opt, __DIR__ . '/askpass.php', __DIR__ . '/recv.sh');
     },
     'run' => function ($args, $opt) use ($remoteDest, $remoteLocalDir) {
-        return RemoteRun::run($remoteDest, $opt, HomePath::home(), $remoteLocalDir);
+        $r = RemoteRun::run($remoteDest, $opt, HomePath::home(), $remoteLocalDir);
+        BackupStatus::refreshAfterBackup($remoteLocalDir);
+        return $r;
     },
     'list' => function ($args, $opt) use ($remoteDest) {
         return RemoteOps::listing($remoteDest);
     },
-    'check' => function ($args, $opt) use ($remoteDest, $remoteCheckFullMax) {
-        return RemoteOps::check($remoteDest, $remoteCheckFullMax);
+    'check' => function ($args, $opt) use ($remoteDest, $remoteCheckFullMax, $remoteLocalDir) {
+        $r = RemoteOps::check($remoteDest, $remoteCheckFullMax);
+        BackupStatus::refreshAfterBackup($remoteLocalDir);
+        return $r;
     },
     'restore' => function ($args, $opt) use ($remoteDest, $remoteMountinfo) {
         return RemoteOps::restore($remoteDest, $args, $opt, HomePath::home(), $remoteMountinfo);

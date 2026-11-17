@@ -34,6 +34,7 @@ $borgStore = new BackupStore('borg', $backupSecretDir, $backupLocalDir);
 Backup::run($argv, [
     'store' => $borgStore,
     'script' => __FILE__,
+    'localDir' => $backupLocalDir,
     'mountinfo' => $backupMountinfo,
     'procRoot' => $backupProcRoot,
     'uid' => function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(),
