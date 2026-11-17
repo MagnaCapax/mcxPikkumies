@@ -63,7 +63,7 @@ class RemoteSetup
         return [$d + ['restricted' => true, 'verified' => true,
             'passphrase_saved_by_user' => $dest->passphraseConfirmed(),
             'next' => ['change the remote password now: the key works without it, and changing it is what really scrubs it',
-                'the password you typed has already reached the model provider and this session\'s history; it is not stored here',
+                'if you gave the password in a chat, it has already reached the model provider and this session\'s history; typed in your own terminal, it did not; it is not stored here',
                 'run `php ' . dirname($recvFile) . '/remote.php passphrase` in your own terminal and keep that passphrase somewhere other'
                 . ' than this server and the backup machine: without it no archive can be decrypted']]];
     }

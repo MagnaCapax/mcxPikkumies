@@ -55,7 +55,7 @@ class ServicesSetup
         $svc = Services::put(['setup_at' => gmdate('c'), 'allow_delete' => $allowDelete] + $svc);
         return ['records' => [['service' => $svc['nick'], 'host_key' => $svc['host_key'], 'transport' => $svc['transport'], 'allow_delete' => $allowDelete,
             'restricted' => $svc['transport'] !== 'shell', 'next' => ['change the password of that account now: the key works without it, and changing it is what really scrubs it',
-                'the password you typed has already reached the model provider and this session\'s history; it is not stored here']]], 'status' => ['verified' => true]];
+                'if you gave the password in a chat, it has already reached the model provider and this session\'s history; typed in your own terminal, it did not; it is not stored here']]], 'status' => ['verified' => true]];
     }
 
     /** One login runs a fixed `sh -s` script: umask 077, append the key line once (needs Pikkumies there for pikkumies). */
