@@ -115,15 +115,22 @@ return [
                 'a package removal stays dangerous even when snapped (the table)');
             BackupHold::saveRecent("$t/local", [realpath("$t/fixturehome/d") => $now - 3600]);
             check(is_array(bshGuard('rm ~/d/a.txt', $bshRm, "$t/local", "$t/fixturehome", 's9')), 'a snap older than 30 minutes does not cover');
-            $scratch = testTempDir('pk-bsh-scratch');
+            // A real scratch folder, not testTempDir(): TMPDIR can point inside the home (the dev sandbox does), and a file there is not scratch.
+            do {
+                $scratch = '/tmp/pk-bsh-scratch-' . bin2hex(random_bytes(4));
+            } while (!@mkdir($scratch, 0700));
             touch("$scratch/x");
             check(bshGuard("rm $scratch/x", $bshRm, "$t/local", "$t/fixturehome", 's10') === null, 'a scratch file outside the home needs no copy');
             // cwe F9: truncate and shred follow a link, so a /tmp link into the home is not scratch.
             file_put_contents("$t/fixturehome/data.db", 'd');
             symlink("$t/fixturehome/data.db", "$scratch/link");
             check(is_array(bshGuard("truncate -s 0 $scratch/link", $bshRm, "$t/local", "$t/fixturehome", 's11')), 'a /tmp link into the home was treated as scratch');
-            testRmTree($scratch);
         } finally {
+            if (isset($scratch)) {
+                @unlink("$scratch/x");
+                @unlink("$scratch/link");
+                @rmdir($scratch);
+            }
             testRmTree($t);
         }
     },
