@@ -283,6 +283,14 @@ if ($hit !== 0) {
 $dk = "\\b(?:docker|podman|nerdctl)\\b(?:$v-{1,2}[A-Za-z][A-Za-z0-9-]*(?:=[^\\s\"',\\])]+|$v(?!-)[^\\s\"',\\])]+)?)*$v";
 // A bind source that is the home itself (or /): `-v ~:/x`, `-v /home/me/:/x`, `--mount source=$HOME,...`.
 $home = '(?:~|\$HOME|\$\{HOME\}|/home/[^/\s:,"\']+|/root)?/?';
+// Command position (issue #20): a backup tool's restore or repair rule below fires where the program is run, not where a note,
+// an echo or a search names it: at the start, after | ; & a newline, $( or a backtick, in a `sh -c` or eval string or a
+// quoted list (["restic", ...]), behind env-style assignments and wrappers (sudo, env, nice -n 5, timeout 60; the list GuardDisk
+// reads) and a path. The name ends at a space, quote, comma or bracket, so `pikkumies restic restore` and the unit's own
+// `php .../restic.php restore` (new or empty directory only, BackupTest) are not it. Prose after a ; or a line start still matches.
+$cp = '(?:^|[;&|`\n]|\$\(|[\[(]\s*["\']|\b(?:ba|z|da|k)?sh\s+(?:-[a-z]+\s+)*-[a-z]*c\s+["\']?|\beval\s+["\']?)\s*'
+    . '(?:(?:[A-Za-z_]\w*=(?:"[^"]*"|\'[^\']*\'|[^\s"\'])*|' . substr(GuardDisk::PREFIX, 2, -2) . '(?:\s+(?:-\S+|\d\S*))*)\s+)*(?:\S*\/)?';
+$ep = '(?=[\s"\',\])])';
 $approve = [
     "/$dk(rmi|(image|container|volume|network|system|builder|buildx){$v}prune|system{$v}reset|(container|image|volume|network){$v}(rm|remove))\\b/s"
         => ['delete', 'deletes containers, images, volumes or networks'],
@@ -346,9 +354,9 @@ $approve = [
     '#\brclone\b.*\brc\b.*\boperations/(purge|delete|deletefile|rmdirs?|cleanup)\b#s'          => ['delete', 'rclone deletes files through its remote control'],
     "#{$lh}[^\\s]*/(operations/(purge|delete|deletefile|rmdirs?|cleanup)|sync/(sync|bisync|move))\\b#" => ['delete', 'rclone deletes or overwrites files through its remote control'],
     '/\bborgmatic\b(?!.*\s(list|info|check|rlist|rinfo|--help|--version)\b)/s'                 => ['delete', 'borgmatic runs prune and compact by default'],
-    "/\\brestic\\b.*{$v}(key{$v}remove|repair{$v}snapshots.*--forget|restore)\\b/s"            => ['delete', 'restic removes a key, rewrites snapshots, or restores over existing files'],
-    "/\\bborg\\b.*{$v}(check.*--repair|extract)\\b/s"                                      => ['delete', 'borg repairs the repository or extracts over existing files'],
-    "/\\bkopia\\b.*{$v}(snapshot{$v}restore|restore)\\b|\\bduplicacy\\b.*-overwrite\\b/s"   => ['delete', 'a restore that can overwrite existing files'],
+    "/{$cp}restic{$ep}.*{$v}(key{$v}remove|repair{$v}snapshots.*--forget|restore)\\b/s"        => ['delete', 'restic removes a key, rewrites snapshots, or restores over existing files'],
+    "/{$cp}borg{$ep}.*{$v}(check.*--repair|extract)\\b/s"                                  => ['delete', 'borg repairs the repository or extracts over existing files'],
+    "/{$cp}(?:kopia{$ep}.*{$v}(snapshot{$v}restore|restore)\\b|duplicacy{$ep}.*-overwrite\\b)/s" => ['delete', 'a restore that can overwrite existing files'],
     // --del is rsync's own short name for --delete-during.
     '/\b(rsync|lftp)\b.*--(delete[a-z-]*|del|remove-source-files|Remove-source-files)\b/s'      => ['delete', 'deletes files on one side of a transfer'],
     '/\bgit\b.*\b(clean\b.*(\s-[a-zA-Z]*f|--force\b)|reset\b.*--hard\b)/s'                     => ['delete', 'git clean or reset --hard deletes files and changes that were never committed'],

@@ -134,7 +134,7 @@ return [
                     $seen['read']++;
                 } else {
                     // Additive verbs (copy without --replace, backup, restore to a new folder, login, unmount): never blocked;
-                    // the guard may ask (it asks for `restic ... restore`, not for borg's). A verb in none of the lists fails.
+                    // the guard may ask (it does not for the unit's own restore: ADR-0020 amendment 2026-11-17). A verb in none of the lists fails.
                     check(in_array($m[1], ['copy', 'backup', 'restore', 'login', 'unmount', 'run', 'snap'], true), "unclassified USAGE verb: $cmd");
                     check(trim($out) === '' || (is_array($d) && $d['action'] === 'approve'),
                         "an additive example was blocked: $cmd -> $out");
