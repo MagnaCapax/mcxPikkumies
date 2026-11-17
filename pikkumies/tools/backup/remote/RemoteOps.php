@@ -147,6 +147,8 @@ class RemoteOps
         return ['records' => [$rec], 'status' => ['verified' => (bool) $ok]];
     }
 
+    const ONE_SCHEDULE = 'one schedule per setup: a new schedule replaces this one; for a full archive once, `run --mode full`';
+
     /** --daily HH:MM --mode meta|full [--allow-large], or --off. */
     public static function schedule(RemoteDest $dest, array $opt, $script, $localDir)
     {
@@ -164,7 +166,9 @@ class RemoteOps
         if (strpos($msg, 'not changed') === 0) {
             throw new CliError("crontab $msg", 'check `crontab -l`');
         }
-        return ['records' => [['schedule' => $msg, 'line' => $line]], 'status' => ['verified' => true]];
+        // One schedule per setup: keepLine replaces the tagged line. Said here because an answer built from this output
+        // suggested a weekly full beside the daily meta (2026-11-17), which the tool cannot keep.
+        return ['records' => [['schedule' => $msg, 'line' => $line, 'note' => self::ONE_SCHEDULE]], 'status' => ['verified' => true]];
     }
 
     /**

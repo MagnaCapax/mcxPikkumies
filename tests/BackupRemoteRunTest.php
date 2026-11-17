@@ -175,7 +175,10 @@ return [
             list($code) = brRun($fx, ['schedule', '--daily', '25:00', '--mode', 'meta']);
             check($code === 1 && !is_file($fx['dir'] . '/crontab'), 'a bad time was scheduled');
             file_put_contents($fx['dir'] . '/crontab', "@reboot ~/start-rtorrent\n");
-            list($code, , $out) = brRun($fx, ['schedule', '--daily', '04:30', '--mode', 'meta']);
+            list($code, $recs, $out) = brRun($fx, ['schedule', '--daily', '04:30', '--mode', 'meta']);
+            // An answer once suggested a second (weekly full) schedule: the output says there is one and what to do instead.
+            check(strpos((string) ($recs[0]['note'] ?? ''), 'one schedule per setup') !== false && strpos((string) ($recs[0]['note'] ?? ''), 'run --mode full') !== false,
+                'schedule must say one schedule per setup: ' . json_encode($recs));
             $tab = (string) file_get_contents($fx['dir'] . '/crontab');
             // The PHP that ran the verb, by full path: cron's PATH may hold another or none.
             check($code === 0 && preg_match('#^30 4 \* \* \* ' . preg_quote(escapeshellarg(PHP_BINARY), '#')
