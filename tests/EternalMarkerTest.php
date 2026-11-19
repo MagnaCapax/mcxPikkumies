@@ -21,7 +21,7 @@ return [
             check(isset(HermesInstall::configFacts()['session.terminal_continue']), 'enabled facts missed terminal continue');
             check(HermesInstall::checksId() !== $plainId, 'enabled verification id did not change');
         } finally {
-            Eternal::$hostMarker = null;
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             testRmTree($root);
         }
     },

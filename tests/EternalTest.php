@@ -13,7 +13,7 @@ return [
             check(EternalAsk::quota('newnonce', ['count' => 4], []) === -1, 'fifth question was blocked');
             check(EternalAsk::screenStatus("This answer mentions approvals.\n────────\n❯ \n────────\n") === 0, 'ordinary answer misread as approval prompt');
         } finally {
-            Eternal::$hostMarker = null;
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             @unlink($marker);
             @rmdir(dirname($marker));
         }
@@ -49,7 +49,7 @@ return [
         } finally {
             $oldOff === null ? @unlink($off) : file_put_contents($off, $oldOff);
             $oldHold === null ? @unlink($hold) : file_put_contents($hold, $oldHold);
-            Eternal::$hostMarker = null;
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             EternalRecord::$base = null;
             testRmTree($root);
         }

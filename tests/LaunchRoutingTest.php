@@ -20,7 +20,7 @@ return [
             check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'prompt claimed: ' . json_encode($words));
         }
         } finally {
-            Eternal::$hostMarker = null;
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             testRmTree($root);
         }
     },
@@ -69,7 +69,7 @@ return [
                 $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
             }
         } finally {
-            Eternal::$hostMarker = null;
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             Eternal::$tmuxDirectory = null;
             testRmTree($root);
         }

@@ -27,6 +27,10 @@ register_shutdown_function(function () use ($cronGuard) {
 foreach (glob($root . '/pikkumies/lib/*.php') as $lib) {
     require_once $lib;
 }
+// The test host's own Eternals marker (Eternal::HOST_MARKER) must not change results: tests start with Eternals off,
+// and a test that needs them on points Eternal::$hostMarker at its own file, then puts this path back.
+const TEST_NO_ETERNALS_MARKER = '/nonexistent/pikkumies-test-eternals-off';
+Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
 
 function check($cond, $msg)
 {
