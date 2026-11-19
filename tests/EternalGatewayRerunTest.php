@@ -2,12 +2,12 @@
 /** Eternal resident reruns Hermes after a gateway that was still starting (ADR-0116); seams only, no gateway or tmux. */
 function eternalRerunSeams($state, $held, $booting, $wait, array &$calls)
 {
-    return [
-        'state' => function ($home) use ($state, &$calls) { $calls[] = 'state'; return $state; },
-        'held' => function ($lock) use ($held, &$calls) { $calls[] = 'held'; return $held; },
-        'booting' => function ($home) use ($booting, &$calls) { $calls[] = 'booting'; return $booting; },
-        'wait' => function ($home, $say, $seams = []) use ($wait, &$calls) { $calls[] = 'wait'; return $wait; },
-    ];
+    $seams = [];
+    $seams['state'] = function ($home) use ($state, &$calls) { $calls[] = 'state'; return $state; };
+    $seams['held'] = function ($lock) use ($held, &$calls) { $calls[] = 'held'; return $held; };
+    $seams['booting'] = function ($home) use ($booting, &$calls) { $calls[] = 'booting'; return $booting; };
+    $seams['wait'] = function ($home, $say, $opts = []) use ($wait, &$calls) { $calls[] = 'wait'; return $wait; };
+    return $seams;
 }
 
 return [
@@ -41,9 +41,14 @@ return [
     'eternal gateway rerun: a stop during the wait ends it and runs nothing again' => function () {
         $sleeps = 0;
         $stopped = false;
-        $r = GatewayWait::run('/h', function ($l) {}, ['state' => function ($h) { return 'starting'; }, 'held' => function ($f) { return true; },
-            'booting' => function ($h) { return true; }, 'sleep' => function ($s) use (&$sleeps, &$stopped) { $sleeps++; $stopped = $sleeps >= 2; },
-            'now' => function () { return 0; }, 'stop' => function () use (&$stopped) { return $stopped; }]);
+        $w = [];
+        $w['state'] = function ($h) { return 'starting'; };
+        $w['held'] = function ($f) { return true; };
+        $w['booting'] = function ($h) { return true; };
+        $w['sleep'] = function ($x) use (&$sleeps, &$stopped) { $sleeps++; $stopped = $sleeps >= 2; };
+        $w['now'] = function () { return 0; };
+        $w['stop'] = function () use (&$stopped) { return $stopped; };
+        $r = GatewayWait::run('/h', function ($l) {}, $w);
         check($r === 'gone' && $sleeps === 2, 'GatewayWait ends as gone on the first check after stop() turns true');
         $calls = [];
         $yes = function () { return true; };
