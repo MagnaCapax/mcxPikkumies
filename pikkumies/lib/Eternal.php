@@ -117,6 +117,30 @@ class Eternal
         return min(30, (int) pow(2, min(max(0, (int) $fails - 1), 5)));
     }
 
+    /** Hermes runs an Eternal may get after the gateway they exited on finished starting (ADR-0116). */
+    const GATEWAY_RERUNS = 3;
+
+    /**
+     * Whether the resident runs Hermes again instead of ending the window (ADR-0116): Hermes' client waits a fixed 60 s for
+     * a cold gateway and exits non-zero while that gateway is still starting (ADR-0113). On a busy disk the boot takes
+     * minutes, so ending the window turns one slow boot into a backed-off restart that reads the cold tree again. Only a
+     * failed exit, with no signal, while the gateway was starting at that moment; then GatewayWait waits on Hermes' own lock
+     * and socket and a 'ready' gateway gets the run again. $seams for tests: state, held, booting, wait.
+     */
+    public static function rerunAfterGateway($code, $signalled, $reruns, $home, callable $say, array $seams = [])
+    {
+        if ($code === 0 || $signalled !== 0 || $reruns >= self::GATEWAY_RERUNS || $home === '') {
+            return false;
+        }
+        $state = isset($seams['state']) ? $seams['state'] : ['GatewayWait', 'state'];
+        $held = isset($seams['held']) ? $seams['held'] : ['GatewayWait', 'lockHeld'];
+        $booting = isset($seams['booting']) ? $seams['booting'] : ['GatewayWait', 'bootingProcess'];
+        $wait = isset($seams['wait']) ? $seams['wait'] : ['GatewayWait', 'run'];
+        $s = (string) call_user_func($state, $home);
+        $starting = $s === 'starting' || ($s === '' && (call_user_func($held, $home . '/gateway.lock') || call_user_func($booting, $home)));
+        return $starting && call_user_func($wait, $home, $say) === 'ready';
+    }
+
     /** Port of the account's recent-reboot stagger: pure data, no sleep in a cron tick. */
     public static function bootStaggerReady($uptime, $user)
     {

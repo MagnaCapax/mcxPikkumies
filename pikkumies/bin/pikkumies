@@ -740,11 +740,15 @@ switch ($cmd) {
         }
         $args = array_map('escapeshellarg', $passArgs);
         // @: PHP's own warning would print the whole command, the prompt included. -1 means sh itself could not start.
-        @passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
-        if ($code === -1) {
-            fwrite(STDERR, HaltRun::START_FAILED);
-            exit(1);
-        }
+        $gatewayReruns = 0;
+        do {
+            @passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+            if ($code === -1) {
+                fwrite(STDERR, HaltRun::START_FAILED);
+                exit(1);
+            }
+        } while ($eternalId !== '' && Eternal::rerunAfterGateway($code, $eternalSignalled, $gatewayReruns++, (string) getenv('HERMES_HOME'),
+            function ($line) { fwrite(STDERR, 'Pikkumies: ' . $line . "\n"); }));
         if ($eternalId !== '') {
             fclose($hermesLock);
             Eternal::afterExit($eternalId, $code, $eternalStarted, $eternalSignalled);
