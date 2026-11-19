@@ -75,11 +75,29 @@ class Eternal
             return 'not-ready';
         }
         fclose($runtimeLock);
-        // The start check runs Hermes, so it needs Pikkumies' Hermes home and pinned layer like every other caller;
-        // without them a never-started account fails it and Primary waits forever.
-        if (HermesInstall::checkBeforeStart(array_merge(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], HermesConfig::envArgv()))) {
-            self::$why = 'start-check';
+        // cron.lock is not held here, and the shared Hermes lock cannot serialise concurrent ticks.
+        $startLock = EternalLock::take(Config::localDir() . '/start-check.lock');
+        if (!$startLock) {
+            self::$why = 'busy';
             return 'not-ready';
+        }
+        try {
+            $stateFile = Config::localDir() . '/start-check.json';
+            $state = json_decode((string) @file_get_contents($stateFile), true);
+            if (($state['nextCheck'] ?? 0) > time()) {
+                self::$why = 'start-check';
+                return 'not-ready';
+            }
+            // Hermes needs Pikkumies' home and pinned layer even for a never-started account.
+            if (HermesInstall::checkBeforeStart(array_merge(CronTick::setprivPresent() ? ['setpriv', '--no-new-privs'] : [], HermesConfig::envArgv()))) {
+                $fails = (int) ($state['fails'] ?? 0) + 1;
+                @file_put_contents($stateFile, json_encode(['fails' => $fails, 'nextCheck' => time() + 60 * self::backoffTicks($fails)]) . "\n");
+                self::$why = 'start-check';
+                return 'not-ready';
+            }
+            @unlink($stateFile);
+        } finally {
+            fclose($startLock);
         }
         return '';
     }

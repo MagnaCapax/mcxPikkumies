@@ -860,6 +860,49 @@ return [
             testRmTree($w['t']);
         }
     },
+    'hermes start check: each command times out outside setpriv and env, and timeout output never verifies the checkout' => function () {
+        $w = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w) {
+                HermesInstall::ensure();
+                hermesTWaitReady($w);
+                // Simulate timeout's statuses after printing even a successful answer, without waiting 300 seconds.
+                hermesTFake($w['bin'] . '/timeout', '
+$args = array_slice($argv, 1);
+file_put_contents(getenv("PK_FAKE_LOG"), "timeout " . json_encode($args) . "\n", FILE_APPEND);
+if (array_slice($args, 0, 6) !== ["-k", "10", "300", "setpriv", "--no-new-privs", "env"]) { exit(2); }
+passthru(implode(" ", array_map("escapeshellarg", array_slice($args, 3))), $code);
+$kind = in_array("hooks", $args, true) ? "hooks" : "config";
+exit(getenv("PK_FAKE_TIMEOUT_KIND") === $kind ? (int) getenv("PK_FAKE_TIMEOUT_CODE") : $code);
+');
+                hermesTFake($w['bin'] . '/setpriv', '
+if ($argv[1] !== "--no-new-privs") { exit(2); }
+passthru(implode(" ", array_map("escapeshellarg", array_slice($argv, 2))), $code);
+exit($code);
+');
+                $prefix = array_merge(['setpriv', '--no-new-privs'], HermesConfig::envArgv($w['root'] . '/local/hermes'));
+                foreach ([124, 137] as $code) {
+                    foreach (['hooks', 'config'] as $kind) {
+                        testWithEnv(['PK_FAKE_TIMEOUT_KIND' => $kind, 'PK_FAKE_TIMEOUT_CODE' => (string) $code, 'PK_FAKE_REQUIRE_MANAGED' => '1'], function () use ($prefix, $kind, $code) {
+                            $problems = HermesInstall::checkBeforeStart($prefix);
+                            $expected = $kind === 'hooks'
+                                ? 'the delete guard check timed out (`hermes hooks test`, exit ' . $code . ')'
+                                : 'the pinned settings check timed out (`hermes config set approvals.mode`, exit ' . $code . ')';
+                            check($problems === [$expected], 'timeout was not reported as its own failure: ' . json_encode($problems));
+                            check(HermesInstall::verifiedCommit() === '', 'timed out check was recorded as verified');
+                        });
+                    }
+                }
+                check(substr_count(file_get_contents($w['log']), 'timeout ["-k","10","300","setpriv","--no-new-privs","env"') === 8, 'both commands must run under timeout on each attempt');
+                check(!glob($w['root'] . '/local/hook-check-*'), 'timed out hook check left its payload');
+                testWithEnv(['PK_FAKE_TIMEOUT_KIND' => null], function () use ($prefix) {
+                    check(HermesInstall::checkBeforeStart($prefix) === [] && HermesInstall::verifiedCommit() !== '', 'passing bounded checks were not recorded');
+                });
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
     'hermes start check: the shipped delete guard answers the rm -rf check with the block text verify() expects' => function () {
         // Hermes hands the hook tool_input from the payload's args (agent/shell_hooks.py), so this is what the guard sees.
         list($code, $out) = runPhp(dirname(__DIR__) . '/pikkumies/hooks/guard/guard-destructive/guard-destructive.php', [],

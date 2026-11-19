@@ -877,7 +877,7 @@ class HermesInstall
             $problems[] = 'could not run the delete guard check';
             return $problems;
         }
-        $argv = array_merge($prefix, [$bin, 'hooks', 'test', 'pre_tool_call', '--for-tool', 'terminal', '--payload-file', $payload]);
+        $argv = array_merge(['timeout', '-k', '10', '300'], $prefix, [$bin, 'hooks', 'test', 'pre_tool_call', '--for-tool', 'terminal', '--payload-file', $payload]);
         $out = [];
         $since = gmdate('Y-m-d\TH:i:s\Z');
         exec(implode(' ', array_map('escapeshellarg', $argv)) . ' 2>&1', $out, $code);
@@ -885,15 +885,19 @@ class HermesInstall
         $text = implode("\n", $out);
         // The answer is the first block of the units (HookAnswers::mergePreToolCall), so on a slow machine a unit that
         // failed closed before the guard answered names itself instead. Then the guard's own row in the hook log says it blocked.
-        if (strpos($text, '"action": "block"') === false || (strpos($text, self::GUARD_BLOCK) === false && !self::guardLoggedBlock($since))) {
+        if ($code === 124 || $code === 137) {
+            $problems[] = 'the delete guard check timed out (`hermes hooks test`, exit ' . $code . ')';
+        } elseif (strpos($text, '"action": "block"') === false || (strpos($text, self::GUARD_BLOCK) === false && !self::guardLoggedBlock($since))) {
             $problems[] = 'the delete guard did not block mkfs in `hermes hooks test` (exit ' . $code . ')';
         }
         // The pins are applied: Hermes refuses to change one. A user config.yaml that does not parse is the user's
         // file to fix (doctor says where the copies are), not a reason to refuse Hermes (ADR-0062).
         $out = [];
-        exec(implode(' ', array_map('escapeshellarg', array_merge($prefix, [$bin, 'config', 'set', 'approvals.mode', 'manual']))) . ' 2>&1', $out, $code);
+        exec(implode(' ', array_map('escapeshellarg', array_merge(['timeout', '-k', '10', '300'], $prefix, [$bin, 'config', 'set', 'approvals.mode', 'manual']))) . ' 2>&1', $out, $code);
         $text = implode("\n", $out);
-        if (strpos($text, self::MANAGED_REFUSAL) === false && strpos($text, self::PARSE_ERROR) === false) {
+        if ($code === 124 || $code === 137) {
+            $problems[] = 'the pinned settings check timed out (`hermes config set approvals.mode`, exit ' . $code . ')';
+        } elseif (strpos($text, self::MANAGED_REFUSAL) === false && strpos($text, self::PARSE_ERROR) === false) {
             $problems[] = 'Hermes did not refuse a change to a setting Pikkumies pins (`hermes config set approvals.mode`, exit ' . $code . '), so the pinned settings are not applied';
         }
         return $problems;
