@@ -125,9 +125,10 @@ class Eternal
      * a cold gateway and exits non-zero while that gateway is still starting (ADR-0113). On a busy disk the boot takes
      * minutes, so ending the window turns one slow boot into a backed-off restart that reads the cold tree again. Only a
      * failed exit, with no signal, while the gateway was starting at that moment; then GatewayWait waits on Hermes' own lock
-     * and socket and a 'ready' gateway gets the run again. $seams for tests: state, held, booting, wait.
+     * and socket and a 'ready' gateway gets the run again; $stop() true (a SIGTERM or SIGHUP during the wait) ends it at once.
+     * $seams for tests: state, held, booting, wait.
      */
-    public static function rerunAfterGateway($code, $signalled, $reruns, $home, callable $say, array $seams = [])
+    public static function rerunAfterGateway($code, $signalled, $reruns, $home, callable $say, callable $stop, array $seams = [])
     {
         if ($code === 0 || $signalled !== 0 || $reruns >= self::GATEWAY_RERUNS || $home === '') {
             return false;
@@ -138,7 +139,7 @@ class Eternal
         $wait = isset($seams['wait']) ? $seams['wait'] : ['GatewayWait', 'run'];
         $s = (string) call_user_func($state, $home);
         $starting = $s === 'starting' || ($s === '' && (call_user_func($held, $home . '/gateway.lock') || call_user_func($booting, $home)));
-        return $starting && call_user_func($wait, $home, $say) === 'ready';
+        return $starting && call_user_func($wait, $home, $say, ['stop' => $stop]) === 'ready' && !call_user_func($stop);
     }
 
     /** Port of the account's recent-reboot stagger: pure data, no sleep in a cron tick. */

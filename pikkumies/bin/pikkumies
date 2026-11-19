@@ -748,7 +748,8 @@ switch ($cmd) {
                 exit(1);
             }
         } while ($eternalId !== '' && Eternal::rerunAfterGateway($code, $eternalSignalled, $gatewayReruns++, (string) getenv('HERMES_HOME'),
-            function ($line) { fwrite(STDERR, 'Pikkumies: ' . $line . "\n"); }));
+            function ($line) { fwrite(STDERR, 'Pikkumies: ' . $line . "\n"); },
+            function () use (&$eternalSignalled) { return $eternalSignalled !== 0; }));
         if ($eternalId !== '') {
             fclose($hermesLock);
             Eternal::afterExit($eternalId, $code, $eternalStarted, $eternalSignalled);

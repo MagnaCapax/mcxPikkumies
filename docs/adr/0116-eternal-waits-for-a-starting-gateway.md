@@ -1,7 +1,7 @@
 # ADR-0116: An Eternal waits for a starting gateway instead of ending its window
 
 ## Metadata
-- Author: Väinämöinen (session 0cff0db8), incident follow-up to ADR-0115.
+- Author: Väinämöinen, incident follow-up to ADR-0115.
 - Date: 2026-11-19
 - Status: Accepted
 
@@ -22,10 +22,11 @@ After ADR-0115 stopped the start-check pile-up, the Eternals on a busy HDD seedb
   - `GatewayWait::run()` then reported `ready`.
 - Any other exit goes to `Eternal::afterExit()` unchanged.
 - The wait ends on Hermes' own lock and socket, never on a Pikkumies timer (ADR-0113). A wedged boot ends through Hermes' own startup watchdog, which also ends the wait.
+- A SIGTERM or SIGHUP during the wait ends it at once (`GatewayWait::run` seam `stop`), so the updater's stop of managed panes and `waitStopped()` are not held up by a resident waiting on a gateway.
 
 ## Consequences
 - A slow gateway boot keeps the window, the run lock and the resume pointer. It does not count as a failure.
-- A rerun's Python and Hermes reads are warm in the page cache from the run that just exited.
+- A rerun follows the exited run within seconds, so its Python and Hermes reads are likely still in the page cache (not measured).
 - A rerun only happens when the gateway really was starting, so a Hermes that fails for another reason against a ready gateway still ends at once.
 - Not covered: pacing across accounts. After a reboot, every account on a host still starts its own gateway inside the 0-300 s boot stagger. Pikkumies runs as each account with no shared state, so pacing needs a host-wide design of its own.
 - Not covered: an exit 0 after a lost gateway is still recorded as the person's quit (`afterExit`), which clears the resume pointer. This needs its own investigation.

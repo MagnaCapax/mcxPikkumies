@@ -37,7 +37,8 @@ class GatewayWait
 
     /**
      * 'ready' or 'gone'. $write($line) prints one progress line (at once, then every EVERY seconds). $seams, for tests:
-     * state($home) (identify's state, '' for no answer), held($lockFile), booting($home), sleep($seconds), now().
+     * state($home) (identify's state, '' for no answer), held($lockFile), booting($home), sleep($seconds), now(); and stop(),
+     * true when the caller has been told to stop (an Eternal's SIGTERM or SIGHUP, ADR-0116): the wait then ends as 'gone'.
      */
     public static function run($home, callable $write, array $seams = [])
     {
@@ -46,9 +47,13 @@ class GatewayWait
         $booting = isset($seams['booting']) ? $seams['booting'] : ['GatewayWait', 'bootingProcess'];
         $sleep = isset($seams['sleep']) ? $seams['sleep'] : 'sleep';
         $now = isset($seams['now']) ? $seams['now'] : 'time';
+        $stop = isset($seams['stop']) ? $seams['stop'] : function () { return false; };
         $start = call_user_func($now);
         $shown = null;
         while (true) {
+            if (call_user_func($stop)) {
+                return 'gone';
+            }
             clearstatcache();
             $s = (string) call_user_func($state, $home);
             if ($s !== '' && $s !== 'starting') {
