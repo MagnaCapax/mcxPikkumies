@@ -183,17 +183,19 @@ class Eternal
         if (!$records) {
             $records['pm1'] = EternalRecord::initial();
         }
+        // The reboot stagger comes before ready(): its start check launches Hermes from the account's own tree, and after a
+        // boot every account's tick ran that cold read at once on a busy HDD host (ADR-0115 amendment 2026-11-20).
+        $identity = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
+        $uptime = explode(' ', trim((string) @file_get_contents('/proc/uptime')))[0];
+        if (!self::bootStaggerReady($uptime, $identity ? $identity['name'] : (string) getmyuid())) {
+            return;
+        }
         $ready = self::ready();
         if ($ready !== '' || !self::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
             self::transition('pm1', 75, $ready !== '' ? $ready : 'host needs update');
             return;
         }
         Update::ensureScheduled(Config::load(), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid(), CronTick::mightEscalate());
-        $identity = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
-        $uptime = explode(' ', trim((string) @file_get_contents('/proc/uptime')))[0];
-        if (!self::bootStaggerReady($uptime, $identity ? $identity['name'] : (string) getmyuid())) {
-            return;
-        }
         $lock = self::lock();
         if (!$lock) {
             return;

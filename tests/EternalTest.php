@@ -255,6 +255,13 @@ return [
             check(!Eternal::bootStaggerReady($delay - 0.1, $user), 'account started before slot');
         }
     },
+    'eternal: ensure staggers after a reboot before the start check runs' => function () {
+        $src = (string) file_get_contents(__DIR__ . '/../pikkumies/lib/Eternal.php');
+        $body = substr($src, (int) strpos($src, 'public static function ensure()'));
+        $stagger = strpos($body, 'self::bootStaggerReady(');
+        $ready = strpos($body, 'self::ready()');
+        check($stagger !== false && $ready !== false && $stagger < $ready, 'start check runs before the reboot stagger');
+    },
     'eternal: ask strips control bytes but leaves bracketed paste bytes literal' => function () {
         check(EternalAsk::clean("A\x1b[201~\rB\xC2\x80\xC2\x9F\n\t") === "A[201~B\n\t", 'control stripping changed');
     },

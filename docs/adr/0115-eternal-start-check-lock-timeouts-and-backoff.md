@@ -58,3 +58,12 @@ Verification had neither command timeouts nor failure backoff.
   source baseline `d1c013d`.
 - [ADR-0033](0033-vanilla-hermes-git-checkout-updated-separately.md): runtime lock and start verification.
 - [ADR-0075](0075-eternals-primary-ask-and-ui.md): ensure before the job lock and Eternal backoff.
+
+## Amendment 2026-11-20: the reboot stagger runs before the start check
+`Eternal::ensure()` called `ready()` before `bootStaggerReady()`, so only the Eternal launch was staggered: after a
+host reboot every account's minute tick ran its start check, a cold Hermes launch from that account's own checkout,
+in the same minute. On a shared host with spinning disks those cold reads queue behind each other, and the start
+checks were among the processes waiting on disk after a boot. `ensure()` now checks the stagger first,
+so in the first 600 s after boot an account's start check, its readiness transition and its update scheduling wait
+for its 0-300 s slot as the launch already did. Outside that window nothing changes. Guard: `tests/EternalTest.php`
+(ensure staggers after a reboot before the start check runs).
