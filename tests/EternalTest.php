@@ -345,7 +345,7 @@ return [
             Eternal::tmux(['kill-server']);
             check(Eternal::tmux(['new-session', '-d', '-s', 'pikkumies', '-n', 'pm1', 'sleep 30'])[0] === 0, 'private server start failed');
             list($code, $rows) = Eternal::tmux(['list-windows', '-t', '=pikkumies', '-F', '#W']);
-            check($code === 0 && trim($rows) === 'pm1', 'private window missing');
+            check($code === 0 && trim($rows) === 'pm1', 'private window missing (list-windows code ' . $code . ', rows ' . json_encode(trim($rows)) . ')');
             check(Eternal::tmux(['copy-mode', '-t', '=pikkumies:pm1'])[0] === 0, 'copy mode could not start');
             check(trim(Eternal::tmux(['display-message', '-p', '-t', '=pikkumies:pm1', '#{pane_in_mode}'])[1]) === '1', 'copy mode absent');
             check(EternalAsk::cancelCopyMode('1'), 'ask did not cancel copy mode');

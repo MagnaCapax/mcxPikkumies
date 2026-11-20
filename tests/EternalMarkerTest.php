@@ -46,7 +46,9 @@ return [
                 };
                 // 8b17c97 has no Eternals or OOM doctor line.
                 check($newCode === 0 && $eternalLines($newOut) === [], 'markerless doctor added Eternal/OOM output: ' . $newOut);
-                check(!is_file($root . '/limits-called'), 'markerless doctor ran userShowLimits');
+                // On a PMSS host the host profile reads $HOME/bin/userShowLimits by design (Detect::limits), marker or not;
+                // the no-limits-without-marker guard is checked off PMSS, where CI runs.
+                check(Host::family() === 'pmss' || !is_file($root . '/limits-called'), 'markerless doctor ran userShowLimits');
             });
         } finally {
             testRmTree($root);
