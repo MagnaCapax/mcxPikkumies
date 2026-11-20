@@ -739,6 +739,27 @@ return [
             check(!HermesInstall::originOfficial($bad), "$bad must not count as official");
         }
     },
+    'hermes start check: payloads left by killed checks are swept, a live check keeps its own' => function () {
+        $root = testTempDir('pk-hook-sweep');
+        $old = HermesInstall::$root;
+        HermesInstall::$root = $root;
+        try {
+            @mkdir($root . '/local', 0700, true);
+            $p = proc_open('exit 0', [], $pipes);
+            $dead = proc_get_status($p)['pid'];
+            proc_close($p);
+            $live = function_exists('posix_getppid') ? posix_getppid() : 1;
+            foreach ([$dead, $live, getmypid()] as $pid) file_put_contents($root . '/local/hook-check-' . $pid . '.json', '{}');
+            file_put_contents($root . '/local/hook-check-notes.json', '{}');
+            HermesInstall::sweepHookChecks();
+            check(!is_file($root . '/local/hook-check-' . $dead . '.json'), 'a dead check payload was kept');
+            check(is_file($root . '/local/hook-check-' . $live . '.json') && is_file($root . '/local/hook-check-' . getmypid() . '.json'), 'a live check payload was removed');
+            check(is_file($root . '/local/hook-check-notes.json'), 'a file not named by a pid was removed');
+        } finally {
+            HermesInstall::$root = $old;
+            testRmTree($root);
+        }
+    },
     'hermes start check: a moved checkout is verified once (keys + delete guard); a failing one is refused and not recorded' => function () {
         $w = hermesTWorld();
         try {

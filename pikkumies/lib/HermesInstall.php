@@ -861,6 +861,27 @@ class HermesInstall
      * through Hermes' own hook runner. HermesConfig::env() must already be in the environment. $prefix: e.g. setpriv for an unattended caller.
      * Returns the problems, [] when it passed.
      */
+    /**
+     * Removes hook-check payloads whose process is gone. verify() deletes its own payload after the check, but a check
+     * killed first (a watchdog reboot, SIGKILL) leaves it behind, and a host under a load storm collects them by the thousand.
+     */
+    public static function sweepHookChecks()
+    {
+        foreach (glob(self::localDir() . '/hook-check-*.json') ?: [] as $file) {
+            if (preg_match('/hook-check-(\d+)\.json$/', $file, $m) && (int) $m[1] !== getmypid() && !self::processAlive((int) $m[1])) {
+                @unlink($file);
+            }
+        }
+    }
+
+    private static function processAlive($pid)
+    {
+        if (function_exists('posix_kill')) {
+            return posix_kill($pid, 0) || posix_get_last_error() === 1; // EPERM: it exists under another user
+        }
+        return is_dir('/proc') ? file_exists('/proc/' . $pid) : true;
+    }
+
     public static function verify(array $prefix = [])
     {
         $problems = [];
@@ -871,6 +892,7 @@ class HermesInstall
             $problems[] = "Hermes no longer has the managed settings layer ($what)";
         }
         $bin = self::bin();
+        self::sweepHookChecks();
         $payload = self::localDir() . '/hook-check-' . getmypid() . '.json';
         $json = json_encode(['args' => ['command' => 'mkfs.ext4 /tmp/pikkumies-hook-check']], JSON_UNESCAPED_SLASHES);
         if ($bin === '' || @file_put_contents($payload, $json) !== strlen($json)) {
