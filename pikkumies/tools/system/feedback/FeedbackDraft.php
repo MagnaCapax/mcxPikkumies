@@ -7,6 +7,7 @@
  * approval. A sent draft is renamed to <id>.sent.json and is never sent again.
  */
 require_once dirname(__DIR__, 3) . '/lib/DraftStore.php';
+require_once dirname(__DIR__, 3) . '/lib/Redact.php';
 
 class FeedbackDraft
 {
@@ -35,7 +36,10 @@ class FeedbackDraft
      */
     public static function create($text, $transcript, array $versions, $now, $stateDir = null, array $session = ['', ''])
     {
-        $text = Redact::secrets(trim((string) $text));
+        $names = [];
+        $raw = trim((string) $text);
+        $text = Redact::outbound($raw, $names);
+        $removed = substr_count($text, 'REDACTED') - substr_count($raw, 'REDACTED');
         if ($text === '') {
             throw new CliError('the feedback text is empty', 'write what happened or what you want changed');
         }
@@ -47,7 +51,11 @@ class FeedbackDraft
             $transcript = self::newest($transcript, self::PAYLOAD_MAX);
             $older = true;
         }
-        $transcript = $transcript === null ? null : Redact::secrets($transcript);
+        if ($transcript !== null) {
+            $raw = $transcript;
+            $transcript = Redact::outbound($raw, $names);
+            $removed += substr_count($transcript, 'REDACTED') - substr_count($raw, 'REDACTED');
+        }
         $payload = ['v' => 1, 'created_at' => (int) $now, 'session_id' => $transcript === null ? '' : (string) $session[0],
             'session_title' => $transcript === null ? '' : (string) $session[1], 'text' => $text, 'transcript' => $transcript,
             'transcript_older_part_left_out' => $older, 'versions' => array_map('strval', $versions)];
@@ -64,7 +72,9 @@ class FeedbackDraft
             throw new CliError('the feedback is too large to send', 'shorten the text or leave the conversation out');
         }
         list($id, $path) = DraftStore::save(self::dir($stateDir), $json);
-        return ['id' => $id] + self::summary($payload, strlen($json)) + ['path' => $path];
+        // What the outbound pass removed (ADR-0117): a count, and the variable names, never a value.
+        return ['id' => $id] + self::summary($payload, strlen($json)) + ['removed' => max(0, $removed),
+            'removed_names' => array_values(array_unique($names)), 'path' => $path];
     }
 
     /** The last $keep bytes of $s, from a line start, valid UTF-8. */
@@ -82,6 +92,7 @@ class FeedbackDraft
         if (count(array_filter($p['versions'], 'is_string')) !== count($p['versions'])) {
             throw new CliError("draft $id is not a feedback draft", 'draft it again');
         }
+        Redact::refuseLeftover($json, "feedback draft $id"); // the exact bytes that are sealed (ADR-0117)
         return [$json, $p];
     }
 

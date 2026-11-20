@@ -2,7 +2,7 @@
 /**
  * PublishScan: where a push goes and what in it looks like a secret (ADR-0083). A remote counts as a public place only on
  * a public code-hosting service (HOSTS); an SSH host alias is read from ~/.ssh/config's Host/HostName lines (no Include,
- * no Match). What goes out is read with Redact::secrets(): a line it changes is a hit, shown as Redact prints it. File
+ * no Match). What goes out is read with Redact::outbound() (ADR-0117): a line it changes is a hit, shown as Redact prints it. File
  * names that look like a credential file (credentialName) are hits too. Scanning stops at a deadline; what was left
  * unread is reported, never treated as clean.
  */
@@ -68,7 +68,7 @@ class PublishScan
     {
         foreach (str_split((string) $line, 4096) as $piece) {
             try {
-                $out = Redact::secrets($piece);
+                $out = Redact::outbound($piece);
             } catch (CliError $e) {
                 continue; // too complex for the regex engine: not a hit
             }

@@ -1,7 +1,7 @@
 <?php
 /**
  * UpstreamScrub: what is taken out of text before it goes to a public upstream project (ADR-0092): an issue search query
- * or an issue draft. Redact::secrets() removes passwords and tokens; this removes who and where the user is, which it does
+ * or an issue draft. Redact::outbound() removes passwords and tokens; this removes who and where the user is, which it does
  * not: the home path, any /home/<name>/, the login name and uid, this machine's host name, Pulsed Media's and other
  * providers' host names, IP addresses, ports, e-mail addresses, tracker, feed and keyed URLs, private tracker host:port,
  * torrent info hashes, release names, and torrent, media and file names in paths (customer data). Deterministic patterns only: no list catches every personal detail, so the user reads
@@ -117,7 +117,7 @@ class UpstreamScrub
     }
 
     /**
-     * Search words for GitHub. The text goes through Redact::secrets and scrub() first; then every word that could
+     * Search words for GitHub. The text goes through Redact::outbound and scrub() first; then every word that could
      * identify the user, their files or their trackers is dropped (review 2026-10-20): paths, URLs, placeholders,
      * redacted secrets, numbers of 4+ digits, tokens of 16+ characters with a digit and long hex (torrent info hashes),
      * release and media names, host:port, host names (a dotted word with letters, except a file name such as php.ini),
@@ -126,7 +126,7 @@ class UpstreamScrub
      */
     public static function query($terms, array $ctx)
     {
-        list($s) = self::scrub(Redact::secrets(str_replace(["\r", "\n"], ' ', (string) $terms)), $ctx);
+        list($s) = self::scrub(Redact::outbound(str_replace(["\r", "\n"], ' ', (string) $terms)), $ctx);
         preg_match_all('/"[^"]*"|\S+/', $s, $m);
         $keep = [];
         foreach ($m[0] as $t) {

@@ -6,7 +6,7 @@
  * (`gh repo view`, 4 s; unknown counts as public); a gist always is. A push to any other remote, and ssh, scp and rsync,
  * are never looked at. For a push: the commits the remote does not have (all reachable ones for a remote with no
  * remote-tracking branches), their messages, added lines and file names; for gh: the title, body and notes, and the files
- * it publishes. Read with Redact::secrets() until PUBLISH_CHECK_SECONDS; anything left unread counts like a hit.
+ * it publishes. Read with Redact::outbound() until PUBLISH_CHECK_SECONDS; anything left unread counts like a hit.
  * On a hit the call is blocked once with the lines as Redact masks them, and the agent takes the value out itself and
  * publishes again (ADR-0101); the same call again (marker local/state/publish-check/<sha1>, 7 days) becomes a send
  * question for the ask policy, which runs it only when what the user asked for covers it, else refuses it (ADR-0073).

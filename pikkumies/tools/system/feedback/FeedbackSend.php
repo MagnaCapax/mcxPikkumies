@@ -10,7 +10,7 @@ class FeedbackSend
     /**
      * The current session, exported by `hermes sessions export --format md --redact --lineage logical` into a fresh
      * directory of its own (mode 0700, inside the user's home, never a shared /tmp), read once, deleted, and
-     * returned as exported: FeedbackDraft::create cuts it to size and runs Redact::secrets on it (Hermes' redaction misses
+     * returned as exported: FeedbackDraft::create cuts it to size and runs Redact::outbound on it (Hermes' redaction misses
      * bare vsk- keys). The session comes from HERMES_SESSION_ID, which Hermes sets for every command it runs; a command
      * can set it too, so the draft and the message the guard checks show which session is attached.
      */
@@ -50,7 +50,7 @@ class FeedbackSend
         if (!preg_match('/^title: (".*")$/m', substr((string) $md, 0, 4096), $m) || !is_string($t = json_decode($m[1]))) {
             return '';
         }
-        $t = Redact::secrets(trim((string) preg_replace('/\s+/u', ' ', $t)));
+        $t = Redact::outbound(trim((string) preg_replace('/\s+/u', ' ', $t)));
         return function_exists('mb_strcut') ? mb_strcut($t, 0, 120, 'UTF-8') : substr($t, 0, 120);
     }
 

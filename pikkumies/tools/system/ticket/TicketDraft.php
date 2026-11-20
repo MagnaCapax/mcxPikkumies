@@ -6,6 +6,7 @@
  * after the draft was made cannot go out under the user's request. The account email is remembered in local/state/ticket/email.
  */
 require_once dirname(__DIR__, 3) . '/lib/DraftStore.php';
+require_once dirname(__DIR__, 3) . '/lib/Redact.php';
 require_once dirname(__DIR__, 3) . '/lib/PathName.php';
 
 class TicketDraft
@@ -50,8 +51,8 @@ class TicketDraft
         if (strlen($email) > 254 || !preg_match('/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/D', $email) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             throw new CliError('the account email is not an email address', 'the email of their Pulsed Media account is needed: say so in your answer, then pass --email');
         }
-        $subject = trim((string) preg_replace('/\s+/u', ' ', Redact::secrets((string) $subject)));
-        $message = Redact::secrets(trim((string) $message));
+        $subject = trim((string) preg_replace('/\s+/u', ' ', Redact::outbound((string) $subject)));
+        $message = Redact::outbound(trim((string) $message));
         $p = ['v' => 1, 'created_at' => (int) $now, 'email' => $email, 'subject' => self::text($subject, self::SUBJECT_MAX, 'subject'),
             'message' => self::text($message, self::MESSAGE_MAX, 'message'), 'priority' => self::priority($priority),
             'service' => (string) $service, 'attachments' => [], 'by' => $by, 'bundle' => $bundle];
@@ -105,6 +106,15 @@ class TicketDraft
                 throw new CliError("draft $id is not a ticket draft", 'draft it again');
             }
         }
+        // The exact text that goes out, checked again (ADR-0117): subject, message and the text attachments.
+        $texts = [$p['subject'], $p['message']];
+        foreach ($p['attachments'] as $a) {
+            $ext = strtolower((string) pathinfo($a['name'], PATHINFO_EXTENSION));
+            if (isset(self::TYPES[$ext]) && self::TYPES[$ext] === '') {
+                $texts[] = (string) base64_decode($a['data'], true);
+            }
+        }
+        Redact::refuseLeftover(implode("\n", $texts), "ticket draft $id");
         return [$json, $p];
     }
 
@@ -154,7 +164,7 @@ class TicketDraft
         $name = strlen($name) > 100 ? substr($name, 0, 99 - strlen($ext)) . ".$ext" : $name;
         $data = $st['size'] > self::FILE_MAX ? false : @file_get_contents($path, false, null, 0, self::FILE_MAX + 1);
         if ($data !== false && self::TYPES[$ext] === '' && strpos($data, "\0") === false) {
-            $data = Redact::secrets($data);
+            $data = Redact::outbound($data);
         } elseif ($data !== false && (self::TYPES[$ext] === '' || strncmp($data, self::TYPES[$ext], strlen(self::TYPES[$ext])) !== 0)) {
             throw new CliError("$path is not a $ext file inside", 'attach the file as what it is');
         }

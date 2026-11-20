@@ -123,3 +123,6 @@ Facts this rests on, checked 2026-10-18 in Hermes v2026.9.24:
 - A change the user can make in the client area, or a wish for something new, is not a ticket. A no to a ticket ends agent tickets for the session; "never" turns `ticket.auto` off.
 
 **Consequences.** The earlier amendment's "other users on the server" ticket trigger is withdrawn. One line per rule, seven lines changed in total.
+
+## Amendment 2026-11-20: the outbound pass
+[ADR-0117](0117-outbound-credential-pass.md): the text, the conversation and the session title go through `Redact::outbound()` (also quoted values inside JSON-escaped tool-call arguments, and a value after a REDACTED marker); the draft record says how many values it removed and under which names; `load()` refuses a draft that still holds such a value, so one saved before this change is drafted again. Everything else here stands.

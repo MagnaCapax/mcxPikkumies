@@ -77,7 +77,7 @@ class TicketAuto
         }, $p['attachments']);
         if (!is_array($p['bundle']) || $names !== TicketBundle::NAMES) {
             $why = 'it does not hold exactly the three bundle attachments and a bundle record';
-        } elseif (strlen($p['message']) > TicketBundle::MESSAGE_MAX || Redact::secrets($p['message']) !== $p['message']) {
+        } elseif (strlen($p['message']) > TicketBundle::MESSAGE_MAX || Redact::outbound($p['message']) !== $p['message']) {
             $why = 'its message is longer than a bundle message or holds text that redaction would remove';
         }
         $scrub = $auto || (is_array($p['bundle']) && !empty($p['bundle']['scrubbed']));
@@ -85,7 +85,7 @@ class TicketAuto
             $text = base64_decode((string) $a['data'], true);
             if (!is_string($text) || strlen($text) > TicketBundle::FILE_MAX) {
                 $why = "{$a['name']} is not readable or over 1 MiB";
-            } elseif (Redact::secrets($text) !== $text) {
+            } elseif (Redact::outbound($text) !== $text) {
                 $why = "{$a['name']} holds text that redaction would remove";
             } elseif ($scrub && TicketBundle::scrubTokens($text) !== $text) {
                 $why = "{$a['name']} holds a long token that the automatic-ticket pass would remove";

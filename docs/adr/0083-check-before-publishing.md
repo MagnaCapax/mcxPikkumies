@@ -48,3 +48,6 @@ What was found:
 - ADR-0030, ADR-0044, ADR-0048, ADR-0056, ADR-0068, ADR-0073, ADR-0076, ADR-0081
 - Code: `pikkumies/hooks/guard/publish-check/`, `pikkumies/lib/Redact.php`, `pikkumies/doctrine/safety.md`
 - gh: `gh repo view --json visibility`; git: `git log --not --remotes=<remote>`, `git remote get-url --push`
+
+## Amendment 2026-11-20: the detector is the outbound pass
+[ADR-0117](0117-outbound-credential-pass.md): a hit is now a line `Redact::outbound()` changes, which adds a quoted value at any escaping depth (inside JSON-escaped text) and a value after a REDACTED marker to the forms `Redact::secrets()` finds. Everything else here stands.

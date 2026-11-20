@@ -1,7 +1,7 @@
 <?php
 /**
  * UpstreamDraft: an issue for an upstream project, drafted locally and never sent (ADR-0092). The title and the body file
- * go through UpstreamScrub (who and where the user is) and Redact::secrets (passwords, keys, tokens); the result is
+ * go through UpstreamScrub (who and where the user is) and Redact::outbound (passwords, keys, tokens); the result is
  * written to local/upstream/drafts/<id>.md (0600) and printed in full with what was replaced, a prefilled
  * github.com/<repo>/issues/new link of at most 6000 encoded characters (longer ones failed, measured 2026-10-20), and
  * the exact `gh issue create --body-file` command for a user already logged in to gh. Publishing is the user's own act.
@@ -23,8 +23,8 @@ class UpstreamDraft
         }
         list($t, $tHits) = UpstreamScrub::scrub($title, $ctx);
         list($b, $bHits) = UpstreamScrub::scrub(str_replace("\r\n", "\n", (string) file_get_contents($bodyFile)), $ctx);
-        $t2 = Redact::secrets($t);
-        $b2 = rtrim(Redact::secrets($b)) . "\n";
+        $t2 = Redact::outbound($t);
+        $b2 = rtrim(Redact::outbound($b)) . "\n";
         $replaced = $tHits;
         foreach ($bHits as $what => $n) {
             $replaced[$what] = (isset($replaced[$what]) ? $replaced[$what] : 0) + $n;
