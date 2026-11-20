@@ -328,6 +328,10 @@ return [
         $socket = 'pikkumies-test-' . getmypid();
         $oldTmuxDir = getenv('TMUX_TMPDIR');
         $oldTmux = getenv('TMUX');
+        // tmux runs the window command through SHELL, else the passwd shell; a test user whose passwd shell
+        // is nologin, with no SHELL set, loses the window at once (cron, where Eternal runs, sets SHELL=/bin/sh).
+        $oldShell = getenv('SHELL');
+        putenv('SHELL=/bin/sh');
         $foreign = sys_get_temp_dir() . '/eternal-foreign-' . getmypid();
         $root = sys_get_temp_dir() . '/eternal-private-' . getmypid();
         @mkdir($foreign, 0700);
@@ -356,6 +360,7 @@ return [
             Eternal::$tmuxDirectory = null;
             $oldTmuxDir === false ? putenv('TMUX_TMPDIR') : putenv('TMUX_TMPDIR=' . $oldTmuxDir);
             $oldTmux === false ? putenv('TMUX') : putenv('TMUX=' . $oldTmux);
+            $oldShell === false ? putenv('SHELL') : putenv('SHELL=' . $oldShell);
             @unlink($blockedDefault);
             @rmdir($foreign);
             @rmdir($root . '/tmux/tmux-' . (function_exists('posix_geteuid') ? posix_geteuid() : getmyuid()));
