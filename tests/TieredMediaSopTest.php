@@ -15,10 +15,12 @@ if (!function_exists('tieredSopText')) {
         return preg_match('~<!-- script:' . $name . ' -->\n```\w+\n(.*?)\n```~s', tieredSopText(), $m) === 1 ? $m[1] : '';
     }
 
-    /** Runs $argv (no shell) with $code on stdin; returns [exit code, output]. */
+    /** Runs $argv with $code on stdin; returns [exit code, output]. Each argument is quoted into
+     *  one command string because PHP 7.3, which CI still runs, has no array form of proc_open. */
     function tieredSopRun(array $argv, $code)
     {
-        $p = proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $cmd = implode(' ', array_map('escapeshellarg', $argv));
+        $p = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (!is_resource($p)) {
             return [-1, 'proc_open failed'];
         }
