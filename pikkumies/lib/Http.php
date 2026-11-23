@@ -14,7 +14,7 @@ class Http
     /**
      * Options: headers (list of "Name: value"), body (string), fields (array name => string|CURLFile:
      * a multipart/form-data request, curl builds it; exclusive with body), timeout (s, default 15),
-     * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener, or 'system'),
+     * max (bytes), agent (User-Agent), owners (extra uids allowed to own a local listener: numbers or [first, last] ranges, or 'system'),
      * discard (true: count the response bytes and keep none, for a throughput test; reaching max or the timeout
      * after the first byte ends the transfer and is not an error), unix_socket (path: the request is made over
      * this unix socket instead of a TCP connection to $url's host/port -- $url still supplies the scheme, host

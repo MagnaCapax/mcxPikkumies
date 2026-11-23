@@ -462,10 +462,9 @@ class DockerDiagnose
     public static function subuidRanges($file, $name, $uid)
     {
         $out = [];
-        foreach ((array) @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-            $p = explode(':', trim((string) $line));
-            if (count($p) === 3 && ($p[0] === (string) $name || $p[0] === (string) $uid) && ctype_digit($p[1]) && ctype_digit($p[2]) && (int) $p[2] > 0) {
-                $out[] = [(int) $p[1], (int) $p[1] + (int) $p[2] - 1];
+        foreach (Host::subuidEntries($file) as $e) {
+            if ($e[0] === (string) $name || $e[0] === (string) $uid) {
+                $out[] = [$e[1], $e[2]];
             }
         }
         return $out;

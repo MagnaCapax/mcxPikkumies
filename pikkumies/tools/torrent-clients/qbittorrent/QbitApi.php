@@ -86,7 +86,7 @@ class QbitApi
     /** True when something on the WebUI port answers HTTP at all (used after a restart). */
     public function answers($timeout = 2)
     {
-        $r = Http::request('GET', $this->ep->base() . 'app/webapiVersion', ['timeout' => $timeout, 'max' => 4096]);
+        $r = Http::request('GET', $this->ep->base() . 'app/webapiVersion', ['timeout' => $timeout, 'max' => 4096, 'owners' => $this->ep->ranges()]);
         return $r['code'] > 0;
     }
 
@@ -142,7 +142,7 @@ class QbitApi
         if ($this->cookie !== '') {
             $headers[] = 'Cookie: ' . $this->cookie;
         }
-        $o = ['headers' => $headers, 'timeout' => $timeout];
+        $o = ['headers' => $headers, 'timeout' => $timeout, 'owners' => $this->ep->ranges()];
         if ($body !== null) {
             $o['body'] = $body;
         }

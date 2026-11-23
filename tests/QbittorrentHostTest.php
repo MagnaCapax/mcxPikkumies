@@ -159,4 +159,49 @@ return [
                 'a symlinked password file: ' . $out);
         });
     },
-];
+    'qbittorrent: a listener on a uid inside this account\'s own sub-uid range is the account\'s own; another account\'s range, an overlap and an unreadable file are not' => function () {
+        qbitWith([], function ($fx) {
+            require_once dirname(__DIR__) . '/pikkumies/tools/torrent-clients/qbittorrent/QbitEndpoint.php';
+            $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+            $table = function ($owner) use ($fx) {
+                return [sprintf("  sl  local_address rem_address   st\n   0: 0100007F:%04X 00000000:0000 0A 00000000:00000000 00:00000000 00000000 %5d 0 1 1\n", $fx['port'], $owner), ''];
+            };
+            $refused = function ($owner, $subuid) use ($fx, $table) {
+                $ep = new QbitEndpoint($fx['home'], 'pmss');
+                $ep->tables = $table($owner);
+                file_put_contents($fx['dir'] . '/subuid', $subuid);
+                $ep->subuidFile = $fx['dir'] . '/subuid';
+                try {
+                    $ep->locate();
+                    return '';
+                } catch (CliError $e) {
+                    return $e->getMessage() . ' | ' . $e->hint;
+                }
+            };
+            $mine = "$uid:100000:65536\n";
+            check($refused(100999, $mine) === '', 'a listener inside the own sub-uid range was refused: ' . $refused(100999, $mine));
+            check($refused(100000, $mine) === '' && $refused(165535, $mine) === '', 'the ends of the own range were refused');
+            check($refused($uid, $mine) === '', 'the account\'s own uid was refused next to a range');
+            $out = $refused(165536, $mine);
+            check(strpos($out, 'another account') !== false && strpos($out, 'different user ID') !== false, 'one past the range must be refused with the user-ID hint: ' . $out);
+            check(strpos($refused(99999, $mine), 'another account') !== false, 'one below the range must be refused');
+            check(strpos($refused($uid + 1, $mine), 'another account') !== false, 'another account\'s ordinary uid must be refused');
+            $both = $mine . "bob:200000:65536\n";
+            check(strpos($refused(200500, $both), 'another account') !== false, 'a listener in another account\'s range was counted as own');
+            check($refused(100999, $both) === '', 'another account\'s disjoint range changed the own answer');
+            $overlap = $mine . "bob:150000:65536\n";
+            check(strpos($refused(100999, $overlap), 'another account') !== false, 'an own range overlapped by another account\'s was still trusted');
+            check(strpos($refused(150500, $overlap), 'another account') !== false, 'a uid in an overlap was counted as own');
+            check(strpos($refused(100999, "bob:100000:65536\n"), 'another account') !== false, 'a range listed only for another account was counted as own');
+            check(strpos($refused(100999, "$uid:1000:65536\n"), 'another account') !== false, 'a range below the floor was trusted');
+            $ep = new QbitEndpoint($fx['home'], 'pmss');
+            $ep->tables = $table(100999);
+            $ep->subuidFile = $fx['dir'] . '/missing-subuid';
+            try {
+                $ep->locate();
+                check(false, 'an unreadable /etc/subuid must keep today\'s refusal');
+            } catch (CliError $e) {
+                check(strpos($e->getMessage(), 'another account') !== false && $ep->ranges() === [], 'unreadable subuid: ' . $e->getMessage());
+            }
+        }, false);
+    },];

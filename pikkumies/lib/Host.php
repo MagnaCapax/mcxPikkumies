@@ -262,8 +262,12 @@ class Host
         return false;
     }
 
+    /** Sub-uid ranges starting below this are never counted as an account's own (PMSS's own ownership repair uses the same floor): they could cover real accounts. */
+    const SUBUID_FLOOR = 100000;
+
     /**
-     * 'own' when the listener on $port belongs to an allowed uid ($uids: one uid or a list),
+     * 'own' when the listener on $port belongs to an allowed uid ($uids: one uid or a list; a list entry may be a
+     * [first, last] pair, a whole uid range, see ownSubuidRanges()),
      * 'other' when any listener on it belongs to another account, 'none' when nothing listens,
      * 'unknown' when /proc/net cannot be read. Listeners on loopback and wildcard addresses count,
      * plus those on the addresses in $dests (the IP actually connected to, e.g. this machine's
@@ -271,7 +275,7 @@ class Host
      */
     public static function ownsListener($port, $uids, ?array $tables = null, array $dests = [])
     {
-        $allowed = array_map('intval', (array) $uids);
+        $allowed = (array) $uids;
         $extra = [];
         foreach ($dests as $ip) {
             $extra = array_merge($extra, self::procAddresses($ip));
@@ -295,13 +299,68 @@ class Host
                 if (strtoupper($p) !== $hexPort || (!preg_match(self::LOCAL_RE, $addr) && !in_array($addr, $extra, true))) {
                     continue;
                 }
-                if (!in_array((int) $f[7], $allowed, true)) {
+                if (!self::uidAllowed((int) $f[7], $allowed)) {
                     return 'other';
                 }
                 $seen = 'own';
             }
         }
         return $seen;
+    }
+
+    private static function uidAllowed($uid, array $allowed)
+    {
+        foreach ($allowed as $a) {
+            if (is_array($a) ? (isset($a[0], $a[1]) && $uid >= (int) $a[0] && $uid <= (int) $a[1]) : $uid === (int) $a) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The lines of /etc/subuid (or subgid) as [owner, first, last]: owner is a name or a uid as written, malformed lines are skipped. */
+    public static function subuidEntries($file = '/etc/subuid')
+    {
+        $out = [];
+        foreach ((array) @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            $p = explode(':', trim((string) $line));
+            if (count($p) === 3 && $p[0] !== '' && ctype_digit($p[1]) && ctype_digit($p[2]) && strlen($p[1]) <= 10 && strlen($p[2]) <= 10 && (int) $p[2] > 0) {
+                $out[] = [$p[0], (int) $p[1], (int) $p[1] + (int) $p[2] - 1];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The [first, last] sub-uid ranges /etc/subuid gives this uid (by name or number) that may count as its own, so a
+     * rootless container running as a non-zero container user, whose host uid sits in the range, is not mistaken for
+     * another account. Fails closed: a range that starts below SUBUID_FLOOR or overlaps any other owner's range is
+     * dropped whole, and an unreadable file gives [] (the owner check then answers as it did before).
+     */
+    public static function ownSubuidRanges($uid, $file = '/etc/subuid')
+    {
+        $pw = function_exists('posix_getpwuid') ? @posix_getpwuid((int) $uid) : false;
+        $name = is_array($pw) && isset($pw['name']) ? (string) $pw['name'] : '';
+        $own = [];
+        $others = [];
+        foreach (self::subuidEntries($file) as $e) {
+            if ($e[0] === (string) (int) $uid || ($name !== '' && $e[0] === $name)) {
+                $own[] = [$e[1], $e[2]];
+            } else {
+                $others[] = [$e[1], $e[2]];
+            }
+        }
+        $safe = [];
+        foreach ($own as $r) {
+            $clash = $r[0] < self::SUBUID_FLOOR;
+            foreach ($others as $o) {
+                $clash = $clash || ($r[0] <= $o[1] && $o[0] <= $r[1]);
+            }
+            if (!$clash) {
+                $safe[] = $r;
+            }
+        }
+        return $safe;
     }
 
     /** $ip in /proc/net/tcp(6) notation: each 32-bit word in host (little-endian) byte order. */

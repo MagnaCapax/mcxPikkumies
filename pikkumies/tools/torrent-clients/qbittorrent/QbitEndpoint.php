@@ -13,6 +13,9 @@ class QbitEndpoint
     /** The all-zero PBKDF2 value PMSS keeps until a WebUI password is chosen (PMSS scripts/lib/user/qbittorrentWebUiAuth.php). */
     const NO_PASSWORD = '@ByteArray(AAAAAAAAAAAAAAAAAAAAAA==:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==)';
 
+    /** Said when the port is held by a user ID that is neither this account's nor inside its sub-uid range. */
+    const OTHER_HINT = "the WebUI port is held by a different user ID than this account's own (or its container user range in /etc/subuid), so it is in use by someone else; restart qBittorrent from the panel so it gets its port back";
+
     public $home;
     public $family;
     public $port = 0;
@@ -20,6 +23,9 @@ class QbitEndpoint
     public $conf;
     /** Test seam: /proc/net/tcp(6) contents for the owner check (null = the real ones). */
     public $tables = null;
+    /** Test seam: the file of sub-uid ranges (null = /etc/subuid). */
+    public $subuidFile = null;
+    private $ranges = null;
 
     public function __construct($home, $family)
     {
@@ -56,14 +62,27 @@ class QbitEndpoint
         return $this;
     }
 
+    /**
+     * The sub-uid ranges this account owns in /etc/subuid, as [first, last] pairs: a rootless-Docker qBittorrent run as a
+     * non-zero container user listens as a host uid inside one (Host::ownSubuidRanges: another account's range never counts).
+     */
+    public function ranges()
+    {
+        if ($this->ranges === null) {
+            $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+            $this->ranges = Host::ownSubuidRanges($uid, $this->subuidFile !== null ? $this->subuidFile : '/etc/subuid');
+        }
+        return $this->ranges;
+    }
+
     /** readConfig(), then who listens on the port. Throws CliError naming the cause. */
     public function locate()
     {
         $this->readConfig();
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
-        $owner = Host::ownsListener($this->port, $uid, $this->tables);
+        $owner = Host::ownsListener($this->port, array_merge([$uid], $this->ranges()), $this->tables);
         if ($owner === 'other') {
-            throw new CliError("port {$this->port} belongs to another account; not connecting (the login is never sent there)", 'the configured WebUI port is in use by someone else; restart qBittorrent from the panel so it gets its port back');
+            throw new CliError("port {$this->port} belongs to another account; not connecting (the login is never sent there)", self::OTHER_HINT);
         }
         if ($owner === 'unknown') {
             throw new CliError("cannot check who owns port {$this->port} (/proc/net is not readable); not connecting", 'this host hides socket owners, so the tool cannot safely log in');
@@ -113,7 +132,7 @@ class QbitEndpoint
             return new CliError("qBittorrent is busy: no answer to $what in time (state unknown, not necessarily down)", 'try again in a minute; a client checking or moving many files answers slowly');
         }
         if (strpos($e, 'another account') !== false) {
-            return new CliError($e, 'the configured WebUI port is in use by someone else; restart qBittorrent from the panel');
+            return new CliError($e, self::OTHER_HINT);
         }
         return new CliError("qBittorrent refused the connection ($what): " . $e, 'check that it runs (`stats`), or run `restart`');
     }

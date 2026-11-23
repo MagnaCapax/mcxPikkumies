@@ -193,4 +193,20 @@ echo extension_loaded("curl") ? "curl-still-loaded" : serialize(Http::request("G
         // Without 'system', only the caller's own uid (plus any explicit $owners) is allowed.
         check(Host::ownsListener(8080, [424242], [$table(500), '']) === 'other', 'uid 500 must NOT be allowed without the system widening');
     },
-];
+    'http: owners accepts a [first, last] uid range, and a range not covering a foreign listener still refuses it' => function () {
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        foreach (explode("\n", (string) @file_get_contents('/proc/net/tcp')) as $line) {
+            $f = preg_split('/\s+/', trim($line));
+            if (count($f) > 7 && $f[3] === '0A' && (int) $f[7] !== $uid && preg_match('/^(0{8}|0100007F):/', $f[1])) {
+                $p = hexdec(substr($f[1], 9));
+                $owner = (int) $f[7];
+                $url = "http://127.0.0.1:$p/";
+                check(Http::foreignLocalListener($url, [[$owner, $owner]]) === '', "a range covering the listener's uid was refused: " . Http::foreignLocalListener($url, [[$owner, $owner]]));
+                check(strpos(Http::foreignLocalListener($url, [[$owner + 1, $owner + 100]]), 'another account') !== false, 'a range above the listener\'s uid let it through');
+                check(strpos(Http::foreignLocalListener($url, [[max(0, $owner - 100), $owner - 1]]), 'another account') !== false || $owner === 0, 'a range below the listener\'s uid let it through');
+                check(strpos(Http::foreignLocalListener($url), 'another account') !== false, 'no owners must still refuse a foreign listener');
+                return;
+            }
+        }
+        skip('no foreign-owned local listener found in /proc/net/tcp on this machine');
+    },];

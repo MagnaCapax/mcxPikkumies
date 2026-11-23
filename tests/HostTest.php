@@ -211,4 +211,48 @@ return [
             testRmTree($dir);
         }
     },
-];
+    'host: ownsListener() counts a [first, last] uid range as own, and only inside its ends' => function () {
+        $table = function ($uid) {
+            return hostTcpTable([['0100007F', 8080, '0A', $uid]]);
+        };
+        $allowed = [1001, [100000, 165535]];
+        check(Host::ownsListener(8080, $allowed, [$table(1001), '']) === 'own', 'the account uid was refused next to a range');
+        check(Host::ownsListener(8080, $allowed, [$table(100000), '']) === 'own', 'the first uid of the range was refused');
+        check(Host::ownsListener(8080, $allowed, [$table(165535), '']) === 'own', 'the last uid of the range was refused');
+        check(Host::ownsListener(8080, $allowed, [$table(99999), '']) === 'other', 'one below the range was counted as own');
+        check(Host::ownsListener(8080, $allowed, [$table(165536), '']) === 'other', 'one past the range was counted as own');
+        $two = hostTcpTable([['0100007F', 8080, '0A', 1001], ['0100007F', 8080, '0A', 200000]]);
+        check(Host::ownsListener(8080, $allowed, [$two, '']) === 'other', 'a second listener outside the range must still refuse');
+        check(Host::ownsListener(8080, [[5, 1]], [$table(3), '']) === 'other', 'an inverted pair must match nothing');
+    },
+    'host: ownSubuidRanges() returns this account\'s ranges and never one another account could share' => function () {
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $dir = sys_get_temp_dir() . '/pk-subuid-' . getmypid() . '-' . mt_rand();
+        mkdir($dir, 0700, true);
+        $ranges = function ($text) use ($dir, $uid) {
+            file_put_contents("$dir/subuid", $text);
+            return Host::ownSubuidRanges($uid, "$dir/subuid");
+        };
+        try {
+            check($ranges("$uid:100000:65536\n") === [[100000, 165535]], 'own range by uid not read');
+            check($ranges("bob:200000:65536\n$uid:100000:65536\n") === [[100000, 165535]], 'another account\'s disjoint line changed the answer');
+            check($ranges("bob:200000:65536\n") === [], 'another account\'s range was taken as own');
+            check($ranges("$uid:100000:65536\nbob:165536:10\n") === [[100000, 165535]], 'a range next to (not inside) another range was dropped');
+            check($ranges("$uid:100000:65536\nbob:165535:10\n") === [], 'a range overlapping another account\'s by one uid was kept');
+            check($ranges("$uid:100000:65536\nbob:100000:65536\n") === [], 'an identical range given to two accounts was kept');
+            check($ranges("$uid:100000:65536\nbob:90000:20000\n") === [], 'a range overlapped from below was kept');
+            check($ranges("$uid:100000:65536\n$uid:300000:100\nbob:300050:10\n") === [[100000, 165535]], 'only the clashing range of two own ranges may be dropped');
+            check($ranges("$uid:99999:65536\n") === [], 'a range starting below the floor was kept');
+            check($ranges("$uid:1000:65536\n") === [], 'a range covering ordinary account uids was kept');
+            check($ranges("$uid:100000:0\n$uid:abc:5\n$uid:100000\n:100000:5\n$uid:99999999999999999999:5\n") === [], 'a malformed line was read as a range');
+            check(Host::ownSubuidRanges($uid, "$dir/missing") === [], 'an unreadable file must give no ranges');
+            $pw = function_exists('posix_getpwuid') ? posix_getpwuid($uid) : false;
+            if (is_array($pw)) {
+                check($ranges($pw['name'] . ":100000:65536\n") === [[100000, 165535]], 'own range by name not read');
+            }
+            file_put_contents("$dir/subuid", "$uid:100000:65536\n");
+            check(Host::ownSubuidRanges($uid + 1, "$dir/subuid") === [], 'another uid read this account\'s range');
+        } finally {
+            testRmTree($dir);
+        }
+    },];
