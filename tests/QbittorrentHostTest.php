@@ -69,7 +69,7 @@ return [
             check($code === 1 && strpos($out, 'busy') !== false, 'timeout must read as busy: ' . $out);
         });
     },
-    'qbittorrent: restart refuses where it must; on PMSS it stops the own process and starts it as the panel does' => function () {
+    'qbittorrent: restart refuses where it must; on PMSS without the start helper it stops the own process and starts the bare binary' => function () {
         qbitWith([], function ($fx) {
             foreach (['generic' => 'not supported', 'feral' => 'five minutes', 'whatbox' => 'Manage page'] as $family => $needle) {
                 list($code, $out) = qbitRun($fx, ['restart'], $family);

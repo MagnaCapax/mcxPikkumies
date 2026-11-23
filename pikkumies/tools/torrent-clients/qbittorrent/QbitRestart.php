@@ -3,12 +3,19 @@
  * QbitRestart: restart qBittorrent the way the host does it, then check that it answers.
  * - PMSS: only while ~/.qbittorrentEnable exists (the panel creates it on start, the watchdog honours
  *   it: PMSS etc/skel/www/scriptsInc.php:1765-1768, scripts/lib/user/watchdog.php:179-180). Graceful
- *   stop of the own process (QbitProc), then the panel's start command `qbittorrent-nox -d`
- *   (etc/skel/www/qbittorrent.php:10), run from $HOME as the watchdog does (checkQbittorrentInstances.php:16).
+ *   stop of the own process (QbitProc), then the start the PMSS watchdog uses
+ *   (scripts/cron/checkQbittorrentInstances.php:21): with the account's start helper
+ *   (~/www/qbittorrentStart.php) the PMSS launcher, `torrentClientsResolve.php qbittorrent --launch --held
+ *   --system`, which starts the build the account selected (its ~/bin/qbittorrent/default link) or the system
+ *   build, under the account's qBittorrent lock held here; without the helper (a half-delivered PMSS update) the
+ *   bare `qbittorrent-nox -d`, as PMSS itself then does. A busy lock or a refusal marker is reported before
+ *   anything is stopped; a launcher refusal is reported, never answered with a bare start.
  * - Ultra.cc: `app-qbittorrent restart` (docs.ultra.cc/applications/qbittorrent, research §4).
  * - Feral, Whatbox, others: refused with the provider's own instructions (Feral documents only
  *   `pkill -f`, which this tool never uses, and says qBittorrent cannot be started by hand).
  */
+require_once dirname(__DIR__, 3) . '/lib/PmssClientLock.php';
+
 class QbitRestart
 {
     const WAIT = 30;
@@ -29,9 +36,7 @@ class QbitRestart
             if (!$ep->enabled()) {
                 throw new CliError('qBittorrent is disabled for this account (~/.qbittorrentEnable is missing); not starting it', 'the user starts qBittorrent in the Pulsed Media panel; this tool never overrides a disabled client');
             }
-            $r = array_merge($r, $this->proc->stop());
-            $this->exec('cd ' . escapeshellarg($ep->home) . ' && qbittorrent-nox -d', 'qbittorrent-nox -d');
-            $r['how'] = 'PMSS: own qbittorrent-nox stopped (SIGTERM, SIGKILL only after 10 s), then started with `qbittorrent-nox -d` as the panel does';
+            $r = array_merge($r, $this->pmssRestart($ep->home));
         } elseif ($ep->family === 'ultra') {
             $this->exec('app-qbittorrent restart', 'app-qbittorrent restart');
             $r['how'] = 'Ultra.cc: app-qbittorrent restart';
@@ -67,6 +72,56 @@ class QbitRestart
             $r['note'] = 'it answers, but the version could not be read: ' . $e->getMessage();
         }
         return $r;
+    }
+
+    /** PMSS stop and start; returns the stop counts and `how`. See the class comment for the two start paths. */
+    private function pmssRestart($home)
+    {
+        $stopText = 'PMSS: own qbittorrent-nox stopped (SIGTERM, SIGKILL only after 10 s), then started ';
+        if (!is_file($home . '/www/qbittorrentStart.php')) {
+            $r = $this->proc->stop();
+            $this->exec('cd ' . escapeshellarg($home) . ' && qbittorrent-nox -d', 'qbittorrent-nox -d');
+            $r['how'] = $stopText . 'with `qbittorrent-nox -d` (this account has no PMSS start helper, and PMSS starts it that way then)';
+            return $r;
+        }
+        $dir = $home . '/.config/pmss/torrentClients';
+        $script = $home . '/www/torrentClientsResolve.php';
+        if (!is_file($script)) {
+            throw new CliError('the PMSS launcher script is missing (~/www/torrentClientsResolve.php); nothing was stopped', 'the provider restores it: report it in your answer');
+        }
+        $lock = PmssClientLock::take($home, 'qbittorrent', 'qBittorrent', true);
+        try {
+            if (file_exists($dir . '/qbittorrent.refused') || is_link($dir . '/qbittorrent.refused')) {
+                throw new CliError('PMSS refuses to start qBittorrent on this account (qbittorrent.refused is set); nothing was stopped', 'the user clears it by starting qBittorrent in the Pulsed Media panel (Apps); this tool never clears it');
+            }
+            $before = $this->notice($dir);
+            $own = $this->proc->pids();
+            $r = $this->proc->stop();
+            for ($i = 0; $i < 10 && array_filter($own, [$this->proc, 'alive']); $i++) { // the start helper refuses while an own process lives
+                usleep(200000);
+            }
+            if (array_filter($own, [$this->proc, 'alive'])) {
+                throw new CliError('qBittorrent was stopped but its process has not exited; nothing was started', 'check again with `stats` in a minute');
+            }
+            exec('cd ' . escapeshellarg($home) . ' && ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script)
+                . ' qbittorrent --launch --held --system >/dev/null 2>&1 </dev/null', $out, $code);
+            if ($code !== 0) {
+                $after = $this->notice($dir);
+                $why = $after !== $before ? trim(substr($after, strpos($after, ':') + 1)) : '';
+                throw new CliError('qBittorrent was stopped and the PMSS launcher refused to start it: ' . ($why !== '' ? $why : "exit $code, no reason recorded"), 'the user starts qBittorrent in the Pulsed Media panel (Apps); this tool does not fall back to a bare start');
+            }
+        } finally {
+            PmssClientLock::release($lock);
+        }
+        $r['how'] = $stopText . "through the account's PMSS launcher (torrentClientsResolve.php qbittorrent --launch --held --system) under the account's qBittorrent lock: the selected build, or the system build when none is selected";
+        return $r;
+    }
+
+    /** The launcher's last refusal text, with its change time in front (so an old, unchanged notice is never reported). */
+    private function notice($dir)
+    {
+        $f = $dir . '/qbittorrent.notice';
+        return is_file($f) ? filemtime($f) . ':' . (string) file_get_contents($f) : '';
     }
 
     private function exec($cmd, $label)
