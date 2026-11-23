@@ -12,10 +12,23 @@
  */
 function testTempDir($prefix = 'pk-test')
 {
+    $base = testTempBase();
     do {
-        $dir = sys_get_temp_dir() . '/p' . bin2hex(random_bytes(4));
+        $dir = $base . '/p' . bin2hex(random_bytes(4));
     } while (!@mkdir($dir, 0700, true));
     return $dir;
+}
+
+/**
+ * Where testTempDir() makes its folders: the system temp dir, unless that path is long (a testing account's TMPDIR is a
+ * folder of its own in the home, 38 characters on the dev sandbox against CI's 4 for /tmp) and /tmp is usable. Hook
+ * messages quote paths in these trees, and a long parent alone pushed five approve messages past HookUnits::APPROVE_SHOWN
+ * there while the same tests passed in CI.
+ */
+function testTempBase()
+{
+    $base = rtrim(sys_get_temp_dir(), '/');
+    return strlen($base) > 16 && is_dir('/tmp') && is_writable('/tmp') ? '/tmp' : $base;
 }
 
 // The scratch folders the hooks make (lib/Scratch.php, ADR-0093) go to a folder of this run, never the real /tmp.
@@ -28,8 +41,9 @@ register_shutdown_function(function () use ($testScratchBase) {
 /** Remove a directory tree made by a test. Refuses anything outside the system temp dir. */
 function testRmTree($dir)
 {
-    $tmp = rtrim(sys_get_temp_dir(), '/') . '/';
-    if (!is_string($dir) || strpos($dir, $tmp) !== 0 || strpos($dir, '..') !== false || $dir === $tmp) {
+    $tmp = testTempBase() . '/';
+    $sys = rtrim(sys_get_temp_dir(), '/') . '/';
+    if (!is_string($dir) || (strpos($dir, $tmp) !== 0 && strpos($dir, $sys) !== 0) || strpos($dir, '..') !== false || $dir === $tmp || $dir === $sys) {
         throw new Exception("testRmTree refused: $dir");
     }
     if (is_dir($dir)) {
