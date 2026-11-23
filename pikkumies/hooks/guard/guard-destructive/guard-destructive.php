@@ -164,7 +164,9 @@ $patterns = $secretPatterns + [
     '/\bmkfs(\.|\s)/'                              => 'filesystem format',
     '/\bdd\s+[^|]*\bof=\/dev\//'                    => 'raw write to a device',
     '/\b(fdisk|parted|sgdisk|wipefs)\b/'            => 'partition or signature change',
-    '/\bchmod\s+(-[a-zA-Z]+\s+|--[a-z-]+\s+)*0*777\b/' => 'world-writable permissions',
+    // Any mode that gives other users write (ADR-0073): octal ending in 2, 3, 6 or 7 (777, 1777, 757, 666), or symbolic with o or a
+    // (and no who is umask-bound, so it is left out) set by + or = with w (o+w, a=rwx, ugo+rwx, u+x,o+w), not o-w, g+w, 2775 or 7770.
+    '/\bchmod\s+(-[a-zA-Z]+\s+|--[a-z-]+\s+)*(?:[0-7]*[2367](?![\w<>])|(?:[ugoa]*[-+=][rwxXst]*,)*[ugoa]*[oa][ugoa]*[+=][rwxXst]*w)/' => 'world-writable permissions',
     '/:\(\)\s*\{\s*:\|:&\s*\};:/'                   => 'fork bomb',
     '/\bgit\s+push\b.*(--force|\s-f)\b/'           => 'force push',
     // A verb behind a name the shell expands (alias x=rm; X=rm; $X -rf) is out of sight of the patterns here.

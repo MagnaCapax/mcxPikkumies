@@ -46,6 +46,21 @@ return [
         guardEdgeExpect(['chmod 777 x', 'chmod -R 777 ~/data', 'chmod 777 -R ~/data', 'chmod 0777 x', 'chmod -R 0777 ~/data', 'chmod -v --recursive 777 ~/data'], 'block', 'world-writable permissions');
         guardEdgeExpect(['chmod 755 x', 'chmod 0755 ~/bin/x', 'chmod -R 700 ~/private', 'chmod 7770 x'], 'none');
     },
+    'guard: every chmod mode that gives other users write is blocked, in octal and in symbolic form (#22)' => function () {
+        // Octal ending in 2, 3, 6 or 7, with or without special bits.
+        guardEdgeExpect(['chmod 1777 x', 'chmod -R 757 ~/data', 'chmod 666 x', 'chmod 0662 x', 'chmod 773 x', 'chmod 4777 x'], 'block', 'world-writable permissions');
+        // Symbolic: o or a (alone, among others, or in an earlier clause) set with + or = and w.
+        guardEdgeExpect(['chmod o+w x', 'chmod -R a+rwX ~', 'chmod -R ugo+rwx ~', 'chmod a=rwx x', 'chmod u+x,o+w x', 'chmod -R o+rw ~', 'chmod go+w x',
+            'chmod --recursive a+w x', 'chmod o=w x'], 'block', 'world-writable permissions');
+        // Behind a wrapper, an exec option, a pipe or a quote-split verb.
+        guardEdgeExpect(['sudo chmod o+w x', 'find ~ -exec chmod 666 {} +', 'find ~ -type f | xargs chmod a+w', 'cd ~ && chmod -R a+rwX .', 'c"h"mod o+w x'], 'block', 'world-writable permissions');
+    },
+    'guard: chmod modes that give no other write stay quiet, and so does a chmod word that is not a command (#22)' => function () {
+        guardEdgeExpect(['chmod 644 x', 'chmod 664 x', 'chmod 600 x', 'chmod 640 f2', 'chmod 2775 x', 'chmod 750 x', 'chmod 4755 x', 'chmod -R 770 ~/shared'], 'none');
+        guardEdgeExpect(['chmod a+rX x', 'chmod -R a+rX ~/pub', 'chmod a+x x', 'chmod o-w x', 'chmod go-w x', 'chmod u+w x', 'chmod g+w x', 'chmod +w x',
+            'chmod o=rx x', 'chmod u=rwx,go=rx x', 'chmod -R u+rwX,g+rX,o-rwx ~/x'], 'none');
+        guardEdgeExpect(['command -v chmod 2>/dev/null', 'which chmod 2>&1'], 'none');
+    },
     'guard: force pushes are blocked, long and short flag; an ordinary push is not' => function () {
         guardEdgeExpect(['git push --force', 'git push origin main --force', 'git push -f origin main', 'git push --force-with-lease'], 'block', 'force push');
         guardEdgeExpect(['git push origin main', 'git push -u origin feature-f'], 'none');
