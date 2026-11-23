@@ -109,7 +109,17 @@ class ArrRecords
     /** An API date-time as unix seconds, 0 when absent. */
     public static function time(array $a, $k)
     {
-        return isset($a[$k]) && is_string($a[$k]) && ($t = strtotime($a[$k])) !== false ? $t : 0;
+        return isset($a[$k]) && is_string($a[$k]) && ($t = self::parse($a[$k])) !== false ? $t : 0;
+    }
+
+    /**
+     * Text as unix seconds, false when unreadable. A bare date (a .NET DateOnly such as 2008-01-27, or a typed --since) is
+     * midnight UTC, whatever zone PHP is set to on this machine; every other form carries its own offset or is relative.
+     */
+    public static function parse($text)
+    {
+        $text = trim((string) $text);
+        return strtotime($text . (preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) === 1 ? ' 00:00:00 UTC' : ''));
     }
 
     /** `stats`: version, start time, where it was found, process state, item count, health warnings, free disk. */

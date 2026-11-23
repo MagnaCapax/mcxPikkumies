@@ -60,7 +60,7 @@ class ArrVerbs
     public static function history(ArrClient $c, array $app, array $opt)
     {
         if (isset($opt['since'])) {
-            $t = is_string($opt['since']) ? strtotime($opt['since']) : false;
+            $t = is_string($opt['since']) ? ArrRecords::parse($opt['since']) : false;
             if ($t === false) {
                 throw new CliError('--since needs a time, e.g. 2026-10-01 or "-2 days"', 'nothing was read');
             }

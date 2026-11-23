@@ -220,6 +220,21 @@ return array(
             testRmTree($noPath);
         }
     },
+    'arr library: a bare date from the app or --since is midnight UTC in any PHP time zone; relative and offset forms are unchanged' => function () {
+        $zone = date_default_timezone_get();
+        try {
+            foreach (['Europe/Helsinki', 'America/Los_Angeles', 'UTC'] as $tz) {
+                date_default_timezone_set($tz);
+                check(ArrRecords::parse('2008-01-27') === 1201392000 && ArrRecords::parse(' 2008-01-27 ') === 1201392000, "bare date in $tz");
+                check(ArrRecords::time(['d' => '2008-01-27'], 'd') === 1201392000, "time() of a bare date in $tz");
+                check(ArrRecords::parse('2008-01-27T10:00:00Z') === 1201428000 && ArrRecords::parse('2008-01-27T12:00:00+02:00') === 1201428000, "offset forms in $tz");
+                check(abs(ArrRecords::parse('-2 days') - (time() - 172800)) < 5, "relative form in $tz");
+                check(ArrRecords::parse('not a time') === false && ArrRecords::time([], 'd') === 0, "unreadable in $tz");
+            }
+        } finally {
+            date_default_timezone_set($zone);
+        }
+    },
     'arr library: lookup() truncates a long overview to 200 characters via ArrRecords::cut' => function () {
         $fx = arrFixture('radarr');
         try {
