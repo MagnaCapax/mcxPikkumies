@@ -174,3 +174,13 @@ is a line in `local/hermes-heal.log` and is named in ensure()'s line. An aside w
 checkout, and a symlink stay. If the tree breaks again later, the daily update rebuilds it once more, since no aside is
 left. HERMES_HOME and `~/.hermes` are not touched. This is the decision of the orchestrating agent (2026-11-13), not an
 operator ruling.
+
+## Addendum 2026-11-23: build runs each pm install step at most twice
+
+Each `pm.cli install` step in `HermesInstall::build()` now runs once more when it exits nonzero, as a bounded mitigation
+for upstream's fixed timeouts on slow-read hosts (the 30 s smoke-import in `pm/runtime_stage.py` and the 1800 s uv sync;
+mcxPikkumies#15). The second run keeps what the first downloaded (the clone, uv, bootstrap Python and uv cache). The reason is run-to-run variance on busy hosts, not a warm page cache, which measurements showed is gone within about a minute. Its benefit is not measured yet,
+and it does not fix the upstream timeouts or host I/O. `addExtra()` stays single-attempt because it is a foreground
+settings toggle. This differs from the 2026-11-12 rejection of a hooks-test retry: that check had an in-repo
+deterministic signal, the delete guard's own log row, whereas this timeout is upstream, has no such signal and leaves
+the upstream tree unmodified. This is the decision of the orchestrating agent (2026-11-23), not an operator ruling.

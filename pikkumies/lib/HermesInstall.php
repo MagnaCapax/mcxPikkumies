@@ -449,6 +449,21 @@ class HermesInstall
     }
 
     /**
+     * Upstream's recovery is re-running pm install: try a build step once more on a nonzero exit,
+     * retaining the clone, uv, bootstrap Python and uv cache (mcxPikkumies#15, ADR-0033).
+     * The line between runs leaves the final verdict to build().
+     */
+    private static function runPm($tag, $step, array $argv, array $env, $tree)
+    {
+        $code = self::run($argv, $env, $tree);
+        if ($code !== 0) {
+            echo "hermes $tag: $step exited $code, running it once more\n";
+            $code = self::run($argv, $env, $tree);
+        }
+        return $code;
+    }
+
+    /**
      * Stage the pinned uv into pm's store slot (<store>/uv-<version>-<target>/uv), as setup-hermes.sh
      * does: download (the mirror only on a network failure), check the sha256 before unpacking, flatten a
      * single wrapping directory, move into place. Returns '' or the problem.
@@ -498,6 +513,7 @@ class HermesInstall
      * The background build: clone the release tag, then upstream's bootstrap (pinned uv, bootstrap
      * Python, `pm.cli install`), then the ready marker. The marker goes first, so a half-built tree never
      * looks complete. No step deletes the tree. Prints its progress (the install log); returns the exit code.
+     * Each `pm.cli install` step runs at most twice.
      */
     public static function build($tag, $optionalTools = false)
     {
@@ -542,12 +558,12 @@ class HermesInstall
         foreach ($optionalTools ? [] : self::OPTIONAL_TOOLS as $name) {
             array_push($pm, '--without', $name);
         }
-        if (self::run($pm, $env, $tree) !== 0) {
+        if (self::runPm($tag, 'pm install', $pm, $env, $tree) !== 0) {
             return $fail('pm install');
         }
         // A second, separate call (ADR-0082): `--extra` alone installs no default closure, so it runs only after the full
         // install above has built the venv it unions into.
-        if (self::run([$boot, '-m', 'pm.cli', 'install', '--extra', self::WEB_SEARCH_EXTRA], $env, $tree) !== 0) {
+        if (self::runPm($tag, 'pm install --extra ' . self::WEB_SEARCH_EXTRA, [$boot, '-m', 'pm.cli', 'install', '--extra', self::WEB_SEARCH_EXTRA], $env, $tree) !== 0) {
             return $fail('pm install --extra ' . self::WEB_SEARCH_EXTRA);
         }
         if (!is_executable($tree . '/.hermes/bin/hermes')) {

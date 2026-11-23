@@ -69,6 +69,16 @@ if (isset($argv[2]) && $argv[1] === "config" && $argv[2] === "set") {
 ');
     // Fake bootstrap Python: only `-m pm.cli install ...`, which publishes the tree's launcher like pm does.
     hermesTFake("$bin/boot-python", sprintf($logLine, '"pm " . implode(" ", array_slice($argv, 1)) . " | cwd=" . getcwd() . " | HERMES_HOME=" . getenv("HERMES_HOME") . " | RUNTIME_DIR=" . var_export(getenv("HERMES_RUNTIME_DIR"), true)') . '
+$always = (string) getenv("PK_FAKE_PM_FAIL_ALWAYS");
+if ($always !== "" && strpos(implode(" ", $argv), $always) !== false) {
+    exit(1);
+}
+$once = (string) getenv("PK_FAKE_PM_FAIL_ONCE");
+$match = (string) getenv("PK_FAKE_PM_FAIL_MATCH");
+if ($once !== "" && !file_exists($once) && ($match === "" || strpos(implode(" ", $argv), $match) !== false)) {
+    touch($once);
+    exit(1);
+}
 if (array_slice($argv, 1, 3) !== ["-m", "pm.cli", "install"]) { exit(2); }
 @mkdir(getcwd() . "/.hermes/bin", 0700, true);
 copy(' . var_export("$bin/fake-hermes", true) . ', getcwd() . "/.hermes/bin/hermes");
@@ -363,23 +373,92 @@ return [
             testRmTree($w['t']);
         }
     },
-    'hermes install: hermes.lazyInstalls keeps the optional tools; a failing pm install leaves no marker; the staged uv is reused' => function () {
+    'hermes install: a full pm install that fails once runs once more and ends ready' => function () {
         $w = hermesTWorld();
         try {
+            mkdir($w['root'] . '/include', 0700, true);
+            hermesTIn($w, function () use ($w) {
+                ob_start();
+                $code = HermesInstall::build('v0.10.0');
+                $out = (string) ob_get_clean();
+                $log = (string) file_get_contents($w['log']);
+                check($code === 0 && is_file($w['root'] . '/include/.hermes-ready'), 'build must finish with a marker: ' . $out);
+                check(substr_count($log, 'pm -m pm.cli install --without agent-browser --without cua-driver | cwd=') === 2, 'full install must run twice: ' . $log);
+                check(substr_count($log, 'pm -m pm.cli install --extra ddgs | cwd=') === 1, 'extra must run once: ' . $log);
+                check(strpos($out, 'hermes v0.10.0: pm install exited 1, running it once more') !== false && strpos($out, 'failed:') === false, 'no failure verdict between attempts: ' . $out);
+                check(substr_count($out, ': ready') === 1, 'only one ready verdict: ' . $out);
+                $lines = explode("\n", trim($out));
+                check(strpos(end($lines), ': ready') !== false, 'ready must be the last line: ' . $out);
+            }, ['PK_FAKE_PM_FAIL_ONCE' => $w['t'] . '/pm-failed']);
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
+    'hermes install: the ddgs extra that fails once runs once more without repeating the full install' => function () {
+        $w = hermesTWorld();
+        try {
+            mkdir($w['root'] . '/include', 0700, true);
+            hermesTIn($w, function () use ($w) {
+                ob_start();
+                $code = HermesInstall::build('v0.10.0');
+                $out = (string) ob_get_clean();
+                $log = (string) file_get_contents($w['log']);
+                check($code === 0 && is_file($w['root'] . '/include/.hermes-ready'), 'build must finish with a marker: ' . $out);
+                check(substr_count($log, 'pm -m pm.cli install --without agent-browser --without cua-driver | cwd=') === 1, 'full install must run once: ' . $log);
+                check(substr_count($log, 'pm -m pm.cli install --extra ddgs | cwd=') === 2, 'extra must run twice: ' . $log);
+                check(strpos($out, 'hermes v0.10.0: pm install --extra ddgs exited 1, running it once more') !== false && strpos($out, 'failed:') === false, 'extra retry must have no failure verdict: ' . $out);
+                check(substr_count($out, ': ready') === 1, 'only one ready verdict: ' . $out);
+                $lines = explode("\n", trim($out));
+                check(strpos(end($lines), ': ready') !== false, 'ready must be the last line: ' . $out);
+            }, ['PK_FAKE_PM_FAIL_ONCE' => $w['t'] . '/pm-failed', 'PK_FAKE_PM_FAIL_MATCH' => '--extra ddgs']);
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
+    'hermes install: the ddgs extra that fails twice ends in one final failure line with no marker' => function () {
+        $w = hermesTWorld();
+        try {
+            mkdir($w['root'] . '/include', 0700, true);
+            hermesTIn($w, function () use ($w) {
+                ob_start();
+                $code = HermesInstall::build('v0.10.0');
+                $out = (string) ob_get_clean();
+                $log = (string) file_get_contents($w['log']);
+                check($code === 1 && !is_file($w['root'] . '/include/.hermes-ready'), 'build must fail without a marker: ' . $out);
+                check(substr_count($log, 'pm -m pm.cli install --without agent-browser --without cua-driver | cwd=') === 1, 'full install must run once: ' . $log);
+                check(substr_count($log, 'pm -m pm.cli install --extra ddgs | cwd=') === 2, 'extra must stop after two attempts: ' . $log);
+                check(substr_count($out, 'failed:') === 1, 'only one failure verdict: ' . $out);
+                $lines = explode("\n", trim($out));
+                check(end($lines) === 'hermes v0.10.0: failed: pm install --extra ddgs', 'failure must be the last line: ' . $out);
+            }, ['PK_FAKE_PM_FAIL_ALWAYS' => '--extra ddgs']);
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
+    'hermes install: hermes.lazyInstalls keeps the optional tools; pm failing twice leaves no marker; the staged uv is reused' => function () {
+        $w = hermesTWorld();
+        try {
+            mkdir($w['root'] . '/include', 0700, true);
             hermesTIn($w, function () use ($w) {
                 ob_start();
                 $code = HermesInstall::build('v0.10.0', true);
                 ob_end_clean();
-                check($code === 0 && preg_match('/^pm -m pm\.cli install \| cwd=/m', (string) file_get_contents($w['log'])) === 1, 'optional tools: no --without');
+                check($code === 0 && is_file($w['root'] . '/include/.hermes-ready') && preg_match('/^pm -m pm\.cli install \| cwd=/m', (string) file_get_contents($w['log'])) === 1, 'optional tools: no --without, ready marker written');
                 rename($w['root'] . '/hermes', $w['t'] . '/first');
                 unlink($w['t'] . '/uv.tar.gz'); // a second download would now fail
                 file_put_contents($w['log'], '');
-                hermesTFake($w['bin'] . '/boot-python', 'exit(1);');
+                hermesTFake($w['bin'] . '/boot-python', 'file_put_contents(getenv("PK_FAKE_LOG"), "pm " . implode(" ", array_slice($argv, 1)) . " | cwd=" . getcwd() . "\n", FILE_APPEND); exit(1);');
                 ob_start();
                 $code = HermesInstall::build('v0.10.0');
                 $out = (string) ob_get_clean();
                 check($code === 1 && strpos($out, 'hermes v0.10.0: failed: pm install') !== false && !is_file($w['root'] . '/include/.hermes-ready'), 'pm failure: ' . $out);
-                check(strpos((string) file_get_contents($w['log']), 'uv python install') !== false, 'the staged uv must be reused without a download: ' . $out);
+                $log = (string) file_get_contents($w['log']);
+                check(substr_count($log, 'pm -m pm.cli install --without agent-browser --without cua-driver | cwd=') === 2, 'full install must stop after two attempts: ' . $log);
+                check(substr_count($out, 'failed:') === 1, 'only one failure verdict: ' . $out);
+                $lines = explode("\n", trim($out));
+                check(end($lines) === 'hermes v0.10.0: failed: pm install', 'failure must be the last line: ' . $out);
+                check(strpos($log, '--extra') === false, 'no extra after full install fails: ' . $log);
+                check(strpos($log, 'uv python install') !== false, 'the staged uv must be reused without a download: ' . $out);
             });
         } finally {
             testRmTree($w['t']);
