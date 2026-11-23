@@ -1,4 +1,4 @@
-# ADR-0123: Restart tools start a PMSS client through the PMSS launcher, under the account lock
+# ADR-0125: Restart tools start a PMSS client through the PMSS launcher, under the account lock
 
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)

@@ -8,7 +8,7 @@
  * both` (the panel: scriptsIncAppProcess.php:220; the watchdog: scripts/cron/checkDelugeInstances.php:22,25),
  * which starts the selected build; with no selection the bare `deluged` and `deluge-web`, run from $HOME like the
  * watchdog. A busy lock is reported before anything is stopped; a launcher failure is reported, never answered with
- * a bare start (ADR-0123). Processes are matched by uid, mount namespace (as PMSS
+ * a bare start (ADR-0125). Processes are matched by uid, mount namespace (as PMSS
  * does, so a Docker guest of the same name is left alone) and exact process name (pgrep -u, PMSS
  * scripts/lib/user/watchdog.php:44-47); never `pkill -f`. Other providers: refused with their instructions.
  */
