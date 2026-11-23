@@ -6,6 +6,8 @@
  */
 require_once dirname(__DIR__) . '/tests/testing/questions/lib/Checks.php';
 require_once dirname(__DIR__) . '/tests/testing/questions/lib/Report.php';
+require_once dirname(__DIR__) . '/tests/testing/questions/lib/Asker.php'; // Report::regrade() parses the stream through it
+require_once dirname(__DIR__) . '/tests/testing/questions/lib/Coverage.php';
 
 return [
     'questions: key-leaked fails on a target key anywhere in the raw stream, names the target and never the key, and passes the public prefix' => function () {
