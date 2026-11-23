@@ -1,8 +1,10 @@
 <?php
 /**
- * Edge cases of the shared extra verbs found in review, through the fake client of TorrentsTest.php (loaded first: name
- * order), plus the size rules for the torrent-clients code (AGENTS.md: small files, short lines).
+ * Edge cases of the shared extra verbs found in review, through the fake client of tests/torrentsSupport.php, plus the size
+ * rules for the torrent-clients code (AGENTS.md: small files, short lines).
  */
+require_once __DIR__ . '/torrentsSupport.php';
+
 return [
     'torrents: a non-zero rate that rounds to 0 B/s is refused (0 means no limit); limit takes no positional argument' => function () {
         $dir = torrentsFixture();

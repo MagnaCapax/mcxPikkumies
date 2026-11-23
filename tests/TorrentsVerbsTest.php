@@ -1,8 +1,10 @@
 <?php
 /**
  * The shared extra verbs (tools/torrent-clients/lib: TorrentList, TorrentChange, TorrentTrackers) through the fake client of
- * TorrentsTest.php, whose helpers this file uses (tests/run.php loads TorrentsTest.php first: name order).
+ * tests/torrentsSupport.php, whose helpers this file requires.
  */
+require_once __DIR__ . '/torrentsSupport.php';
+
 return [
     'torrents: list --sort orders before the limit, nulls last, --reverse flips; bad field or bare --reverse refused' => function () {
         $dir = torrentsFixture();

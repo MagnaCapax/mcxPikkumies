@@ -1,9 +1,10 @@
 <?php
 /**
  * The shared delete rules (tools/torrent-clients/lib: DeletePlan, DeleteFreed, DeleteRun) and add --dir, through the fake
- * client of TorrentsTest.php. Its helpers (torrentsFixture and the others) are defined there: tests/run.php loads the test
- * files in name order, and TorrentsTest.php sorts before this file (as CliTest.php, which defines cliLines, sorts first).
+ * client of tests/torrentsSupport.php, whose helpers (torrentsFixture and the others) this file requires.
  */
+require_once __DIR__ . '/torrentsSupport.php';
+
 return [
     'torrents: --expect is the exact byte total show printed; a bare rounded label or a changed total is refused' => function () {
         $dir = torrentsFixture();
