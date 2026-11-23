@@ -190,9 +190,7 @@ switch ($cmd) {
         }
         $home = getenv('HOME');
         $link = $home . '/pikkumies';
-        if (!file_exists($link)) {
-            @symlink(Config::root(), $link);
-        }
+        $linkNote = PathInstall::ensureRootLink($home, Config::root());
         Config::writeDefaultsIfMissing();
         try {
             foreach ($installSettings as $key => $value) {
@@ -217,6 +215,9 @@ switch ($cmd) {
             exit(1);
         }
         out('pikkumies installed at ' . Config::root());
+        if ($linkNote !== '') {
+            out('  link: ' . $linkNote);
+        }
         out('  root: ' . ($profile['root']['available'] ? 'available via ' . $profile['root']['via'] : 'not available'));
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');

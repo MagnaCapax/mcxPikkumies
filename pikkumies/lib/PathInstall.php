@@ -57,6 +57,26 @@ class PathInstall
         return is_link($link) && readlink($link) === $target ? "$link (already linked)" : "could not link $link";
     }
 
+    /**
+     * Make ~/pikkumies point at the install root. Only an absent name and a symlink that no longer
+     * resolves are touched: anything that exists (a real file or directory, or a link that resolves,
+     * even to somewhere else) is the user's and is left alone. Returns '' when nothing needs saying,
+     * else one line naming the repaired link's old target or the failure.
+     */
+    public static function ensureRootLink($home, $root)
+    {
+        $link = rtrim((string) $home, '/') . '/pikkumies';
+        if (file_exists($link)) {
+            return '';
+        }
+        $old = is_link($link) ? readlink($link) : false;
+        $result = self::ensureLink($home, $root);
+        if (strpos($result, 'could not link') === 0) {
+            return $result;
+        }
+        return $old === false ? '' : "replaced $link, which pointed at $old that does not exist; $result";
+    }
+
     /** The marked PATH block for $dir, as shell source lines. */
     public static function block($dir)
     {

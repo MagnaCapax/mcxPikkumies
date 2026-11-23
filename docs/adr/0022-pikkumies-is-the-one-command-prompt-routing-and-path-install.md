@@ -53,3 +53,6 @@ For PATH:
 
 ## Amendment 2026-10-19: Eternal resident invocation
 `pikkumies run --eternal pmN` is the resident process of an Eternal tmux window. It takes the same launcher gates and session path as a normal `pikkumies --resume <id>` start. See [ADR-0075](0075-eternals-primary-ask-and-ui.md).
+
+## Amendment 2026-11-23: a dangling ~/pikkumies is repaired
+`pikkumies install` links `~/pikkumies` to the install root through `PathInstall::ensureRootLink()`. A name that is absent gets the link, as before. A symlink that no longer resolves (a restored or copied home, for example) is replaced and the install prints the old target and the new link; a failed link is printed too, never swallowed. Anything that exists is left alone: a real file or directory, and a link that resolves even to somewhere else. The old inline `file_exists()` check treated a dangling link as absent and its suppressed `symlink()` then failed, so `~/.local/bin/pikkumies` was linked through a dead path and the command was not found.

@@ -81,4 +81,53 @@ return [
         check(is_link("$tmp/.profile") && !file_exists("$tmp/nowhere"), 'dangling link was followed or replaced');
         exec('rm -rf ' . escapeshellarg($tmp));
     },
+    'pathinstall: ensureRootLink repairs a dangling ~/pikkumies and names the old target; creates an absent one silently' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-root-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/home", 0700, true);
+        @mkdir("$tmp/root/bin", 0700, true);
+        file_put_contents("$tmp/root/bin/pikkumies", "#!/bin/sh\n");
+        symlink("$tmp/missing-home/.mcxPikkumies/pikkumies", "$tmp/home/pikkumies");
+        check(!file_exists("$tmp/home/pikkumies"), 'setup: the link should dangle');
+        $note = PathInstall::ensureRootLink("$tmp/home", "$tmp/root");
+        check(is_link("$tmp/home/pikkumies") && readlink("$tmp/home/pikkumies") === "$tmp/root", 'dangling link not repointed: ' . $note);
+        check(is_file("$tmp/home/pikkumies/bin/pikkumies"), 'the repaired link does not resolve to the launcher');
+        check(strpos($note, "$tmp/missing-home/.mcxPikkumies/pikkumies") !== false, "the old target is not named: $note");
+        check(PathInstall::ensureRootLink("$tmp/home", "$tmp/root") === '', 're-run should say nothing');
+        unlink("$tmp/home/pikkumies");
+        check(PathInstall::ensureRootLink("$tmp/home", "$tmp/root") === '' && readlink("$tmp/home/pikkumies") === "$tmp/root", 'an absent link was not created quietly');
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
+    'pathinstall: ensureRootLink never touches a real directory, a real file or a link that resolves' => function () {
+        $tmp = sys_get_temp_dir() . '/pk-root2-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/root", 0700, true);
+        @mkdir("$tmp/h1/pikkumies/keep", 0700, true);
+        file_put_contents("$tmp/h1/pikkumies/keep/data", 'mine');
+        @mkdir("$tmp/h2", 0700, true);
+        file_put_contents("$tmp/h2/pikkumies", 'a plain file');
+        @mkdir("$tmp/h3", 0700, true);
+        @mkdir("$tmp/own-clone", 0700, true);
+        symlink("$tmp/own-clone", "$tmp/h3/pikkumies");
+        foreach (['h1', 'h2', 'h3'] as $h) {
+            $note = PathInstall::ensureRootLink("$tmp/$h", "$tmp/root");
+            check($note === '', "$h: said something about a name that exists: $note");
+        }
+        check(file_get_contents("$tmp/h1/pikkumies/keep/data") === 'mine' && !is_link("$tmp/h1/pikkumies"), 'a real directory was replaced');
+        check(file_get_contents("$tmp/h2/pikkumies") === 'a plain file', 'a real file was replaced');
+        check(readlink("$tmp/h3/pikkumies") === "$tmp/own-clone", 'a resolving link to another directory was repointed');
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
+    'pathinstall: ensureRootLink reports a failure to link instead of staying silent' => function () {
+        // A home whose parent is a regular file cannot hold a link, whoever runs the test.
+        $tmp = sys_get_temp_dir() . '/pk-root3-' . getmypid() . '-' . mt_rand();
+        @mkdir("$tmp/root", 0700, true);
+        file_put_contents("$tmp/notadir", 'x');
+        $note = PathInstall::ensureRootLink("$tmp/notadir/home", "$tmp/root");
+        check(strpos($note, 'could not link') === 0, "a failed link was silent or misreported: '$note'");
+        exec('rm -rf ' . escapeshellarg($tmp));
+    },
+    'pathinstall: the install case in bin/pikkumies uses ensureRootLink, not an inline file_exists + @symlink' => function () {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
+        check(strpos($src, 'PathInstall::ensureRootLink(') !== false, 'install no longer calls PathInstall::ensureRootLink');
+        check(strpos($src, '@symlink(') === false, 'install again links ~/pikkumies inline with a suppressed @symlink');
+    },
 ];
