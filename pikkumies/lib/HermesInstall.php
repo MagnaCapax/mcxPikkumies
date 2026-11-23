@@ -58,6 +58,7 @@ class HermesInstall
         'web.keyless_rescue' => ['hermes_cli/config_defaults.py', '"keyless_rescue":'],
         'web.search_backend' => ['hermes_cli/config_defaults.py', '"search_backend":'],
         'security.allow_lazy_installs' => ['hermes_cli/config_defaults.py', '"allow_lazy_installs":'],
+        'lsp.install_strategy' => ['hermes_cli/config_defaults.py', '"install_strategy":'],
         'approvals.mode' => ['tools/approval_context.py', '_VALID_MODES = ("manual", "smart", "off")'],
         'approvals.destructive_slash_confirm' => ['hermes_cli/config_defaults.py', '"destructive_slash_confirm":'],
         'approvals.mcp_reload_confirm' => ['hermes_cli/config_defaults.py', '"mcp_reload_confirm":'],

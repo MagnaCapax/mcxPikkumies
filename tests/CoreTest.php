@@ -119,6 +119,9 @@ return [
         check(strpos($y, "approvals:\n  mode: \"off\"\n") !== false, 'approvals off: Hermes never shows its approval prompt, hook questions are decided by the ask policy (ADR-0073)');
         $lazy = HermesConfig::renderYaml(['endpoint' => 'e', 'model' => 'm', 'key' => 'k'], ['/a/skills'], [], true);
         check(strpos($lazy, "allow_lazy_installs: true") !== false, 'hermes.lazyInstalls switch ignored');
+        // Hermes' language-server auto-install is a runtime install outside allow_lazy_installs and fills the account's file quota.
+        check(strpos($y, "lsp:\n  install_strategy: manual\n") !== false, 'no language server is installed at runtime by default');
+        check(strpos($lazy, "lsp:\n  install_strategy: auto\n") !== false && strpos($lazy, 'manual') === false, 'hermes.lazyInstalls gives the language-server install back');
         // Unapproved shell hooks are silently skipped in a non-interactive run.
         check(strpos($y, "hooks_auto_accept: true\nhooks:\n  pre_tool_call:\n    - command: \"/usr/bin/php /h/orchestrator.php pre_tool_call\"\n      timeout: 12\n") !== false, 'hook with consent');
         $noHooks = HermesConfig::renderYaml(['endpoint' => 'https://x/v1', 'model' => 'm', 'key' => 'secret'], ['/a/skills'], []);

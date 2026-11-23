@@ -245,6 +245,10 @@ class HermesConfig
         // (tools/file_tools_write_guards.py). Such a write can be undone and its terminal form was never asked; Pikkumies'
         // own SOUL.md is rebuilt at every start and its hooks and settings have their own checks (ADR-0073 amendment).
         $y .= "security:\n  allow_lazy_installs: " . ($lazyInstalls ? 'true' : 'false') . "\n  protected_instruction_files: false\n";
+        // Hermes' LSP diagnostics install language servers from npm, go and pip on first use into HERMES_HOME/lsp, which
+        // allow_lazy_installs does not gate (agent/lsp/install.py try_install), and an npm install is thousands of
+        // files in the account. manual: only servers already on PATH. hermes.lazyInstalls puts it back to Hermes' own auto (ADR-0021 amendment).
+        $y .= "lsp:\n  install_strategy: " . ($lazyInstalls ? 'auto' : 'manual') . "\n";
         // approvals.mode "off": Hermes never shows its approval prompt; its hardline floor (rm -rf /, mkfs on a disk, ...)
         // and the user's approvals.deny still block (tools/approval.py, hermes_cli/approvals_test.py). "off" also approves
         // every hook "approve" answer without asking (_run_approval_gate), so Pikkumies never sends one: the orchestrator's
