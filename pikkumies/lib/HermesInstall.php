@@ -77,6 +77,9 @@ class HermesInstall
         'telemetry.shared_metrics' => ['hermes_cli/config_defaults.py', '"shared_metrics":'],
         'onboarding.profile_build' => ['agent/onboarding.py', '_onboarding_section(config).get("profile_build")'],
         'onboarding.run' => ['hermes_cli/config_defaults.py', '"run": None,'],
+        // The step bound on every run (RunBound, ADR-0126): a Hermes without it would run unbounded, as before the bound existed.
+        // Weak: goals.max_turns has the same text in that file; the gateway reads agent.max_turns from the effective config, managed layer included.
+        'agent.max_turns' => ['hermes_cli/config_defaults.py', '"max_turns":'],
         'agent.disabled_toolsets' => ['hermes_cli/tools_config.py', '.get("disabled_toolsets")'],
         // The answer HermesTelemetry records; without it the dashboard and chat ask about sending metrics (ADR-0072).
         'telemetry.shared_metrics.offer_version' => ['hermes_cli/observability/shared_metrics_consent.py', 'section["offer_version"] = OFFER_VERSION'],

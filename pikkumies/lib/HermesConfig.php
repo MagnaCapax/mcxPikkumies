@@ -22,6 +22,7 @@ require_once __DIR__ . '/AskReview.php'; // AskReview::TIMEOUT in the pre_tool_c
 require_once __DIR__ . '/LocalNotes.php';
 require_once __DIR__ . '/HookInterval.php';
 require_once __DIR__ . '/PathName.php';
+require_once __DIR__ . '/RunBound.php';
 
 /** Only install and post-update may finish without a model; write failures must still stop them. */
 class ModelUnavailable extends Exception
@@ -109,7 +110,7 @@ class HermesConfig
         $web = !empty($config['web']['search']);
         // The pins, at every start: a key or setting changed after install reaches Hermes (ADR-0005), and a run
         // never starts without the hooks, since a failed write throws (ADR-0062).
-        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true, $web) . self::sessionsYaml($config, true));
+        self::put($managed . '/config.yaml', self::renderYaml($prov, [], $hooks, $lazy, $light, true, $web) . self::sessionsYaml($config, true) . RunBound::yaml($config));
         // Key lives only in the managed .env (0600); config.yaml points at it via providers.pikkumies.key_env.
         self::put($managed . '/.env', "PIKKUMIES_API_KEY=" . $prov['key'] . "\n", 0600);
         // The skin display.skin names (StatusTheme), rebuilt like the managed files, before the seed can name it.
@@ -269,7 +270,8 @@ class HermesConfig
         $y .= $pinsOnly ? ($goalJudgeModel !== '' ? "auxiliary:\n" : '') : "auxiliary:\n  background_review:\n    enabled: true\n";
         // /goal's own judge (hermes_cli/goals.py auxiliary.goal_judge.provider/.model): the light model
         // already decided for hooks, under the one named provider every call here uses (ADR-0047).
-        // goals.max_turns stays at Hermes' own default; nothing here was measured to pick a number.
+        // goals.max_turns (the /goal loop's own limit) stays at Hermes' own default; nothing here was measured to pick a number.
+        // The bound on every other run is agent.max_turns, pinned in the managed file only (RunBound, ADR-0126).
         if ($goalJudgeModel !== '') {
             $y .= "  goal_judge:\n    provider: \"pikkumies\"\n    model: " . self::q($goalJudgeModel) . "\n";        }
         // The seed only, so the line stays the user's: clarify is how Hermes lets the agent stop to ask; the tool hook

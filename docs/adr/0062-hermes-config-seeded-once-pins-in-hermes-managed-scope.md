@@ -47,6 +47,7 @@ Hermes v0.22.2 (the newest stable release, which `pikkumies install` checks out)
 - A user's own Hermes hook on an event Pikkumies also hooks is replaced, since the managed list wins whole; local hook units ([ADR-0054](0054-tool-hooks-and-local-hooks.md)) are the way to add one.
 - Someone who removes the generated directory from `skills.external_dirs` gets it back at the next start; `tools.disabled` and `skills.disabled` are the supported off switches.
 - Not verified on a live host in this change (live QA was not run): that `hermes config set display.skin x` survives a restart, that `approvals.mode off` is refused, that the managed `.env` key reaches the provider, that a one-shot run with broken YAML shows Hermes' message, and that `pikkumies -m` overrides the pinned model.
+- (Amended 2026-11-23, [ADR-0126](0126-a-bound-on-every-run-agent-max-turns-and-a-time-limit-on-the-one-shot-resumes.md).) `agent.max_turns` joins the pinned list, from `run.maxTurns` in `local/config.php`.
 
 ## References
 - Hermes v0.22.2: `hermes_cli/managed_scope.py`, `hermes_cli/env_loader.py` (`_apply_managed_env`), `hermes_cli/config.py` (`_exit_if_key_managed`, `set_config_value`, `_strip_managed_keys_for_save`, `require_parseable_user_config`), `hermes_cli/config_backups.py`, `agent/skill_utils.py`, `hermes_cli/cli_init_mixin.py`.

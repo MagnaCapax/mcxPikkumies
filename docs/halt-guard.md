@@ -23,6 +23,10 @@ Hermes only offers one hook that can keep a turn going after a text answer, `pre
 
 If Pikkumies already writes a Hermes `auxiliary.*` setting for this provider (it does, `auxiliary.background_review`), `/goal`'s own judge (`auxiliary.goal_judge`) is pointed at the same light model the hooks use, so it costs no extra model selection; `goals.max_turns` is left at Hermes' default, since nothing here measured a better number.
 
+## The bound on every run
+
+Every Hermes run Pikkumies starts carries a step limit, pinned in the managed config ([ADR-0126](adr/0126-a-bound-on-every-run-agent-max-turns-and-a-time-limit-on-the-one-shot-resumes.md)): `agent.max_turns` = `run.maxTurns` (default **100** model requests per turn; Hermes then asks the model for a last answer from what it has). It reaches interactive sessions too. Separately, the halt guard stops resuming an unfinished one-shot once `run.budgetSeconds` (default **1200** seconds) have passed since it started, and says so on stderr; that time limit is Pikkumies' own and touches no interactive session. Both are set by hand in `local/config.php` (`return ['run' => ['maxTurns' => 300, 'budgetSeconds' => 3600]];`), `0` turns one off, and the agent cannot change them. The defaults are a judgement from the longest completed runs measured (33 tool calls, 6.6 minutes), not a limit anyone measured: raise them for a deployment whose tasks are longer. `pikkumies run chat --max-turns N` still wins for one call.
+
 ## Safety
 
 - Both hooks are fail-open: `failClosed: false` ([ADR-0030](adr/0030-hooks-as-units-run-by-one-orchestrator.md) fails closed only for `pre_tool_call`, where the delete guard lives). An unreadable snapshot, a dead model endpoint or a timeout always lets the turn end.

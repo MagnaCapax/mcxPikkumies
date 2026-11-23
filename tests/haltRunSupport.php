@@ -47,6 +47,8 @@ if (!function_exists('haltRunTree')) {
             . '$plan = json_decode((string) @file_get_contents("$dir/plan.json"), true);' . "\n"
             . '$plan = is_array($plan) ? $plan : [];' . "\n"
             . '$step = isset($plan[$n]) ? $plan[$n] : ($plan ? end($plan) : ["output" => "", "code" => 0, "session_id" => "fakesess"]);' . "\n"
+            // A planned step may take time ("sleep" seconds), for the tests of the run's time bound (ADR-0126).
+            . 'if (isset($step["sleep"])) { sleep((int) $step["sleep"]); }' . "\n"
             . '$qf = null; $hasQuery = false;' . "\n"
             . 'foreach (array_slice($argv, 1) as $k => $a) { if (strpos($a, "--query-file=") === 0) { $qf = substr($a, 13); } elseif ($a === "--query-file") { $qf = (string) $argv[$k + 2]; } elseif (strpos($a, "--query=") === 0) { $hasQuery = true; } }' . "\n"
             . '$qfText = $qf === null ? null : ($qf === "-" ? stream_get_contents(STDIN) : (string) @file_get_contents($qf));' . "\n"

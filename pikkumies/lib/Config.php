@@ -41,6 +41,8 @@ class Config
             'agent' => ['name' => ''],
             // perfLogging: memory-search and lesson-save metrics kept on this machine only (ADR-0041). telemetry: a setting only, no sender exists.
             'privacy' => ['perfLogging' => true, 'telemetry' => true],
+            // run: the bound on every Hermes run (RunBound, ADR-0126): model requests per turn (pinned as agent.max_turns), and seconds a one-shot may run before it is no longer resumed. 0 = off. Hand-edited only, never agent-settable.
+            'run' => ['maxTurns' => 100, 'budgetSeconds' => 1200],
             'sessions' => ['retentionDays' => 0],   // Hermes session history; 0 = keep forever
             'terms' => ['accepted' => false],        // set only by the person: the first interactive run or install --accept-terms
             // Where the agent may connect over SSH (ADR-0068): host patterns; deny wins; blockUnknown refuses a host on neither list.

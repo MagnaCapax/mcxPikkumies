@@ -23,6 +23,7 @@ require_once __DIR__ . '/HookAsync.php';
 require_once __DIR__ . '/Antipatterns.php';
 require_once __DIR__ . '/StreamProgress.php';
 require_once __DIR__ . '/GatewayWait.php';
+require_once __DIR__ . '/RunBound.php';
 
 class HaltRun
 {
@@ -38,6 +39,7 @@ class HaltRun
      */
     public static function run($hermesBin, array $passArgs, ?StreamProgress $render = null)
     {
+        $startedAt = time();
         $lost = false;
         list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs, $render, false, $lost);
         if ($lost) {
@@ -51,6 +53,7 @@ class HaltRun
         }
         $resumeTail = self::formatArgs($passArgs); // a stream-json caller keeps getting stream-json on the resumes
         $continuesLeft = self::MAX_CONTINUES;
+        $budget = RunBound::budgetSeconds(Config::load()); // run.budgetSeconds: past it, no further resume of an unfinished run
         $wrappedUp = false;
         // One resume of the session; true when its turn was lost (the report is out and the run ends, see lostTurn()).
         $resume = function ($text, $aside) use ($hermesBin, $sessionId, $resumeTail, $render, &$code, &$output) {
@@ -73,6 +76,16 @@ class HaltRun
             $applied = Antipatterns::apply($verdict, Antipatterns::forTurn($sessionId, $output, $evidence['commands'], 'oneshot'));
             $verdict['message'] = $applied['message'];
             HaltState::logDecision($sessionId, 'oneshot', 0, $verdict, 0, $continuesLeft === 0); // no continue left after this one (ADR-0102)
+            if ($verdict['verdict'] === 'continue' && $continuesLeft > 0 && $budget > 0 && time() - $startedAt >= $budget) {
+                // The one-shot has used its time (ADR-0126): another resume would start a new Hermes run with a new budget of its own.
+                $stop = 'Stopped: this run used its time limit of ' . (int) floor($budget / 60) . ' minutes (run.budgetSeconds) and is not finished. What is above is what it got to.';
+                if ($render !== null) {
+                    $render->say($stop);
+                } else {
+                    fwrite(STDERR, 'Pikkumies: ' . $stop . "\n");
+                }
+                return $code;
+            }
             if ($verdict['verdict'] === 'continue' && $continuesLeft > 0) {
                 $continuesLeft--;
                 if ($render !== null) {
