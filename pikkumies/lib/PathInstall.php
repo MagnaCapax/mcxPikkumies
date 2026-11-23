@@ -36,14 +36,20 @@ class PathInstall
         return [self::candidates($home)[0], false];
     }
 
-    /** Symlink $dir/pikkumies -> $target. Leaves an existing non-symlink alone (never overwritten). */
-    public static function ensureLink($dir, $target)
+    /**
+     * Symlink $dir/$name -> $target. Leaves an existing non-symlink alone (never overwritten). A link that points elsewhere
+     * is retargeted when $retarget (the `pikkumies` link is ours), else left alone (a `hermes` link may be the person's own).
+     */
+    public static function ensureLink($dir, $target, $name = 'pikkumies', $retarget = true)
     {
         @mkdir($dir, 0700, true);
-        $link = $dir . '/pikkumies';
+        $link = $dir . '/' . $name;
         if (is_link($link)) {
             if (readlink($link) === $target) {
                 return $link . ' (already linked)';
+            }
+            if (!$retarget) {
+                return $link . ' links elsewhere; left alone';
             }
             @unlink($link);
         } elseif (file_exists($link)) {
@@ -75,6 +81,21 @@ class PathInstall
             return $result;
         }
         return $old === false ? '' : "replaced $link, which pointed at $old that does not exist; $result";
+    }
+
+    /**
+     * $name -> $target next to the `pikkumies` link, in each bin directory that already holds one and nowhere else (the
+     * `hermes` resume entry, ADR-0022 amendment 2026-11-23). Returns a status line per directory.
+     */
+    public static function linkBeside($home, $name, $target)
+    {
+        $lines = [];
+        foreach (self::candidates($home) as $dir) {
+            if (is_link($dir . '/pikkumies')) {
+                $lines[] = self::ensureLink($dir, $target, $name, false);
+            }
+        }
+        return $lines;
     }
 
     /** The marked PATH block for $dir, as shell source lines. */
@@ -156,10 +177,13 @@ class PathInstall
      * ~/.bashrc and ~/.profile when $dir is not already on PATH some other way. Returns a status
      * line for `pikkumies install` to print.
      */
-    public static function install($home, $pathEnv, $target)
+    public static function install($home, $pathEnv, $target, $resumeTarget = '')
     {
         list($dir, $onPath) = self::binDir($home, $pathEnv);
         $linked = self::ensureLink($dir, $target);
+        if ($resumeTarget !== '') {
+            $linked .= '; hermes resume entry: ' . implode(', ', self::linkBeside($home, 'hermes', $resumeTarget));
+        }
         if ($onPath) {
             return "$dir ($linked); already on PATH";
         }

@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+/**
+ * hermes: the resume entry that sits beside `pikkumies` on PATH because Hermes prints `hermes --resume <id>` when a session
+ * ends. It continues a session and nothing else (lib/HermesShim.php, ADR-0022 amendment 2026-11-23).
+ */
+require_once dirname(__DIR__) . '/lib/HermesShim.php';
+
+list($words, $refusal) = HermesShim::route(array_slice($argv, 1));
+if ($refusal !== '') {
+    fwrite(STDERR, $refusal . "\n");
+    exit(2);
+}
+@passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/pikkumies') . ' ' . implode(' ', array_map('escapeshellarg', $words)), $code);
+exit($code === -1 || $code === null ? 1 : $code);

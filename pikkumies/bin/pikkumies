@@ -228,7 +228,7 @@ switch ($cmd) {
         out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));
         out('  docs: ' . startDocsFill());
         try {
-            out('  path: ' . PathInstall::install($home, (string) getenv('PATH'), $link . '/bin/pikkumies'));
+            out('  path: ' . PathInstall::install($home, (string) getenv('PATH'), $link . '/bin/pikkumies', $link . '/bin/hermes'));
         } catch (Exception $x) {
             out('  path: not set up: ' . $x->getMessage());
         }
@@ -266,6 +266,8 @@ switch ($cmd) {
         // Hermes updates on its own path (`pikkumies run update`, ADR-0033): this only builds it where none exists.
         // Unattended (reserve, idle priority) unless a person started the update (ADR-0013 addendum 2026-11-14).
         out('hermes: ' . HermesInstall::ensure(!Update::attended(), !empty($profile['root']['available']), !empty($config['hermes']['lazyInstalls'])));
+        // The resume entry (ADR-0022 amendment 2026-11-23) reaches an account that installed before it existed; beside the person's own `pikkumies` link only.
+        out('hermes resume entry: ' . (implode(', ', PathInstall::linkBeside((string) getenv('HOME'), 'hermes', (string) getenv('HOME') . '/pikkumies/bin/hermes')) ?: 'no pikkumies link in ~/.local/bin or ~/bin'));
         out('docs: ' . startDocsFill());
         break;
 
@@ -343,7 +345,7 @@ switch ($cmd) {
             $fix = $missingKeys ? HermesInstall::refusedFix() : '';
             out('hermes config keys: ' . ($missingKeys ? 'missing: ' . implode(', ', $missingKeys) . ' (Pikkumies will not start this Hermes)' . ($fix !== '' ? '. ' . $fix : '') : 'ok'));
             $leaks = HermesInstall::pathLaunchers((string) getenv('HOME'));
-            out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no launchers in ~/.local/bin (cli.expose_on_path: false)'));
+            out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no Hermes launchers in ~/.local/bin (cli.expose_on_path: false)'));
             // What a start checks before it launches Hermes, said here too (GH #17); nothing printed when it passes.
             if (($startRefusal = HermesInstall::startRefusal(HermesConfig::envArgv())) !== '') {
                 out('Not starting: ' . $startRefusal);
