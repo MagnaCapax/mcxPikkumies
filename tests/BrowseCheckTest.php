@@ -26,6 +26,12 @@ function browseCheckWorld(callable $fn)
         BrowsePaths::$local = "$t/local";
         BrowseCheck::$source = "$t/hermes";
         BrowseCheck::$userConfig = "$t/config.yaml";
+        // a shared account list by default, so nothing here depends on the machine the suite runs on (fenceReason)
+        file_put_contents("$t/passwd", "alpha:x:1000:1000::$t:/bin/sh\nbeta:x:1001:1001::$t:/bin/sh\n");
+        file_put_contents("$t/nsswitch.conf", "passwd:         files systemd\n");
+        BrowseCheck::$seedbox = "$t/no-seedbox";
+        BrowseCheck::$passwd = "$t/passwd";
+        BrowseCheck::$nsswitch = "$t/nsswitch.conf";
         BrowseCheck::$procSys = "$t/sys";
         BrowseCheck::$which = function ($tool) {
             return "/usr/bin/$tool";
@@ -38,6 +44,9 @@ function browseCheckWorld(callable $fn)
         BrowseCheck::$source = null;
         BrowseCheck::$userConfig = null;
         BrowseCheck::$procSys = '/proc/sys';
+        BrowseCheck::$seedbox = '/etc/seedbox';
+        BrowseCheck::$passwd = '/etc/passwd';
+        BrowseCheck::$nsswitch = '/etc/nsswitch.conf';
         BrowseCheck::$which = null;
         BrowseBinary::$lockFile = null;
         testRmTree($t);
@@ -98,6 +107,48 @@ return [
             check(BrowseCheck::chromiumVersion() === '141.0.7390.54', 'read from chromium --version');
             file_put_contents("$t/config.yaml", "browser:\n  restrict_evaluate: false\n");
             check(strpos(BrowseCheck::doctorLine(null, 'x'), 'browse:   off (browser.restrict_evaluate is not true') === 0, BrowseCheck::doctorLine(null, 'x'));
+        });
+    },
+    'browse check: the per-account fence is dropped only on a machine proven single-tenant, and every doubt keeps it (fenceReason)' => function () {
+        browseCheckWorld(function ($t) {
+            $one = "alpha:x:1000:1000::$t:/bin/sh\nroot:x:0:0:root:$t:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nsvc:x:998:998::$t:/bin/false\n";
+            $cases = [
+                // [passwd, nsswitch, seedbox dir present, expected: '' for no fence, else a word of the reason, what it shows]
+                [$one, "passwd: files systemd\n", false, '', 'one human account (system accounts and root do not count)'],
+                ["root:x:0:0:root:$t:/bin/bash\n", "passwd:  files\n", false, '', 'root alone'],
+                [$one . "beta:x:1001:1001::$t:/bin/sh\n", "passwd: files systemd\n", false, 'more than one account', 'two accounts with a home'],
+                [$one, "passwd: files systemd\n", true, 'PMSS', 'a PMSS server with one account'],
+                [$one, "passwd: files ldap\n", false, 'directory service', 'accounts from LDAP the file cannot show'],
+                [$one, "passwd: files sss systemd\n", false, 'directory service', 'accounts from sssd'],
+                [$one, "passwd: compat\n", false, 'directory service', 'compat mode reads NIS entries'],
+                [$one, "# nothing about passwd here\nhosts: files dns\n", false, 'directory service', 'no passwd line'],
+                [$one, "passwd: files [NOTFOUND=return] systemd\n", false, 'directory service', 'a lookup action is not plain files'],
+            ];
+            foreach ($cases as $c) {
+                file_put_contents("$t/passwd", $c[0]);
+                file_put_contents("$t/nsswitch.conf", $c[1]);
+                BrowseCheck::$seedbox = $c[2] ? $t : "$t/no-seedbox";
+                $r = BrowseCheck::fenceReason();
+                check($c[3] === '' ? $r === '' : strpos($r, $c[3]) !== false, "{$c[4]}: " . json_encode($r));
+            }
+            BrowseCheck::$seedbox = "$t/no-seedbox";
+            file_put_contents("$t/passwd", $one);
+            unlink("$t/nsswitch.conf");
+            check(strpos(BrowseCheck::fenceReason(), 'cannot be read') !== false, 'no name-service switch file: the fence stays');
+            file_put_contents("$t/nsswitch.conf", "passwd: files\n");
+            BrowseCheck::$passwd = "$t/missing-passwd";
+            check(strpos(BrowseCheck::fenceReason(), 'cannot be read') !== false, 'no account list: the fence stays (Detect::sharedTenancy alone would say not shared)');
+        });
+    },
+    'browse check: the doctor line and status name the single-tenant mode, and the shared line is unchanged' => function () {
+        browseCheckWorld(function ($t) {
+            check(BrowseCheck::doctorLine(['guard' => []], '141.0.7390.54') === 'browse:   ready (chromium 141.0.7390.54, agent-browser 0.26.0, isolated, guard up)', 'shared: as before');
+            check(BrowseCli::statusRecord()['fence'] === 'per-account paths', 'status on a shared host');
+            file_put_contents("$t/passwd", "alpha:x:1000:1000::$t:/bin/sh\n");
+            check(BrowseCheck::doctorLine(['guard' => []], '141.0.7390.54') === 'browse:   ready (chromium 141.0.7390.54, agent-browser 0.26.0, single-tenant host: no per-account fence, isolated, guard up)',
+                BrowseCheck::doctorLine(['guard' => []], '141.0.7390.54'));
+            check(strpos(BrowseCheck::doctorLine(null, '141.0.7390.54'), 'agent-browser 0.26.0, single-tenant host: no per-account fence') !== false, 'the stopped line says it too');
+            check(strpos(BrowseCli::statusRecord()['fence'], 'none') === 0, 'status on a single-tenant host');
         });
     },
 ];

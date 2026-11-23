@@ -102,7 +102,8 @@ class BrowseSupervisor
             return $gate;
         }
         $id = $this->identity !== null ? $this->identity : self::identity();
-        if (!preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i', $id['fqdn'])) { // the guard's fence is keyed on the panel host; a guess would leave it open
+        $single = BrowseCheck::fenceReason() === ''; // proven single-tenant: nobody to fence off and no panel login to protect (ADR-0120)
+        if (!$single && !preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i', $id['fqdn'])) { // the guard's fence is keyed on the panel host; a guess would leave it open
             return 'the panel host name of this server could not be resolved (hostname -f gave "' . $id['fqdn'] . '")';
         }
         BrowseState::clear();
@@ -154,9 +155,10 @@ class BrowseSupervisor
             return $iso;
         }
 
-        $guardArgv = [PHP_BINARY, __DIR__ . '/guard.php', '--cdp', $cdp, '--log', BrowsePaths::file('guardLog'), '--self', $id['user'],
-            '--host', $id['fqdn'], '--intent', BrowsePaths::file('intent'), '--ready', BrowsePaths::file('ready')];
-        $auth = $this->panelAuth($id);
+        $guardArgv = array_merge([PHP_BINARY, __DIR__ . '/guard.php', '--cdp', $cdp, '--log', BrowsePaths::file('guardLog'), '--self', $id['user']],
+            $single ? ['--single-tenant'] : ['--host', $id['fqdn']],
+            ['--intent', BrowsePaths::file('intent'), '--ready', BrowsePaths::file('ready')]);
+        $auth = $single ? '' : $this->panelAuth($id); // no fence, so no login: the guard refuses the two together
         if ($auth !== '') {
             $guardArgv = array_merge($guardArgv, ['--auth-file', $auth]);
         }
@@ -174,7 +176,7 @@ class BrowseSupervisor
         BrowseState::touch();
         $s['watcher'] = BrowseState::part($p->spawn([PHP_BINARY, __DIR__ . '/browse.php', 'watch'], $log), $p);
         BrowseState::write($s);
-        BrowseState::log("started (agent-browser {$pin['version']}, isolated, guard up)");
+        BrowseState::log("started (agent-browser {$pin['version']}, isolated, guard up" . ($single ? ', single-tenant host: no per-account fence' : '') . ')');
         return '';
     }
 

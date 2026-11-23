@@ -49,6 +49,8 @@ return [
                 [['--cdp', $ws, '--log', $log], 'no --self'],
                 [['--cdp', $ws, '--log', $log, '--self', '../x'], 'a bad account name'],
                 [['--cdp', $ws, '--log', $log, '--self', 'exampleuser'], 'no --host'],
+                [['--cdp', $ws, '--log', $log, '--self', 'exampleuser', '--single-tenant', '--host', 'panel.example.com'], '--single-tenant with --host'],
+                [['--cdp', $ws, '--log', $log, '--self', 'exampleuser', '--single-tenant', '--auth-file', "$dir/auth-bad"], '--single-tenant with a login file'],
                 [['--cdp', 'ws://192.0.2.1:9222/devtools/browser/x', '--log', $log, '--self', 'exampleuser', '--host', 'panel.example.com'], 'a DevTools address off loopback'],
                 [['--cdp', "http://127.0.0.1:$port/", '--log', $log, '--self', 'exampleuser', '--host', 'panel.example.com'], 'an http address'],
                 [['--cdp', $ws, '--log', $log, '--self', 'exampleuser', '--host', 'panel.example.com', '--auth-file', "$dir/missing"], 'a missing login file'],

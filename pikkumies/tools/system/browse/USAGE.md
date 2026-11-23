@@ -6,7 +6,7 @@ The isolated browser behind Hermes' browser tools: agent-browser and the server'
 |---|---|---|---|
 | up | `[--human]` | yes | Start the browser now: the readiness checks, the memory gate, the namespace, slirp4netns, agent-browser with Chromium, the isolation check, the guard. One record as `status` gives, `verified` when it runs. A failed check is a refusal with the reason; nothing is left running. |
 | down | `[--human]` | yes | Stop the browser and everything started for it. `stopped` (it was running), `running` (always false after). |
-| status | `[--human]` | no | `may_run` and `off_because` (the first failing check), `running`, `agent_browser` (the version the Hermes lock pins), `agent_browser_fetched`, `isolated`, `guard` (`up`/`down`), `idle_seconds`, `stops_after_idle_seconds`. |
+| status | `[--human]` | no | `may_run` and `off_because` (the first failing check), `running`, `agent_browser` (the version the Hermes lock pins), `agent_browser_fetched`, `isolated`, `guard` (`up`/`down`), `fence` (`per-account paths`, or `none: single-tenant host` where [ADR-0120](../../../../docs/adr/0120-single-tenant-machines-need-no-browser-fence.md) applies), `idle_seconds`, `stops_after_idle_seconds`. |
 
 ```sh
 php ~/pikkumies/tools/system/browse/browse.php status          # may it run here, does it run

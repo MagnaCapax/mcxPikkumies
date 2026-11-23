@@ -34,6 +34,33 @@ class BrowseCheck
     public static $userConfig = null;
     public static $which = null;
     public static $procSys = '/proc/sys';
+    /** Test seams for fenceReason(): the PMSS marker directory, the account list, the name-service switch. */
+    public static $seedbox = '/etc/seedbox';
+    public static $passwd = '/etc/passwd';
+    public static $nsswitch = '/etc/nsswitch.conf';
+
+    /**
+     * '' when this machine is proven single-tenant, so nobody else shares the server's own name and the guard needs no
+     * per-account fence (ADR-0120); else the plain reason the fence stays. Every doubt keeps the fence: a PMSS server
+     * (accounts share one panel name), an account list that cannot be read, accounts that may come from a directory
+     * service (the passwd line of nsswitch.conf names anything but files and systemd), or more than one account with a
+     * home (Detect::sharedTenancy). Read live from the OS each time, never from the cached profile: that file is the
+     * account's own to edit (ADR-0004 addendum), and a fence this account could drop by editing a cache is no fence.
+     */
+    public static function fenceReason()
+    {
+        if (is_dir(self::$seedbox)) {
+            return 'a PMSS server: accounts share one panel name';
+        }
+        $ns = is_readable(self::$passwd) ? @file_get_contents(self::$nsswitch) : false;
+        if ($ns === false) {
+            return 'the account list, or where it comes from, cannot be read';
+        }
+        if (!preg_match('/^passwd:[ \t]*([^#\r\n]*)/mi', $ns, $m) || array_diff(preg_split('/\s+/', trim($m[1])), ['files', 'systemd'])) {
+            return 'accounts may come from a directory service';
+        }
+        return Detect::sharedTenancy(false, self::$passwd) ? 'more than one account has a home on this server' : '';
+    }
 
     /** '' when the browser may be offered, else the first failing check, in plain words. Cheap: no process is run. */
     public static function problem()
@@ -129,6 +156,7 @@ class BrowseCheck
         $pin = BrowseBinary::currentPin();
         $chromiumVersion = $chromiumVersion !== null ? $chromiumVersion : self::chromiumVersion();
         $versions = 'chromium ' . ($chromiumVersion !== '' ? $chromiumVersion : '?') . ', agent-browser ' . $pin['version'];
+        $versions .= self::fenceReason() === '' ? ', single-tenant host: no per-account fence' : ''; // the shared-server line stays as it was
         if ($state !== null) {
             return "browse:   ready ($versions, isolated, guard up)";
         }

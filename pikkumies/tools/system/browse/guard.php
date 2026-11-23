@@ -8,10 +8,14 @@
  *
  * php guard.php --cdp ws://127.0.0.1:<port>/devtools/browser/<id> --log <file> --self <account> --host <panel host>...
  *               [--intent <file>] [--auth-file <file>] [--ready <file>]
+ * php guard.php --cdp ... --log <file> --self <account> --single-tenant [--intent <file>] [--ready <file>]
  *  --log        JSON Lines of blocked requests: time, reason, first path segment, method, type (never a full URL or
  *               a query string). Created 0600.
  *  --host       a host name the panel is reached by (repeatable, at least one). Required: a guessed name that missed
  *               the one the browser uses would leave the neighbours' paths unfenced.
+ *  --single-tenant  instead of --host, on a machine the supervisor proved has no other account (BrowseCheck::fenceReason):
+ *               nothing is fenced and no login is ever added, every request goes out stripped, every 401 is cancelled. It
+ *               refuses to start together with --host or --auth-file.
  *  --intent     the file the wrapper writes the CLI's next URL to (WebGuardIntent); without it the CLI's own
  *               navigation never gets the login.
  *  --auth-file  one line, the Authorization header value ("Basic <base64>"); a regular file this account owns, 0600.
@@ -35,6 +39,10 @@ function webGuardOptions(array $argv)
     $o = ['hosts' => []];
     for ($i = 1; $i < count($argv); $i++) {
         $k = $argv[$i];
+        if ($k === '--single-tenant') {
+            $o['single'] = true;
+            continue;
+        }
         if (!in_array($k, ['--cdp', '--auth-file', '--log', '--self', '--host', '--intent', '--ready'], true) || !isset($argv[$i + 1])) {
             throw new Exception("unknown option or missing value: $k");
         }
@@ -50,8 +58,12 @@ function webGuardOptions(array $argv)
             throw new Exception("--$need is required");
         }
     }
-    if (!$o['hosts'] || in_array('', $o['hosts'], true)) {
-        throw new Exception('--host is required: the panel host name the browser uses');
+    if (!empty($o['single'])) {
+        if ($o['hosts'] || isset($o['auth-file'])) { // with no panel host there is no fence; a login must never go out without one
+            throw new Exception('--single-tenant takes neither --host nor --auth-file');
+        }
+    } elseif (!$o['hosts'] || in_array('', $o['hosts'], true)) {
+        throw new Exception('--host is required (or --single-tenant): the panel host name the browser uses');
     }
     if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/', $o['self'])) {
         throw new Exception('--self is not an account name');

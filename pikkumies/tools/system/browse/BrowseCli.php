@@ -79,7 +79,7 @@ class BrowseCli
         $idle = BrowseState::idleSeconds(time());
         return ['may_run' => $problem === '', 'off_because' => $problem !== '' ? $problem : null, 'running' => $running,
             'agent_browser' => $pin !== null ? $pin['version'] : null, 'agent_browser_fetched' => $pin !== null && BrowseBinary::verify($pin, false) === '',
-            'isolated' => $running, 'guard' => $running ? 'up' : 'down', 'idle_seconds' => $running ? $idle : null,
+            'isolated' => $running, 'guard' => $running ? 'up' : 'down', 'fence' => BrowseCheck::fenceReason() === '' ? 'none: single-tenant host' : 'per-account paths', 'idle_seconds' => $running ? $idle : null,
             'stops_after_idle_seconds' => BrowseSupervisor::IDLE];
     }
 

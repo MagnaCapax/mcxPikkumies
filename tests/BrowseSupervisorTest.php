@@ -146,6 +146,12 @@ function browseSupWorld(callable $fn, $usage = null)
         BrowsePaths::$local = "$t/local";
         BrowseCheck::$source = "$t/hermes";
         BrowseCheck::$userConfig = "$t/config.yaml";
+        // a shared account list by default, so nothing here depends on the machine the suite runs on (fenceReason)
+        file_put_contents("$t/passwd", "alpha:x:1000:1000::$t:/bin/sh\nbeta:x:1001:1001::$t:/bin/sh\n");
+        file_put_contents("$t/nsswitch.conf", "passwd:         files systemd\n");
+        BrowseCheck::$seedbox = "$t/no-seedbox";
+        BrowseCheck::$passwd = "$t/passwd";
+        BrowseCheck::$nsswitch = "$t/nsswitch.conf";
         BrowseCheck::$procSys = "$t/nosys";
         BrowseCheck::$which = function ($tool) {
             return "/usr/bin/$tool";
@@ -168,6 +174,9 @@ function browseSupWorld(callable $fn, $usage = null)
         BrowseCheck::$source = null;
         BrowseCheck::$userConfig = null;
         BrowseCheck::$procSys = '/proc/sys';
+        BrowseCheck::$seedbox = '/etc/seedbox';
+        BrowseCheck::$passwd = '/etc/passwd';
+        BrowseCheck::$nsswitch = '/etc/nsswitch.conf';
         BrowseCheck::$which = null;
         BrowseBinary::$lockFile = null;
         testRmTree($t);
@@ -325,6 +334,31 @@ return [
             $code = BrowseCli::main(['--json', 'snapshot'], $sup);
             $out = ob_get_clean();
             check($code === 1 && strpos($out, 'guard did not attach') !== false && browseAllStopped($proc), "guard gone and cannot come back: fail closed: $out");
+        });
+    },
+    'browse supervisor: on a proven single-tenant machine the guard gets --single-tenant, no --host, no login and no host name is needed' => function () {
+        browseSupWorld(function ($sup, $proc, $t) {
+            file_put_contents(BrowseCheck::$passwd, "alpha:x:1000:1000::$t:/bin/sh\n");
+            mkdir("$t/home/.lighttpd", 0751, true);
+            file_put_contents("$t/home/.lighttpd.conf", "auth.require = (\n \"/user-exampleuser/\" => ( \"require\" => \"user=exampleuser|user=pikkumies.agent\" )\n)\n");
+            file_put_contents("$t/home/.lighttpd/.htpasswd", "exampleuser:kept-as-is\n");
+            mkdir("$t/local/secrets", 0700);
+            file_put_contents(BrowsePaths::authFile(), "Basic ZXhhbXBsZTpleGFtcGxl\n");
+            chmod(BrowsePaths::authFile(), 0600);
+            $sup->identity['home'] = "$t/home";
+            $sup->identity['fqdn'] = 'debian'; // an unqualified host name: a fence keyed on it would refuse, no fence needs none
+            check($sup->up() === [true, 'started'], 'started');
+            $guard = $proc->spawned()[2][1];
+            check(in_array('--single-tenant', $guard, true) && !in_array('--host', $guard, true) && !in_array('--auth-file', $guard, true)
+                && $guard[array_search('--self', $guard, true) + 1] === 'exampleuser', json_encode($guard));
+            check($proc->authSeen === null && !file_exists("$t/local/secrets/panel-agent") && file_get_contents("$t/home/.lighttpd/.htpasswd") === "exampleuser:kept-as-is\n",
+                'neither a stored header nor the agent login is used, and nothing is written to the panel password file');
+            check(strpos((string) file_get_contents(BrowsePaths::file('log')), 'single-tenant host: no per-account fence') !== false, 'the start says which mode it picked');
+        });
+        browseSupWorld(function ($sup, $proc) {
+            $sup->identity['fqdn'] = 'debian';
+            list($ok, $why) = $sup->up();
+            check(!$ok && strpos($why, 'panel host name') !== false && $proc->calls === [], "shared (two accounts): the unqualified name still refuses, nothing started: $why");
         });
     },
 ];

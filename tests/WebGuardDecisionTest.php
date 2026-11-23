@@ -113,4 +113,13 @@ return [
             testRmTree($dir);
         }
     },
+    'browse guard: with no panel host (a single-tenant machine) nothing is fenced and no request gets a login' => function () {
+        $own = 'https://server.example.com/user-exampleuser/';
+        foreach ([$own, 'https://server.example.com/', 'https://server.example.com/user-otheruser/', 'https://server.example.com/~otheruser/', 'http://192.0.2.10/app/'] as $url) {
+            foreach ([['mainNav' => true, 'cli' => true], ['top' => $own, 'frame' => $own], ['redirect' => true]] as $more) {
+                $d = WebGuardDecision::decide($more + ['url' => $url, 'method' => 'GET', 'type' => 'Document', 'top' => null, 'frame' => null, 'mainNav' => false, 'cli' => false], 'exampleuser', []);
+                check($d['action'] === 'strip', "$url with " . json_encode($more) . " gave {$d['action']}");
+            }
+        }
+    },
 ];
