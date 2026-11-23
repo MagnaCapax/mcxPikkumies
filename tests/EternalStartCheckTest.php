@@ -105,4 +105,43 @@ return [
             testRmTree($root);
         }
     },
+    'eternal list: a Primary with a free run lock says waiting-for-scheduler when no tick ran lately, and nothing extra when one did or the lock is held' => function () {
+        $root = eternalStartCheckWorld();
+        file_put_contents($root . '/listing.php', '<?php
+foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file;
+HermesInstall::$root = __DIR__;
+Eternal::$hostMarker = __DIR__ . "/enabled";
+CronTick::$setprivPresentOverride = false;
+putenv("PIKKUMIES_CONFIG=" . __DIR__ . "/local/config.php");
+putenv("PIKKUMIES_KEY=fixture-key");
+putenv("PIKKUMIES_ENDPOINT=https://example.invalid");
+Update::$cronTickLogOverride = $argv[1];
+EternalCli::$cgroupBody = "0::/user.slice/user-" . (function_exists("posix_geteuid") ? posix_geteuid() : getmyuid()) . ".slice/session-1.scope\n";
+echo json_encode(EternalCli::listing());');
+        $tick = $root . '/local/cron-tick.last';
+        $list = function () use ($root, $tick) {
+            list($code, $out) = runPhp($root . '/listing.php', [$tick]);
+            check($code === 0, 'listing fixture failed: ' . $code . ' ' . $out);
+            return json_decode($out, true)[0];
+        };
+        $run = null;
+        try {
+            $row = $list(); // no tick log at all: the tick has never run
+            check($row === ['id' => 'pm1', 'state' => 'starting', 'why' => 'waiting-for-scheduler'], 'a never-ticked scheduler was not named: ' . json_encode($row));
+            file_put_contents($tick, '');
+            touch($tick, time() - (Update::CRON_TICK_STALE_SECONDS + 60));
+            check($list()['why'] === 'waiting-for-scheduler', 'a stale tick was not named');
+            touch($tick, time() - 30);
+            check($list() === ['id' => 'pm1', 'state' => 'starting'], 'a fresh tick still got a reason: ' . json_encode($list()));
+            touch($tick, time() - (Update::CRON_TICK_STALE_SECONDS + 60));
+            $run = EternalLock::take($root . '/local/eternals/pm1.run');
+            check($run !== false, 'could not hold the run lock');
+            check($list() === ['id' => 'pm1', 'state' => 'running'], 'a resident Primary was reported with a scheduler reason: ' . json_encode($list()));
+        } finally {
+            if ($run) {
+                fclose($run);
+            }
+            testRmTree($root);
+        }
+    },
 ];

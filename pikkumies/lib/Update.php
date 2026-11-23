@@ -263,12 +263,25 @@ class Update
         if ($crontab !== null && strpos($crontab, self::CRON_TICK_TAG) === false) {
             return ['state' => 'missing-line', 'age' => null];
         }
-        $mtime = @filemtime(self::cronTickLog());
-        if ($mtime === false) {
+        $age = self::cronTickAge();
+        if ($age === null) {
             return ['state' => 'never', 'age' => null];
         }
-        $age = max(0, time() - $mtime);
         return ['state' => $age > self::CRON_TICK_STALE_SECONDS ? 'stale' : 'ok', 'age' => $age];
+    }
+
+    /** Seconds since the tick log was last rewritten, null when it never was. */
+    public static function cronTickAge()
+    {
+        $mtime = @filemtime(self::cronTickLog());
+        return $mtime === false ? null : max(0, time() - $mtime);
+    }
+
+    /** No tick seen for CRON_TICK_STALE_SECONDS, or ever: what `eternal list` shows as waiting-for-scheduler. Says nothing about why. */
+    public static function cronTickLate()
+    {
+        $age = self::cronTickAge();
+        return $age === null || $age > self::CRON_TICK_STALE_SECONDS;
     }
 
     /** Five missed ticks before it counts as not running: one slow minute or a suspended host is not a fault. */

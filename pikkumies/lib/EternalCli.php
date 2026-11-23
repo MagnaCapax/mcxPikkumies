@@ -150,6 +150,9 @@ class EternalCli
         return 2;
     }
 
+    /** Test seam: the /proc/self/cgroup text listing() reads (null = the real file). */
+    public static $cgroupBody = null;
+
     public static function listing()
     {
         $out = [];
@@ -172,7 +175,7 @@ class EternalCli
             }
             $hostWhy = '';
             $state = $paused !== '' || is_file(Eternal::quitPath($id)) ? 'quit' : ($lock ? ($ready ?: 'starting') : 'running');
-            if ($state !== 'quit' && $lock && !Eternal::cgroupAllows(@file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
+            if ($state !== 'quit' && $lock && !Eternal::cgroupAllows(self::$cgroupBody !== null ? self::$cgroupBody : @file_get_contents('/proc/self/cgroup'), function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())) {
                 $state = 'not-ready';
                 $hostWhy = 'host';
             }
@@ -180,8 +183,10 @@ class EternalCli
                 fclose($lock);
             }
             // 'why' tells the browser window what to say instead of waiting forever; 'reason' already means off/hold.
+            // A 'starting' row says waiting-for-scheduler when no per-minute tick has run lately: the tick is what starts it (ADR-0075 amendment 2026-11-23).
             $out[] = ['id' => $id, 'state' => $state] + ($paused !== '' ? ['reason' => $paused] : [])
-                + ($state === 'not-ready' ? ['why' => $hostWhy !== '' ? $hostWhy : ($why !== '' ? $why : 'unknown')] : []);
+                + ($state === 'not-ready' ? ['why' => $hostWhy !== '' ? $hostWhy : ($why !== '' ? $why : 'unknown')] : [])
+                + ($state === 'starting' && Update::cronTickLate() ? ['why' => 'waiting-for-scheduler'] : []);
         }
         return $out;
     }

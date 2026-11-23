@@ -116,4 +116,25 @@ return [
         }
         check($s['state'] === 'missing-line', 'an empty crontab has no tick line, so it is missing-line: ' . json_encode($s));
     },
+    'cronTickLate: no tick for longer than the stale limit, or never, is late; a tick inside the limit is not (what eternal list shows as waiting-for-scheduler)' => function () {
+        $dir = testTempDir('pk-tick-late');
+        $log = "$dir/cron-tick.last";
+        Update::$cronTickLogOverride = $log;
+        try {
+            $setAge = function ($seconds) use ($log) {
+                file_put_contents($log, '');
+                touch($log, time() - $seconds);
+                clearstatcache(); // one process reads the file once in production; this test reads it several times
+            };
+            check(Update::cronTickLate() === true && Update::cronTickAge() === null, 'a tick log that does not exist must read as late');
+            $setAge(Update::CRON_TICK_STALE_SECONDS - 10);
+            check(Update::cronTickLate() === false, 'a tick inside the limit must not read as late');
+            $setAge(Update::CRON_TICK_STALE_SECONDS + 10);
+            check(Update::cronTickLate() === true, 'a tick past the limit must read as late');
+            $setAge(-3600);
+            check(Update::cronTickAge() === 0 && Update::cronTickLate() === false, 'a tick dated in the future must read as fresh, not as an error');
+        } finally {
+            Update::$cronTickLogOverride = null;
+        }
+    },
 ];
