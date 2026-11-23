@@ -2,7 +2,7 @@
 require_once __DIR__ . '/ModelStartTest.php';
 
 /** Real provisioning in a private tree; intercept background downloads and never use the real crontab. */
-function modelInstallCheck($command, $keyFile, $endpoint = '', $existing = false)
+function modelInstallCheck($command, $keyFile, $endpoint = '', $existing = false, $model = '')
 {
     $dir = modelStartWorld();
     $repo = testTempDir('model-install');
@@ -13,7 +13,7 @@ function modelInstallCheck($command, $keyFile, $endpoint = '', $existing = false
         unlink("$dir/include/.hermes-ready");
         $config = [
             'autoUpdate' => ['disabled' => true], 'cron' => ['disabled' => true],
-            'provider' => ['keyFile' => "$dir/.pikkumiesKey", 'virsilipasKeyFile' => "$dir/.virsilipasKey"],
+            'provider' => ['keyFile' => "$dir/.pikkumiesKey", 'virsilipasKeyFile' => "$dir/.virsilipasKey", 'model' => $model],
             'update' => ['channel' => 'git/main'],
         ];
         file_put_contents("$dir/local/config.php", '<?php return ' . var_export($config, true) . ';');
@@ -95,6 +95,16 @@ return [
         list($code, $out, $dir) = modelInstallCheck('generate', "key=fixture-key\n");
         check($code === 1 && strpos($out, 'no endpoint= line') !== false && strpos($out, "$dir/.virsilipasKey") !== false
             && strpos($out, 'unreachable') === false, "generate: $code " . strtok($out, "\n"));
+    },
+    'a pinned model with a key and no endpoint is refused like an unpinned one, naming the endpoint= line, and writes nothing (#2)' => function () {
+        // The generated provider entry would carry base_url "", Hermes skips it and answers Unknown provider.
+        foreach ([false, true] as $existing) {
+            list($code, $out, $dir) = modelInstallCheck('generate', "key=fixture-key\n", '', $existing, 'pinned-model');
+            check($code === 1 && strpos($out, 'no endpoint= line') !== false && strpos($out, "$dir/.virsilipasKey") !== false,
+                "pinned generate: $code " . strtok($out, "\n"));
+            list(, $out) = modelInstallCheck('install', "key=fixture-key\n", '', $existing, 'pinned-model');
+            check(strpos($out, 'model: unavailable;') !== false && strpos($out, 'no endpoint= line') !== false, 'pinned install hid the missing endpoint');
+        }
     },
     'keyless generate still fails with the launch reason' => function () {
         list($code, $out) = modelInstallCheck('generate', null);

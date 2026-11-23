@@ -80,6 +80,11 @@ class HermesConfig
             // Leave both config layers and the light-model decision intact; never start on an empty default.
             throw new ModelUnavailable(Provider::modelFailure($http, $keyFile));
         }
+        // A pinned model skips discovery, so an empty endpoint would reach the provider entry as base_url "" and Hermes
+        // would skip that entry and answer Unknown provider; refuse with the same reason as an unpinned model (ADR-0110).
+        if ($prov['endpoint'] === '' && $prov['key'] !== '') {
+            throw new ModelUnavailable(Provider::modelFailure(Provider::MODEL_NO_ENDPOINT, $keyFile));
+        }
         @mkdir($home . '/skills', 0700, true);
         // The light model for hooks (local/llm.json), reusing the /models answer when there was one;
         // also goes under auxiliary.goal_judge below, since /goal already uses an auxiliary judge (ADR-0047).

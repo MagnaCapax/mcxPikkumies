@@ -59,3 +59,16 @@ no discovery request, so calling either case an unreachable endpoint was incorre
   reason, rather than claiming an HTTP 0 network failure.
 - Regression coverage: `tests/ModelInstallTest.php`, `tests/ModelStartTest.php`,
   `tests/ProviderModelTest.php`, `tests/CoreTest.php`.
+
+## Amendment 2026-11-23: a pinned model does not excuse a missing endpoint
+
+"An explicitly configured model keeps its existing behavior" is about choosing the
+model, not about the endpoint. A pinned model skips discovery, so a key file with a
+key and no `endpoint=` line still reached the generated provider entry as
+`base_url: ""`. Hermes skips a provider entry with an empty `base_url` and then
+answers `Unknown provider` for the entry's own name, which is the error that looks
+like a bad provider id. `HermesConfig::write` now refuses that case before either
+config layer or `local/llm.json` is written, with the same no-endpoint reason as an
+unpinned model; install and update treat it as `model: unavailable`, and start,
+`generate` and doctor agree. A missing key keeps its own launch message.
+Regression coverage: `tests/ModelInstallTest.php`.
