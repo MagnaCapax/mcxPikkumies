@@ -122,13 +122,13 @@ return [
             testWithEnv(['HOME' => $dir, 'PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null], function () use ($dir, &$code, &$out) {
                 list($code, $out) = runPhp("$dir/tools/system/pikkumies-configure/pikkumies-configure.php", ['set', 'run.maxTurns', '100000']);
             });
-            check($code !== 0 && strpos($out, 'run.maxTurns is not a Pikkumies setting; nothing was changed') !== false, "set was not refused: $code $out");
+            check($code !== 0 && strpos($out, '"ok":false') !== false && strpos($out, 'run.maxTurns: this one is yours to change') !== false, "set was not refused: $code $out");
             check(file_get_contents("$dir/local/config.php") === $before, 'the config file changed');
             list($code, $out) = (function () use ($dir) {
                 return runPhp("$dir/tools/system/pikkumies-configure/pikkumies-configure.php", ['set', 'run.budgetSeconds', '0']);
             })();
             check($code !== 0 && file_get_contents("$dir/local/config.php") === $before, 'run.budgetSeconds was settable');
-            runBoundAcctSay('UC08', 'configure set run.maxTurns and run.budgetSeconds exit non-zero ("is not a Pikkumies setting; nothing was changed"), local/config.php byte for byte unchanged');
+            runBoundAcctSay('UC08', 'configure set run.maxTurns and run.budgetSeconds exit non-zero (a key only the person sets, ADR-0059: "this one is yours to change"), local/config.php byte for byte unchanged');
         } finally {
             testRmTree($dir);
         }

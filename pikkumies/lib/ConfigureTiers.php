@@ -51,6 +51,8 @@ class ConfigureTiers
         'hermes.lazyInstalls' => ['bool', 'person', 'free'],
         'agent.name' => ['any', 'free'],
         'privacy.perfLogging' => ['any', 'free'],
+        'run.maxTurns' => ['any', 'person'], // the bound on every run (ADR-0126): hand-edited only
+        'run.budgetSeconds' => ['any', 'person'],
         'privacy.telemetry' => ['any', 'free'],
         'sessions.retentionDays' => ['retention'],
         'terms.accepted' => ['any', 'person'],
