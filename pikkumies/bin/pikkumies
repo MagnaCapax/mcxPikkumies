@@ -404,7 +404,7 @@ switch ($cmd) {
             };
             out('features:');
             out('  guard scan (agent-created skills): ' . ($has("  guard_agent_created: true\n") ? 'on' : 'off'));
-            out('  checkpoints (/rollback):           ' . ($has("checkpoints:\n  enabled: true\n") ? 'on' : 'off'));
+            out('  checkpoints (/rollback):           ' . ($has("checkpoints:\n  enabled: true\n") ? 'on (restore: type /rollback in a session)' : 'off'));
             out('  security-guidance plugin:          ' . ($has('"security-guidance"') ? 'on' : 'off'));
             out('  background review (self-improve):  ' . ($has("background_review:\n    enabled: true\n") ? 'on' : 'off'));
             out('  curator (skill housekeeping):      ' . ($has("curator:\n  enabled: true\n") ? 'on' : 'off'));

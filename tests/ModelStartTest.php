@@ -138,4 +138,21 @@ http_response_code(404); echo "{}";
             testRmTree($dir);
         }
     },
+    'doctor says who restores a checkpoint: on tells the person to type /rollback in a session, off says only off' => function () {
+        $dir = modelStartWorld();
+        try {
+            testWithEnv(['HOME' => $dir, 'PIKKUMIES_CONFIG' => null, 'PIKKUMIES_DEPTH' => null,
+                'PIKKUMIES_ENDPOINT' => null, 'PIKKUMIES_KEY' => null], function () use ($dir) {
+                mkdir("$dir/local/hermes", 0700, true);
+                foreach (['true' => 'on (restore: type /rollback in a session)', 'false' => 'off'] as $flag => $shown) {
+                    file_put_contents("$dir/local/hermes/config.yaml", "checkpoints:\n  enabled: $flag\n");
+                    list($code, $out) = runPhp("$dir/bin/pikkumies", ['doctor']);
+                    preg_match('/^  checkpoints \(\/rollback\): +(.*)$/m', $out, $m);
+                    check($code === 0 && isset($m[1]) && $m[1] === $shown, "checkpoints=$flag: " . (isset($m[1]) ? $m[1] : 'no checkpoints line') . " ($code)");
+                }
+            });
+        } finally {
+            testRmTree($dir);
+        }
+    },
 ];
