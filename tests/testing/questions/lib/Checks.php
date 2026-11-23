@@ -6,6 +6,7 @@
 require_once __DIR__ . '/Questions.php';
 require_once __DIR__ . '/Judge.php';
 require_once __DIR__ . '/Coverage.php';
+require_once __DIR__ . '/StreamChecks.php';
 
 class Checks
 {
@@ -71,7 +72,7 @@ class Checks
         foreach (Questions::values($q, 'not_contains') as $s) {
             $add("not_contains: $s", !Questions::has($text, $s), 'found in the final text');
         }
-        return $out;
+        return array_merge($out, StreamChecks::checks($q, $record));
     }
 
     /**

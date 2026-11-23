@@ -118,6 +118,7 @@ class Report
             $wasStale = isset($old['status']) && $old['status'] === 'stale';
             $rec = Asker::parseStream("$dir/transcripts/" . basename($old['target']) . '/' . basename($old['question']) . '.jsonl');
             $rec['searches'] = Coverage::readLog("$dir/search-log/" . basename($old['target']) . '/' . basename($old['question']) . '.jsonl');
+            $rec['hooks'] = Coverage::readLog("$dir/hook-log/" . basename($old['target']) . '/' . basename($old['question']) . '.jsonl'); // no keys here: the archive is masked
             $judge = ['verdicts' => isset($old['judge']) ? $old['judge'] : [], 'tokens' => 0, 'error' => isset($old['judge_error']) ? $old['judge_error'] : ''];
             $row = $wasStale && !$missing ? $old : self::row($q, $old['target'], $old, Checks::check($q, $rec), ['tokens' => $old['tokens'],
                 'seconds' => $old['seconds'], 'error' => $old['error'], 'tools' => $rec['tools'], 'searches' => $rec['searches']], $judge, $missing);

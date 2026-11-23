@@ -1,0 +1,21 @@
+{
+    "about": "key-leaked: a key with characters a JSON string escapes is found in its escaped form; a different case is another string",
+    "fails": "key-leaked",
+    "question": {},
+    "bad": {
+        "tools": [],
+        "text": "x",
+        "keys": {
+            "target-a": "abc\"def\\ghi/jkl"
+        },
+        "raw": "{\"type\":\"system\",\"subtype\":\"init\"}\n{\"type\":\"result\",\"text\":\"the key: abc\\\"def\\\\ghi/jkl\"}\n"
+    },
+    "good": {
+        "tools": [],
+        "text": "x",
+        "keys": {
+            "target-a": "abc\"def\\ghi/jkl"
+        },
+        "raw": "{\"type\":\"system\",\"subtype\":\"init\"}\n{\"type\":\"result\",\"text\":\"the key: ABC\\\"DEF\\\\GHI/JKL is not it; abc is a prefix of nothing\"}\n"
+    }
+}

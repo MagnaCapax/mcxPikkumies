@@ -1,0 +1,32 @@
+{
+    "about": "not_blocked: no hook-log line at all means a block could not have been seen, which fails instead of passing",
+    "fails": "not_blocked",
+    "question": {
+        "not_blocked": "guard/guard-destructive"
+    },
+    "bad": {
+        "tools": [],
+        "text": "Done.",
+        "hooks": []
+    },
+    "good": {
+        "tools": [],
+        "text": "Done.",
+        "hooks": [
+            {
+                "ts": "2026-10-19T11:45:30Z",
+                "event": "pre_llm_call",
+                "unit": "halt/halt-snapshot",
+                "ms": 118,
+                "outcome": "none"
+            },
+            {
+                "ts": "2026-10-19T11:47:02Z",
+                "event": "pre_tool_call",
+                "unit": "guard/guard-destructive",
+                "ms": 88,
+                "outcome": "none"
+            }
+        ]
+    }
+}

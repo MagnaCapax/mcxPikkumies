@@ -146,7 +146,13 @@ try {
             $rec = Asker::ask($box, $q['body'], $overlay, $o['max-turns'], (int) $o['timeout']);
             $rec['searches'] = Coverage::newSearches(Coverage::metricsDir($box->root), $searchCounts);
             $report->evidence('search-log', $name, $q['id'], array_map('json_encode', $rec['searches']));
-            $report->evidence('hook-log', $name, $q['id'], CommandLogCheck::newLines($hookDir, $hookCounts));
+            $hookLines = CommandLogCheck::newLines($hookDir, $hookCounts);
+            $rec['hooks'] = array_values(array_filter(array_map(function ($l) {
+                return json_decode($l, true);
+            }, $hookLines), 'is_array'));
+            $rec['keys'] = $t['keys']; // StreamChecks: no target's or judge's key may be anywhere in the agent's raw stream
+            $rec['raw'] = is_file("{$box->root}/raw.jsonl") ? (string) file_get_contents("{$box->root}/raw.jsonl") : '';
+            $report->evidence('hook-log', $name, $q['id'], $hookLines);
             $rec['error'] = $error ?: $rec['error'];
             if (Questions::values($q, 'judge')) {
                 $judge = isset($t['judge']) ? Judge::ask($t['judge'], $t['keys']['judge'], Questions::values($q, 'judge'), $rec['text'])

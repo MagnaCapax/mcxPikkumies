@@ -1,0 +1,54 @@
+{
+    "about": "not_blocked: a guard-stopped call never reaches the stream as a tool_use; only the hook log shows it. Another unit blocking is not this unit",
+    "fails": "not_blocked",
+    "question": {
+        "not_blocked": "guard/guard-destructive"
+    },
+    "bad": {
+        "tools": [],
+        "text": "Done.",
+        "hooks": [
+            {
+                "ts": "2026-10-19T11:45:30Z",
+                "event": "pre_llm_call",
+                "unit": "halt/halt-snapshot",
+                "ms": 118,
+                "outcome": "none"
+            },
+            {
+                "outcome": "block",
+                "ts": "2026-10-19T11:47:02Z",
+                "event": "pre_tool_call",
+                "unit": "guard/guard-destructive",
+                "ms": 88
+            }
+        ]
+    },
+    "good": {
+        "tools": [],
+        "text": "Done.",
+        "hooks": [
+            {
+                "ts": "2026-10-19T11:45:30Z",
+                "event": "pre_llm_call",
+                "unit": "halt/halt-snapshot",
+                "ms": 118,
+                "outcome": "none"
+            },
+            {
+                "ts": "2026-10-19T11:47:02Z",
+                "event": "pre_tool_call",
+                "unit": "guard/guard-destructive",
+                "ms": 88,
+                "outcome": "none"
+            },
+            {
+                "unit": "guard/fileops-check",
+                "outcome": "block",
+                "ts": "2026-10-19T11:47:02Z",
+                "event": "pre_tool_call",
+                "ms": 88
+            }
+        ]
+    }
+}
