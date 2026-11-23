@@ -881,6 +881,54 @@ return [
             testRmTree($w['t']);
         }
     },
+    'hermes start refusal (doctor, GH #17): the start gate itself - a failing check or a missing launcher is named, a passing or cached one is silent, nothing runs while an update or another check holds its lock' => function () {
+        $w = hermesTWorld();
+        try {
+            hermesTIn($w, function () use ($w) {
+                check(HermesInstall::startRefusal() === '', 'a tree that is not installed is doctor\'s "not installed" line, not a refusal');
+                HermesInstall::ensure();
+                hermesTWaitReady($w);
+                $tree = $w['root'] . '/hermes';
+                $guardFails = "      parsed: <none - hook contributed nothing to the dispatcher>\n";
+                // Never verified and the guard does not block: the refusal a start would print, with the same problem text.
+                testWithEnv(['PK_FAKE_HOOK_OUT' => $guardFails], function () use ($w) {
+                    $why = HermesInstall::startRefusal();
+                    check($why === 'pikkumies/hermes changed and fails the Pikkumies checks: the delete guard did not block mkfs in `hermes hooks test` (exit 0)', 'got ' . json_encode($why));
+                    check(HermesInstall::verifiedCommit() === '', 'a failing check must not be recorded');
+                });
+                // The gate passes: silent, and recorded exactly as a start records it.
+                check(HermesInstall::startRefusal() === '' && HermesInstall::verifiedCommit() === $w['release'], 'a passing gate must be silent and recorded');
+                // Already verified: no Hermes run, as at a start, even if the guard would fail now.
+                testWithEnv(['PK_FAKE_HOOK_OUT' => $guardFails], function () use ($w) {
+                    file_put_contents($w['log'], '');
+                    check(HermesInstall::startRefusal() === '' && (string) file_get_contents($w['log']) === '', 'a verified checkout must not be re-checked');
+                });
+                // An update holds the tree, or another start check runs: nothing is run, nothing is said (ADR-0115).
+                file_put_contents("$tree/local-edit.txt", "x\n");
+                hermesTSh('git -C ' . escapeshellarg($tree) . ' -c user.name=t -c user.email=t@t -c commit.gpgsign=false add -A');
+                hermesTSh('git -C ' . escapeshellarg($tree) . ' -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q -m moved');
+                testWithEnv(['PK_FAKE_HOOK_OUT' => $guardFails], function () use ($w) {
+                    file_put_contents($w['log'], '');
+                    $update = HermesInstall::lock(true);
+                    check(is_resource($update) && HermesInstall::startRefusal() === '' && (string) file_get_contents($w['log']) === '', 'a running update must not be checked against');
+                    fclose($update);
+                    $other = EternalLock::take(HermesInstall::localDir() . '/start-check.lock');
+                    check(is_resource($other) && HermesInstall::startRefusal() === '' && (string) file_get_contents($w['log']) === '', 'a running start check must not be doubled');
+                    fclose($other);
+                    check(strpos(HermesInstall::startRefusal(), 'the delete guard did not block mkfs') !== false, 'both locks free: the moved checkout is checked and refused');
+                    check(is_resource(HermesInstall::lock(true)), 'doctor must not keep the Hermes lock');
+                });
+                // A complete tree whose launcher is gone: refused before any check, even for a verified commit (run stops at hermesBin() first).
+                hermesTSh('git -C ' . escapeshellarg($tree) . ' -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m again');
+                HermesInstall::markVerified(HermesInstall::head());
+                check(HermesInstall::startRefusal() === '', 'a verified, launchable checkout is silent');
+                unlink("$tree/.hermes/bin/hermes");
+                check(HermesInstall::startRefusal() === 'pikkumies/hermes is installed but its launcher (.hermes/bin/hermes) is missing or not executable', 'got ' . json_encode(HermesInstall::startRefusal()));
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
     'hermes start check: each command times out outside setpriv and env, and timeout output never verifies the checkout' => function () {
         $w = hermesTWorld();
         try {

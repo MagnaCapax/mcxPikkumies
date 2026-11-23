@@ -996,4 +996,35 @@ class HermesInstall
         }
         return $problems;
     }
+
+    /**
+     * For doctor (GH #17): why a start would be refused here by the checks `run` makes after the runtime exists, in its order, or ''
+     * when none fails or they cannot run now. It is the start gate itself, not a copy: no launcher is hermesBin() === '', else
+     * checkBeforeStart(), so an already verified checkout passes without running Hermes, exactly as a start would. Not run while an update
+     * holds the tree (`run` says that itself), nor while another start check holds local/start-check.lock (ADR-0115: checks never pile up).
+     * $prefix as for checkBeforeStart(): doctor passes HermesConfig::envArgv(), as Eternal::ready() does.
+     */
+    public static function startRefusal(array $prefix = [])
+    {
+        if (!self::isComplete()) {
+            return ''; // doctor already says "not installed"
+        }
+        if (self::bin() === '') {
+            return 'pikkumies/hermes is installed but its launcher (.hermes/bin/hermes) is missing or not executable';
+        }
+        $runtimeLock = self::lock(false);
+        if (!$runtimeLock) {
+            return '';
+        }
+        $checkLock = EternalLock::take(self::localDir() . '/start-check.lock');
+        try {
+            $problems = $checkLock ? self::checkBeforeStart($prefix) : [];
+        } finally {
+            fclose($runtimeLock);
+            if ($checkLock) {
+                fclose($checkLock);
+            }
+        }
+        return $problems ? 'pikkumies/hermes changed and fails the Pikkumies checks: ' . implode('; ', $problems) : '';
+    }
 }

@@ -343,6 +343,10 @@ switch ($cmd) {
             out('hermes config keys: ' . ($missingKeys ? 'missing: ' . implode(', ', $missingKeys) . ' (Pikkumies will not start this Hermes)' . ($fix !== '' ? '. ' . $fix : '') : 'ok'));
             $leaks = HermesInstall::pathLaunchers((string) getenv('HOME'));
             out('hermes on PATH: ' . ($leaks ? implode(', ', $leaks) . ' run this Hermes without the Pikkumies config; remove them' : 'no launchers in ~/.local/bin (cli.expose_on_path: false)'));
+            // What a start checks before it launches Hermes, said here too (GH #17); nothing printed when it passes.
+            if (($startRefusal = HermesInstall::startRefusal(HermesConfig::envArgv())) !== '') {
+                out('Not starting: ' . $startRefusal);
+            }
         } else {
             out('hermes:   not installed' . (HermesInstall::building() ? ' (building, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . ')' : (file_exists(HermesInstall::treeDir()) ? ' (incomplete build, see ' . Config::shown(HermesInstall::localDir() . '/install.log') . '; `pikkumies install` builds again)' : '')));
         }

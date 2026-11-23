@@ -99,7 +99,8 @@ http_response_code(404); echo "{}";
                 check(substr_count(file_get_contents("$serverDir/calls"), "models\n") === 1, 'generation repeated discovery');
                 file_put_contents("$serverDir/calls", '');
                 list($code, $out) = runPhp("$dir/bin/pikkumies", ['doctor']);
-                check($code === 0 && strpos($out, 'model:    fixture') !== false && strpos($out, 'Not starting:') === false, "non-empty doctor: $code $out");
+                // This fixture's Hermes is no real checkout, so doctor rightly adds the start gate's own refusal (GH #17); the model line is what is asserted.
+                check($code === 0 && strpos($out, 'model:    fixture') !== false && preg_match('#^Not starting: (?!pikkumies/hermes)#m', $out) === 0, "non-empty doctor: $code $out");
                 check(substr_count(file_get_contents("$serverDir/calls"), "models\n") === 1, 'doctor repeated successful discovery');
             });
         } finally {
