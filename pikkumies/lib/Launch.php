@@ -103,6 +103,11 @@ class Launch
         if ($argv[1] === 'eternal' && in_array($rest, [['ensure'], ['list'], ['list', '--json']], true)) {
             return ['eternal', $rest];
         }
+        // The platform dashboard's Close button sends `eternal quit -- pmN` (Agentboard v0.36.0-pikkumies.1 to .6); it is the
+        // `quit pmN` form, so it routes as that one. Any other use of `--` after `quit` stays a prompt (ADR-0075 amendment 2026-11-23).
+        if ($argv[1] === 'eternal' && count($rest) === 3 && $rest[0] === 'quit' && $rest[1] === '--') {
+            $rest = ['quit', $rest[2]];
+        }
         if (Eternal::enabled() && $argv[1] === 'eternal' && (in_array($rest, [[], ['list'], ['list', '--json'], ['ensure'], ['on'], ['off'], ['new'], ['activity'], ['activity', '--json']], true)
             || (count($rest) === 2 && $rest[0] === 'quit' && preg_match('/^pm[1-9]$/D', $rest[1]) === 1)
             || (count($rest) === 3 && $rest[0] === 'hold' && $rest[1] === '--until' && ctype_digit($rest[2])))) {

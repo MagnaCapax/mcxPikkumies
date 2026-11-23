@@ -24,6 +24,53 @@ return [
             testRmTree($root);
         }
     },
+    'launch: the dashboard Close form eternal quit -- pmN is the quit pmN command, and no other use of -- is' => function () {
+        $root = testTempDir('launch-eternal-quit-dashes');
+        file_put_contents($root . '/enabled', "1\n");
+        Eternal::$hostMarker = $root . '/enabled';
+        try {
+            foreach (['pm1', 'pm2', 'pm9'] as $id) {
+                check(Launch::route(['pikkumies', 'eternal', 'quit', '--', $id]) === ['eternal', ['quit', $id]], 'dashboard Close form not routed: ' . $id);
+            }
+            foreach ([['quit', '--'], ['quit', '--', 'bad'], ['quit', '--', 'pm0'], ['quit', '--', 'pm10'], ['quit', '--', 'PM2'], ['quit', '--', 'pm2', 'pm3'], ['quit', 'pm2', '--'], ['quit', '--', '--'], ['--', 'quit', 'pm2']] as $rest) {
+                $words = array_merge(['eternal'], $rest);
+                check(Launch::route(array_merge(['pikkumies'], $words)) === ['run', ['chat', '--query=' . implode(' ', $words)]], 'prompt claimed: ' . json_encode($words));
+            }
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
+            check(Launch::route(['pikkumies', 'eternal', 'quit', '--', 'pm2']) === ['run', ['chat', '--query=eternal quit -- pm2']], 'a markerless host claimed the Close form');
+        } finally {
+            Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
+            testRmTree($root);
+        }
+    },
+    'launch: the dashboard Close form, routed and run by EternalCli, closes the extra window' => function () {
+        $root = testTempDir('launch-eternal-quit-dashes-run');
+        $source = dirname(__DIR__) . '/pikkumies';
+        exec('cp -R ' . escapeshellarg($source . '/lib') . ' ' . escapeshellarg($root) . '/');
+        @mkdir($root . '/fake-bin', 0700);
+        @mkdir($root . '/local/eternals', 0700, true);
+        file_put_contents($root . '/enabled', "1\n");
+        file_put_contents($root . '/fake-bin/tmux', "#!/bin/sh\nexit 0\n");
+        chmod($root . '/fake-bin/tmux', 0700);
+        file_put_contents($root . '/local/eternals/pm2', json_encode(['sessionId' => 'old', 'fails' => 0, 'lastStart' => 1]));
+        file_put_contents($root . '/local/eternals/pm3', json_encode(['sessionId' => 'old', 'fails' => 0, 'lastStart' => 1]));
+        $runner = $root . '/runner.php';
+        // The launcher's own argv, as bin/pikkumies gets it: route, and only an `eternal` route is run.
+        file_put_contents($runner, '<?php foreach (glob(__DIR__ . "/lib/*.php") as $file) require_once $file; Eternal::$hostMarker = __DIR__ . "/enabled"; $route = Launch::route(array_merge(["pikkumies"], array_slice($argv, 1))); exit($route[0] === "eternal" ? EternalCli::run($route[1]) : 99);');
+        $oldPath = getenv('PATH');
+        putenv('PATH=' . $root . '/fake-bin:' . $oldPath);
+        try {
+            list($code) = runPhp($runner, ['eternal', 'quit', '--', 'pm2']);
+            check($code === 0, 'the Close form did not exit 0: rc=' . $code);
+            check(!is_file($root . '/local/eternals/pm2'), 'the Close form left the pm2 record');
+            check(is_file($root . '/local/eternals/pm3'), 'the Close form touched another window');
+            list($code) = runPhp($runner, ['eternal', 'quit', '--', 'pm2', 'pm3']);
+            check($code === 99 && is_file($root . '/local/eternals/pm3'), 'extra words after the id were run as a quit: rc=' . $code);
+        } finally {
+            putenv('PATH=' . $oldPath);
+            testRmTree($root);
+        }
+    },
     'launch: inside tmux switches the existing client' => function () {
         $plan = Launch::tmuxPlan('2', ['pm1', 'pm2'], true, 'ignored');
         check(end($plan) === ['tmux', 'switch-client', '-t', '=pikkumies'], 'an existing client was not switched');
