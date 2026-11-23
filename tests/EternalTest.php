@@ -26,6 +26,9 @@ return [
         Eternal::$hostMarker = $marker;
         EternalRecord::$base = $root . '/records';
         EternalRecord::write('pm2', EternalRecord::initial());
+        // local/ is never tracked, so a clean tree has none (earlier test files make it in a full run); the pause files below
+        // are written with @ and a missing folder would hide the write.
+        $madeLocal = !is_dir(Config::localDir()) && mkdir(Config::localDir(), 0700, true);
         $off = Config::localDir() . '/eternals.off';
         $oldOff = is_file($off) ? file_get_contents($off) : null;
         $hold = Config::localDir() . '/eternals.hold';
@@ -49,6 +52,7 @@ return [
         } finally {
             $oldOff === null ? @unlink($off) : file_put_contents($off, $oldOff);
             $oldHold === null ? @unlink($hold) : file_put_contents($hold, $oldHold);
+            $madeLocal && @rmdir(Config::localDir());
             Eternal::$hostMarker = TEST_NO_ETERNALS_MARKER;
             EternalRecord::$base = null;
             testRmTree($root);
