@@ -38,7 +38,11 @@ class HaltRun
      */
     public static function run($hermesBin, array $passArgs, ?StreamProgress $render = null)
     {
-        list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs, $render);
+        $lost = false;
+        list($code, $output, $sessionId) = self::exec($hermesBin, $passArgs, $render, false, $lost);
+        if ($lost) {
+            return self::lostTurn($sessionId, $code); // the report is out; a lost turn is never judged or resumed (ADR-0122)
+        }
         if ($render !== null && !empty(Config::load()['halt']['disabled'])) {
             return $code; // halt guard off: the question still gets its progress lines, nothing is judged
         }
@@ -48,6 +52,12 @@ class HaltRun
         $resumeTail = self::formatArgs($passArgs); // a stream-json caller keeps getting stream-json on the resumes
         $continuesLeft = self::MAX_CONTINUES;
         $wrappedUp = false;
+        // One resume of the session; true when its turn was lost (the report is out and the run ends, see lostTurn()).
+        $resume = function ($text, $aside) use ($hermesBin, $sessionId, $resumeTail, $render, &$code, &$output) {
+            $lost = false;
+            list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($text)], $resumeTail), $render, $aside, $lost);
+            return $lost;
+        };
         while (true) {
             if (HaltState::alreadyJudgedThisTurn($sessionId)) {
                 return $code; // the live pre_verify hook already judged this turn
@@ -69,7 +79,9 @@ class HaltRun
                     $render->say('Not finished, continuing (' . (self::MAX_CONTINUES - $continuesLeft) . ' of ' . self::MAX_CONTINUES . ')');
                 }
                 // after the wrap-up turn, a further continue is still wrap-up talk, not an answer: stderr (ADR-0109)
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($verdict['message'])], $resumeTail), $render, $wrappedUp);
+                if ($resume($verdict['message'], $wrappedUp)) {
+                    return self::lostTurn($sessionId, $code);
+                }
                 continue;
             }
             if ($verdict['verdict'] === 'done-wrapup' && !$wrappedUp) {
@@ -80,7 +92,9 @@ class HaltRun
                 if ($render !== null) {
                     $render->say('Wrapping up');
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($verdict['message'])], $resumeTail), $render, true);
+                if ($resume($verdict['message'], true)) {
+                    return self::lostTurn($sessionId, $code);
+                }
                 continue; // the wrap-up turn may itself edit a file and get judged live; check again before acting further
             }
             if ($applied['resume'] !== null && !$wrappedUp) {
@@ -91,11 +105,22 @@ class HaltRun
                 if ($render !== null) {
                     $render->say('Wrapping up');
                 }
-                list($code, $output) = self::exec($hermesBin, array_merge(['chat', '--resume=' . $sessionId, '--query=' . HaltJudge::note($applied['resume'])], $resumeTail), $render, true);
+                if ($resume($applied['resume'], true)) {
+                    return self::lostTurn($sessionId, $code);
+                }
                 continue; // same single wrap-up slot as done-wrapup above: ADR-0047's bound stays 3 continues + 1 final resume
             }
             return $code;
         }
+    }
+
+    /** Records that a run ended in a lost turn (so the stage that counts skipped judge resumes can find it) and returns the exit code. */
+    private static function lostTurn($sessionId, $code)
+    {
+        if ($sessionId !== '' && empty(Config::load()['halt']['disabled'])) { // with the guard off nothing is judged, so no skipped judge to record
+            HaltState::logDecision($sessionId, 'oneshot', 0, ['verdict' => 'lost-turn']);
+        }
+        return $code;
     }
 
     const WRAPUP_DETACH_ENV = 'PIKKUMIES_WRAPUP_DETACH'; // set to 1 by an unattended caller (a support job) that reads the answer and goes
@@ -149,9 +174,12 @@ class HaltRun
      * hands Hermes the same question; the file is removed when the run ends. "Gateway connection failed; no local fallback"
      * with nothing done (GH #12 finding 4) is run again once, whether or not a gateway answers: every re-run seen of it was a
      * single one, so a second failure in a row is said with its cause instead of repeating on a loaded host.
+     * A run that ends with "Gateway disconnected; turn outcome is unknown" (a lost turn, GH #19, ADR-0122) is never held or run again: it did work.
+     * $lost is set true for it, after the report is said, so run() ends without judging or resuming.
      */
-    private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false)
+    private static function exec($hermesBin, array $argv, ?StreamProgress $render = null, $aside = false, &$lost = null)
     {
+        $lost = false;
         $home = (string) getenv('HERMES_HOME');
         // A caller's own `--format stream-json` (`run chat`, how a support job asks) has no renderer: a parse-only one reads
         // the stream, and its stdout is held only while the run has said nothing yet (execOnce, quietStart).
@@ -179,8 +207,13 @@ class HaltRun
         $connectRerun = false;
         try {
             while (true) {
+                $mark = GatewayWait::logMark($home);
                 $result = self::execOnce($hermesBin, $argv, $render, $aside, $hold, $raw ? $probe : null);
                 if ($hold === null || $probe->heldError() === '') {
+                    if ($probe !== null && GatewayWait::lostTurn($probe->lastError())) {
+                        $lost = true;
+                        self::sayLostTurn($render, $home, $probe->sessionId(), $mark);
+                    }
                     return $result;
                 }
                 $release = function ($why) use ($render, $probe, $result) {
@@ -208,6 +241,18 @@ class HaltRun
         } finally {
             if (is_array($kept)) {
                 @unlink($kept[1]);
+            }
+        }
+    }
+
+    /** Says what is known after a lost turn (GatewayWait::lostReport) on stderr; always, like any error (ADR-0109). */
+    private static function sayLostTurn(?StreamProgress $render, $home, $sessionId, array $mark)
+    {
+        foreach (GatewayWait::lostReport($home, $sessionId, $mark) as $line) {
+            if ($render !== null) {
+                $render->warn($line);
+            } else {
+                fwrite(STDERR, 'Pikkumies: ' . $line . "\n");
             }
         }
     }
@@ -311,8 +356,10 @@ class HaltRun
                     $render->feed($chunk);
                     continue;
                 }
+                if ($probe !== null) {
+                    $probe->feed($chunk); // always: a run that did work still ends in a result event, which says whether the turn was lost
+                }
                 if (!$live) {
-                    $probe->feed($chunk);
                     $pending .= $chunk;
                     if (strlen($pending) <= self::CAPTURE_MAX && self::quietStart($pending)) {
                         continue;

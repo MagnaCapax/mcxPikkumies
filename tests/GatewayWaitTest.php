@@ -149,4 +149,75 @@ return [
             testRmTree($dir);
         }
     },
+    'lost turn: only Hermes\' disconnect text is one, by its start, and the zero-work hold does not take it (ADR-0122)' => function () {
+        $full = 'Gateway disconnected; turn outcome is unknown. Resume the printed session ID to check whether it completed or was interrupted; do not resend the work.';
+        check(GatewayWait::lostTurn($full) && GatewayWait::lostTurn('Gateway disconnected; turn outcome is unknown') && GatewayWait::lostTurn("  $full "), 'the text, whole, bare or padded');
+        check(!GatewayWait::lostTurn('') && !GatewayWait::lostTurn('Gateway starting: deadline') && !GatewayWait::lostTurn('Gateway connection failed; no local fallback')
+            && !GatewayWait::lostTurn('The model failed: Gateway disconnected; turn outcome is unknown'), 'other errors, and the text only inside another');
+        check(!GatewayWait::triggered($full, 0, 0), 'a run that did work is never held for a re-run, whatever the token count says');
+    },
+    'lost turn: the report says the work was not run again, names the session and the way to look at it, and never tells the person to send text' => function () {
+        $home = testTempDir('pk-lost');
+        try {
+            $none = ['state' => function () { return ''; }, 'held' => function () { return false; }, 'booting' => function () { return false; }];
+            $lines = GatewayWait::lostReport($home, 'sess-1', GatewayWait::logMark($home), $none);
+            $all = implode("\n", $lines);
+            check(strpos($all, 'was not asked again') !== false && strpos($all, 'pays for it again') !== false, 'not asked again: ' . $all);
+            check(strpos($all, 'pikkumies --resume sess-1` and send no new text') !== false, 'the session and the no-text instruction: ' . $all);
+            check(strpos($all, 'dropped') === false && strpos($all, 'crashed') === false && strpos($all, 'send a message') === false, 'no cause claimed, no message suggested: ' . $all);
+            check(strpos($all, 'Gateway now: no gateway is running.') !== false, 'gateway state: ' . $all);
+            check(strpos($all, 'Gateway log: not determined (no agent.log).') !== false, 'no log is not determined: ' . $all);
+            check(strpos(implode("\n", GatewayWait::lostReport($home, '', [0, 0], $none)), 'No session ID was printed.') !== false, 'no session ID');
+            $answers = $none;
+            $answers['state'] = function () { return 'ready'; };
+            check(strpos(implode("\n", GatewayWait::lostReport($home, 's', [0, 0], $answers)), 'Gateway now: answering (state ready).') !== false, 'an answering gateway');
+            $answers['state'] = function () { return ''; };
+            $answers['held'] = function () { return true; };
+            check(strpos(implode("\n", GatewayWait::lostReport($home, 's', [0, 0], $answers)), 'a gateway process exists and does not answer') !== false, 'a held lock without an answer');
+            $answers['held'] = function () { throw new Exception('probe failed'); };
+            check(strpos(implode("\n", GatewayWait::lostReport($home, 's', [0, 0], $answers)), 'Gateway state and log: not determined.') !== false, 'a probe that throws is not determined');
+            check(strpos(implode("\n", GatewayWait::lostReport('', 's', [0, 0])), 'not determined (the agent home is not known here)') !== false, 'no home: nothing probed');
+        } finally {
+            testRmTree($home);
+        }
+    },
+    'lost turn: a close line is printed only when exactly one was written since the mark; none, two, a rotated log and over-long lines say what they are' => function () {
+        $home = testTempDir('pk-lost');
+        try {
+            mkdir("$home/logs");
+            $log = "$home/logs/agent.log";
+            $none = ['state' => function () { return ''; }, 'held' => function () { return false; }, 'booting' => function () { return false; }];
+            $close = function ($peer, $reason) {
+                return "2026-11-22 12:00:01,000 INFO tui_gateway.ws: ws closed peer=$peer reason=$reason messages=9 parse_errors=0 dispatch_crashes=0 send_failures=0 reaped_sessions=0 detached_sessions=1\n";
+            };
+            $words = function ($mark) use ($home, $none) {
+                return implode("\n", GatewayWait::lostReport($home, 's', $mark, $none));
+            };
+            // A close from before the run is never this run's.
+            file_put_contents($log, $close('127.0.0.1:1111', 'client_disconnect(code=1000)'));
+            $mark = GatewayWait::logMark($home);
+            check(strpos($words($mark), 'no close line since the run started') !== false && strpos($words($mark), '1111') === false, 'an earlier close is outside the window: ' . $words($mark));
+            file_put_contents($log, $close('127.0.0.1:2222', 'client_disconnect(code=1011,reason=keepalive ping timeout)'), FILE_APPEND);
+            check(strpos($words($mark), 'peer=127.0.0.1:2222 reason=client_disconnect(code=1011,reason=keepalive ping timeout)') !== false && strpos($words($mark), '1111') === false, 'exactly one: printed, as written: ' . $words($mark));
+            file_put_contents($log, "2026-11-22 12:00:02,000 INFO agent: something else\n" . $close('127.0.0.1:3333', 'client_disconnect(code=1000)'), FILE_APPEND);
+            $two = $words($mark);
+            check(strpos($two, '2 close lines since the run started; which one is this run\'s is not determined') !== false && strpos($two, '2222') === false && strpos($two, '3333') === false, 'two: no reason printed: ' . $two);
+            // An over-long line that contains the marker text after its first 8 KiB is not a line of its own.
+            $mark2 = GatewayWait::logMark($home);
+            file_put_contents($log, str_repeat('x', 9000) . $close('peer-long:5', 'inside a long line'), FILE_APPEND);
+            check(strpos($words($mark2), 'no close line since the run started') !== false, 'the tail of an over-long line is skipped: ' . $words($mark2));
+            // A line that is not UTF-8 is still one close line, printed clean.
+            $mark3 = GatewayWait::logMark($home);
+            file_put_contents($log, "2026-11-22 12:00:03,000 INFO tui_gateway.ws: ws closed peer=\xff\xfe:1 reason=x\x01y\n", FILE_APPEND);
+            $bad = $words($mark3);
+            check(strpos($bad, 'Gateway log: ') !== false && strpos($bad, "\x01") === false && strpos($bad, "\xff") === false, 'control and non-UTF-8 bytes do not reach the terminal: ' . json_encode($bad));
+            // Rotation during the run: the file is smaller than the mark, or another file.
+            $mark4 = GatewayWait::logMark($home);
+            file_put_contents($log, $close('peer-rotated:9', 'after rotation'));
+            check(strpos($words($mark4), 'not determined (agent.log was rotated during the run)') !== false, 'a log shorter than the mark: ' . $words($mark4));
+            check(strpos($words([filesize($log), 12345]), 'rotated') !== false, 'another file under the same name');
+        } finally {
+            testRmTree($home);
+        }
+    },
 ];

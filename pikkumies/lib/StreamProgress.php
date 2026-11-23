@@ -70,6 +70,7 @@ class StreamProgress
     private $newStep = false;
     private $answered = false;
     private $held = '';
+    private $lastError = '';
     private $toolsBase = 0;
     private $tokensBase = 0;
     private $stats = ['runs' => 0, 'tools' => 0, 'failed' => 0, 'model' => '', 'session' => '',
@@ -135,6 +136,7 @@ class StreamProgress
         $this->toolsBase = $this->stats['tools'];
         $this->tokensBase = array_sum($this->stats['tokens']);
         $this->held = '';
+        $this->lastError = $this->runText === null ? '' : $this->runError;
         if ($this->runText === null) {
             $this->sayAlways($this->mark() . 'Hermes ended without finishing (exit ' . (int) $exitCode . ')');
         } elseif ($this->runError !== '') {
@@ -156,6 +158,18 @@ class StreamProgress
     public function heldError()
     {
         return $this->held;
+    }
+
+    /** The error the last finished run reported, held back or said, '' when it reported none (a lost turn is read from it). */
+    public function lastError()
+    {
+        return $this->lastError;
+    }
+
+    /** One stderr line for the person whatever the progress setting: what must be read (errors always print, ADR-0109). */
+    public function warn($message)
+    {
+        $this->sayAlways($message);
     }
 
     /** Says the held error on stderr, as finishRun() would have, with $why after it when given, and forgets it. */

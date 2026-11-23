@@ -51,6 +51,8 @@ if (!function_exists('haltRunTree')) {
             . 'foreach (array_slice($argv, 1) as $k => $a) { if (strpos($a, "--query-file=") === 0) { $qf = substr($a, 13); } elseif ($a === "--query-file") { $qf = (string) $argv[$k + 2]; } elseif (strpos($a, "--query=") === 0) { $hasQuery = true; } }' . "\n"
             . '$qfText = $qf === null ? null : ($qf === "-" ? stream_get_contents(STDIN) : (string) @file_get_contents($qf));' . "\n"
             . 'file_put_contents($callsFile, json_encode(["argv" => array_slice($argv, 1), "query_file_text" => $qfText]) . "\n", FILE_APPEND);' . "\n"
+            // A planned run may write lines to the gateway's agent.log ("log": [lines]), as the gateway does while a turn runs.
+            . 'if (isset($step["log"]) && getenv("HERMES_HOME")) { @mkdir(getenv("HERMES_HOME") . "/logs", 0700, true); file_put_contents(getenv("HERMES_HOME") . "/logs/agent.log", implode("\\n", $step["log"]) . "\\n", FILE_APPEND); }' . "\n"
             . 'if ($qf !== null && $hasQuery) { fwrite(STDERR, "hermes chat: error: argument --query-file: not allowed with argument -q/--query\n"); exit(2); }' . "\n"
             . 'if ($qf !== null && trim($qfText) === "") { fwrite(STDERR, "Error: --query-file $qf is empty\n"); exit(2); }' . "\n"
             // Like Hermes v0.22.2: after the `chat` subcommand an option chat does not define is an argparse error.

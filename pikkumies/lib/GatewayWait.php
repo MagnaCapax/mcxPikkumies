@@ -137,6 +137,93 @@ class GatewayWait
         return false;
     }
 
+    /** Hermes' text when the connection to the gateway ended in the middle of a turn (hermes_cli/gateway_client.py, GatewayClient._read). */
+    const LOST = 'Gateway disconnected; turn outcome is unknown';
+
+    /** Whether a run's error is that text. The run may have done work: it is never run again (ADR-0122). */
+    public static function lostTurn($error)
+    {
+        return strncmp(trim((string) $error), self::LOST, strlen(self::LOST)) === 0;
+    }
+
+    /** Where agent.log stands now, [size, inode]: the gateway's close line of a run is looked for after it. */
+    public static function logMark($home)
+    {
+        clearstatcache(true, $home . '/logs/agent.log'); // stat() is cached: the second run of a session must not see the first one's size
+        $st = @stat($home . '/logs/agent.log');
+        return is_array($st) ? [(int) $st['size'], (int) $st['ino']] : [0, 0];
+    }
+
+    /**
+     * The lines that say what is known after a lost turn, for stderr: that the question was not run again, the session ID
+     * and how to look at it, whether a gateway answers now, and the gateway's own `ws closed` line from agent.log (the
+     * tui_gateway logger is not in gateway.log, Hermes hermes_logging.py) when exactly one was written since $mark. The line
+     * carries no session tag, so with two or more, or none, nothing is attributed. $seams as in run(): state, held, booting.
+     */
+    public static function lostReport($home, $sessionId, array $mark, array $seams = [])
+    {
+        $lines = ['The connection to the agent gateway ended while the question was running, and Hermes does not say which side ended it. '
+            . 'The question was not asked again: the work may be finished, still running or cut short, and asking again pays for it again.'];
+        $lines[] = $sessionId !== ''
+            ? 'Session ' . $sessionId . ': look at what it holds with `pikkumies --resume ' . $sessionId . '` and send no new text.'
+            : 'No session ID was printed.';
+        if ($home === '') {
+            $lines[] = 'Gateway state and log: not determined (the agent home is not known here).';
+            return $lines;
+        }
+        try {
+            $lines[] = 'Gateway now: ' . self::stateWords($home, $seams) . '.';
+            $lines[] = 'Gateway log: ' . self::closeWords($home, $mark) . '.';
+        } catch (\Throwable $e) {
+            $lines[] = 'Gateway state and log: not determined.';
+        }
+        return $lines;
+    }
+
+    private static function stateWords($home, array $seams)
+    {
+        $state = isset($seams['state']) ? $seams['state'] : ['GatewayWait', 'state'];
+        $held = isset($seams['held']) ? $seams['held'] : ['GatewayWait', 'lockHeld'];
+        $booting = isset($seams['booting']) ? $seams['booting'] : ['GatewayWait', 'bootingProcess'];
+        $s = (string) call_user_func($state, $home);
+        if ($s !== '') {
+            return 'answering (state ' . StreamProgress::safe($s, 40) . ')';
+        }
+        return call_user_func($held, $home . '/gateway.lock') || call_user_func($booting, $home)
+            ? 'a gateway process exists and does not answer' : 'no gateway is running';
+    }
+
+    private static function closeWords($home, array $mark)
+    {
+        $log = $home . '/logs/agent.log';
+        clearstatcache(true, $log);
+        $st = @stat($log);
+        if ($st === false || ((int) $st['ino'] !== $mark[1] && $mark[1] !== 0) || (int) $st['size'] < $mark[0]) {
+            return $st === false ? 'not determined (no agent.log)' : 'not determined (agent.log was rotated during the run)';
+        }
+        $h = @fopen($log, 'rb');
+        if ($h === false || fseek($h, $mark[0]) !== 0) {
+            return 'not determined (agent.log cannot be read)';
+        }
+        $closes = [];
+        $inLong = false;
+        while (($l = fgets($h, 8192)) !== false) {
+            $whole = substr($l, -1) === "\n";
+            if (!$inLong && strpos($l, ' ws closed peer=') !== false) {
+                $closes[] = $l;
+            }
+            $inLong = !$whole; // the rest of an over-long line is not a line of its own
+        }
+        fclose($h);
+        if (count($closes) === 1) {
+            $line = StreamProgress::safe(trim($closes[0]), 200);
+            return $line === null ? 'one close line, not shown' : $line;
+        }
+        return count($closes) === 0
+            ? 'no close line since the run started (a gateway that was killed writes none, and the line may not be written yet)'
+            : count($closes) . ' close lines since the run started; which one is this run\'s is not determined';
+    }
+
     /** The gateway log's last line, redacted and cut; '' for none. */
     private static function logLine($home)
     {
