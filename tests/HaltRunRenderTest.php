@@ -165,7 +165,7 @@ return [
             testRmTree($home);
         }
     },
-    'HaltRun render: the deadline error is still printed, once and without a second run, when the gateway is gone, or when the run spent tokens' => function () {
+    'HaltRun render: the deadline error is still printed, once and without a second run, when the gateway is gone, or when the run streamed text' => function () {
         $fakeModel = testTempDir('pk-haltrun-model');
         list($proc, $port) = haltRunFakeModel($fakeModel);
         $tree = haltRunTree($port);
@@ -179,9 +179,9 @@ return [
             check(haltRunCalls($tree) === 1, 'gone: no second run: ' . haltRunCalls($tree));
             check(strpos($err, 'the agent gateway stopped before it finished starting, so the question did not run') !== false, 'gone: the error names what stopped: ' . $err);
             @unlink("$tree/calls.jsonl");
-            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed('Gateway starting: deadline', 5), 'code' => 1]]));
+            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed('Gateway starting: deadline', haltRunRenderText()), 'code' => 1]]));
             list(, , $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, ['chat', '--query=disk?', '--format=stream-json']);
-            check(substr_count($err, 'Hermes: Gateway starting: deadline') === 1 && strpos($err, 'Waiting for') === false && strpos($err, 'did not run') === false && haltRunCalls($tree) === 1, 'tokens spent: not the cold-start failure: ' . $err);
+            check(substr_count($err, 'Hermes: Gateway starting: deadline') === 1 && strpos($err, 'Waiting for') === false && strpos($err, 'did not run') === false && haltRunCalls($tree) === 1, 'text streamed: not the cold-start failure: ' . $err);
             $reads = new ReflectionMethod('HaltRun', 'readsStdin');
             $reads->setAccessible(true);
             check($reads->invoke(null, ['chat', '--query-file=-']) && $reads->invoke(null, ['chat', '--query-file', '-']), 'stdin forms are seen');
@@ -196,7 +196,7 @@ return [
             testRmTree($home);
         }
     },
-    'HaltRun render: "Gateway connection failed" with nothing done runs once more and prints the answer; failing twice says the cause once; with tokens spent it is printed as before (GH #12 finding 4)' => function () {
+    'HaltRun render: "Gateway connection failed" with nothing done runs once more and prints the answer; failing twice says the cause once; after streamed text or a tool step it is printed as before (GH #12 finding 4, GH #27)' => function () {
         $fakeModel = testTempDir('pk-haltrun-model');
         list($proc, $port) = haltRunFakeModel($fakeModel);
         $tree = haltRunTree($port);
@@ -218,9 +218,13 @@ return [
             check($code === 1 && $out === '' && haltRunCalls($tree) === 2, 'twice: one re-run, then it stops: ' . json_encode([$code, $out, haltRunCalls($tree)]));
             check(substr_count($err, 'Hermes: ' . $failed . ' (the agent gateway did not take the connection twice in a row, so the question did not run)') === 1, 'twice: the error once, with its cause: ' . $err);
             @unlink("$tree/calls.jsonl");
-            file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed($failed, 7), 'code' => 1]]));
-            list(, , $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, $args);
-            check(substr_count($err, 'Hermes: ' . $failed) === 1 && strpos($err, 'asking again') === false && haltRunCalls($tree) === 1, 'tokens spent: printed once, no re-run: ' . $err);
+            // Hermes zeroes every token count of a failed result, so the run's own events are what show it worked (GH #27).
+            foreach (['text streamed' => haltRunRenderText(), 'a tool step' => haltRunRenderTool()] as $what => $work) {
+                @unlink("$tree/calls.jsonl");
+                file_put_contents("$tree/plan.json", json_encode([['events' => haltRunRenderFailed($failed, $work), 'code' => 1]]));
+                list(, , $err) = haltRunRenderDrive($tree, haltRunFakeHermes($tree), 'fakesess', true, $args);
+                check(substr_count($err, 'Hermes: ' . $failed) === 1 && strpos($err, 'asking again') === false && haltRunCalls($tree) === 1, "$what: printed once, no re-run: " . $err);
+            }
         } finally {
             putenv('PK_FAKE_HERMES_DIR');
             putenv('HERMES_HOME');

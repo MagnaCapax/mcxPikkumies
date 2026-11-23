@@ -94,7 +94,7 @@ return [
             }
         });
     },
-    'HaltRun passthrough: when the gateway is gone, or the run spent tokens, the stream is written unchanged and Hermes runs once' => function () use ($supportArgs) {
+    'HaltRun passthrough: when the gateway is gone, or the run streamed text, the stream is written unchanged and Hermes runs once' => function () use ($supportArgs) {
         haltRunRawCase(function ($tree) use ($supportArgs) {
             $failed = haltRunRenderFailed('Gateway starting: deadline');
             file_put_contents("$tree/plan.json", json_encode([['events' => $failed, 'code' => 1]]));
@@ -104,11 +104,11 @@ return [
             check(substr_count($err, 'Pikkumies: Hermes: Gateway starting: deadline (the agent gateway stopped before it finished starting, so the question did not run)') === 1, 'gone: one line names what stopped: ' . $err);
             check(strpos($err, '❌') === false && strpos($err, 'FAILED') === false, 'the parse-only reader prints nothing itself: ' . $err);
             @unlink("$tree/calls.jsonl");
-            $spent = haltRunRenderFailed('Gateway starting: deadline', 5);
+            $spent = haltRunRenderFailed('Gateway starting: deadline', haltRunRenderText());
             file_put_contents("$tree/plan.json", json_encode([['events' => $spent, 'code' => 1]]));
             list(, $out, $err) = haltRunRawDrive($tree, haltRunFakeHermes($tree), $supportArgs, "disk?\n");
-            check($out === haltRunRawStream($spent) && haltRunCalls($tree) === 1, 'tokens spent: unchanged, one run: ' . json_encode($out));
-            check(strpos($err, 'Waiting for') === false && strpos($err, 'did not run') === false, 'tokens spent: nothing added: ' . $err);
+            check($out === haltRunRawStream($spent) && haltRunCalls($tree) === 1, 'text streamed: unchanged, one run: ' . json_encode($out));
+            check(strpos($err, 'Waiting for') === false && strpos($err, 'did not run') === false, 'text streamed: nothing added: ' . $err);
         });
     },
     'HaltRun passthrough: a working run streams byte for byte as before, and a plain-text passthrough is never held' => function () use ($supportArgs) {

@@ -72,7 +72,7 @@ class StreamProgress
     private $held = '';
     private $lastError = '';
     private $toolsBase = 0;
-    private $tokensBase = 0;
+    private $sawText = false;
     private $stats = ['runs' => 0, 'tools' => 0, 'failed' => 0, 'model' => '', 'session' => '',
         'tokens' => ['input' => 0, 'output' => 0, 'cache_read' => 0, 'cache_write' => 0, 'total' => 0]];
 
@@ -119,8 +119,9 @@ class StreamProgress
     /**
      * One Hermes run has ended (its stdout closed): the answer text ('' when it printed none). An error the run
      * reported, or an end without a result event, is said on stderr. The next run starts clean.
-     * $hold, when given, is asked about a reported error with (error, tokens this run spent, tool calls this run made):
-     * true keeps the error back, for the caller that is about to run the same command again (GatewayWait), and counts
+     * $hold, when given, is asked about a reported error with (error, whether this run did any work: a `tool_use` or a
+     * non-empty `text` event came before its result; the result's own token counts are not used, Hermes writes zeros there on
+     * every failure): true keeps the error back, for the caller that is about to run the same command again (GatewayWait), and counts
      * the run as not made. Said or not, the error is never lost: heldError() has it, releaseError() says it (ADR-0109:
      * errors always print).
      */
@@ -131,16 +132,15 @@ class StreamProgress
         }
         $this->buf = '';
         $this->skipping = false;
-        $tools = $this->stats['tools'] - $this->toolsBase;
-        $tokens = array_sum($this->stats['tokens']) - $this->tokensBase;
+        $worked = $this->sawText || $this->stats['tools'] > $this->toolsBase;
         $this->toolsBase = $this->stats['tools'];
-        $this->tokensBase = array_sum($this->stats['tokens']);
+        $this->sawText = false;
         $this->held = '';
         $this->lastError = $this->runText === null ? '' : $this->runError;
         if ($this->runText === null) {
             $this->sayAlways($this->mark() . 'Hermes ended without finishing (exit ' . (int) $exitCode . ')');
         } elseif ($this->runError !== '') {
-            if ($hold !== null && call_user_func($hold, $this->runError, $tokens, $tools)) {
+            if ($hold !== null && call_user_func($hold, $this->runError, $worked)) {
                 $this->held = $this->runError;
                 $this->stats['runs']--; // a run that did nothing and is run again is one run in the figures
             } else {
@@ -238,6 +238,7 @@ class StreamProgress
             $this->stats['model'] = (string) self::safe($e['model'], self::TARGET_MAX);
         } elseif ($type === 'text' && isset($e['text']) && is_string($e['text'])) {
             $this->text .= $e['text'];
+            $this->sawText = $this->sawText || $e['text'] !== '';
         } elseif ($type === 'tool_use') {
             $this->stats['tools']++;
             $note = self::lastSentence($this->text);

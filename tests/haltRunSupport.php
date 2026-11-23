@@ -149,11 +149,27 @@ if (!function_exists('haltRunFakeGateway')) {
         return $p;
     }
 
-    /** The events of a run Hermes ended at once with $error: no step, no text, tokens as given. */
-    function haltRunRenderFailed($error, $tokens = 0, $sessionId = 'fakesess')
+    /**
+     * The events of a run that failed with $error, in the shape Hermes writes: a failed result is built from defaults with no
+     * usage, so every token count is 0 whatever the model spent (hermes_cli/stream_json.py emit_result writes `or 0` for each).
+     * $work: the events the run streamed before it failed (none: it failed at once).
+     */
+    function haltRunRenderFailed($error, array $work = [], $sessionId = 'fakesess')
     {
-        return [['type' => 'system', 'subtype' => 'init', 'model' => 'm', 'session_id' => $sessionId],
-            ['type' => 'result', 'session_id' => $sessionId, 'exit_code' => 1, 'text' => '', 'error' => $error, 'tokens' => ['input' => $tokens, 'output' => 0, 'total' => $tokens]]];
+        return array_merge([['type' => 'system', 'subtype' => 'init', 'model' => 'm', 'session_id' => $sessionId]], $work,
+            [['type' => 'result', 'session_id' => $sessionId, 'exit_code' => 1, 'text' => '', 'error' => $error,
+                'tokens' => ['input' => 0, 'output' => 0, 'total' => 0, 'cache_read' => 0, 'cache_write' => 0]]]);
+    }
+
+    /** Events a run streamed before a connection failure: text, then (as a second case) a tool step. */
+    function haltRunRenderText()
+    {
+        return [['type' => 'text', 'text' => 'Let me check the disk.']];
+    }
+
+    function haltRunRenderTool()
+    {
+        return [['type' => 'tool_use', 'name' => 'terminal', 'input' => ['command' => 'df -h']], ['type' => 'tool_result', 'name' => 'terminal', 'is_error' => false]];
     }
 
     function haltRunRenderEvents($answer, $sessionId = 'fakesess')

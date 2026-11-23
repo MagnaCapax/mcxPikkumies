@@ -40,15 +40,14 @@ if (!function_exists('gatewayWaitRun')) {
 }
 
 return [
-    'gateway wait: only the exact fixed-deadline error with no tokens and no tool calls triggers it' => function () {
-        check(GatewayWait::triggered('Gateway starting: deadline', 0, 0), 'the deadline error with nothing done');
-        check(!GatewayWait::triggered('Gateway starting: deadline', 12, 0), 'tokens were spent: the run did something');
-        check(!GatewayWait::triggered('Gateway starting: deadline', 0, 1), 'a tool was called: the run did something');
-        check(!GatewayWait::triggered('Gateway inaccessible: authorization', 0, 0), 'another gateway failure');
-        check(!GatewayWait::triggered('Gateway starting: not_ready', 0, 0), 'another reason');
-        check(!GatewayWait::triggered('', 0, 0) && !GatewayWait::triggered('The model failed. Gateway starting: deadline', 0, 0), 'no error, or the text only inside another');
-        check(GatewayWait::triggered('Gateway connection failed; no local fallback', 0, 0), 'the connection failure with nothing done (finding 4)');
-        check(!GatewayWait::triggered('Gateway connection failed; no local fallback', 3, 0) && !GatewayWait::triggered('Gateway connection failed; no local fallback', 0, 2), 'the connection failure after the run did something');
+    'gateway wait: only the exact fixed-deadline error from a run that did no work triggers it' => function () {
+        check(GatewayWait::triggered('Gateway starting: deadline', false), 'the deadline error with nothing done');
+        check(!GatewayWait::triggered('Gateway starting: deadline', true), 'the run streamed text or called a tool: it did something');
+        check(!GatewayWait::triggered('Gateway inaccessible: authorization', false), 'another gateway failure');
+        check(!GatewayWait::triggered('Gateway starting: not_ready', false), 'another reason');
+        check(!GatewayWait::triggered('', false) && !GatewayWait::triggered('The model failed. Gateway starting: deadline', false), 'no error, or the text only inside another');
+        check(GatewayWait::triggered('Gateway connection failed; no local fallback', false), 'the connection failure with nothing done (finding 4)');
+        check(!GatewayWait::triggered('Gateway connection failed; no local fallback', true), 'the connection failure after the run did something');
     },
     'gateway wait: waits while the lock is held and the gateway says it is starting, then is ready on any other state' => function () {
         list($r, $lines, $sleeps) = gatewayWaitRun(['', '', 'starting', 'starting', 'ready'], [true], [false]);
@@ -154,7 +153,7 @@ return [
         check(GatewayWait::lostTurn($full) && GatewayWait::lostTurn('Gateway disconnected; turn outcome is unknown') && GatewayWait::lostTurn("  $full "), 'the text, whole, bare or padded');
         check(!GatewayWait::lostTurn('') && !GatewayWait::lostTurn('Gateway starting: deadline') && !GatewayWait::lostTurn('Gateway connection failed; no local fallback')
             && !GatewayWait::lostTurn('The model failed: Gateway disconnected; turn outcome is unknown'), 'other errors, and the text only inside another');
-        check(!GatewayWait::triggered($full, 0, 0), 'a run that did work is never held for a re-run, whatever the token count says');
+        check(!GatewayWait::triggered($full, false), 'a run that did work is never held for a re-run, whatever the token count says');
     },
     'lost turn: the report says the work was not run again, names the session and the way to look at it, and never tells the person to send text' => function () {
         $home = testTempDir('pk-lost');

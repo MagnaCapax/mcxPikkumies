@@ -113,6 +113,30 @@ return [
         check($s['runs'] === 2 && $s['tools'] === 2 && $s['tokens']['input'] === 7 && $s['tokens']['total'] === 9, json_encode($s));
         check($sp->answerSeparator() === '' && $sp->answerSeparator() === "\n", 'separator');
     },
+    'StreamProgress: the hold callback is told whether the run did work (a tool_use or a non-empty text event), never from the result\'s token counts (GH #27)' => function () {
+        $failed = ['type' => 'result', 'text' => '', 'error' => 'e', 'tokens' => ['input' => 0, 'output' => 0, 'total' => 0]];
+        $seen = [];
+        $hold = function ($error, $worked) use (&$seen) {
+            $seen[] = $worked;
+            return true;
+        };
+        $cases = [
+            'nothing before the result' => [[], false],
+            'an empty text event' => [[['type' => 'text', 'text' => '']], false],
+            'text' => [[['type' => 'text', 'text' => 'Let me check.']], true],
+            'a tool step' => [[['type' => 'tool_use', 'name' => 'terminal', 'input' => ['command' => 'ls']]], true],
+            'nothing again: the flag is per run' => [[], false],
+        ];
+        $sp = new StreamProgress(false, true, null, fopen('php://memory', 'w+'));
+        foreach ($cases as $what => $case) {
+            foreach (array_merge($case[0], [$failed]) as $e) {
+                $sp->feed(json_encode($e) . "\n");
+            }
+            $sp->finishRun(1, $hold);
+            check(end($seen) === $case[1], "$what: worked is " . json_encode($case[1]) . ', got ' . json_encode($seen));
+        }
+        check(count($seen) === count($cases), 'asked once per run');
+    },
     'StreamProgress: the narrator runs once per read for the newest step, gets the last steps as data, and its line is cleaned' => function () {
         $calls = [];
         $narrator = function (array $lines) use (&$calls) {

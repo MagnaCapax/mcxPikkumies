@@ -29,10 +29,14 @@ class GatewayWait
     /** Seconds one identify probe may take to connect and answer: the 2 s Hermes' own discovery allows it (discover_gateway_endpoint). */
     const PROBE = 2;
 
-    /** Whether a finished run is one of the two gateway failures with nothing done: no tokens spent and no tool called. */
-    public static function triggered($error, $tokens, $tools)
+    /**
+     * Whether a finished run is one of the two gateway failures with nothing done: no tool called and no text streamed
+     * ($worked, from the run's events). The result's token counts cannot say: Hermes builds a failed result from defaults
+     * with no usage, so they are zero whatever the model spent.
+     */
+    public static function triggered($error, $worked)
     {
-        return in_array(trim((string) $error), [self::ERROR, self::CONNECT], true) && (int) $tokens === 0 && (int) $tools === 0;
+        return in_array(trim((string) $error), [self::ERROR, self::CONNECT], true) && !$worked;
     }
 
     /**
