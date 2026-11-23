@@ -86,6 +86,6 @@ return [
     },
     'bin/pikkumies: the interactive passthru prints the same line and exits 1 when sh itself could not start (-1)' => function () {
         $bin = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/bin/pikkumies');
-        check(preg_match('/@passthru\(escapeshellarg\(hermesBin\(\)\)[^\n]*\$code\);\n\s*if \(\$code === -1\) \{\n\s*fwrite\(STDERR, HaltRun::START_FAILED\);\n\s*exit\(1\);/', $bin) === 1, 'the passthru start-failure branch is missing');
+        check(preg_match('/@passthru\(escapeshellarg\(hermesBin\(\)\)[^\n]*\$code\);\n(?:\s*\}\n)?\s*if \(\$code === -1\) \{\n\s*fwrite\(STDERR, HaltRun::START_FAILED\);\n\s*exit\(1\);/', $bin) === 1, 'the passthru start-failure branch is missing');
     },
 ];
