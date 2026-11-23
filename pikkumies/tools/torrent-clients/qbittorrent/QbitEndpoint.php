@@ -62,10 +62,7 @@ class QbitEndpoint
         return $this;
     }
 
-    /**
-     * The sub-uid ranges this account owns in /etc/subuid, as [first, last] pairs: a rootless-Docker qBittorrent run as a
-     * non-zero container user listens as a host uid inside one (Host::ownSubuidRanges: another account's range never counts).
-     */
+    /** This account's own /etc/subuid ranges as [first, last] pairs; a rootless-Docker container user listens inside one. */
     public function ranges()
     {
         if ($this->ranges === null) {
