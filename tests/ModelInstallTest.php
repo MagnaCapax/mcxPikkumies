@@ -79,6 +79,10 @@ return [
             }
         }
     },
+    'install hint says a platform key file written by hand needs endpoint= as well as key=' => function () {
+        list(, $out) = modelInstallCheck('install', null);
+        check(strpos($out, 'a file you write there yourself needs the endpoint= line as well as key=') !== false, 'the Next hint does not say a hand-made key file needs endpoint=: ' . $out);
+    },
     'keyless update and post-update finish and preserve previous model files' => function () {
         foreach (['update', 'post-update'] as $command) {
             foreach ([false, true] as $existing) {
