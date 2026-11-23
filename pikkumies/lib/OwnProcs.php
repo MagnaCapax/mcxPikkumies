@@ -2,7 +2,8 @@
 /**
  * OwnProcs: this account's own processes, found in /proc by owner uid, mount namespace and exact process
  * name (never by pattern, never `pkill -f`), and a process identity that survives pid reuse: the start
- * time, field 22 of /proc/<pid>/stat. Used by the torrent clients' restart verbs; $proc is a test seam.
+ * time, field 22 of /proc/<pid>/stat. Used by the torrent clients' restart verbs and by an Eternal's bounded stop
+ * (lib/EternalChild.php); $proc is a test seam.
  */
 require_once __DIR__ . '/PathName.php';
 
@@ -61,5 +62,86 @@ class OwnProcs
             }
         }
         return $out;
+    }
+
+    /**
+     * What $uid runs, from one read of /proc: pid => ['ppid', 'start', 'comm'] (stat fields 4 and 22 and the name,
+     * read around the last ')'). Zombies are left out. Pure data, so a test can hand in a stub /proc.
+     */
+    public static function tree($uid, $proc = '/proc')
+    {
+        $out = [];
+        foreach ((array) glob("$proc/[0-9]*", GLOB_ONLYDIR) as $dir) {
+            $stat = @fileowner($dir) === (int) $uid ? @file_get_contents("$dir/stat") : false;
+            $open = is_string($stat) ? strpos($stat, '(') : false;
+            $close = is_string($stat) ? strrpos($stat, ')') : false;
+            if ($open === false || $close === false) {
+                continue;
+            }
+            $f = explode(' ', substr($stat, $close + 2));
+            if (isset($f[19]) && $f[0] !== 'Z' && ctype_digit($f[1]) && ctype_digit($f[19])) {
+                $out[(int) PathName::base($dir)] = ['ppid' => (int) $f[1], 'start' => $f[19], 'comm' => substr($stat, $open + 1, $close - $open - 1)];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The processes a bounded stop of $root may end: its descendants by parent pid, plus $known (pid => start time seen
+     * earlier) while they still run, as (pid, start time) pairs so a reused pid is never taken for them. Never a process
+     * whose name is one of $spare, nor anything above or below one (a parent that dies can hang up its terminal's
+     * foreground group), except $root itself, which the stop is for; never this process or pid 1. $root -1: none.
+     */
+    public static function killable($root, array $known, array $spare, $uid, $proc = '/proc')
+    {
+        $tree = self::tree($uid, $proc);
+        $children = [];
+        foreach ($tree as $pid => $p) {
+            $children[$p['ppid']][] = $pid;
+        }
+        $match = array_unique(array_merge($spare, array_map(function ($n) {
+            return substr($n, 0, 15);
+        }, $spare)));
+        $spared = [];
+        foreach ($tree as $pid => $p) {
+            if (in_array($p['comm'], $match, true)) {
+                foreach (self::below($children, $pid) as $d) {
+                    $spared[$d] = true;
+                }
+                for ($up = $p['ppid'], $n = 0; isset($tree[$up]) && $n < 4096; $up = $tree[$up]['ppid'], $n++) {
+                    $spared[$up] = true;
+                }
+            }
+        }
+        unset($spared[$root]);
+        $candidates = array_flip(self::below($children, $root));
+        foreach ($known as $pid => $start) {
+            if (isset($tree[$pid]) && $tree[$pid]['start'] === (string) $start) {
+                $candidates[$pid] = true;
+            }
+        }
+        $out = [];
+        foreach ($candidates as $pid => $unused) {
+            if (isset($tree[$pid]) && !isset($spared[$pid]) && $pid > 1 && $pid !== getmypid()) {
+                $out[$pid] = $tree[$pid]['start'];
+            }
+        }
+        return $out;
+    }
+
+    /** $pid and everything under it, by parent pid. */
+    private static function below(array $children, $pid)
+    {
+        $found = [(int) $pid];
+        $seen = [(int) $pid => true];
+        for ($i = 0; $i < count($found); $i++) {
+            foreach (isset($children[$found[$i]]) ? $children[$found[$i]] : [] as $child) {
+                if (!isset($seen[$child])) {
+                    $seen[$child] = true;
+                    $found[] = $child;
+                }
+            }
+        }
+        return $found;
     }
 }

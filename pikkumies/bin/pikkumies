@@ -479,6 +479,7 @@ switch ($cmd) {
         $eternalId = '';
         $eternalStarted = time();
         $eternalSignalled = 0;
+        $eternalVanished = false;
         if (isset($passArgs[0]) && $passArgs[0] === '--eternal') {
             if (!Eternal::enabled()) {
                 out('Pikkumies windows are not enabled on this host.');
@@ -504,10 +505,14 @@ switch ($cmd) {
                         }
                     });
                 }
-                pcntl_signal(SIGALRM, function () use (&$eternalSignalled) {
+                pcntl_signal(SIGALRM, function () use (&$eternalSignalled, &$eternalVanished) {
                     if (!is_dir(Config::root())) {
                         $eternalSignalled = SIGTERM;
-                        exit(75);
+                        if (!EternalChild::$running) {
+                            exit(75);
+                        }
+                        $eternalVanished = true; // exit() here would wait for Hermes; the wait loop ends it, then the run exits 75
+                        return;
                     }
                     pcntl_alarm(60);
                 });
@@ -749,7 +754,14 @@ switch ($cmd) {
         // @: PHP's own warning would print the whole command, the prompt included. -1 means sh itself could not start.
         $gatewayReruns = 0;
         do {
-            @passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+            // An Eternal polls its Hermes so SIGTERM can end the whole tree within a grace (ADR-0075, amendment 2026-11-23).
+            if ($eternalId !== '') {
+                $code = EternalChild::run(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), function () use (&$eternalSignalled, $eternalId) {
+                    return EternalChild::stopping($eternalSignalled, Eternal::stopPath($eternalId));
+                });
+            } else {
+                @passthru(escapeshellarg(hermesBin()) . ' ' . implode(' ', $args), $code);
+            }
             if ($code === -1) {
                 fwrite(STDERR, HaltRun::START_FAILED);
                 exit(1);
@@ -757,6 +769,9 @@ switch ($cmd) {
         } while ($eternalId !== '' && Eternal::rerunAfterGateway($code, $eternalSignalled, $gatewayReruns++, (string) getenv('HERMES_HOME'),
             function ($line) { fwrite(STDERR, 'Pikkumies: ' . $line . "\n"); },
             function () use (&$eternalSignalled) { return $eternalSignalled !== 0; }));
+        if ($eternalVanished) {
+            exit(75);
+        }
         if ($eternalId !== '') {
             fclose($hermesLock);
             Eternal::afterExit($eternalId, $code, $eternalStarted, $eternalSignalled);
