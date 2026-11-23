@@ -85,8 +85,15 @@ return [
         check(preg_match("/\n    case 'install':(.*?)\n        break;/s", $bin, $m) === 1, 'install case not found in bin/pikkumies');
         $install = $m[1];
         check(strpos($install, "\$link = \$home . '/pikkumies';") !== false, 'the ~/pikkumies link path must be derived from $home: ' . $install);
-        check(preg_match('/if \(!file_exists\(\$link\)\) \{\s*@symlink\(Config::root\(\), \$link\);\s*\}/', $install) === 1,
-            'the layout step must be exactly "if not already there, symlink to Config::root()": ' . $install);
+        check(strpos($install, 'PathInstall::ensureRootLink($home, Config::root())') !== false,
+            'the layout step must be PathInstall::ensureRootLink($home, Config::root()): ' . $install);
+        // ensureRootLink leaves anything that exists alone and only links (PathInstallTest covers it end to end).
+        $lib = (string) file_get_contents(dirname(__DIR__) . '/pikkumies/lib/PathInstall.php');
+        check(preg_match('/function ensureRootLink\(\$home, \$root\)\s*\{(.*?)\n    \}/s', $lib, $r) === 1, 'ensureRootLink not found');
+        check(preg_match('/if \(file_exists\(\$link\)\) \{\s*return \'\';\s*\}/', $r[1]) === 1, 'ensureRootLink must leave an existing ~/pikkumies alone');
+        foreach (['copy(', 'rename(', 'mkdir('] as $op) {
+            check(strpos($r[1], $op) === false, "ensureRootLink must never $op");
+        }
         foreach (['copy(', 'rename(', 'mkdir($link'] as $op) {
             check(strpos($install, $op) === false, "the ~/pikkumies layout step must never $op (a copy, not a symlink): " . $install);
         }
