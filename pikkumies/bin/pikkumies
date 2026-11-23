@@ -222,7 +222,7 @@ switch ($cmd) {
         out('  pmss: ' . ($profile['pmss'] ? 'yes' : 'no') . '; apps: ' . (implode(', ', $profile['apps']) ?: 'none'));
         out('  host: ' . $profile['family'] . '; tools: ' . $generated['skills'] . ' skills');
         out('  model: ' . $modelState);
-        out('  hermes: ' . HermesInstall::ensure(false, !empty($profile['root']['available']), !empty(Config::load()['hermes']['lazyInstalls'])));
+        out('  hermes: ' . HermesInstall::ensure(false, !empty($profile['root']['available']), !empty(Config::load()['hermes']['lazyInstalls']), true));
         out('  version: ' . UpdateChannel::describe(Config::load()['update']['channel']));
         out('  auto-update: ' . Update::schedule(Config::load(), $profile['uid']));
         out('  cron-tick: ' . Update::scheduleCronTick(Config::load(), !empty($profile['root']['available'])));

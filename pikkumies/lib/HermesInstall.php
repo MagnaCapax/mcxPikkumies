@@ -213,22 +213,21 @@ class HermesInstall
     const NEWEST_CHECKED = '0.22.5';
 
     /**
-     * The release tag of a checkout Pikkumies installed and can never start, '' for any other tree: an unmodified checkout of the
-     * official repository at a stable tag newer than NEWEST_CHECKED, missing a key of CONFIG_FACTS, that never passed verify()
-     * (no hermes-verified.json). A tree with the person's own changes, another origin or a verified start is left alone.
+     * The release tag of a complete checkout Pikkumies can never start, '' for any other tree: an unmodified checkout of the
+     * official repository at a stable tag newer than NEWEST_CHECKED that is missing a key of CONFIG_FACTS. A tree with the
+     * person's own changes or another origin is left alone. Whether Pikkumies may replace it is ensure()'s question: the
+     * daily update only does when the tree never passed verify() (ADR-0033 amendments 2026-11-03 and 2026-11-23).
      */
     public static function refusedNewerRelease()
     {
-        if (file_exists(self::localDir() . '/hermes-verified.json') || !self::missingConfigKeys(self::treeDir())) {
-            return '';
-        }
-        // Files first, so a complete install that is not this case runs no git (a session start reads this).
-        $tag = self::packedTagAtHead(self::treeDir() . '/.git');
-        if ($tag === '' || !preg_match(self::STABLE_TAG_RE, $tag) || version_compare(substr($tag, 1), self::NEWEST_CHECKED, '<=')) {
+        // The key check reads files; git runs only for a tree that already fails it, so a session start on a healthy install runs none.
+        if (!self::missingConfigKeys(self::treeDir())) {
             return '';
         }
         $s = self::status();
-        return $s['clean'] && $s['official'] && $s['rev'] === $tag ? $tag : '';
+        $tag = $s['rev'];
+        // status() asks git for the tag: it finds one a Hermes update fetched loose or annotated as well as a release clone's packed one.
+        return $s['clean'] && $s['official'] && preg_match(self::STABLE_TAG_RE, $tag) && version_compare(substr($tag, 1), self::NEWEST_CHECKED, '>') ? $tag : '';
     }
 
     // What a Pikkumies build or a Hermes start adds inside a release checkout, all ignored by upstream and all rebuilt by the
@@ -342,29 +341,6 @@ class HermesInstall
         list($entries) = self::treeSize(self::treeDir());
         return 'Hermes ' . $tag . ' is newer than the release Pikkumies has checked (v' . self::NEWEST_CHECKED . '): run `pikkumies install` to rebuild Hermes at v'
             . self::NEWEST_CHECKED . '; it needs about ' . number_format((int) ceil(2 * $entries / 1000)) . ' thousand free files in your quota.';
-    }
-
-    /** The tag in packed-refs that names the detached HEAD commit (a release clone), '' when there is none. Reads files only. */
-    public static function packedTagAtHead($gitDir)
-    {
-        $head = trim((string) @file_get_contents($gitDir . '/HEAD'));
-        if (!preg_match('/^[0-9a-f]{40,64}$/', $head)) {
-            return '';
-        }
-        $last = '';
-        foreach (preg_split('/\r?\n/', (string) @file_get_contents($gitDir . '/packed-refs')) as $line) {
-            if (preg_match('#^([0-9a-f]{40,64}) refs/tags/(\S+)$#', $line, $m)) {
-                if ($m[1] === $head) {
-                    return $m[2];
-                }
-                $last = $m[2];
-            } elseif ($last !== '' && $line === '^' . $head) {
-                return $last; // the peeled commit of an annotated tag
-            } else {
-                $last = '';
-            }
-        }
-        return '';
     }
 
     /** The newest stable release tag in `git ls-remote --tags` output, no newer than NEWEST_CHECKED; '' when there is none. */
@@ -634,13 +610,21 @@ class HermesInstall
         return '';
     }
 
-    public static function ensure($unattended = false, $rootAvailable = false, $optionalTools = false)
+    /**
+     * $replaceVerified: `pikkumies install` only, never a build nobody asked for. A complete tree Pikkumies refuses to start
+     * because it is a release newer than the checked one is rebuilt at the checked release, the old tree moved aside
+     * (ADR-0033 amendment 2026-11-03). One that already passed verify() once (a Hermes update moved it forward later) is
+     * the person's choice, so only the install command the refusal names replaces it (amendment 2026-11-23).
+     */
+    public static function ensure($unattended = false, $rootAvailable = false, $optionalTools = false, $replaceVerified = false)
     {
-        // A complete checkout Pikkumies refuses to start because it is a release newer than the checked one is rebuilt at the
-        // checked release, the old tree moved aside (ADR-0033 amendment 2026-11-03).
         $refused = self::isComplete() ? self::refusedNewerRelease() : '';
-        if (self::isComplete() && $refused === '') {
+        $stays = $refused !== '' && !$replaceVerified && file_exists(self::localDir() . '/hermes-verified.json');
+        if (self::isComplete() && ($refused === '' || $stays)) {
             $line = 'installed (pikkumies/hermes; updates: `pikkumies run update`)' . self::clearAsides();
+            if ($stays) {
+                $line .= '; ' . self::refusedFix();
+            }
             if ($unattended) {
                 self::collectGenerations();
             }

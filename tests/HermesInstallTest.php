@@ -468,8 +468,13 @@ return [
         $w = hermesTWorld();
         try {
             hermesTFake($w['bin'] . '/git', 'file_put_contents(getenv("PK_FAKE_LOG"), "git called\n", FILE_APPEND); exit(1);');
-            hermesTFakeComplete($w);
-            hermesTIn($w, function () use ($w) {
+            $tree = hermesTFakeComplete($w);
+            hermesTIn($w, function () use ($w, $tree) {
+                // A healthy install has every checked key in its source; only a tree that lacks one is looked at with git (refusedNewerRelease).
+                foreach (HermesInstall::configFacts() as $fact) {
+                    @mkdir(dirname("$tree/{$fact[0]}"), 0700, true);
+                    file_put_contents("$tree/{$fact[0]}", (is_file("$tree/{$fact[0]}") ? file_get_contents("$tree/{$fact[0]}") : '') . $fact[1] . "\n");
+                }
                 $msg = HermesInstall::ensure(true);
                 check($msg === 'installed (pikkumies/hermes; updates: `pikkumies run update`)', 'ensure: ' . $msg);
                 check(@file_get_contents($w['log']) === "hermes pm gc\n", 'a complete install must run nothing but upstream gc: ' . @file_get_contents($w['log']));
@@ -598,6 +603,39 @@ return [
             }
         }
     },
+    'hermes ensure: a refused release that passed verify() before a Hermes update moved it forward (loose annotated tag, older verified commit) is named by doctor and the start, left alone by every run but `pikkumies install`, and rebuilt by that one' => function () {
+        $w = hermesTWorld();
+        try {
+            $tree = hermesTCompleteAt($w, 'v0.23.0', true);
+            // The shape a Hermes update leaves: HEAD on the release commit, the tag a loose annotated ref (the clone's packed one is gone).
+            $g = 'git -C ' . escapeshellarg($tree) . ' -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false ';
+            hermesTSh($g . 'tag -d v0.23.0');
+            hermesTSh($g . 'tag -a v0.23.0 -m release');
+            check(is_file("$tree/.git/refs/tags/v0.23.0") && strpos((string) @file_get_contents("$tree/.git/packed-refs"), 'refs/tags/v0.23.0') === false, 'the tag must be loose, not packed');
+            hermesTIn($w, function () use ($w, $tree) {
+                // A start that passed on an older commit (v0.22.5 before the update), under today's checks.
+                file_put_contents($w['root'] . '/local/hermes-verified.json', json_encode(['commit' => str_repeat('a', 40), 'checks' => HermesInstall::checksId()]) . "\n");
+                check(HermesInstall::refusedNewerRelease() === 'v0.23.0', 'recognised: ' . json_encode(HermesInstall::refusedNewerRelease()));
+                check(strpos(HermesInstall::refusedFix(), 'Hermes v0.23.0 is newer than the release Pikkumies has checked (v' . HermesInstall::NEWEST_CHECKED . '): run `pikkumies install` to rebuild Hermes') === 0,
+                    'doctor and the refused start must name the way back: ' . HermesInstall::refusedFix());
+                foreach ([[false], [true], [false, false, false, false]] as $args) {
+                    $msg = call_user_func_array(['HermesInstall', 'ensure'], $args);
+                    check(strpos($msg, 'installed (pikkumies/hermes; updates: `pikkumies run update`); Hermes v0.23.0 is newer') === 0 && strpos($msg, 'run `pikkumies install`') !== false, 'left alone and said so: ' . $msg);
+                    check(is_dir("$tree/.git") && !glob($w['root'] . '/hermes.refused-*') && !file_exists($w['root'] . '/local/hermes-heal.log'), 'the tree must stay where it is');
+                }
+                $msg = HermesInstall::ensure(false, false, false, true);
+                $aside = glob($w['root'] . '/hermes.refused-v0.23.0-*');
+                check(count($aside) === 1 && is_dir($aside[0] . '/.git'), 'install keeps the old tree whole beside the new: ' . json_encode($aside));
+                check(strpos($msg, 'moved the v0.23.0 tree Pikkumies cannot start to ' . basename($aside[0]) . ' (remove it when it is not needed); building v0.10.0 in the background') === 0, 'install: ' . $msg);
+                hermesTWaitReady($w);
+                check(HermesInstall::isComplete() && HermesInstall::status()['rev'] === 'v0.10.0', 'rebuilt at: ' . json_encode(HermesInstall::status()));
+                check(file_get_contents($w['root'] . '/local/hermes/sessions/one.json') === "{\"mine\":1}\n", 'HERMES_HOME data must not be touched');
+                check(HermesInstall::refusedNewerRelease() === '' && HermesInstall::refusedFix() === '', 'the rebuilt tree is not refused');
+            });
+        } finally {
+            testRmTree($w['t']);
+        }
+    },
     'hermes room: the rebuild of a refused release is sized from that tree, not a fresh build, so the daily update can heal a full-size install' => function () {
         // QA account on 2026-11-03: 150,000 soft files, 75,437 in use (a v0.22.6 tree of 23,360 files plus its HERMES_HOME).
         $files = ['soft' => 150000, 'used' => 75437];
@@ -612,23 +650,6 @@ return [
             file_put_contents("$d/a/b/two", '123');
             symlink("$d/a/one", "$d/link");
             check(HermesInstall::treeSize($d) === [5, 8 + filesize("$d/a") + filesize("$d/a/b")], 'treeSize: ' . json_encode(HermesInstall::treeSize($d)));
-        } finally {
-            testRmTree($d);
-        }
-    },
-    'hermes refused release: the tag of a release clone is read from packed-refs, annotated (peeled line) or not, without git' => function () {
-        $d = testTempDir('pk-hermes-refs');
-        try {
-            $head = str_repeat('f', 40);
-            file_put_contents("$d/HEAD", "$head\n");
-            file_put_contents("$d/packed-refs", "# pack-refs with: peeled fully-peeled sorted\n" . str_repeat('4', 40) . " refs/tags/v0.22.6\n^$head\n");
-            check(HermesInstall::packedTagAtHead($d) === 'v0.22.6', 'annotated tag');
-            file_put_contents("$d/packed-refs", str_repeat('4', 40) . " refs/tags/v0.22.5\n^" . str_repeat('5', 40) . "\n$head refs/tags/v0.23.0\n");
-            check(HermesInstall::packedTagAtHead($d) === 'v0.23.0', 'lightweight tag after another tag');
-            file_put_contents("$d/packed-refs", str_repeat('4', 40) . " refs/tags/v0.22.6\n^" . str_repeat('5', 40) . "\n");
-            check(HermesInstall::packedTagAtHead($d) === '', 'no tag at HEAD');
-            file_put_contents("$d/HEAD", "ref: refs/heads/main\n");
-            check(HermesInstall::packedTagAtHead($d) === '' && HermesInstall::packedTagAtHead("$d/missing") === '', 'a branch or no HEAD has no release tag');
         } finally {
             testRmTree($d);
         }
@@ -709,10 +730,9 @@ return [
             check(!HermesInstall::isBuildOutput($p), "not build output: $p");
         }
     },
-    'hermes ensure: a refused release is left alone when it has the person\'s changes, passed verify, is not newer than NEWEST_CHECKED, keeps every checked key, or has another origin' => function () {
+    'hermes ensure: a refused release is left alone when it has the person\'s changes, is not newer than NEWEST_CHECKED, keeps every checked key, or has another origin' => function () {
         $cases = [
             'modified' => ['v0.23.0', true, function ($w, $tree) { file_put_contents("$tree/mine.patch", "user work\n"); }],
-            'verified' => ['v0.23.0', true, function ($w, $tree) { file_put_contents($w['root'] . '/local/hermes-verified.json', "{}\n"); }],
             'not newer' => ['v0.22.4', true, null],
             'keys kept' => ['v0.23.1', false, null],
             'other origin' => ['v0.23.0', true, function ($w, $tree) { hermesTSh('git -C ' . escapeshellarg($tree) . ' remote set-url origin https://example.invalid/fork.git'); }],

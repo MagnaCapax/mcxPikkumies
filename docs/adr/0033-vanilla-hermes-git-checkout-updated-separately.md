@@ -184,3 +184,29 @@ and it does not fix the upstream timeouts or host I/O. `addExtra()` stays single
 settings toggle. This differs from the 2026-11-12 rejection of a hooks-test retry: that check had an in-repo
 deterministic signal, the delete guard's own log row, whereas this timeout is upstream, has no such signal and leaves
 the upstream tree unmodified. This is the decision of the orchestrating agent (2026-11-23), not an operator ruling.
+
+## Amendment 2026-11-23: a refused release a Hermes update moved forward is named and rebuilt by `pikkumies install`
+The 2026-11-03 rebuild left a tree alone once `local/hermes-verified.json` existed ("a recorded verified start stays where it
+is"). That file only says that some earlier commit passed `verify()`. A person who builds at v0.22.5, starts it, and later runs
+`hermes update` keeps the file, and the checkout moves to a release whose `CONFIG_FACTS` key is gone: every start is refused,
+`ensure()` printed "installed", and `refusedNewerRelease()` returned nothing, so doctor and the refused start named no command.
+The only way back was renaming the checkout by hand (seen on three accounts in two weeks), and the update skill
+tells the in-account agent not to touch the checkout.
+Now: `refusedNewerRelease()` answers one question, whether the complete tree is an unmodified official checkout at a stable
+tag newer than `NEWEST_CHECKED` that lacks a checked key. It takes the tag from `status()` (`git describe`), which finds a tag
+that is loose or annotated as well as a clone's packed one. It ran no git before and still runs none on a startable tree: the
+key check is files only and comes first. `packedTagAtHead()` is gone: it read `packed-refs` only, and a Hermes update fetches
+the tag as a loose ref. `refusedFix()` therefore names `pikkumies install` for a verified tree too, in doctor and in the
+refused start. Who may replace the tree is `ensure()`'s decision:
+- `pikkumies install` (the command the refusal names): always. The old tree is moved to `hermes.refused-<tag>-<UTC time>`,
+  never deleted unless it is an unchanged public release with no room (2026-11-03), and HERMES_HOME is not touched.
+- The daily update, a `pikkumies update` the person started, and the first start's runtime wait: only a tree that never
+  passed `verify()` (no marker file), as before. For a verified one they return the "installed" line with the way back
+  appended. Rebuilding it unattended would undo the person's update every time they repeat it, with an aside of about 23,000
+  entries each time (a v0.22.6 tree on a QA account, 2026-11-03).
+Rejected: widening the unattended rule to a marker that does not name HEAD (the loop above); an aside-count once-guard for
+the daily update (more state for a case the person can settle with one command); reading `refs/tags/` by hand (annotated tags
+hold the tag object, not the commit, so HEAD never equals the loose ref without unpacking objects).
+Not changed: `pikkumies run update` still moves the tree past `NEWEST_CHECKED` (upstream's updater has no target tag); stopping
+it before it does is a separate change. A tree with the person's own changes or another origin is not refused and stays. This
+is the decision of the orchestrating agent (2026-11-23), not an operator ruling.
