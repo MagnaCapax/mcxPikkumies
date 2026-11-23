@@ -276,8 +276,12 @@ return [
         }
         $body .= "sh -c 'trap \"\" TERM HUP; echo \$\$ > \"\$0/pid-child\"; while :; do sleep 1; done' \"\$D\" &\nsleep 1\necho ready > \"\$D/ready\"\nwhile :; do sleep 1; done\n";
         $root = boundedStopFixture($body);
-        foreach (['rtorrent', 'rtorrent main', 'rclone'] as $name) {
-            symlink(trim((string) shell_exec('command -v sleep')), $root . '/' . $name);
+        // Scripts, not links to sleep: where sleep is a multi-call program it runs only under its own name. A script's
+        // process name is its file name, so each one is seen as rtorrent, "rtorrent main", rclone or jellyfin.
+        @unlink($root . '/jellyfin');
+        foreach (['rtorrent', 'rtorrent main', 'rclone', 'jellyfin'] as $name) {
+            file_put_contents($root . '/' . $name, "#!/bin/sh\nwhile :; do sleep 1; done\n");
+            chmod($root . '/' . $name, 0700);
         }
         $process = null;
         try {
