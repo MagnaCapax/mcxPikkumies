@@ -21,7 +21,7 @@ function boundedStopFixture($hermesBody)
     foreach (['include', 'home', 'local'] as $dir) {
         @mkdir($root . '/' . $dir, 0700);
     }
-    file_put_contents($root . '/local/config.php', '<?php return ' . var_export(['provider' => ['model' => 'fixture']], true) . ';');
+    file_put_contents($root . '/local/config.php', '<?php return ' . var_export(['provider' => ['model' => 'fixture', 'endpoint' => 'http://127.0.0.1:9/v1']], true) . ';');
     @mkdir($root . '/hermes/.hermes/bin', 0700, true);
     file_put_contents($root . '/enabled', "1\n");
     file_put_contents($root . '/include/.hermes-ready', "ready\n");
@@ -54,10 +54,31 @@ function boundedStopStart($root)
 function boundedStopWait($process, $max)
 {
     $start = microtime(true);
-    while (proc_get_status($process)['running'] && microtime(true) - $start < $max) {
+    $GLOBALS['boundedStopCode'] = null;
+    while (microtime(true) - $start < $max) {
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            $GLOBALS['boundedStopCode'] = $status['exitcode']; // PHP gives the code once only
+            break;
+        }
         usleep(50000);
     }
     return microtime(true) - $start;
+}
+
+/** Seconds until the window's run lock is free, which is what Eternal::waitStopped() polls (eternal off, hold); false after $max. */
+function boundedStopCallerWait($root, $max)
+{
+    $start = microtime(true);
+    do {
+        $lock = EternalLock::take($root . '/local/eternals/pm2.run');
+        if ($lock) {
+            fclose($lock);
+            return microtime(true) - $start;
+        }
+        usleep(100000);
+    } while (microtime(true) - $start < $max);
+    return false;
 }
 
 function boundedStopPid($root, $name)
@@ -174,7 +195,7 @@ return [
             boundedStopClean($root, $process);
         }
     },
-    'bounded stop: SIGHUP without a stop marker (a person closing the window) is not a bounded stop; with the marker it is' => function () {
+    'bounded stop: the callers\' 10 s wait (eternal off, hold) sees the window gone when Hermes and its helpers ignore SIGTERM' => function () {
         if (!function_exists('pcntl_signal')) {
             skip('needs pcntl');
         }
@@ -183,12 +204,218 @@ return [
         try {
             testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
                 $process = boundedStopStart($root);
-                $resident = proc_get_status($process)['pid'];
-                posix_kill($resident, SIGHUP);
+                posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                $took = boundedStopCallerWait($root, 10);
+                fwrite(STDERR, sprintf("[measured] the run lock was free %.2f s after SIGTERM (callers wait 10 s)\n", $took));
+                check($took !== false, 'the window still held its run lock 10 s after SIGTERM, which is what eternal off and hold wait');
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: processes of other accounts and of other sessions are left untouched by a stop' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $others = [];
+        foreach ((array) glob('/proc/[0-9]*', GLOB_ONLYDIR) as $dir) {
+            $pid = (int) substr($dir, 6);
+            if (@fileowner($dir) !== $uid && $pid > 1 && OwnProcs::started($pid, '/proc') !== null) {
+                $others[$pid] = OwnProcs::started($pid, '/proc');
+            }
+        }
+        $others[1] = OwnProcs::started(1, '/proc');
+        $mine = [getmypid() => OwnProcs::started(getmypid(), '/proc')];
+        $root = boundedStopFixture(BOUNDED_STOP_STUBBORN);
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process, $others, $mine) {
+                $process = boundedStopStart($root);
+                posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                boundedStopWait($process, EternalChild::GRACE * 3);
+                check(!proc_get_status($process)['running'], 'the resident did not end');
+                foreach ($others + $mine as $pid => $start) {
+                    check(OwnProcs::started($pid, '/proc') === $start, "process $pid (not part of the window) was ended or replaced by the stop");
+                }
+                fwrite(STDERR, sprintf("[measured] %d foreign processes and the test runner itself were still running after the stop\n", count($others) + count($mine)));
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: a service an agent detached from the window (own session, reparented) is not part of the tree and keeps running' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture("trap '' TERM HUP\necho \$\$ > \"\$D/pid-hermes\"\n(setsid sh -c 'echo \$\$ > \"\$0/pid-service\"; exec sleep 300' \"\$D\" &)\nsleep 1\necho ready > \"\$D/ready\"\nwhile :; do sleep 1; done\n");
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                $service = boundedStopPid($root, 'service');
+                check($service > 1 && OwnProcs::started($service) !== null, 'the detached fixture service is not running');
+                $ppid = (int) OwnProcs::tree(function_exists('posix_geteuid') ? posix_geteuid() : getmyuid())[$service]['ppid'];
+                check($ppid !== boundedStopPid($root, 'hermes'), 'the fixture service is still Hermes\' child, so it is not detached');
+                posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                boundedStopWait($process, EternalChild::GRACE * 3);
+                check(!proc_get_status($process)['running'] && OwnProcs::started(boundedStopPid($root, 'hermes')) === null, 'the window did not stop');
+                check(OwnProcs::started($service) !== null, 'the detached service was ended by the stop');
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: torrent client and service names started under Hermes (rtorrent, rtorrent main, rclone, jellyfin) survive while its other children do not' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $body = "trap '' TERM HUP\necho \$\$ > \"\$D/pid-hermes\"\n";
+        foreach (['rtorrent' => 'a', 'rtorrent main' => 'b', 'rclone' => 'c', 'jellyfin' => 'd'] as $name => $key) {
+            $body .= "\"\$D/$name\" 300 &\necho \$! > \"\$D/pid-app$key\"\n";
+        }
+        $body .= "sh -c 'trap \"\" TERM HUP; echo \$\$ > \"\$0/pid-child\"; while :; do sleep 1; done' \"\$D\" &\nsleep 1\necho ready > \"\$D/ready\"\nwhile :; do sleep 1; done\n";
+        $root = boundedStopFixture($body);
+        foreach (['rtorrent', 'rtorrent main', 'rclone'] as $name) {
+            symlink(trim((string) shell_exec('command -v sleep')), $root . '/' . $name);
+        }
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                $apps = [];
+                foreach (['a', 'b', 'c', 'd'] as $key) {
+                    $apps[$key] = boundedStopPid($root, 'app' . $key);
+                    check($apps[$key] > 1 && OwnProcs::started($apps[$key]) !== null, "fixture app $key is not running");
+                }
+                posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                boundedStopWait($process, EternalChild::GRACE * 3);
+                check(!proc_get_status($process)['running'], 'the resident did not end');
+                check(OwnProcs::started(boundedStopPid($root, 'child')) === null, 'the plain child is still running after the stop');
+                foreach ($apps as $key => $pid) {
+                    check(OwnProcs::started($pid) !== null, "the known service app $key started under Hermes was ended by the stop");
+                }
+            });
+        } finally {
+            foreach (['a', 'b', 'c', 'd'] as $key) {
+                $pid = boundedStopPid($root, 'app' . $key);
+                if ($pid > 1) {
+                    @posix_kill($pid, 9);
+                }
+            }
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: a Hermes that dies of SIGTERM ends the resident with 128 + 15 and the stop marker, and an ordinary failing exit is still its own code' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture("echo \$\$ > \"\$D/pid-hermes\"\necho ready > \"\$D/ready\"\nwhile :; do sleep 0.1; done\n");
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                boundedStopWait($process, EternalChild::GRACE * 3);
+                check(!proc_get_status($process)['running'], 'the resident did not end');
+                check($GLOBALS['boundedStopCode'] === 143, 'the resident exited ' . var_export($GLOBALS['boundedStopCode'], true) . ', not 143 (128 + SIGTERM)');
+                check(is_file($root . '/local/eternals/pm2.stop') && is_file($root . '/local/eternals/pm2'), 'marker or record missing');
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+        $root = boundedStopFixture("echo ready > \"\$D/ready\"\nsleep 1\nexit 3\n");
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                boundedStopWait($process, 10);
+                check(!proc_get_status($process)['running'], 'the resident did not end after Hermes exited 3');
+                check($GLOBALS['boundedStopCode'] === 3, 'the resident exited ' . var_export($GLOBALS['boundedStopCode'], true) . ', not 3');
+                $record = json_decode((string) @file_get_contents($root . '/local/eternals/pm2'), true);
+                check(is_array($record) && $record['fails'] === 1 && !is_file($root . '/local/eternals/pm2.stop'), 'a failing exit must count one failure and write no stop marker: ' . json_encode($record));
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: what Hermes prints reaches the window through the resident, as it did under passthru' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture("printf 'first line\\n'\nprintf 'no newline at the end'\nprintf 'to stderr\\n' >&2\necho ready > \"\$D/ready\"\nsleep 1\nexit 0\n");
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                boundedStopWait($process, 10);
+                check(!proc_get_status($process)['running'], 'the resident did not end');
+                check($GLOBALS['boundedStopCode'] === 0, 'a Hermes exit 0 must end the resident with 0: ' . var_export($GLOBALS['boundedStopCode'], true));
+                // The runner requires bin/pikkumies, so the script's own shebang line comes out first; that is the fixture, not Hermes.
+                $stdout = (string) @file_get_contents($root . '/stdout');
+                check(substr($stdout, -strlen("first line\nno newline at the end")) === "first line\nno newline at the end" && substr_count($stdout, 'first line') === 1, 'stdout was ' . json_encode($stdout));
+                check(strpos((string) @file_get_contents($root . '/stderr'), "to stderr\n") !== false, 'stderr did not reach the window');
+                check(!is_file($root . '/local/eternals/pm2'), 'a user quit (Hermes exit 0) must remove an extra window\'s record');
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: after a bounded stop the same window starts again and is bounded again (the restart a new build needs)' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture(BOUNDED_STOP_STUBBORN);
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                for ($round = 1; $round <= 2; $round++) {
+                    @unlink($root . '/ready');
+                    @unlink($root . '/local/eternals/pm2.stop');
+                    $process = boundedStopStart($root);
+                    $hermes = boundedStopPid($root, 'hermes');
+                    check($hermes > 1 && OwnProcs::started($hermes) !== null, "round $round: Hermes did not start");
+                    posix_kill(proc_get_status($process)['pid'], SIGTERM);
+                    $took = boundedStopWait($process, EternalChild::GRACE * 3);
+                    check(!proc_get_status($process)['running'] && $took <= EternalChild::GRACE * 2, "round $round: the stop took $took s");
+                    check(OwnProcs::started($hermes) === null, "round $round: Hermes is still running after the stop");
+                    check(is_file($root . '/local/eternals/pm2'), "round $round: the window record was lost");
+                    proc_close($process);
+                    $process = null;
+                }
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: SIGHUP without a stop marker (a person closing the window) is not a bounded stop' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture(BOUNDED_STOP_STUBBORN);
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
+                posix_kill(proc_get_status($process)['pid'], SIGHUP);
                 boundedStopWait($process, 3);
                 check(proc_get_status($process)['running'] && OwnProcs::started(boundedStopPid($root, 'hermes')) !== null, 'a HUP without a marker ended the window');
+            });
+        } finally {
+            boundedStopClean($root, $process);
+        }
+    },
+    'bounded stop: SIGHUP once a stop marker exists (the update, off and hold stops) ends the tree within the grace' => function () {
+        if (!function_exists('pcntl_signal')) {
+            skip('needs pcntl');
+        }
+        $root = boundedStopFixture(BOUNDED_STOP_STUBBORN);
+        $process = null;
+        try {
+            testWithEnv(['HOME' => $root . '/home', 'PIKKUMIES_KEY' => 'fixture-key'], function () use ($root, &$process) {
+                $process = boundedStopStart($root);
                 file_put_contents($root . '/local/eternals/pm2.stop', "stop\n");
-                posix_kill($resident, SIGHUP);
+                posix_kill(proc_get_status($process)['pid'], SIGHUP);
                 $took = boundedStopWait($process, EternalChild::GRACE * 3);
                 check(!proc_get_status($process)['running'] && $took <= EternalChild::GRACE * 2, "a HUP with the marker did not end the window within the grace ($took s)");
                 check(OwnProcs::started(boundedStopPid($root, 'hermes')) === null, 'Hermes is still running after a marked HUP');
