@@ -3,7 +3,7 @@
 ## Metadata
 - Author: Aleksi Ursin / MCX (with Väinämöinen)
 - Date: 2026-10-14
-- Status: Accepted. Supersedes [ADR-0012](0012-one-search-command-and-curl.md) (the one search lives in `docs.php`). Amends [ADR-0011](0011-documentation-sources-and-search-first.md): the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
+- Status: Accepted. Supersedes [ADR-0012](0012-one-search-command-and-curl.md) (the one search lives in `docs.php`). Amended by the 2026-11-23 amendment below (the description no longer starts with "Memory:"). Amends [ADR-0011](0011-documentation-sources-and-search-first.md): the search command the hook and gate name changes; the hook still injects titles, trust levels and paths only.
 
 ## Context
 The request of 2026-10-14: "a skill for memorySave, memoryAppend, memorySearch a bit like ours but lightened, but not less powerful, so memorySearch is just the first step and the last big step if not found -- combine merge the other memory things, and make sure the memory doctrine is there", with "Minimal frontmatter, but full on hierarchy for the memory, autofetches and a hook similar to here to enforce memory searches. cross linking enforced", and the location `tools/memory/pikkumies/ {save,search,append}`, so later memory sources can sit beside it.
@@ -48,3 +48,6 @@ The wiki and the knowledge base are also tool units of their own ([ADR-0037](003
 
 ## Amendment 2026-10-18
 Save and append write each link to a memory file in the new text relative to the file written, and the unit gains a read-only `links` verb ([ADR-0060](0060-links-and-the-link-graph.md)). Every link form save accepted still counts (a link in code no longer does; one with a fragment or a title now does); what is already in a memory file is never rewritten.
+
+## Amendment 2026-11-23
+The skill description no longer starts with "Memory:". The first live installs showed an agent asked to recall calling Hermes' built-in `memory` tool first, which has only add, patch and remove actions and failed with a missing-`action` error before the agent fell back to this unit. The description, which the skills index shows next to the skill name, now starts with the skill's own name and says "not the built-in memory tool" in its first words. The doctrine that reaches every turn through SOUL.md calls the skill by its name (`pikkumies`), not "the memory skill", which no skill is called, and says the built-in memory is already in the prompt and cannot be read. The opening word was a trade-off recorded above; it did not stop the misroute, and the lever that does is the doctrine text, as for the agent's name in the QA run that led to the `pikkumies-configure` line. The question suite gains a recall and a save question that fail on any call to the built-in `memory` tool ([ADR-0039](0039-question-suite.md)).

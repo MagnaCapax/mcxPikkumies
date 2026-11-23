@@ -41,4 +41,4 @@ Never present an unresolved conflict as settled, and never merge two claims into
 
 ## 5. Keep what you learned
 
-If you settled a real conflict (say a wiki page is out of date and the knowledge base is current), save a lesson with the memory skill (`pikkumies.php save`): both claims, the sources, the deciding evidence. The next search will find it.
+If you settled a real conflict (say a wiki page is out of date and the knowledge base is current), save a lesson with the `pikkumies` skill (`pikkumies.php save`): both claims, the sources, the deciding evidence. The next search will find it.

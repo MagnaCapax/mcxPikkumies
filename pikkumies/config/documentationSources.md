@@ -1,6 +1,6 @@
 # Documentation sources
 
-The documentation Pikkumies searches before it acts: wikis, knowledge bases, provider manuals and app documentation. The memory skill (`php ~/pikkumies/tools/memory/pikkumies/pikkumies.php`) downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded. The sources meant for this host (its `scope`) are downloaded and searched first; other providers' sources only as a lower tier (see Search tiers).
+The documentation Pikkumies searches before it acts: wikis, knowledge bases, provider manuals and app documentation. The `pikkumies` skill (`php ~/pikkumies/tools/memory/pikkumies/pikkumies.php`) downloads each source into `~/pikkumies/local/docs-cache/` and searches that copy, together with the lessons, on this machine. Your search words never leave the machine; only the documentation itself is downloaded. The sources meant for this host (its `scope`) are downloaded and searched first; other providers' sources only as a lower tier (see Search tiers).
 
 ## How to change this list
 

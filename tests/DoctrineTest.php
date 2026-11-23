@@ -171,6 +171,14 @@ return [
         }
         check(!preg_match('/\bpkill\b|\bkillall\b/', $rules), 'the containers doctrine must name the recovery outcome, never a kill command');
     },
+    'doctrine: recalling goes to the pikkumies skill by its own name, and the built-in memory is said to have no read action' => function () {
+        $core = HermesConfig::renderSoul(soulProfiles()['generic, no root'], Config::defaults(), false);
+        check(preg_match('/^- Your built-in memory tool only adds, patches and removes: its contents are already in your prompt every turn and it has no read action\. To recall or look up what you know, run `pikkumies\.php search`, never the built-in memory tool\.$/m', $core) === 1,
+            'the built-in memory has no read action: recall goes to pikkumies.php search');
+        // No text the agent reads names the skill "the memory skill": no skill has that name, and the built-in tool is the only thing called memory.
+        check(strpos($core, 'the memory skill') === false, 'SOUL.md must call the skill by its name, `pikkumies`, never "the memory skill"');
+        check(strpos($core, 'with the `pikkumies` skill, never the built-in memory tool') !== false, 'the save steer must name the pikkumies skill');
+    },
     'doctrine: the torrent-clients rules reach SOUL.md: a client\'s config changes on request or on a how-to about this account, with a backup, and no restart by hand; settings and the name through pikkumies-configure, not the built-in memory' => function () {
         $s = HermesConfig::renderSoul(soulProfiles()['pmss shared, no root'], Config::defaults());
         check(strpos($s, "\n### torrent-clients\n") !== false, 'the torrent-clients category must be in SOUL.md');
