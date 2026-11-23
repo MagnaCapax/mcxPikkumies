@@ -3,12 +3,17 @@
  * DelugeRestart: restart the way the provider does it, then check Deluge answers.
  * PMSS (the panel's restart, etc/skel/www/deluge.php:6-12 and scriptsInc.php:1762-1781, 1178-1191):
  * only while ~/.delugeEnable exists; SIGTERM to the user's own deluged and deluge-web, 3 s, SIGKILL to
- * survivors; then the panel's start command, run from $HOME like the watchdog
- * (scripts/cron/checkDelugeInstances.php:18-24). Processes are matched by uid, mount namespace (as PMSS
+ * survivors; then the start PMSS itself uses, under the account's Deluge lock held here: when the account
+ * selected a build (~/bin/deluge/default is a link) the PMSS launcher, `torrentClientsResolve.php deluge --launch
+ * both` (the panel: scriptsIncAppProcess.php:220; the watchdog: scripts/cron/checkDelugeInstances.php:22,25),
+ * which starts the selected build; with no selection the bare `deluged` and `deluge-web`, run from $HOME like the
+ * watchdog. A busy lock is reported before anything is stopped; a launcher failure is reported, never answered with
+ * a bare start (ADR-0123). Processes are matched by uid, mount namespace (as PMSS
  * does, so a Docker guest of the same name is left alone) and exact process name (pgrep -u, PMSS
  * scripts/lib/user/watchdog.php:44-47); never `pkill -f`. Other providers: refused with their instructions.
  */
 require_once dirname(__DIR__, 3) . '/lib/OwnProcs.php';
+require_once dirname(__DIR__, 3) . '/lib/PmssClientLock.php';
 
 class DelugeRestart
 {
@@ -36,10 +41,27 @@ class DelugeRestart
         if (!function_exists('posix_kill')) {
             throw new CliError('the PHP posix extension is missing, so the tool cannot stop Deluge gracefully', 'use the PMSS web panel: Deluge, restart');
         }
-        $stopped = self::stop($uid);
         $h = escapeshellarg($home);
-        // The panel's start command (etc/skel/www/deluge.php:8), with the home directory spelled out.
-        exec("cd $h && { nohup deluged -l $h/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l $h/.delugeWebLog -L info >> /dev/null 2>&1 & }");
+        $selected = is_link("$home/bin/deluge/default");
+        $script = $home . '/www/torrentClientsResolve.php';
+        if ($selected && !is_file($script)) {
+            throw new CliError('the PMSS launcher script is missing (~/www/torrentClientsResolve.php); nothing was stopped', 'the provider restores it: report it in your answer');
+        }
+        $lock = PmssClientLock::take($home, 'deluge', 'Deluge', $selected);
+        try {
+            $stopped = self::stop($uid);
+            if ($selected) {
+                exec("cd $h && " . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' deluge --launch both >/dev/null 2>&1 </dev/null', $out, $code);
+                if ($code !== 0) {
+                    throw new CliError("Deluge was stopped and the PMSS launcher refused to start it (exit $code)", 'the user starts Deluge in the PMSS web panel (Deluge: start); this tool does not fall back to a bare start');
+                }
+            } else {
+                // The panel's start command (etc/skel/www/deluge.php:8), with the home directory spelled out.
+                exec("cd $h && { nohup deluged -l $h/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l $h/.delugeWebLog -L info >> /dev/null 2>&1 & }");
+            }
+        } finally {
+            PmssClientLock::release($lock);
+        }
         $c->reset();
         $version = null;
         $last = '';
@@ -53,7 +75,8 @@ class DelugeRestart
                 $c->reset();
             }
         }
-        return ['how' => "PMSS: stopped $stopped process(es) (SIGTERM, then SIGKILL after 3 s), started deluged and deluge-web as the panel does",
+        $start = $selected ? "through the account's PMSS launcher (torrentClientsResolve.php deluge --launch both) under the account's Deluge lock: the selected build" : 'with the bare deluged and deluge-web (no build is selected)';
+        return ['how' => "PMSS: stopped $stopped process(es) (SIGTERM, then SIGKILL after 3 s), started deluged and deluge-web $start",
             'answered' => $version !== null, 'version' => $version, 'last_error' => $version === null ? $last : ''];
     }
 
